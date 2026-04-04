@@ -457,6 +457,40 @@ const TOOLS=[
 
 const PREDEFINED={
   lateral:[
+    {name:"General Ceph Analysis",pts:[
+      {l:"N",def:"Nasion - the most anterior point of the frontonasal suture in the middle.",color:"#f59e0b"},
+      {l:"S",def:"Sella - the geometric center of the pituitary fossa (sella turcica).",color:"#f59e0b"},
+      {l:"Ba",def:"Basion - most inferior posterior point of the occipital bone.",color:"#f59e0b"},
+      {l:"Or",def:"Orbitale - the lowest point on the inferior margin of the orbit.",color:"#60a5fa"},
+      {l:"Po",def:"Porion - the superior point of the external auditory meatus.",color:"#60a5fa"},
+      {l:"Ar",def:"Articulare - the point of intersection of the posterior border of the condylar process and the inferior border of the basilar part of the occipital bone.",color:"#60a5fa"},
+      {l:"A",def:"Point A - the deepest point on the curve of the maxilla.",color:"#34d399"},
+      {l:"B",def:"Point B - the deepest midline point on the mandible.",color:"#34d399"},
+      {l:"ANS",def:"Anterior nasal spine - tip of the bony anterior nasal spine.",color:"#34d399"},
+      {l:"PNS",def:"Posterior nasal spine - intersection of palatum posterior and fossa pterygopalatina.",color:"#34d399"},
+      {l:"Pog",def:"Pogonion - the most anterior point on the chin.",color:"#a78bfa"},
+      {l:"Gn",def:"Gnathion - a point on the chin determined by bisecting the facial and mandibular planes.",color:"#a78bfa"},
+      {l:"Me",def:"Menton - the most inferior midline point on the mandibular symphysis.",color:"#a78bfa"},
+      {l:"Go",def:"Gonion - the point of intersection of the ramus plane and the mandibular plane.",color:"#a78bfa"},
+      {l:"Co",def:"Condylion - the most superior point of the mandibular condyle.",color:"#34d399"},
+      {l:"Is",def:"Incision superius - the incisal point of the most prominent maxillary central incisor.",color:"#fb923c"},
+      {l:"Ii",def:"Incision inferius - the incisal point of the most prominent mandibular central incisor.",color:"#f472b6"},
+      {l:"Prn",def:"Pronasale - the most protruded point of the apex nasi.",color:"#f472b6"},
+      {l:"Sn",def:"Subnasale - midpoint of the columella base at the apex of the nasolabial angle.",color:"#f472b6"},
+      {l:"Ss",def:"Superior sulcus - the deepest midline point between subnasion and the vermilion border.",color:"#f472b6"},
+      {l:"Stms",def:"Stomion superius - the lowermost point on the vermilion of the upper lip.",color:"#f472b6"},
+      {l:"Stmi",def:"Stomion inferius - the uppermost point on the vermilion of the lower lip.",color:"#f472b6"},
+      {l:"Si",def:"Sulpion - the point of greatest concavity in the midline between the lower lip and chin.",color:"#f472b6"},
+      {l:"TMJ",def:"Temporomandibular joint point - on the contour of the glenoid fossa.",color:"#60a5fa"},
+      {l:"Ids",def:"Infradentale superius - the highest point on the alveolar crest between the mandibular central incisors.",color:"#f472b6"},
+      {l:"Pr",def:"Prosthion - the most anterior point on the maxillary alveolar process.",color:"#34d399"},
+    ],
+    lines:[
+      {l:"Sella-Nasion line",def:"Line connecting Sella to Nasion.",color:"#f59e0b"},
+      {l:"Frankfort Horizontal",def:"Plane connecting Porion to Orbitale.",color:"#60a5fa"},
+      {l:"NBa plane",def:"Plane connecting Nasion to Basion.",color:"#f59e0b"},
+      {l:"Mandibular plane",def:"Plane connecting Gonion to Menton.",color:"#a78bfa"},
+    ]},
     {name:"Steiner Analysis",pts:[
       {l:"N",def:"Nasion is the most anterior point of the frontonasal suture in the middle.",color:"#f59e0b"},
       {l:"S",def:"The center of sella turcica (the midpoint of the horizontal diameter).",color:"#f59e0b"},
@@ -1170,8 +1204,13 @@ function hitTest(markups,ip,zoom,reproCollecting){
   for(let i=markups.length-1;i>=0;i--){
     const m=markups[i];if(m.visible===false)continue;
     if(m.type==="point"&&m.repro&&!isReproPointVisible(m,reproCollecting))continue;
+    if(m.type==="point"){const vp=vpts(m);if(vp.length&&dist(vp[0],ip)<thr+(m.size||6)/zoom)return m.id;}
+  }
+  for(let i=markups.length-1;i>=0;i--){
+    const m=markups[i];if(m.visible===false)continue;
+    if(m.type==="point")continue;
+    if(m.type==="point"&&m.repro&&!isReproPointVisible(m,reproCollecting))continue;
     const vp=vpts(m);
-    if(m.type==="point"&&vp.length&&dist(vp[0],ip)<thr+(m.size||6)/zoom)return m.id;
     if((m.type==="line"||m.type==="parallel"||m.type==="ruler")&&vp.length>=2&&perpDist(ip,vp[0],vp[1])<thr)return m.id;
     if((m.type==="angle3"||m.type==="angle4")&&vp.some(p=>dist(p,ip)<thr*2))return m.id;
     if((m.type==="polygon"||m.type==="curve")&&vp.length>=2){for(let j=1;j<vp.length;j++){if(perpDist(ip,vp[j-1],vp[j])<thr&&dist(ip,vp[j-1])<dist(vp[j-1],vp[j])+thr)return m.id;}}
@@ -1216,11 +1255,11 @@ function HomePage({t,theme,setTheme,projects,onOpen,onCreate,onImport}){
 
       {/* HERO */}
       <div style={{textAlign:"center",padding:"64px 32px 48px"}}>
-        <div style={{display:"inline-block",background:t.accMuted,border:`1px solid ${t.acc}44`,borderRadius:20,padding:"5px 16px",fontSize:12,color:t.acc,fontWeight:600,letterSpacing:0.5,marginBottom:24}}>CLINICAL-GRADE IN SILICO CEPHALOMETRY</div>
+        <div style={{display:"inline-block",background:t.accMuted,border:`1px solid ${t.acc}44`,borderRadius:20,padding:"5px 16px",fontSize:12,color:t.acc,fontWeight:600,letterSpacing:0.5,marginBottom:24}}>RESEARCH-GRADE IN SILICO CEPHALOMETRY</div>
         <h1 style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:"clamp(36px,5vw,64px)",margin:"0 0 16px",lineHeight:1.1,letterSpacing:-2,color:t.tx}}>
           Precision Landmark<br/><span style={{color:t.acc}}>Analysis Platform</span>
         </h1>
-        <p style={{color:t.tx2,fontSize:17,maxWidth:540,margin:"0 auto",lineHeight:1.7}}>Calibrate, annotate, and measure with sub-pixel accuracy. Export structured data for computational pipelines.</p>
+        <p style={{color:t.tx2,fontSize:17,maxWidth:640,margin:"0 auto",lineHeight:1.7}}>Calibrate, annotate, and measure with reproducible geometric precision.<br /> Export structured data for computational pipelines.</p>
       </div>
 
       {/* PORTAL CARDS */}
@@ -1246,8 +1285,8 @@ function HomePage({t,theme,setTheme,projects,onOpen,onCreate,onImport}){
         <div style={{background:t.surf,border:`1px solid ${t.bdr}`,borderRadius:12,padding:24,textAlign:"center"}}>
           <div style={{fontSize:11,color:t.tx2,marginBottom:8,lineHeight:1.6}}>
             This website was developed by <strong style={{color:t.tx}}>Dr. Muhammad Nabeel Shaesha</strong>,<br/>
-            Teaching Assistant at the Prosthodontics department, PUA<br/>
-            Currently enrolled in Masters of Prosthodontics and Implantology program, PUA
+            Teaching Assistant at the Prosthodontics Department, PUA<br/>
+            Currently enrolled in Masters of Prosthodontics and Implantology Program, PUA
           </div>
           <div style={{fontSize:10,color:t.tx3,marginTop:12,marginBottom:16}}>Built with the help of</div>
           <div style={{display:"flex",justifyContent:"center",gap:8,flexWrap:"wrap",alignItems:"center"}}>
@@ -1295,6 +1334,15 @@ function HomePage({t,theme,setTheme,projects,onOpen,onCreate,onImport}){
               <span style={{color:t.acc,fontSize:15}}>{icon}</span>{label}
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* DISCLAIMER */}
+      <div style={{background:t.bg,borderTop:`1px solid ${t.bdr}`,padding:"20px 32px 28px"}}>
+        <div style={{maxWidth:1100,margin:"0 auto",textAlign:"center"}}>
+          <p style={{fontSize:11,color:t.tx3,lineHeight:1.6,margin:0}}>
+            CephaloStudio is intended for research and educational purposes only. It is not approved or cleared for clinical diagnosis or treatment planning. <br /> Clinical decisions should not be made solely on the basis of measurements produced by this software.
+          </p>
         </div>
       </div>
     </div>
@@ -1376,7 +1424,13 @@ function TemplatePickerModal({t,projection,onPick,onClose}){
           <div key={opt.id} onClick={()=>{
             if(opt.id==="upload"){templateRef.current?.click();return;}
             if(opt.id==="analysis"){if(analyses.length===0){onPick("blank");return;}setStep("analysis");return;}
-            if(opt.id==="complete"){if(analyses.length>0)onPick("complete",analyses[0]);else onPick("blank");return;}
+            if(opt.id==="complete"){
+              const template=projection==="ap"?analyses.find(a=>a.name==="General PA Analysis")||analyses[0]:
+                               projection==="lateral"?analyses.find(a=>a.name==="General Ceph Analysis")||analyses[0]:
+                               analyses[0];
+              if(template)onPick("complete",template);else onPick("blank");
+              return;
+            }
             onPick(opt.id);
           }}
             style={{padding:"14px 16px",border:`1px solid ${t.bdr}`,borderRadius:10,cursor:"pointer",background:t.surf2,transition:"all 0.15s"}}
@@ -1942,7 +1996,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const[mousePos,setMousePos]=useState(null);const[snapPos,setSnapPos]=useState(null);
   const[selectedId,setSelectedId]=useState(null);const[currentDraw,setCurrentDraw]=useState(null);
   const[activeTool,setActiveTool]=useState("select");const[curveMode,setCurveMode]=useState("linear");
-  const[snapEnabled,setSnapEnabled]=useState(false);const[showScaleBar,setShowScaleBar]=useState(false);
+  const[snapEnabled,setSnapEnabled]=useState(true);const[showScaleBar,setShowScaleBar]=useState(false);
   const[showLUT,setShowLUT]=useState(false);const[showHistogram,setShowHistogram]=useState(false);
   const[showDisplacement,setShowDisplacement]=useState(false);const[compareVersionId,setCompareVersionId]=useState(null);
   const[rightPanel,setRightPanel]=useState("markups");
@@ -1983,7 +2037,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   },[toolbarDragging]);
 
   const isPanning=useRef(false);const panStart=useRef(null);
-  const isDragging=useRef(false);const dragStart=useRef(null);
+  const isDragging=useRef(false);const dragStart=useRef(null);const dragStartState=useRef(null);
   const dragMid=useRef(null);const dragPtIdx=useRef(null);
   const canvasSize=useRef({w:800,h:600});const lastTouchDist=useRef(null);
   const undoStackRef=useRef([]);
@@ -2203,7 +2257,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
           if(bestIdx>=0&&vp.length>2){const newPoints=m.points.filter((_,i)=>i!==bestIdx);updMarkup(hit,{points:newPoints});}
           return;
         }
-        isDragging.current=true;dragMid.current=hit;
+        isDragging.current=true;dragMid.current=hit;dragStartState.current=JSON.stringify(markups);
         let bi=0,bd=Infinity;(m.points||[]).forEach((p,i)=>{const d=dist(p,ip);if(d<bd){bd=d;bi=i;}});
         dragPtIdx.current=bi;dragStart.current=ip;
       }
@@ -2254,7 +2308,18 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     if(isDragging.current&&dragMid.current){const ip=toImage(sp.x,sp.y);const dx=ip.x-dragStart.current.x,dy=ip.y-dragStart.current.y;updMarkup(dragMid.current,{points:(markups.find(m=>m.id===dragMid.current)?.points||[]).map((p,i)=>i===dragPtIdx.current?{x:p.x+dx,y:p.y+dy}:p)});dragStart.current=ip;}
   },[activeTool,markups,zoom,snapEnabled]);
 
-  const handleMouseUp=()=>{isPanning.current=false;isDragging.current=false;};
+  const handleMouseUp=()=>{
+    if(isDragging.current&&dragStartState.current){
+      const currentState=JSON.stringify(markups);
+      if(dragStartState.current!==currentState){
+        undoStackRef.current.push(dragStartState.current);
+        if(undoStackRef.current.length>50)undoStackRef.current.shift();
+        redoStackRef.current=[];
+      }
+      dragStartState.current=null;
+    }
+    isPanning.current=false;isDragging.current=false;
+  };
   const handleDblClick=()=>{if((activeTool==="polygon"||activeTool==="curve")&&currentDraw?.points.length>=2){finalizeMarkup(currentDraw);setCurrentDraw(null);}};
   useEffect(()=>{const c=canvasRef.current;if(!c)return;const onWheel=e=>{if(Math.abs(e.deltaY)>0.1||Math.abs(e.deltaX)>0.1){e.preventDefault();e.stopPropagation();const sp=getCanvasPos(e),f=e.deltaY>0?0.9:1.1,nz=clamp(zoom*f,0.05,15);setPan(prev=>({x:sp.x-(sp.x-prev.x)*(nz/zoom),y:sp.y-(sp.y-prev.y)*(nz/zoom)}));setZoom(nz);}};c.addEventListener("wheel",onWheel,{passive:false});return()=>c.removeEventListener("wheel",onWheel);},[zoom]);
   const handleTouchStart=e=>{e.preventDefault();if(e.touches.length===1){const t2=e.touches[0];handleMouseDown({button:0,clientX:t2.clientX,clientY:t2.clientY});}if(e.touches.length===2)lastTouchDist.current=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);};
