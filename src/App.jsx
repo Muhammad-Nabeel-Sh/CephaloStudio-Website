@@ -1057,7 +1057,10 @@ function drawMarkup(ctx,m,zoom,pan,cal,sel,t,reproCollecting,canvasSize,angleMod
     if(m.curveStyle==="bspline"&&sp.length>=3)catmullRom(ctx,sp,true);
     else{ctx.moveTo(sp[0].x,sp[0].y);sp.slice(1).forEach(p=>ctx.lineTo(p.x,p.y));ctx.closePath();}
     ctx.fillStyle=m.fillColor||"rgba(56,189,248,0.12)";ctx.fill();
-    ctx.strokeStyle=m.strokeColor||t.acc;ctx.lineWidth=(m.strokeWidth||1.5)*Math.sqrt(zoom);ctx.stroke();
+    if(m.style==="dashed")ctx.setLineDash([8*zoom,4*zoom]);
+    else if(m.style==="dotted")ctx.setLineDash([2*zoom,4*zoom]);
+    else ctx.setLineDash([]);
+    ctx.strokeStyle=m.strokeColor||t.acc;ctx.lineWidth=(m.strokeWidth||1.5)*Math.sqrt(zoom);ctx.stroke();ctx.setLineDash([]);
     if(isSel)sp.forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,5,0,Math.PI*2);ctx.fillStyle="#fff";ctx.fill();});
     if(cal?.done&&sp.length>=3){const ip=vpts(m);const cx=sp.reduce((s,p)=>s+p.x,0)/sp.length,cy=sp.reduce((s,p)=>s+p.y,0)/sp.length;
       const area=(m.curveStyle==="bspline"?splineArea(ip):polyArea(ip))/cal.pxPerMm**2;
@@ -1067,11 +1070,14 @@ function drawMarkup(ctx,m,zoom,pan,cal,sel,t,reproCollecting,canvasSize,angleMod
   }
   else if(m.type==="curve"){
     if(sp.length<2){ctx.restore();return;}
-    ctx.strokeStyle=m.color||"#fb923c";ctx.lineWidth=(m.width||1.5)*Math.sqrt(zoom);ctx.setLineDash([]);
+    if(m.style==="dashed")ctx.setLineDash([8*zoom,4*zoom]);
+    else if(m.style==="dotted")ctx.setLineDash([2*zoom,4*zoom]);
+    else ctx.setLineDash([]);
+    ctx.strokeStyle=m.color||"#fb923c";ctx.lineWidth=(m.width||1.5)*Math.sqrt(zoom);
     ctx.beginPath();
     if(m.curveStyle==="bspline"&&sp.length>=3)catmullRom(ctx,sp,false);
     else{ctx.moveTo(sp[0].x,sp[0].y);sp.slice(1).forEach(p=>ctx.lineTo(p.x,p.y));}
-    ctx.stroke();
+    ctx.stroke();ctx.setLineDash([]);
     if(isSel)sp.forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,4,0,Math.PI*2);ctx.fillStyle="#fff";ctx.fill();});
     if(cal?.done){const ip=vpts(m);const lp=sp[Math.floor(sp.length/2)];
       const len=(m.curveStyle==="bspline"&&ip.length>=3?splineLen(ip,false):polyLen(ip,false))/cal.pxPerMm;
@@ -1855,8 +1861,9 @@ function MarkupProps({m,t,theme,onUpdate,onDelete,calibration,onParallel,formatA
       <PropRow label="Label" t={t}><Inp value={m.label||""} onChange={v=>onUpdate({label:v})} t={t}/></PropRow>
       {m.type==="point"&&<><PropRow label="Definition" t={t}><Inp value={m.definition||""} onChange={v=>onUpdate({definition:v})} t={t}/></PropRow><PropRow label="Size" t={t}><input type="range" min="3" max="14" value={m.size||6} onChange={e=>onUpdate({size:+e.target.value})} style={{width:"100%",accentColor:t.acc}}/></PropRow></>}
       {m.type==="text"&&<><PropRow label="Text" t={t}><Inp value={m.text||""} onChange={v=>onUpdate({text:v})} t={t}/></PropRow><PropRow label="Size" t={t}><input type="range" min="8" max="48" value={m.fontSize||14} onChange={e=>onUpdate({fontSize:+e.target.value})} style={{width:"100%",accentColor:t.acc}}/></PropRow><PropRow label="Bold" t={t}><input type="checkbox" checked={!!m.bold} onChange={e=>onUpdate({bold:e.target.checked})} style={{accentColor:t.acc}}/></PropRow></>}
-      {(m.type==="curve"||m.type==="polygon")&&<PropRow label="Points" t={t}><div style={{display:"flex",gap:6,alignItems:"center"}}><span style={{fontSize:11,color:t.tx2}}>{m.points?.length||0} pts</span><span style={{fontSize:9,color:t.tx3}}>Ctrl+click add • Shift+click remove</span></div></PropRow>}
+      {(m.type==="curve"||m.type==="polygon")&&<PropRow label="Dash" t={t}><select value={m.style||"solid"} onChange={e=>onUpdate({style:e.target.value})} style={{background:t.surf3,border:`1px solid ${t.bdr}`,borderRadius:4,padding:"3px 6px",color:t.tx,fontSize:12,width:"100%",fontFamily:"inherit"}}><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></PropRow>}
       {(m.type==="curve"||m.type==="polygon")&&<PropRow label="Style" t={t}><div style={{display:"flex",gap:4}}>{["linear","bspline"].map(s=><button key={s} onClick={()=>onUpdate({curveStyle:s})} style={{padding:"2px 8px",fontSize:10,border:`1px solid ${t.bdr}`,borderRadius:4,background:m.curveStyle===s?t.acc:"transparent",color:m.curveStyle===s?(theme==="light"?"#fff":t.bg):t.tx,cursor:"pointer",fontWeight:600}}>{s==="linear"?"Linear":"B-Spline"}</button>)}</div></PropRow>}
+      {(m.type==="curve"||m.type==="polygon")&&<PropRow label="Points" t={t}><div style={{display:"flex",gap:6,alignItems:"center"}}><span style={{fontSize:11,color:t.tx2}}>{m.points?.length||0} pts</span><span style={{fontSize:9,color:t.tx3}}>Ctrl+click add • Shift+click remove</span></div></PropRow>}
       <PropRow label="Color" t={t}><input type="color" value={m.color||m.strokeColor||"#38bdf8"} onChange={e=>onUpdate(m.type==="polygon"?{strokeColor:e.target.value}:{color:e.target.value})} style={{width:40,height:24,padding:0,border:"none",cursor:"pointer",borderRadius:4}}/></PropRow>
       {m.type==="polygon"&&<PropRow label="Fill" t={t}><input type="color" value={(m.fillColor||"#38bdf8aa").slice(0,7)} onChange={e=>onUpdate({fillColor:e.target.value+"33"})} style={{width:40,height:24,padding:0,border:"none",cursor:"pointer",borderRadius:4}}/></PropRow>}
       {["line","angle3","angle4","curve","perp","parallel"].includes(m.type)&&<PropRow label="Width" t={t}><input type="range" min="0.5" max="6" step="0.5" value={m.width||1.5} onChange={e=>onUpdate({width:+e.target.value})} style={{width:"100%",accentColor:t.acc}}/></PropRow>}
