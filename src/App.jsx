@@ -1,6 +1,110 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import * as math from "mathjs";
 
+const SMV_CSV = `Analysis,View,Markup type,Landmark,Definition
+General SMV Analysis,SMV,Point,Ang-L - Angulare (Left),The point of intersection between the posterior border of the ramus and the inferior border of the mandibular body on the left side.
+General SMV Analysis,SMV,Point,Ang-R - Angulare (Right),The point of intersection between the posterior border of the ramus and the inferior border of the mandibular body on the right side.
+General SMV Analysis,SMV,Point,ANS - Anterior nasal spine,The tip of the anterior nasal spine in the midline.
+General SMV Analysis,SMV,Point,Ba - Basion,The median point of the anterior margin of the foramen magnum.
+General SMV Analysis,SMV,Point,CdA-L - Condylion Anterioris (Left),The most anterior point on the contour of the left mandibular condylar head.
+General SMV Analysis,SMV,Point,CdA-R - Condylion Anterioris (Right),The most anterior point on the contour of the right mandibular condylar head.
+General SMV Analysis,SMV,Point,CdL-L - Condylion Lateral (Left),The most lateral point on the left mandibular condyle.
+General SMV Analysis,SMV,Point,CdL-R - Condylion Lateral (Right),The most lateral point on the right mandibular condyle.
+General SMV Analysis,SMV,Point,CdM-L - Condylion Medial (Left),The most medial point on the left mandibular condyle.
+General SMV Analysis,SMV,Point,CdM-R - Condylion Medial (Right),The most medial point on the right mandibular condyle.
+General SMV Analysis,SMV,Point,CdP-L - Condylion Posterioris (Left),The most posterior point on the contour of the left mandibular condylar head.
+General SMV Analysis,SMV,Point,CdP-R - Condylion Posterioris (Right),The most posterior point on the contour of the right mandibular condylar head.
+General SMV Analysis,SMV,Point,Cg - Crista galli,The most anterior point of the crista galli.
+General SMV Analysis,SMV,Point,Cor-L - Coronoid (Left),The most anterior projection of the left coronoid process.
+General SMV Analysis,SMV,Point,Cor-R - Coronoid (Right),The most anterior projection of the right coronoid process.
+General SMV Analysis,SMV,Point,Go-L - Gonion (Left),The most lateral point at the angle of the left mandible.
+General SMV Analysis,SMV,Point,Go-R - Gonion (Right),The most lateral point at the angle of the right mandible.
+General SMV Analysis,SMV,Point,Jug-L - Jugale (Left),The intersection of the maxillary tuberosity and zygomatic buttress on the left side.
+General SMV Analysis,SMV,Point,Jug-R - Jugale (Right),The intersection of the maxillary tuberosity and zygomatic buttress on the right side.
+General SMV Analysis,SMV,Point,L1M - Lower dental midline,The dental midline point of the mandibular central incisors.
+General SMV Analysis,SMV,Point,L6-L - Lower first molar (Left),The most prominent lateral point on the buccal surface of the left mandibular first molar.
+General SMV Analysis,SMV,Point,L6-R - Lower first molar (Right),The most prominent lateral point on the buccal surface of the right mandibular first molar.
+General SMV Analysis,SMV,Point,Ma-L - Mastoid (Left),The most inferior and lateral point of the left mastoid process.
+General SMV Analysis,SMV,Point,Ma-R - Mastoid (Right),The most inferior and lateral point of the right mastoid process.
+General SMV Analysis,SMV,Point,MCF-L - Middle Cranial Fossa (Left),The most lateral or inferior prominent point on the outline of the left middle cranial fossa.
+General SMV Analysis,SMV,Point,MCF-R - Middle Cranial Fossa (Right),The most lateral or inferior prominent point on the outline of the right middle cranial fossa.
+General SMV Analysis,SMV,Point,MdABM - Mandibular Apical Base Midline,The geometric midline point of the mandibular apical base in the transverse plane.
+General SMV Analysis,SMV,Point,Me - Menton,The most anterior point on the symphysis of the mandible in the SMV projection.
+General SMV Analysis,SMV,Point,MxABM - Maxillary Apical Base Midline,The geometric midline point of the maxillary apical base in the transverse plane.
+General SMV Analysis,SMV,Point,Od - Odontoid,The most superior point on the tip of the odontoid process (dens) of the second cervical vertebra (axis).
+General SMV Analysis,SMV,Point,Op - Opisthion,The median point of the posterior margin of the foramen magnum.
+General SMV Analysis,SMV,Point,PCV-L - Posterior Cranial Vault (Left),The most posterior point on the bony outline of the left posterior cranial vault.
+General SMV Analysis,SMV,Point,PCV-R - Posterior Cranial Vault (Right),The most posterior point on the bony outline of the right posterior cranial vault.
+General SMV Analysis,SMV,Point,Ptm-L - Pterygomaxillary Fissure (Left),The most inferior point of the teardrop-shaped radiolucency representing the pterygomaxillary fissure on the left side.
+General SMV Analysis,SMV,Point,Ptm-R - Pterygomaxillary Fissure (Right),The most inferior point of the teardrop-shaped radiolucency representing the pterygomaxillary fissure on the right side.
+General SMV Analysis,SMV,Point,Sp-L - Foramen Spinosum (Left),The center of the left foramen spinosum, often used as a reliable bilateral cranial base reference structure.
+General SMV Analysis,SMV,Point,Sp-R - Foramen Spinosum (Right),The center of the right foramen spinosum, often used as a reliable bilateral cranial base reference structure.
+General SMV Analysis,SMV,Point,U1M - Upper dental midline,The dental midline point of the maxillary central incisors.
+General SMV Analysis,SMV,Point,U6-L - Upper first molar (Left),The most prominent lateral point on the buccal surface of the left maxillary first molar.
+General SMV Analysis,SMV,Point,U6-R - Upper first molar (Right),The most prominent lateral point on the buccal surface of the right maxillary first molar.
+General SMV Analysis,SMV,Point,V - Vomer,The most posterior point on the bony nasal septum (vomer).
+General SMV Analysis,SMV,Point,ZA-L - Zygomatic Arch (Left),The most lateral point on the left zygomatic arch.
+General SMV Analysis,SMV,Point,ZA-R - Zygomatic Arch (Right),The most lateral point on the right zygomatic arch.`;
+
+const OPG_CSV = `Analysis,View,Markup type,Landmark,Definition
+General OPG Analysis,OPG,Point,Ag-L - Antegonion (Left),The deepest point of the antegonial notch on the lower border of the left mandible.
+General OPG Analysis,OPG,Point,Ag-R - Antegonion (Right),The deepest point of the antegonial notch on the lower border of the right mandible.
+General OPG Analysis,OPG,Point,Ar-L - Articulare (Left),The point of intersection of the posterior border of the left condylar neck and the inferior border of the cranial base.
+General OPG Analysis,OPG,Point,Ar-R - Articulare (Right),The point of intersection of the posterior border of the right condylar neck and the inferior border of the cranial base.
+General OPG Analysis,OPG,Point,Co-L - Condylion (Left),The most superior point on the contour of the left mandibular condylar head.
+General OPG Analysis,OPG,Point,Co-R - Condylion (Right),The most superior point on the contour of the right mandibular condylar head.
+General OPG Analysis,OPG,Point,Cor-L - Coronoid (Left),The most superior point of the left coronoid process.
+General OPG Analysis,OPG,Point,Cor-R - Coronoid (Right),The most superior point of the right coronoid process.
+General OPG Analysis,OPG,Point,Go-L - Gonion (Left),The most inferior and posterior point at the angle of the left mandible.
+General OPG Analysis,OPG,Point,Go-R - Gonion (Right),The most inferior and posterior point at the angle of the right mandible.
+General OPG Analysis,OPG,Point,MdF-L - Mandibular Foramen (Left),The geometric center of the left mandibular foramen.
+General OPG Analysis,OPG,Point,MdF-R - Mandibular Foramen (Right),The geometric center of the right mandibular foramen.
+General OPG Analysis,OPG,Point,Me - Menton,The most inferior point on the outline of the mandibular symphysis.
+General OPG Analysis,OPG,Point,Mf-L - Mental Foramen (Left),The geometric center of the left mental foramen.
+General OPG Analysis,OPG,Point,Mf-R - Mental Foramen (Right),The geometric center of the right mental foramen.
+General OPG Analysis,OPG,Point,Or-L - Orbitale (Left),The lowest point on the left infraorbital margin.
+General OPG Analysis,OPG,Point,Or-R - Orbitale (Right),The lowest point on the right infraorbital margin.
+General OPG Analysis,OPG,Point,Ptm-L - Pterygomaxillary Fissure (Left),The lowest point of the teardrop-shaped radiolucency of the pterygomaxillary fissure on the left side.
+General OPG Analysis,OPG,Point,Ptm-R - Pterygomaxillary Fissure (Right),The lowest point of the teardrop-shaped radiolucency of the pterygomaxillary fissure on the right side.
+General OPG Analysis,OPG,Point,Sig-L - Sigmoid Notch (Left),The deepest point of the mandibular (sigmoid) notch between the coronoid process and the condyle on the left side.
+General OPG Analysis,OPG,Point,Sig-R - Sigmoid Notch (Right),The deepest point of the mandibular (sigmoid) notch between the coronoid process and the condyle on the right side.
+General Analysis,Multi-view,Point,Inc-L - Incisura Mandibulae (Left),The deepest point of the mandibular (sigmoid) notch between the coronoid process and the condyle on the left side.
+General Analysis,Multi-view,Point,Inc-R - Incisura Mandibulae (Right),The deepest point of the mandibular (sigmoid) notch between the coronoid process and the condyle on the right side.`;
+
+function parseCSV(csv){
+  const lines=csv.trim().split("\n");
+  const headers=lines[0].split(",").map(h=>h.trim());
+  const result=[];
+  for(let i=1;i<lines.length;i++){
+    let line=lines[i],row=[],inQuote=false,current="";
+    for(let j=0;j<line.length;j++){
+      const ch=line[j];
+      if(ch==='"'){inQuote=!inQuote;continue;}
+      if(ch===","&&!inQuote){row.push(current.trim());current="";continue;}
+      current+=ch;
+    }
+    row.push(current.trim());
+    if(row.length>0){
+      const obj={};
+      headers.forEach((h,idx)=>obj[h]=row[idx]||"");
+      result.push(obj);
+    }
+  }
+  return result;
+}
+
+function csvToAnalysis(csv,name,color){
+  const data=parseCSV(csv);
+  const analyses={};
+  data.forEach(row=>{
+    const aname=row.Analysis||"General";
+    if(!analyses[aname])analyses[aname]=[];
+    const label=row.Landmark.split(" - ")[0].trim();
+    analyses[aname].push({l:label,def:row.Definition||"",color:color});
+  });
+  return Object.entries(analyses).map(([aname,pts])=>({name:aname,pts}));
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // KATEX LOADER
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -552,171 +656,44 @@ const PREDEFINED={
       {l:"A",def:"The deepest point on the contour of the alveolar projection, between the spinal point and prosthion.",color:"#34d399"},
       {l:"B",def:"The deepest point on the contour of the alveolar projection, between infradentale and pogonion.",color:"#34d399"},
       {l:"ANS",def:"The apex of spina nasalis anterior.",color:"#34d399"},
-      {l:"PNS",def:"The point of intersection of palatum posterior durum, palatum molle and fossa pterygopalatina.",color:"#34d399"},
-      {l:"Pog",def:"The most prominent point on the chin.",color:"#a78bfa"},
-      {l:"Gn",def:"The deepest point on the chin.",color:"#a78bfa"},
-      {l:"Me",def:"The most inferior point on the contour of the chin.",color:"#a78bfa"},
-      {l:"Go",def:"The point of intersection between the base and ramus tangents to the mandible. The midpoint is used where double projection gives rise to two points.",color:"#a78bfa"},
-      {l:"Is",def:"The incisal point of the most prominent medial maxillary incisor.",color:"#fb923c"},
-      {l:"Ii",def:"The incisal point of the most prominent medial mandibular incisor.",color:"#f472b6"},
-    ]},
-    {name:"Holdaway Analysis",pts:[
-      {l:"N",def:"Nasion is the most anterior point of the frontonasal suture in the middle.",color:"#f59e0b"},
-      {l:"Prn",def:"The most protruded point of the apex nasi.",color:"#f472b6"},
-      {l:"Sn",def:"Midpoint of the columella base at the apex of the nasolabial angle.",color:"#f472b6"},
-      {l:"Ss",def:"The deepest midline point between subnasion and the vermilion border of the upper lip.",color:"#f472b6"},
-      {l:"Stms",def:"The lowermost point on the vermilion of the upper lip.",color:"#f472b6"},
-      {l:"Stmi",def:"The uppermost point on the vermilion of the lower lip.",color:"#f472b6"},
-      {l:"Si",def:"The point of greatest concavity in the midline between the lower lip and chin.",color:"#f472b6"},
-      {l:"Pog",def:"The most anterior midpoint of the chin.",color:"#a78bfa"},
-      {l:"Gn",def:"The constructed midpoint between soft tissue pogonion and soft tissue menton.",color:"#a78bfa"},
-      {l:"Me",def:"The lowest point on the contour of the soft tissue chin.",color:"#a78bfa"},
-    ],
-    lines:[
-      {l:"H Line",def:"Drawn tangent to the soft tissue chin and the upper lip.",color:"#a78bfa"},
-      {l:"Soft tissue facial line",def:"A soft tissue facial line from soft-tissue nasion to the point on the soft tissue chin overlying Rickett's suprapogonion.",color:"#a78bfa"},
-      {l:"Sella-Nasion line",def:"The sella-nasion line.",color:"#f59e0b"},
-    ],
-    planes:[
-      {l:"Frankfort Horizontal (FH)",def:"Frankfort horizontal plane connecting porion to orbitale.",color:"#60a5fa"},
-      {l:"NBa plane",def:"Plane connecting nasion to basion.",color:"#f59e0b"},
-    ]},
-    {name:"Harvold Analysis",pts:[
-      {l:"TMJ",def:"A point on the contour of the glenoid fossa, where the line indicating the maximum length of the mandible intercepts the contour of the temporomandibular fossa. The midpoint between the right and left side is marked.",color:"#60a5fa"},
-      {l:"ANS",def:"A point on the lower contour of the anterior nasal spine where the vertical thickness is 3 mm, used for horizontal measurements.",color:"#34d399"},
-      {l:"GN",def:"The most inferior point on the contour of the chin.",color:"#a78bfa"},
-      {l:"PG",def:"The most anterior point on the chin.",color:"#a78bfa"},
-      {l:"N",def:"The point at which the nasofrontal suture reaches the contour line of the bones.",color:"#f59e0b"},
-    ],
-    distances:[
-      {l:"Mandibular length",def:"Measured from TM to PGN.",color:"#a78bfa"},
-      {l:"Lower face height",def:"Measured from ANS to GN.",color:"#34d399"},
-    ],
-    angles:[
-      {l:"Angle of convexity",def:"The angle between the lines PG-ANS and ANS-N.",color:"#a78bfa"},
-    ]},
-    {name:"Jarabak Analysis",pts:[
-      {l:"S",def:"The point representing the geometric center of the pituitary fossa (sella turcica).",color:"#f59e0b"},
-      {l:"N",def:"The most anterior (midline) point of the frontonasal suture.",color:"#f59e0b"},
-      {l:"Ba",def:"The median point of the anterior margin of the foramen magnum located by following the image of the slope of the inferior border of the basilar part of the occipital bone to its posterior limit.",color:"#f59e0b"},
-      {l:"Ar",def:"The point of intersection of the images of the posterior border of the condylar process of the mandible and the inferior border of the basilar part of the occipital bone.",color:"#60a5fa"},
-      {l:"Po",def:"The superior point of the external auditory meatus (superior margin of temporomandibular fossa, which lies at the same level, may be substituted in the construction of Frankfort horizontal).",color:"#60a5fa"},
-      {l:"A",def:"The point at the deepest midline concavity on the maxilla between the anterior nasal spine and prosthion.",color:"#34d399"},
-      {l:"B",def:"The point at the deepest midline concavity on the mandibular symphysis between infradentale and pogonion.",color:"#34d399"},
-      {l:"ANS",def:"The most anterior point of the anterior nasal spine.",color:"#34d399"},
-      {l:"PNS",def:"The point of intersection of palatum posterior durum, palatum molle and fossa pterygopalatina.",color:"#34d399"},
-      {l:"Pog",def:"The most anterior point on the mandible in the midline.",color:"#a78bfa"},
-      {l:"Go",def:"The point of intersection of the ramus plane and the mandibular plane.",color:"#a78bfa"},
-      {l:"Me",def:"The most inferior midline point on the mandibular symphysis.",color:"#a78bfa"},
-    ]},
-    {name:"Riedel Analysis",pts:[
-      {l:"S",def:"The point representing the geometric center of the pituitary fossa (sella turcica).",color:"#f59e0b"},
-      {l:"N",def:"The most anterior (midline) point of the frontonasal suture.",color:"#f59e0b"},
-      {l:"A",def:"The point at the deepest midline concavity on the maxilla between the anterior nasal spine and prosthion.",color:"#34d399"},
-      {l:"B",def:"The point at the deepest midline concavity on the mandibular symphysis between infradentale and pogonion.",color:"#34d399"},
-      {l:"ANS",def:"The most anterior point of the anterior nasal spine.",color:"#34d399"},
-      {l:"PNS",def:"The point of intersection of palatum posterior durum, palatum molle and fossa pterygopalatina.",color:"#34d399"},
-      {l:"Or",def:"The lowest point on the inferior margin of the orbit, midpoint between right and left images.",color:"#60a5fa"},
-      {l:"Po",def:"The superior point of the external auditory meatus (superior margin of temporomandibular fossa).",color:"#60a5fa"},
-      {l:"Pog",def:"The most anterior point on the mandible in the midline.",color:"#a78bfa"},
-      {l:"Go",def:"The point of intersection of the ramus plane and the mandibular plane.",color:"#a78bfa"},
-      {l:"Me",def:"The most inferior midline point on the mandibular symphysis.",color:"#a78bfa"},
-    ]},
-    {name:"Schwartz Analysis",pts:[
-      {l:"S",def:"The point representing the geometric center of the pituitary fossa (sella turcica).",color:"#f59e0b"},
-      {l:"N",def:"The most anterior (midline) point of the frontonasal suture.",color:"#f59e0b"},
-      {l:"A",def:"The point at the deepest midline concavity on the maxilla between the anterior nasal spine and prosthion.",color:"#34d399"},
-      {l:"B",def:"The point at the deepest midline concavity on the mandibular symphysis between infradentale and pogonion.",color:"#34d399"},
-      {l:"ANS",def:"The most anterior point of the anterior nasal spine.",color:"#34d399"},
-      {l:"Pog",def:"The most anterior point on the mandible in the midline.",color:"#a78bfa"},
-      {l:"Me",def:"The most inferior midline point on the mandibular symphysis.",color:"#a78bfa"},
-      {l:"Is",def:"The incisal point of the most prominent medial maxillary incisor.",color:"#fb923c"},
-      {l:"Ii",def:"The incisal point of the most prominent medial mandibular incisor.",color:"#f472b6"},
-    ]},
-    {name:"Wylie Analysis",pts:[
-      {l:"S",def:"The midpoint of sella turcica or hypophyseal fossa or pituitary fossa.",color:"#f59e0b"},
-      {l:"N",def:"The point at which the nasofrontal suture reaches the contour line of the bones.",color:"#f59e0b"},
-      {l:"ANS",def:"The tip of bony anterior nasal spine in the midline or median plane.",color:"#34d399"},
-      {l:"A",def:"The deepest point on the curved bony outline between the anterior nasal spine (ANS) and prosthion (Pr).",color:"#34d399"},
-      {l:"PNS",def:"The intersection of continuation of the anterior wall of the pterygopalatine fossa and the floor of the nose.",color:"#34d399"},
-      {l:"Or",def:"The deepest point on the infraorbital margin. The midpoint, or is used where double projection gives rise to two points.",color:"#60a5fa"},
-      {l:"Po",def:"The superior point of the external auditory meatus (superior margin of temporomandibular fossa).",color:"#60a5fa"},
+      {l:"PNS",def:"Posterior spine of palatum durum.",color:"#34d399"},
       {l:"Pog",def:"The most anterior point on the chin.",color:"#a78bfa"},
-      {l:"Gn",def:"The most inferior point on the contour of the chin.",color:"#a78bfa"},
+      {l:"Gn",def:"A point on the chin determined by bisecting the angle formed by the facial and mandibular planes.",color:"#a78bfa"},
       {l:"Me",def:"The most inferior midline point on the mandibular symphysis.",color:"#a78bfa"},
+      {l:"Go",def:"The point of intersection of the ramus plane and the mandibular plane.",color:"#a78bfa"},
     ]},
     {name:"Tweed Analysis",pts:[
+      {l:"N",def:"Nasion is the most anterior point of the frontonasal suture in the middle.",color:"#f59e0b"},
       {l:"Or",def:"The lowest point on the left infraorbital margin.",color:"#60a5fa"},
       {l:"Po",def:"The highest point on the superior surface of the soft tissue of the external auditory meati.",color:"#60a5fa"},
-      {l:"Go",def:"The point of intersection of the ramus plane and the mandibular plane.",color:"#a78bfa"},
       {l:"Me",def:"The most inferior midline point on the mandibular symphysis.",color:"#a78bfa"},
-      {l:"Is",def:"The incisal point of the most prominent medial maxillary incisor.",color:"#fb923c"},
-      {l:"Ii",def:"The incisal point of the most prominent medial mandibular incisor.",color:"#f472b6"},
-    ]},
-    {name:"Wit's Appraisal",pts:[
-      {l:"A",def:"The deepest midline point on the premaxilla between the anterior nasal spine and prosthion.",color:"#60a5fa"},
-      {l:"B",def:"The deepest midline point on the mandible between infradentale and pogonion.",color:"#a78bfa"},
-      {l:"ANS",def:"Anterior nasal spine is the tip of bony anterior nasal spine in the midline or median plane.",color:"#34d399"},
-      {l:"PNS",def:"Posterior nasal spine is the intersection of a continuation of the anterior wall of the pterygopalatine fossa and the floor of the nose.",color:"#34d399"},
-      {l:"Or",def:"The lowest point on the left infraorbital margin.",color:"#60a5fa"},
-      {l:"Po",def:"The highest point on the superior surface of the soft tissue of the external auditory meati.",color:"#60a5fa"},
-    ]},
-    {name:"Di Paolo Quadrilateral",pts:[
-      {l:"N",def:"The point at which the nasofrontal suture reaches the contour line of the bones.",color:"#f59e0b"},
-      {l:"S",def:"The point representing the geometric center of the pituitary fossa (sella turcica).",color:"#f59e0b"},
-      {l:"Ba",def:"Most inferior posterior point of the occipital bone.",color:"#f59e0b"},
-      {l:"Ar",def:"The point of intersection of the dorsal contours of processus articularis mandibulae and os temporale. The midpoint is used where double projection gives rise to two articulare points.",color:"#60a5fa"},
-      {l:"A",def:"The deepest point on the curve of the maxilla between the anterior nasal spine and the dental alveolus.",color:"#34d399"},
-      {l:"B",def:"The deepest midline point on the mandible between infradentale and pogonion.",color:"#34d399"},
+      {l:"Go",def:"The point of intersection of the ramus plane and the mandibular plane.",color:"#a78bfa"},
+      {l:"Xi",def:"The midpoint of the Xi path (a small round radiopacity representing the intersection of the ramus plane with the posterior border of the mandibular canal).",color:"#34d399"},
       {l:"Pog",def:"The most anterior point on the chin.",color:"#a78bfa"},
-      {l:"Go",def:"The point of intersection of the ramus plane and the mandibular plane.",color:"#a78bfa"},
-      {l:"PNS",def:"The point of intersection of palatum posterior durum, palatum molle and fossa pterygopalatina.",color:"#34d399"},
     ]},
-    {name:"Hasund Bergen",pts:[
-      {l:"S",def:"The point representing the geometric center of the pituitary fossa (sella turcica).",color:"#f59e0b"},
-      {l:"N",def:"The most anterior (midline) point of the frontonasal suture.",color:"#f59e0b"},
-      {l:"Ba",def:"The median point of the anterior margin of the foramen magnum located by following the image of the slope of the inferior border of the basilar part of the occipital bone to its posterior limit.",color:"#f59e0b"},
-      {l:"Ar",def:"The point of intersection of the images of the posterior border of the condylar process of the mandible and the inferior border of the basilar part of the occipital bone.",color:"#60a5fa"},
-      {l:"A",def:"The point at the deepest midline concavity on the maxilla between the anterior nasal spine and prosthion.",color:"#34d399"},
-      {l:"B",def:"The point at the deepest midline concavity on the mandibular symphysis between infradentale and pogonion.",color:"#34d399"},
-      {l:"ANS",def:"The most anterior point of the anterior nasal spine.",color:"#34d399"},
-      {l:"PNS",def:"The point of intersection of palatum posterior durum, palatum molle and fossa pterygopalatina.",color:"#34d399"},
-      {l:"Pog",def:"The most anterior point on the mandible in the midline.",color:"#a78bfa"},
-      {l:"Go",def:"The point of intersection of the ramus plane and the mandibular plane.",color:"#a78bfa"},
-      {l:"Me",def:"The most inferior midline point on the mandibular symphysis.",color:"#a78bfa"},
-    ]},
-    {name:"Sassouni Analysis",pts:[
-      {l:"S",def:"The point representing the geometric center of the pituitary fossa (sella turcica).",color:"#f59e0b"},
-      {l:"N",def:"The most anterior (midline) point of the frontonasal suture.",color:"#f59e0b"},
+    {name:"Jarv-Bjork",pts:[
+      {l:"N",def:"Nasion is the most anterior point of the frontonasal suture in the middle.",color:"#f59e0b"},
+      {l:"S",def:"The center of sella turcica (the midpoint of the horizontal diameter).",color:"#f59e0b"},
       {l:"Ba",def:"Most inferior posterior point of the occipital bone.",color:"#f59e0b"},
-      {l:"Ar",def:"The point of intersection of the images of the posterior border of the condylar process of the mandible and the inferior border of the basilar part of the occipital bone.",color:"#60a5fa"},
-      {l:"Or",def:"The lowest point on the inferior margin of the orbit.",color:"#60a5fa"},
-      {l:"Po",def:"The superior point of the external auditory meatus (superior margin of temporomandibular fossa).",color:"#60a5fa"},
-      {l:"A",def:"The deepest point on the curve of the maxilla between the anterior nasal spine and the dental alveolus.",color:"#34d399"},
-      {l:"ANS",def:"The most anterior point of the anterior nasal spine.",color:"#34d399"},
-      {l:"PNS",def:"The point of intersection of palatum posterior durum, palatum molle and fossa pterygopalatina.",color:"#34d399"},
-      {l:"Pog",def:"The most anterior point on the mandible in the midline.",color:"#a78bfa"},
-      {l:"Go",def:"The point of intersection of the ramus plane and the mandibular plane.",color:"#a78bfa"},
+      {l:"Ar",def:"The point of intersection of the dorsal contours of processus articularis mandibulae and os temporale.",color:"#60a5fa"},
+      {l:"Or",def:"The deepest point on the infraorbital margin.",color:"#60a5fa"},
+      {l:"Po",def:"Porion is the most superior point of the external auditory meatus.",color:"#60a5fa"},
+      {l:"PNS",def:"Posterior spine of palatum durum.",color:"#34d399"},
+      {l:"ANS",def:"The apex of spina nasalis anterior.",color:"#34d399"},
+      {l:"A",def:"The deepest point on the contour of the alveolar projection.",color:"#34d399"},
+      {l:"B",def:"The deepest point on the contour of the alveolar projection.",color:"#34d399"},
+      {l:"Pog",def:"The most anterior point on the chin.",color:"#a78bfa"},
+      {l:"Gn",def:"A point on the chin determined by bisecting the angle formed by the facial and mandibular planes.",color:"#a78bfa"},
       {l:"Me",def:"The most inferior midline point on the mandibular symphysis.",color:"#a78bfa"},
-    ],
-    angles:[
-      {l:"Palatocranial angle",def:"Angle formed by the palatal plane and the anterior cranial base plane.",color:"#34d399"},
-      {l:"Palatomandibular angle",def:"Angle formed by the palatal plane and the mandibular base plane.",color:"#a78bfa"},
-      {l:"Occlusopalatal angle",def:"Angle formed by the occlusal plane and the palatal plane.",color:"#fb923c"},
-      {l:"Occlusomandibular angle",def:"Angle formed by the occlusal plane and the mandibular base plane.",color:"#f472b6"},
-      {l:"Angle I",def:"Angle formed by upper incisor and the occlusal plane.",color:"#fb923c"},
-      {l:"Angle i",def:"Angle formed by lower incisor and the occlusal plane.",color:"#f472b6"},
+      {l:"Go",def:"The point of intersection of the ramus plane and the mandibular plane.",color:"#a78bfa"},
     ]},
-    {name:"Farkas Soft Tissue",pts:[
-      {l:"Tr",def:"Point on the hairline in the midline of the forehead.",color:"#f59e0b"},
-      {l:"G",def:"The most prominent midline point between the eyebrows.",color:"#f59e0b"},
-      {l:"N'",def:"Deepest point of the nasofrontal angle.",color:"#f59e0b"},
-      {l:"Prn",def:"The most protruded point of the apex nasi.",color:"#f472b6"},
-      {l:"Sn",def:"Midpoint of the columella base at the apex of the nasolabial angle.",color:"#f472b6"},
-      {l:"Ls",def:"Midpoint of the upper vermilion line.",color:"#fb923c"},
-      {l:"Li",def:"Midpoint of the lower vermilion line.",color:"#f472b6"},
-      {l:"Si",def:"Midpoint of the horizontal labiomental skin ridge.",color:"#a78bfa"},
-      {l:"Pg",def:"The most anterior midpoint of the chin.",color:"#a78bfa"},
+    {name:"Wits Analysis",pts:[
+      {l:"A",def:"The deepest point on the contour of the alveolar projection.",color:"#34d399"},
+      {l:"B",def:"The deepest point on the contour of the mandibular symphysis.",color:"#34d399"},
+      {l:"Po",def:"The highest point on the superior surface of the soft tissue of the external auditory meati.",color:"#60a5fa"},
+      {l:"Or",def:"The lowest point on the left infraorbital margin.",color:"#60a5fa"},
+      {l:"Ba",def:"Most inferior posterior point of the occipital bone.",color:"#f59e0b"},
+      {l:"N",def:"Nasion is the most anterior point of the frontonasal suture in the middle.",color:"#f59e0b"},
     ]},
   ],
   ap:[
@@ -818,6 +795,28 @@ const PREDEFINED={
       {l:"Me",def:"The lowest point on the mandibular symphysis.",color:"#a78bfa"},
       {l:"Zf-R",def:"The junction of the zygomatic and frontal bones at the lateral orbital rim on the right side.",color:"#fb923c"},
       {l:"Zf-L",def:"The junction of the zygomatic and frontal bones at the lateral orbital rim on the left side.",color:"#fb923c"},
+    ]},
+  ],
+  other:[
+    {group:"Standard Orthodontic & Orthognathic",projections:[
+      {name:"Submentovertex (SMV)",def:"Evaluating cranial base symmetry, condylar angulation, and transverse discrepancies from a bottom-up angle.",color:"#f59e0b"},
+      {name:"Panoramic Radiograph (OPG)",def:"Providing a broad overview of the dentition, jaws, and vertical ramal/condylar asymmetries.",color:"#60a5fa"},
+    ]},
+    {group:"TMJ-Specific",projections:[
+      {name:"Transcranial View (Schüller)",def:"Evaluating the lateral aspect of the TMJ and condylar position/translation.",color:"#34d399"},
+      {name:"Transpharyngeal View (Parma)",def:"Providing a clear view of the condylar head and neck across the pharynx.",color:"#a78bfa"},
+      {name:"Transorbital View (Zimmer)",def:"Viewing the TMJ from an anterior-to-posterior perspective through the orbit.",color:"#fb923c"},
+    ]},
+    {group:"Specialized Cranial & Midface",projections:[
+      {name:"Waters View",def:"Examining the midface, maxillary sinuses, and zygomatic arches.",color:"#f472b6"},
+      {name:"Caldwell View",def:"Evaluating the frontal and ethmoid sinuses, as well as lateral orbital walls.",color:"#c084fc"},
+      {name:"Towne's View",def:"Checking for medial/lateral condylar displacement and evaluating the occipital bone.",color:"#22d3ee"},
+    ]},
+    {group:"Growth & Skeletal Maturation",projections:[
+      {name:"Hand-Wrist Radiograph",def:"Assessing skeletal bone age and pubertal growth stages.",color:"#fbbf24"},
+    ]},
+    {group:"Modern 3D Imaging",projections:[
+      {name:"CBCT Derived Views",def:"A single 3D volumetric scan that digitally recreates 2D views without superimposition or magnification.",color:"#34d399"},
     ]},
   ],
 };
@@ -1392,6 +1391,45 @@ function TemplatePickerModal({t,projection,onPick,onClose}){
   const templateRef=useRef(null);
   const[step,setStep]=useState("choose"); // choose | analysis
   const[selectedAnalysis,setSelectedAnalysis]=useState(null);
+
+  if(projection==="other"){
+    const otherData=PREDEFINED.other||[];
+    const handleProjectionClick=(p)=>{
+      if(p.name.includes("SMV")||p.name.includes("Submentovertex")){
+        const analyses=csvToAnalysis(SMV_CSV,"General SMV Analysis",p.color);
+        onPick("analysis",analyses[0]);
+      }else if(p.name.includes("OPG")||p.name.includes("Panoramic")){
+        const analyses=csvToAnalysis(OPG_CSV,"General OPG Analysis",p.color);
+        onPick("analysis",analyses[0]);
+      }else{
+        onPick("projection",{name:p.name,def:p.def,color:p.color});
+      }
+    };
+    return(
+      <div>
+        <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:18,color:t.tx,marginBottom:4}}>Select Projection</div>
+        <div style={{fontSize:13,color:t.tx2,marginBottom:20}}>Choose the radiographic projection you're working on.</div>
+        {otherData.map(group=>(
+          <div key={group.group} style={{marginBottom:16}}>
+            <div style={{fontSize:11,fontWeight:700,color:t.tx2,marginBottom:8,textTransform:"uppercase",letterSpacing:0.5}}>{group.group}</div>
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {group.projections.map(p=>(
+                <div key={p.name} onClick={()=>handleProjectionClick(p)}
+                  style={{padding:"12px 14px",border:`1px solid ${t.bdr}`,borderRadius:10,cursor:"pointer",background:t.surf2,borderLeft:`4px solid ${p.color}`,transition:"all 0.15s"}}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor=p.color;e.currentTarget.style.background=t.accMuted;}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor=t.bdr;e.currentTarget.style.background=t.surf2;}}>
+                  <div style={{fontWeight:700,fontSize:14,color:t.tx,marginBottom:4}}>{p.name}</div>
+                  <div style={{fontSize:11,color:t.tx2,lineHeight:1.5}}>{p.def}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+        <Btn t={t} onClick={onClose} style={{width:"100%",marginTop:8}}>Cancel</Btn>
+      </div>
+    );
+  }
+
   const options=[
     {id:"blank",icon:"☐",title:"Blank",desc:"Start with a clean canvas. Place your own landmarks, lines, and measurements."},
     {id:"analysis",icon:"⊛",title:"Analysis Template",desc:"Select a predefined landmark set (Steiner, Ricketts, McNamara…) for guided placement."},
