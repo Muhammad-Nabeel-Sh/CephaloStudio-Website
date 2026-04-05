@@ -2197,76 +2197,72 @@ function StatsDashboard({ dataset, t }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 function MarkupTablesPanel({databaseImages,currentImageIndex,t,formatAngle}){
   const[activeTable,setActiveTable]=useState("points");
-  const[currentImage]=useState(()=>databaseImages[currentImageIndex]);
 
   const exportTableCSV=(type)=>{
-    const imgData=databaseImages[currentImageIndex];
-    const rows=[["Variable",...imgData.images.map((_,i)=>`Image ${i+1}`)]];
+    const rows=[["Variable",...databaseImages.map((_,i)=>`Image ${i+1}`)]];
     
     if(type==="points"){
-      imgData.images.forEach((img,imgIdx)=>{
-        const imgMarkups=img.markups||[];
-        const points=imgMarkups.filter(m=>m.type==="point");
+      const maxPoints=Math.max(...databaseImages.map(img=>(img.markups||[]).filter(m=>m.type==="point").length));
+      for(let ptIdx=0;ptIdx<maxPoints;ptIdx++){
+        rows.push([`P${ptIdx+1}_X`]);
+        rows.push([`P${ptIdx+1}_Y`]);
+      }
+      databaseImages.forEach((img,imgIdx)=>{
+        const points=(img.markups||[]).filter(m=>m.type==="point");
         points.forEach((pt,ptIdx)=>{
-          if(ptIdx===0)rows.push([`P${ptIdx+1}_X`]);
-          else if(rows.length<=ptIdx+1)rows.push([`P${ptIdx+1}_X`]);
           const vp=vpts(pt);
           if(vp.length>0){
-            const rowIdx=ptIdx+1;
-            if(!rows[rowIdx])rows[rowIdx]=[`P${ptIdx+1}_X`];
-            rows[rowIdx].push(vp[0].x.toFixed(2));
-          }
-        });
-        points.forEach((pt,ptIdx)=>{
-          const rowIdx=ptIdx+1+points.length;
-          if(!rows[rowIdx])rows[rowIdx]=[`P${ptIdx+1}_Y`];
-          const vp=vpts(pt);
-          if(vp.length>0){
-            rows[rowIdx].push(vp[0].y.toFixed(2));
+            rows[ptIdx+1].push(vp[0].x.toFixed(2));
+            rows[ptIdx+1+maxPoints].push(vp[0].y.toFixed(2));
           }else{
-            rows[rowIdx].push("");
+            rows[ptIdx+1].push("");
+            rows[ptIdx+1+maxPoints].push("");
           }
         });
       });
     }else if(type==="lines"){
-      imgData.images.forEach((img,imgIdx)=>{
-        const imgMarkups=img.markups||[];
-        const lines=imgMarkups.filter(m=>m.type==="line"||m.type==="parallel");
+      const maxLines=Math.max(...databaseImages.map(img=>(img.markups||[]).filter(m=>m.type==="line"||m.type==="parallel").length));
+      for(let i=0;i<maxLines;i++)rows.push([`Line${i+1}_length`]);
+      databaseImages.forEach((img,imgIdx)=>{
+        const lines=(img.markups||[]).filter(m=>m.type==="line"||m.type==="parallel");
         lines.forEach((ln,lnIdx)=>{
-          if(!rows[lnIdx+1])rows[lnIdx+1]=[`Line${lnIdx+1}_length`];
           const meas=computeMeasurements(ln,img.calibration);
           rows[lnIdx+1].push(meas.length?.toFixed(2)||"");
         });
       });
     }else if(type==="angles"){
-      imgData.images.forEach((img,imgIdx)=>{
-        const imgMarkups=img.markups||[];
-        const angles=[...imgMarkups.filter(m=>m.type==="angle3"),...imgMarkups.filter(m=>m.type==="angle4")];
+      const maxAngles=Math.max(...databaseImages.map(img=>[...(img.markups||[]).filter(m=>m.type==="angle3"),...(img.markups||[]).filter(m=>m.type==="angle4")].length));
+      for(let i=0;i<maxAngles;i++){
+        rows.push([`Angle${i+1}_deg`]);
+        rows.push([`Angle${i+1}_rad`]);
+      }
+      databaseImages.forEach((img,imgIdx)=>{
+        const angles=[...(img.markups||[]).filter(m=>m.type==="angle3"),...(img.markups||[]).filter(m=>m.type==="angle4")];
         angles.forEach((ang,angIdx)=>{
-          if(!rows[angIdx*2+1])rows[angIdx*2+1]=[`Angle${angIdx+1}_deg`];
-          if(!rows[angIdx*2+2])rows[angIdx*2+2]=[`Angle${angIdx+1}_rad`];
           const meas=computeMeasurements(ang,img.calibration);
           rows[angIdx*2+1].push(meas.angle?.toFixed(2)||"");
           rows[angIdx*2+2].push(meas.angle?((meas.angle*Math.PI/180).toFixed(4)):"");
         });
       });
     }else if(type==="curves"){
-      imgData.images.forEach((img,imgIdx)=>{
-        const imgMarkups=img.markups||[];
-        const curves=imgMarkups.filter(m=>m.type==="curve");
+      const maxCurves=Math.max(...databaseImages.map(img=>(img.markups||[]).filter(m=>m.type==="curve").length));
+      for(let i=0;i<maxCurves;i++)rows.push([`Curve${i+1}_length`]);
+      databaseImages.forEach((img,imgIdx)=>{
+        const curves=(img.markups||[]).filter(m=>m.type==="curve");
         curves.forEach((cv,cvIdx)=>{
-          if(!rows[cvIdx+1])rows[cvIdx+1]=[`Curve${cvIdx+1}_length`];
           const meas=computeMeasurements(cv,img.calibration);
           rows[cvIdx+1].push(meas.length?.toFixed(2)||"");
         });
       });
     }else if(type==="polygons"){
-      imgData.images.forEach((img,imgIdx)=>{
-        const imgMarkups=img.markups||[];
-        const polys=imgMarkups.filter(m=>m.type==="polygon");
+      const maxPolys=Math.max(...databaseImages.map(img=>(img.markups||[]).filter(m=>m.type==="polygon").length));
+      for(let i=0;i<maxPolys;i++){
+        rows.push([`Polygon${i+1}_area`]);
+        rows.push([`Polygon${i+1}_perimeter`]);
+      }
+      databaseImages.forEach((img,imgIdx)=>{
+        const polys=(img.markups||[]).filter(m=>m.type==="polygon");
         polys.forEach((poly,polyIdx)=>{
-          if(!rows[polyIdx*2+1])rows[polyIdx*2+1]=[`Polygon${polyIdx+1}_area`];
-          if(!rows[polyIdx*2+2])rows[polyIdx*2+2]=[`Polygon${polyIdx+1}_perimeter`];
           const meas=computeMeasurements(poly,img.calibration);
           rows[polyIdx*2+1].push(meas.area?.toFixed(2)||"");
           rows[polyIdx*2+2].push(meas.perimeter?.toFixed(2)||"");
@@ -2290,139 +2286,116 @@ function MarkupTablesPanel({databaseImages,currentImageIndex,t,formatAngle}){
   ];
 
   const getTableData=()=>{
-    const imgData=databaseImages[currentImageIndex];
-    if(!imgData)return[];
-    
     if(activeTable==="points"){
+      const maxPoints=Math.max(...databaseImages.map(img=>(img.markups||[]).filter(m=>m.type==="point").length));
       const allPoints=[];
-      imgData.images.forEach((img,imgIdx)=>{
-        const points=(img.markups||[]).filter(m=>m.type==="point");
-        points.forEach((pt,ptIdx)=>{
-          if(!allPoints[ptIdx])allPoints[ptIdx]={label:`P${ptIdx+1}`,values:[]};
-          const vp=vpts(pt);
-          allPoints[ptIdx].values[imgIdx]=vp.length>0?{x:vp[0].x,y:vp[0].y}:null;
+      for(let ptIdx=0;ptIdx<maxPoints;ptIdx++){
+        allPoints[ptIdx]={label:`P${ptIdx+1}`,values:[]};
+        databaseImages.forEach((img,imgIdx)=>{
+          const points=(img.markups||[]).filter(m=>m.type==="point");
+          const pt=points[ptIdx];
+          if(pt){
+            const vp=vpts(pt);
+            allPoints[ptIdx].values[imgIdx]=vp.length>0?{x:vp[0].x,y:vp[0].y}:null;
+          }
         });
-      });
+      }
       return allPoints;
     }else if(activeTable==="lines"){
+      const maxLines=Math.max(...databaseImages.map(img=>(img.markups||[]).filter(m=>m.type==="line"||m.type==="parallel").length));
       const allLines=[];
-      imgData.images.forEach((img,imgIdx)=>{
-        const lines=[...(img.markups||[]).filter(m=>m.type==="line"),...(img.markups||[]).filter(m=>m.type==="parallel")];
-        lines.forEach((ln,lnIdx)=>{
-          if(!allLines[lnIdx])allLines[lnIdx]={label:ln.label||`Line${lnIdx+1}`,values:[]};
-          const meas=computeMeasurements(ln,img.calibration);
-          allLines[lnIdx].values[imgIdx]=meas.length;
+      for(let lnIdx=0;lnIdx<maxLines;lnIdx++){
+        allLines[lnIdx]={label:`Line${lnIdx+1}`,values:[]};
+        databaseImages.forEach((img,imgIdx)=>{
+          const lines=[...(img.markups||[]).filter(m=>m.type==="line"),...(img.markups||[]).filter(m=>m.type==="parallel")];
+          const ln=lines[lnIdx];
+          if(ln){
+            const meas=computeMeasurements(ln,img.calibration);
+            allLines[lnIdx].values[imgIdx]=meas.length;
+          }
         });
-      });
+      }
       return allLines;
     }else if(activeTable==="angles"){
+      const maxAngles=Math.max(...databaseImages.map(img=>[...(img.markups||[]).filter(m=>m.type==="angle3"),...(img.markups||[]).filter(m=>m.type==="angle4")].length));
       const allAngles=[];
-      imgData.images.forEach((img,imgIdx)=>{
-        const angles=[...(img.markups||[]).filter(m=>m.type==="angle3"),...(img.markups||[]).filter(m=>m.type==="angle4")];
-        angles.forEach((ang,angIdx)=>{
-          if(!allAngles[angIdx])allAngles[angIdx]={label:ang.label||`Angle${angIdx+1}`,values:[]};
-          const meas=computeMeasurements(ang,img.calibration);
-          allAngles[angIdx].values[imgIdx]=meas.angle;
+      for(let angIdx=0;angIdx<maxAngles;angIdx++){
+        allAngles[angIdx]={label:`Angle${angIdx+1}`,values:[]};
+        databaseImages.forEach((img,imgIdx)=>{
+          const angles=[...(img.markups||[]).filter(m=>m.type==="angle3"),...(img.markups||[]).filter(m=>m.type==="angle4")];
+          const ang=angles[angIdx];
+          if(ang){
+            const meas=computeMeasurements(ang,img.calibration);
+            allAngles[angIdx].values[imgIdx]=meas.angle;
+          }
         });
-      });
+      }
       return allAngles;
     }else if(activeTable==="curves"){
+      const maxCurves=Math.max(...databaseImages.map(img=>(img.markups||[]).filter(m=>m.type==="curve").length));
       const allCurves=[];
-      imgData.images.forEach((img,imgIdx)=>{
-        const curves=(img.markups||[]).filter(m=>m.type==="curve");
-        curves.forEach((cv,cvIdx)=>{
-          if(!allCurves[cvIdx])allCurves[cvIdx]={label:cv.label||`Curve${cvIdx+1}`,values:[]};
-          const meas=computeMeasurements(cv,img.calibration);
-          allCurves[cvIdx].values[imgIdx]=meas.length;
+      for(let cvIdx=0;cvIdx<maxCurves;cvIdx++){
+        allCurves[cvIdx]={label:`Curve${cvIdx+1}`,values:[]};
+        databaseImages.forEach((img,imgIdx)=>{
+          const curves=(img.markups||[]).filter(m=>m.type==="curve");
+          const cv=curves[cvIdx];
+          if(cv){
+            const meas=computeMeasurements(cv,img.calibration);
+            allCurves[cvIdx].values[imgIdx]=meas.length;
+          }
         });
-      });
+      }
       return allCurves;
     }else if(activeTable==="polygons"){
+      const maxPolys=Math.max(...databaseImages.map(img=>(img.markups||[]).filter(m=>m.type==="polygon").length));
       const allPolys=[];
-      imgData.images.forEach((img,imgIdx)=>{
-        const polys=(img.markups||[]).filter(m=>m.type==="polygon");
-        polys.forEach((poly,polyIdx)=>{
-          if(!allPolys[polyIdx])allPolys[polyIdx]={label:poly.label||`Polygon${polyIdx+1}`,values:[]};
-          const meas=computeMeasurements(poly,img.calibration);
-          allPolys[polyIdx].values[imgIdx]=meas;
+      for(let polyIdx=0;polyIdx<maxPolys;polyIdx++){
+        allPolys[polyIdx]={label:`Polygon${polyIdx+1}`,values:[]};
+        databaseImages.forEach((img,imgIdx)=>{
+          const polys=(img.markups||[]).filter(m=>m.type==="polygon");
+          const poly=polys[polyIdx];
+          if(poly){
+            const meas=computeMeasurements(poly,img.calibration);
+            allPolys[polyIdx].values[imgIdx]={area:meas.area,perimeter:meas.perimeter};
+          }
         });
-      });
+      }
       return allPolys;
     }
     return[];
   };
 
+  const tableData=getTableData();
+  const numImages=databaseImages.length;
+
   return(
-    <div style={{padding:12}}>
-      <div style={{display:"flex",gap:4,marginBottom:12,flexWrap:"wrap"}}>
-        {tableTypes.map(type=>(
-          <button key={type.id} onClick={()=>setActiveTable(type.id)}
-            style={{padding:"6px 10px",borderRadius:6,border:"none",background:activeTable===type.id?t.acc:t.surf3,color:activeTable===type.id?(t.id==="light"?"#fff":t.bg):t.tx,cursor:"pointer",fontSize:11,fontWeight:600}}>
-            {type.icon} {type.label}
+    <div>
+      <div style={{display:"flex",gap:4,marginBottom:12}}>
+        {tableTypes.map(tt=>(
+          <button key={tt.id} onClick={()=>setActiveTable(tt.id)} style={{padding:"6px 12px",borderRadius:6,border:`1px solid ${activeTable===tt.id?t.acc:t.bdr}`,background:activeTable===tt.id?t.acc+"22":"transparent",color:activeTable===tt.id?t.acc:t.tx,cursor:"pointer",fontSize:12}}>
+            {tt.icon} {tt.label}
           </button>
         ))}
+        <button onClick={()=>exportTableCSV(activeTable)} style={{marginLeft:"auto",padding:"6px 12px",borderRadius:6,border:`1px solid ${t.bdr}`,background:t.surf2,color:t.tx,cursor:"pointer",fontSize:12}}>Export CSV</button>
       </div>
-      {databaseImages.length===0&&<div style={{color:t.tx3,fontSize:12,textAlign:"center",padding:20}}>No database images imported.</div>}
-      {databaseImages.length>0&&(
+      {tableData.length===0?<div style={{color:t.tx2,textAlign:"center",padding:20}}>No {activeTable} data</div>:(
         <div style={{overflowX:"auto"}}>
-          <table style={{width:"100%",fontSize:10,borderCollapse:"collapse"}}>
+          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,fontFamily:"'DM Mono',monospace"}}>
             <thead>
-              <tr style={{borderBottom:`2px solid ${t.bdr}`}}>
-                <th style={{textAlign:"left",padding:6,color:t.tx2}}>Variable</th>
-                {databaseImages[currentImageIndex].images.map((img,idx)=>(
-                  <th key={idx} style={{textAlign:"center",padding:6,color:t.acc,minWidth:60}}>Image {idx+1}</th>
+              <tr>
+                <th style={{textAlign:"left",padding:"8px 12px",borderBottom:`1px solid ${t.bdr}`,background:t.surf2,color:t.tx2}}>{activeTable}</th>
+                {databaseImages.map((img,i)=>(
+                  <th key={i} style={{textAlign:"center",padding:"8px 12px",borderBottom:`1px solid ${t.bdr}`,background:t.surf2,color:t.acc}}>Img {i+1}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {activeTable==="points"&&getTableData().map((row,rowIdx)=>(
+              {tableData.map((row,rowIdx)=>(
                 <tr key={rowIdx}>
-                  <td style={{padding:4,borderBottom:`1px solid ${t.bdr}44`}}>
-                    <div style={{fontWeight:600,color:t.tx}}>{row.label}_X</div>
-                    <div style={{fontWeight:600,color:t.tx}}>{row.label}_Y</div>
-                  </td>
-                  {row.values.map((val,valIdx)=>(
-                    <td key={valIdx} style={{padding:4,textAlign:"center",borderBottom:`1px solid ${t.bdr}44`}}>
-                      <div style={{fontFamily:"'DM Mono',monospace",color:t.acc}}>{val?.x?.toFixed(1)??"—"}</div>
-                      <div style={{fontFamily:"'DM Mono',monospace",color:t.acc}}>{val?.y?.toFixed(1)??"—"}</div>
-                    </td>
-                  ))}
-                </tr>
-              ))}
-              {activeTable==="angles"&&getTableData().map((row,rowIdx)=>(
-                <tr key={rowIdx}>
-                  <td style={{padding:4,borderBottom:`1px solid ${t.bdr}44`}}>
-                    <div style={{fontWeight:600,color:t.tx}}>{row.label}_deg</div>
-                    <div style={{fontWeight:600,color:t.tx}}>{row.label}_rad</div>
-                  </td>
-                  {row.values.map((val,valIdx)=>(
-                    <td key={valIdx} style={{padding:4,textAlign:"center",borderBottom:`1px solid ${t.bdr}44`}}>
-                      <div style={{fontFamily:"'DM Mono',monospace",color:t.acc}}>{val?.toFixed(1)??"—"}</div>
-                      <div style={{fontFamily:"'DM Mono',monospace",color:t.tx2}}>{val?(val*Math.PI/180).toFixed(3):"—"}</div>
-                    </td>
-                  ))}
-                </tr>
-              ))}
-              {(activeTable==="lines"||activeTable==="curves")&&getTableData().map((row,rowIdx)=>(
-                <tr key={rowIdx}>
-                  <td style={{padding:4,borderBottom:`1px solid ${t.bdr}44`,fontWeight:600,color:t.tx}}>{row.label}</td>
-                  {row.values.map((val,valIdx)=>(
-                    <td key={valIdx} style={{padding:4,textAlign:"center",borderBottom:`1px solid ${t.bdr}44`,fontFamily:"'DM Mono',monospace",color:t.acc}}>
-                      {val?.toFixed(2)??"—"} mm
-                    </td>
-                  ))}
-                </tr>
-              ))}
-              {activeTable==="polygons"&&getTableData().map((row,rowIdx)=>(
-                <tr key={rowIdx}>
-                  <td style={{padding:4,borderBottom:`1px solid ${t.bdr}44`}}>
-                    <div style={{fontWeight:600,color:t.tx}}>{row.label}_area</div>
-                    <div style={{fontWeight:600,color:t.tx}}>{row.label}_perimeter</div>
-                  </td>
-                  {row.values.map((val,valIdx)=>(
-                    <td key={valIdx} style={{padding:4,textAlign:"center",borderBottom:`1px solid ${t.bdr}44`}}>
-                      <div style={{fontFamily:"'DM Mono',monospace",color:t.acc}}>{val?.area?.toFixed(2)??"—"} mm²</div>
-                      <div style={{fontFamily:"'DM Mono',monospace",color:t.tx2}}>{val?.perimeter?.toFixed(2)??"—"} mm</div>
+                  <td style={{padding:"8px 12px",borderBottom:`1px solid ${t.bdr}`,color:t.tx,fontWeight:500}}>{row.label}</td>
+                  {row.values.map((v,colIdx)=>(
+                    <td key={colIdx} style={{padding:"8px 12px",borderBottom:`1px solid ${t.bdr}`,textAlign:"center",color:v!=null?t.tx:t.tx3}}>
+                      {v==null?"-":activeTable==="points"?`(${v.x?.toFixed(1)??'-'},${v.y?.toFixed(1)??'-'})`:activeTable==="polygons"?`A:${v.area?.toFixed(1)??'-'} P:${v.perimeter?.toFixed(1)??'-'}`:typeof v==="number"?v.toFixed(2):v}
                     </td>
                   ))}
                 </tr>
@@ -2431,7 +2404,6 @@ function MarkupTablesPanel({databaseImages,currentImageIndex,t,formatAngle}){
           </table>
         </div>
       )}
-      {databaseImages.length>0&&<Btn t={t} small onClick={()=>exportTableCSV(activeTable)} style={{width:"100%",marginTop:12}}>⬇ Export CSV</Btn>}
     </div>
   );
 }
@@ -2444,9 +2416,7 @@ function DatabaseStatsPanel({databaseImages,currentImageIndex,t}){
 
   const buildDataset=()=>{
     const dataset=[];
-    const imgData=databaseImages[currentImageIndex];
-    if(!imgData)return dataset;
-    imgData.images.forEach((img,idx)=>{
+    databaseImages.forEach((img,idx)=>{
       const entry={id:`img_${idx}`,measurements:{},formulas:{},group:"default",timepoint:`T${idx+1}`,operator:"default"};
       (img.markups||[]).forEach(m=>{
         const meas=computeMeasurements(m,img.calibration);
@@ -2467,7 +2437,7 @@ function DatabaseStatsPanel({databaseImages,currentImageIndex,t}){
         <Btn t={t} small active={view==="dashboard"} onClick={()=>setView("dashboard")}>Statistics Dashboard</Btn>
       </div>
       {view==="tables"&&<MarkupTablesPanel databaseImages={databaseImages} currentImageIndex={currentImageIndex} t={t} formatAngle={(v)=>v.toFixed(1)+"°"}/>}
-      {view==="dashboard"&&<StatsDashboard dataset={buildDataset()}/>}
+      {view==="dashboard"&&<StatsDashboard dataset={buildDataset()} t={t}/>}
     </div>
   );
 }
