@@ -2494,7 +2494,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const[reproCollecting,setReproCollecting]=useState(null);
 
   // Database mode states
-  const[databaseMode,setDatabaseMode]=useState(true); // Default to database mode
+  const[databaseMode,setDatabaseMode]=useState(false); // Default to off
   const[databaseImages,setDatabaseImages]=useState([]); // Array of {id, name, dataUrl, markups:[], calibration:{}, processing:{}}
   const[currentImageIndex,setCurrentImageIndex]=useState(0);
   const[showDatabaseImport,setShowDatabaseImport]=useState(false);
@@ -2581,7 +2581,8 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     }));
   };
   const updMarkup=(id,patch)=>{
-    if(databaseMode){
+    const useDb=databaseMode&&databaseImages.length>0&&!reproCollecting;
+    if(useDb){
       const currentDbImg=databaseImages[currentImageIndex];
       const currentMarkups=currentDbImg?.markups||[];
       const prevM=currentMarkups.find(m=>m.id===id);
@@ -2603,7 +2604,8 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     }
   };
   const delMarkup=id=>{
-    if(databaseMode){
+    const useDb=databaseMode&&databaseImages.length>0&&!reproCollecting;
+    if(useDb){
       const newMarkups=(databaseImages[currentImageIndex]?.markups||[]).filter(mm=>mm.id!==id);
       updateDatabaseImage(currentImageIndex,{markups:newMarkups});
       if(selectedId===id)setSelectedId(null);
@@ -2627,16 +2629,17 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     }
   };
   const addMarkup=partial=>{
-    const currentDbImg=databaseMode?databaseImages[currentImageIndex]:null;
-    const existingMarkups=currentDbImg?.markups||[];
+    const useDb=databaseMode&&databaseImages.length>0&&!reproCollecting;
+    const currentDbImg=useDb?databaseImages[currentImageIndex]:null;
+    const existingMarkups=useDb?(currentDbImg?.markups||[]):markups;
     const typeCount=(type)=>existingMarkups.filter(m=>m.type===type).length;
     const m={id:uid(),color:t.acc,width:1.5,style:"solid",size:6,label:"",definition:"",showLength:true,strokeColor:t.acc,fillColor:t.acc+"22",strokeWidth:1.5,visible:true,...partial};
     if(partial.type==="point")m.label=`P${typeCount("point")+1}`;
     if(partial.type==="line"||partial.type==="parallel")m.label=partial.label||`Line ${typeCount("line")+typeCount("parallel")+1}`;
     if(partial.type==="curve")m.label=partial.label||`Trace ${typeCount("curve")+1}`;
     if(partial.type==="angle3"||partial.type==="angle4")m.label=partial.label||`Angle ${typeCount("angle3")+typeCount("angle4")+1}`;
-    if(databaseMode){
-      const newMarkups=[...existingMarkups,m];
+    if(useDb){
+      const newMarkups=[...currentDbImg?.markups||[],m];
       updateDatabaseImage(currentImageIndex,{markups:newMarkups});
       setSelectedId(m.id);
       return m;
@@ -2644,8 +2647,9 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     updMarkups(ms=>[...ms,m]);setSelectedId(m.id);return m;
   };
   const finalizeMarkup=draw=>{
-    const currentDbImg=databaseMode?databaseImages[currentImageIndex]:null;
-    const existingMarkups=currentDbImg?.markups||[];
+    const useDb=databaseMode&&databaseImages.length>0&&!reproCollecting;
+    const currentDbImg=useDb?databaseImages[currentImageIndex]:null;
+    const existingMarkups=useDb?(currentDbImg?.markups||[]):markups;
     const D={
       line:{color:t.acc,width:1.5,style:"solid",mode:"segment",label:`Line ${existingMarkups.filter(m=>m.type==="line").length+1}`,showLength:true},
       angle3:{color:"#f472b6",width:1.5,label:`Angle ${existingMarkups.filter(m=>m.type==="angle3").length+1}`},
@@ -2711,8 +2715,8 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         ctx.restore();
       });
     }
-    const drawMarkups=databaseMode?activeMarkups:markups;
-    const drawCalibration=databaseMode?activeCalibration:calibration;
+    const drawMarkups=databaseMode&&databaseImages.length>0&&!reproCollecting?activeMarkups:markups;
+    const drawCalibration=databaseMode&&databaseImages.length>0&&!reproCollecting?activeCalibration:calibration;
     drawMarkups.forEach(m=>drawMarkup(ctx,m,zoom,pan,drawCalibration,selectedId,t,reproCollecting,canvasSize.current,angleMode));
     if(showDisplacement){
       if(!compareVersion){
@@ -2820,9 +2824,9 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
 
   const handleMouseDown=useCallback(e=>{
     if(e.button!==0)return;
-    const currentDbImg=databaseMode&&databaseImages.length>0?databaseImages[currentImageIndex]:null;
+    const currentDbImg=databaseMode&&!reproCollecting&&databaseImages.length>0?databaseImages[currentImageIndex]:null;
     const dbMarkups=currentDbImg?.markups||[];
-    const activeMarkupsList=databaseMode?dbMarkups:markups;
+    const activeMarkupsList=databaseMode&&!reproCollecting?dbMarkups:markups;
     const sp=getCanvasPos(e);let ip=toImage(sp.x,sp.y);
     ip=snapPoint(ip,activeMarkupsList,12/zoom,snapEnabled);
     if(placingMode&&placingQueue.length>0&&placingIdx<placingQueue.length){
@@ -2899,18 +2903,18 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   },[activeTool,markups,zoom,pan,snapEnabled,currentDraw,selectedMarkup,curveMode,placingMode,placingQueue,placingIdx,reproCollecting,reproStudies,databaseMode,databaseImages,currentImageIndex]);
 
   const handleMouseMove=useCallback(e=>{
-    const currentDbImg=databaseMode&&databaseImages.length>0?databaseImages[currentImageIndex]:null;
+    const currentDbImg=databaseMode&&!reproCollecting&&databaseImages.length>0?databaseImages[currentImageIndex]:null;
     const dbMarkups=currentDbImg?.markups||[];
-    const activeMarkupsList=databaseMode?dbMarkups:markups;
+    const activeMarkupsList=databaseMode&&!reproCollecting?dbMarkups:markups;
     const sp=getCanvasPos(e);setMousePos(sp);
     if(snapEnabled&&activeTool!=="select"&&activeTool!=="pan"){const ip=toImage(sp.x,sp.y);const sn=snapPoint(ip,activeMarkupsList,12/zoom,snapEnabled);setSnapPos((Math.abs(sn.x-ip.x)>0.1||Math.abs(sn.y-ip.y)>0.1)?sn:null);}else setSnapPos(null);
     if(isPanning.current&&panStart.current)setPan({x:panStart.current.px+(e.clientX-panStart.current.mx),y:panStart.current.py+(e.clientY-panStart.current.my)});
     if(isDragging.current&&dragMid.current){const ip=toImage(sp.x,sp.y);const dx=ip.x-dragStart.current.x,dy=ip.y-dragStart.current.y;updMarkup(dragMid.current,{points:(activeMarkupsList.find(m=>m.id===dragMid.current)?.points||[]).map((p,i)=>i===dragPtIdx.current?{x:p.x+dx,y:p.y+dy}:p)});dragStart.current=ip;}
-  },[activeTool,markups,zoom,snapEnabled,databaseMode,databaseImages,currentImageIndex]);
+  },[activeTool,markups,zoom,snapEnabled,databaseMode,databaseImages,currentImageIndex,reproCollecting]);
 
   const handleMouseUp=()=>{
-    const currentDbImg=databaseMode&&databaseImages.length>0?databaseImages[currentImageIndex]:null;
-    const activeMarkupsList=databaseMode?(currentDbImg?.markups||[]):markups;
+    const currentDbImg=databaseMode&&!reproCollecting&&databaseImages.length>0?databaseImages[currentImageIndex]:null;
+    const activeMarkupsList=databaseMode&&!reproCollecting?(currentDbImg?.markups||[]):markups;
     if(isDragging.current&&dragStartState.current){
       const currentState=JSON.stringify(activeMarkupsList);
       if(dragStartState.current!==currentState){
@@ -2929,7 +2933,8 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const handleTouchEnd=()=>{handleMouseUp();lastTouchDist.current=null;};
 
   const finalizeCalib=(mm,manualPpm)=>{
-    if(databaseMode){
+    const useDb=databaseMode&&databaseImages.length>0&&!reproCollecting;
+    if(useDb){
       const currentDbImg=databaseImages[currentImageIndex];
       const currentMarkups=currentDbImg?.markups||[];
       if(manualPpm){
@@ -2980,8 +2985,8 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const cursorStyle={select:"default",pan:"grab",point:"crosshair",line:"crosshair",angle3:"crosshair",angle4:"crosshair",polygon:"crosshair",curve:"crosshair",perp:"crosshair",parallel:"crosshair",midpoint:"crosshair",perppoint:"crosshair",arrow:"crosshair",text:"text",ruler:"crosshair"}[activeTool]||"default";
   const availAnalyses=PREDEFINED[project.projection]||[];
 
-  const panelIcons={markups:"◉",measurements:"📏",formulas:"∑",image:"▦",layers:"⊞",versions:"☰",reproducibility:"↻",statistics:"σ",templates:"▤",themes:"◐"};
-  const panelTabs=[["markups","Markups"],["measurements","Measure"],["formulas","Formulas"],["image","Image"],["layers","Layers"],["versions","Versions"],["reproducibility","Reproducibility"],["statistics","Statistics"],["templates","Templates"],["themes","Themes"]];
+  const panelIcons={markups:"◉",measurements:"📏",formulas:"∑",image:"▦",layers:"⊞",versions:"☰",reproducibility:"↻",statistics:"σ",templates:"▤",themes:"◐","repro-stats":"≋"};
+  const panelTabs=[["markups","Markups"],["measurements","Measure"],["formulas","Formulas"],["image","Image"],["layers","Layers"],["versions","Versions"],["reproducibility","Reproducibility"],["statistics","Statistics"],["repro-stats","Repro Stats"],["templates","Templates"],["themes","Themes"]];
 
   return(
     <div style={{height:"100vh",display:"flex",flexDirection:"column",background:t.bg,color:t.tx,fontFamily:"'DM Sans',sans-serif",overflow:"hidden"}}>
@@ -3019,7 +3024,14 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         <Btn t={t} small onClick={()=>openImgRef.current?.click()}>Open</Btn>
         {!isMobile&&<Btn t={t} small onClick={()=>stackImgRef.current?.click()}>+ Stack</Btn>}
         <Btn t={t} small onClick={()=>exportCephx(project)}>Save</Btn>
-        {!isMobile&&<Btn t={t} small onClick={()=>setShowDatabaseImport(true)}>Database</Btn>}
+        {!isMobile&&<div style={{display:"flex",alignItems:"center",gap:6}}>
+          <Btn t={t} small onClick={()=>setShowDatabaseImport(true)}>DB</Btn>
+          <button onClick={()=>{if(!databaseMode&&databaseImages.length===0)setShowDatabaseImport(true);else if(databaseMode){setDatabaseMode(false);setDatabaseImages([]);setCurrentImageIndex(0);}}} title={databaseImages.length===0?"Import images first":"Toggle Database Mode"} style={{background:"none",border:"none",cursor:databaseImages.length===0?"not-allowed":"pointer",padding:4,display:"flex",alignItems:"center",opacity:databaseImages.length===0?0.5:1}}>
+            <div style={{width:36,height:20,borderRadius:10,background:databaseMode?t.acc:t.surf3,border:`1px solid ${databaseMode?t.acc:t.bdr}`,position:"relative",transition:"all 0.2s"}}>
+              <div style={{width:16,height:16,borderRadius:8,background:databaseMode?(t.id==="light"?"#fff":t.bg):t.tx,position:"absolute",top:1,left:databaseMode?18:2,transition:"all 0.2s",boxShadow:"0 1px 3px rgba(0,0,0,3)"}}/>
+            </div>
+          </button>
+        </div>}
         {!isMobile&&<Btn t={t} small onClick={()=>setShowExport(true)}>Export</Btn>}
         {!isMobile&&<Btn t={t} small onClick={()=>setShowAnon(true)}>Anonymization</Btn>}
         <div style={{width:1,height:20,background:t.bdr,flexShrink:0}}/>
@@ -3189,7 +3201,8 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
                   {rightPanel==="layers"&&<LayersPanel t={t} images={project.images} onUpdateImages={imgs=>onUpdateProject({images:imgs})} onAddImage={e=>{if(e.target.files[0])loadImage(e.target.files[0],true);}} showDisplacement={showDisplacement} setShowDisplacement={setShowDisplacement} compareVersionId={compareVersionId} setCompareVersionId={setCompareVersionId} versions={project.versions} onShowAlign={()=>setShowAlign(true)} onShowTransform={()=>setShowTransform(true)}/>}
                   {rightPanel==="versions"&&<VersionsPanel project={project} t={t} onUpdateProject={onUpdateProject} onUpdateVersion={onUpdateVersion} onExportTemplate={v=>exportCepht({name:`${project.name}-${v.label}`,projection:project.projection,markups:v.markups||[],formulas:v.formulas||[],norms:v.norms||[]})}/>}
                   {rightPanel==="reproducibility"&&<ReproducibilityPanel t={t} markups={markups} studies={reproStudies} onUpdateStudies={setReproStudies} activeStudyId={activeStudyId} setActiveStudyId={setActiveStudyId} reproCollecting={reproCollecting} setReproCollecting={setReproCollecting}/>}
-                  {rightPanel==="statistics"&&(databaseMode?<DatabaseStatsPanel databaseImages={databaseImages} currentImageIndex={currentImageIndex} t={t}/>:<StatisticsPanel t={t} studies={reproStudies}/>)}
+                  {rightPanel==="statistics"&&(databaseMode?<DatabaseStatsPanel databaseImages={databaseImages} currentImageIndex={currentImageIndex} t={t}/>:<div style={{padding:12}}><div style={{fontSize:12,color:t.tx3,textAlign:"center"}}>Enable Database Mode to view statistics</div></div>)}
+                  {rightPanel==="repro-stats"&&<StatisticsPanel t={t} studies={reproStudies}/>}
                   {rightPanel==="templates"&&<TemplatesPanel t={t} projection={project.projection} onLoadTemplate={loadTemplate}/>}
                   {rightPanel==="themes"&&(
                     <div style={{padding:12}}>
