@@ -2007,8 +2007,470 @@ function FormulaEditor({t,formula,scope,onSave,onClose}){
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PIN GATE
+// DATABASE MODE MODAL
 // ═══════════════════════════════════════════════════════════════════════════════
+function DatabaseImportModal({t,onImport,onClose}){
+  const fileRef=useRef(null);
+  const[files,setFiles]=useState([]);
+
+  const handleFileChange=e=>{
+    const newFiles=Array.from(e.target.files);
+    setFiles(prev=>[...prev,...newFiles]);
+  };
+
+  const removeFile=idx=>{
+    setFiles(prev=>prev.filter((_,i)=>i!==idx));
+  };
+
+  const handleImport=()=>{
+    if(files.length===0)return;
+    onImport(files);
+    onClose();
+  };
+
+  return(
+    <div>
+      <div style={{fontSize:13,color:t.tx2,marginBottom:16,lineHeight:1.5}}>
+        Select multiple images to import for batch processing. Each image will have its own markups and calibration.
+      </div>
+      <input ref={fileRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={handleFileChange}/>
+      <div onClick={()=>fileRef.current?.click()} style={{border:`2px dashed ${t.bdr}`,borderRadius:10,padding:24,textAlign:"center",cursor:"pointer",marginBottom:16}}>
+        <div style={{fontSize:24,marginBottom:8}}>📁</div>
+        <div style={{fontSize:13,color:t.tx}}>Click to select images</div>
+        <div style={{fontSize:11,color:t.tx3}}>or drag and drop</div>
+      </div>
+      {files.length>0&&(
+        <div style={{marginBottom:16}}>
+          <div style={{fontSize:11,fontWeight:700,color:t.tx2,marginBottom:8}}>Selected files ({files.length})</div>
+          <div style={{maxHeight:180,overflowY:"auto"}}>
+            {files.map((f,idx)=>(
+              <div key={idx} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",background:t.surf2,borderRadius:6,marginBottom:4}}>
+                <span style={{flex:1,fontSize:11,color:t.tx,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{f.name}</span>
+                <span style={{fontSize:10,color:t.tx3}}>{(f.size/1024).toFixed(1)} KB</span>
+                <button onClick={()=>removeFile(idx)} style={{background:"none",border:"none",color:t.tx3,cursor:"pointer",fontSize:14}}>×</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      <div style={{display:"flex",gap:8}}>
+        <Btn t={t} onClick={handleImport} disabled={files.length===0} style={{flex:1}}>Import {files.length} Image{files.length!==1?"s":""}</Btn>
+        <Btn t={t} onClick={onClose} style={{flex:1}}>Cancel</Btn>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// STATS DASHBOARD
+// ═══════════════════════════════════════════════════════════════════════════════
+function mean$1(arr){
+  if(!arr.length) return null;
+  return arr.reduce((a,b)=>a+b,0)/arr.length;
+}
+
+function std$1(arr){
+  if(arr.length < 2) return null;
+  const m = mean$1(arr);
+  return Math.sqrt(arr.reduce((s,x)=>s+(x-m)**2,0)/(arr.length-1));
+}
+
+function median$1(arr){
+  if(!arr.length) return null;
+  const sorted = [...arr].sort((a,b)=>a-b);
+  const mid = Math.floor(sorted.length/2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid-1]+sorted[mid])/2;
+}
+
+function range$1(arr){
+  if(!arr.length) return null;
+  return { min: Math.min(...arr), max: Math.max(...arr) };
+}
+
+function correlation$1(x,y){
+  if(x.length !== y.length || x.length < 2) return null;
+  const mx = mean$1(x);
+  const my = mean$1(y);
+  const num = x.reduce((s,xi,i)=>s+(xi-mx)*(y[i]-my),0);
+  const den = Math.sqrt(
+    x.reduce((s,xi)=>s+(xi-mx)**2,0) *
+    y.reduce((s,yi)=>s+(yi-my)**2,0)
+  );
+  return den === 0 ? null : num/den;
+}
+
+function groupBy$1(dataset, key){
+  return dataset.reduce((acc, item)=>{
+    const k = item[key] || "undefined";
+    if(!acc[k]) acc[k] = [];
+    acc[k].push(item);
+    return acc;
+  }, {});
+}
+
+function extractVariable$1(dataset, variable){
+  return dataset
+    .map(c => c.measurements?.[variable] ?? c.formulas?.[variable])
+    .filter(v => typeof v === "number");
+}
+
+function descriptiveStats$1(values){
+  return {
+    n: values.length,
+    mean: mean$1(values),
+    sd: std$1(values),
+    median: median$1(values),
+    range: range$1(values)
+  };
+}
+
+function StatsDashboard({ dataset, t }) {
+  const [selectedVar, setSelectedVar] = useState("SNA");
+  const [groupKey, setGroupKey] = useState("group");
+
+  const variables = useMemo(()=>{
+    if(!dataset.length) return [];
+    return Object.keys({
+      ...(dataset[0]?.measurements||{}),
+      ...(dataset[0]?.formulas||{})
+    });
+  },[dataset]);
+
+  const values = useMemo(()=> extractVariable$1(dataset, selectedVar), [dataset, selectedVar]);
+  const stats = useMemo(()=> descriptiveStats$1(values), [values]);
+  const grouped = useMemo(()=> groupBy$1(dataset, groupKey), [dataset, groupKey]);
+
+  return (
+    <div style={{padding:16}}>
+      <h3 style={{fontSize:14,fontWeight:700,color:"inherit",marginBottom:12}}>Statistical Dashboard</h3>
+      <div style={{marginBottom:10}}>
+        <label style={{fontSize:11,color:t.tx2,marginRight:8}}>Variable: </label>
+        <select value={selectedVar} onChange={e=>setSelectedVar(e.target.value)} style={{padding:"4px 8px",border:`1px solid ${t.bdr}`,borderRadius:4,background:t.surf3,color:t.tx,fontSize:11}}>
+          {variables.map(v => <option key={v} value={v}>{v}</option>)}
+        </select>
+      </div>
+      <div style={{marginBottom:20, padding:10, border:"1px solid "+t.bdr,borderRadius:8}}>
+        <strong style={{fontSize:11,color:t.tx}}>Descriptive Statistics</strong>
+        <div style={{fontSize:11,marginTop:6}}>N = {stats.n}</div>
+        <div style={{fontSize:11}}>Mean = {stats.mean?.toFixed(2)}</div>
+        <div style={{fontSize:11}}>SD = {stats.sd?.toFixed(2)}</div>
+        <div style={{fontSize:11}}>Median = {stats.median?.toFixed(2)}</div>
+        <div style={{fontSize:11}}>Range = {stats.range ? `${stats.range.min} – ${stats.range.max}` : "-"}</div>
+      </div>
+      <div style={{marginBottom:20}}>
+        <label style={{fontSize:11,color:t.tx2,marginRight:8}}>Group by: </label>
+        <select value={groupKey} onChange={e=>setGroupKey(e.target.value)} style={{padding:"4px 8px",border:`1px solid ${t.bdr}`,borderRadius:4,background:t.surf3,color:t.tx,fontSize:11}}>
+          <option value="group">Group</option>
+          <option value="timepoint">Timepoint</option>
+          <option value="operator">Operator</option>
+        </select>
+        {Object.entries(grouped).map(([g, cases])=>{
+          const vals = extractVariable$1(cases, selectedVar);
+          const s = descriptiveStats$1(vals);
+          return (
+            <div key={g} style={{marginTop:8, padding:8, border:"1px solid "+t.bdr,borderRadius:6}}>
+              <strong style={{fontSize:11,color:t.tx}}>{g}</strong>
+              <div style={{fontSize:10}}>Mean: {s.mean?.toFixed(2)}</div>
+              <div style={{fontSize:10}}>SD: {s.sd?.toFixed(2)}</div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{marginBottom:20}}>
+        <strong style={{fontSize:11,color:t.tx}}>Correlation (Quick)</strong>
+        {variables.slice(0,5).map(v=>{
+          const arr = extractVariable$1(dataset, v);
+          const r = correlation$1(values, arr);
+          return (
+            <div key={v} style={{fontSize:10,color:t.tx2}}>
+              {selectedVar} vs {v}: {r ? r.toFixed(2) : "-"}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MARKUP TABLES PANEL
+// ═══════════════════════════════════════════════════════════════════════════════
+function MarkupTablesPanel({databaseImages,currentImageIndex,t,formatAngle}){
+  const[activeTable,setActiveTable]=useState("points");
+  const[currentImage]=useState(()=>databaseImages[currentImageIndex]);
+
+  const exportTableCSV=(type)=>{
+    const imgData=databaseImages[currentImageIndex];
+    const rows=[["Variable",...imgData.images.map((_,i)=>`Image ${i+1}`)]];
+    
+    if(type==="points"){
+      imgData.images.forEach((img,imgIdx)=>{
+        const imgMarkups=img.markups||[];
+        const points=imgMarkups.filter(m=>m.type==="point");
+        points.forEach((pt,ptIdx)=>{
+          if(ptIdx===0)rows.push([`P${ptIdx+1}_X`]);
+          else if(rows.length<=ptIdx+1)rows.push([`P${ptIdx+1}_X`]);
+          const vp=vpts(pt);
+          if(vp.length>0){
+            const rowIdx=ptIdx+1;
+            if(!rows[rowIdx])rows[rowIdx]=[`P${ptIdx+1}_X`];
+            rows[rowIdx].push(vp[0].x.toFixed(2));
+          }
+        });
+        points.forEach((pt,ptIdx)=>{
+          const rowIdx=ptIdx+1+points.length;
+          if(!rows[rowIdx])rows[rowIdx]=[`P${ptIdx+1}_Y`];
+          const vp=vpts(pt);
+          if(vp.length>0){
+            rows[rowIdx].push(vp[0].y.toFixed(2));
+          }else{
+            rows[rowIdx].push("");
+          }
+        });
+      });
+    }else if(type==="lines"){
+      imgData.images.forEach((img,imgIdx)=>{
+        const imgMarkups=img.markups||[];
+        const lines=imgMarkups.filter(m=>m.type==="line"||m.type==="parallel");
+        lines.forEach((ln,lnIdx)=>{
+          if(!rows[lnIdx+1])rows[lnIdx+1]=[`Line${lnIdx+1}_length`];
+          const meas=computeMeasurements(ln,img.calibration);
+          rows[lnIdx+1].push(meas.length?.toFixed(2)||"");
+        });
+      });
+    }else if(type==="angles"){
+      imgData.images.forEach((img,imgIdx)=>{
+        const imgMarkups=img.markups||[];
+        const angles=[...imgMarkups.filter(m=>m.type==="angle3"),...imgMarkups.filter(m=>m.type==="angle4")];
+        angles.forEach((ang,angIdx)=>{
+          if(!rows[angIdx*2+1])rows[angIdx*2+1]=[`Angle${angIdx+1}_deg`];
+          if(!rows[angIdx*2+2])rows[angIdx*2+2]=[`Angle${angIdx+1}_rad`];
+          const meas=computeMeasurements(ang,img.calibration);
+          rows[angIdx*2+1].push(meas.angle?.toFixed(2)||"");
+          rows[angIdx*2+2].push(meas.angle?((meas.angle*Math.PI/180).toFixed(4)):"");
+        });
+      });
+    }else if(type==="curves"){
+      imgData.images.forEach((img,imgIdx)=>{
+        const imgMarkups=img.markups||[];
+        const curves=imgMarkups.filter(m=>m.type==="curve");
+        curves.forEach((cv,cvIdx)=>{
+          if(!rows[cvIdx+1])rows[cvIdx+1]=[`Curve${cvIdx+1}_length`];
+          const meas=computeMeasurements(cv,img.calibration);
+          rows[cvIdx+1].push(meas.length?.toFixed(2)||"");
+        });
+      });
+    }else if(type==="polygons"){
+      imgData.images.forEach((img,imgIdx)=>{
+        const imgMarkups=img.markups||[];
+        const polys=imgMarkups.filter(m=>m.type==="polygon");
+        polys.forEach((poly,polyIdx)=>{
+          if(!rows[polyIdx*2+1])rows[polyIdx*2+1]=[`Polygon${polyIdx+1}_area`];
+          if(!rows[polyIdx*2+2])rows[polyIdx*2+2]=[`Polygon${polyIdx+1}_perimeter`];
+          const meas=computeMeasurements(poly,img.calibration);
+          rows[polyIdx*2+1].push(meas.area?.toFixed(2)||"");
+          rows[polyIdx*2+2].push(meas.perimeter?.toFixed(2)||"");
+        });
+      });
+    }
+
+    const csv=rows.map(r=>r.join(",")).join("\n");
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
+    a.download=`markups_${type}_table.csv`;
+    a.click();
+  };
+
+  const tableTypes=[
+    {id:"points",label:"Points",icon:"◉"},
+    {id:"lines",label:"Lines",icon:"⟋"},
+    {id:"angles",label:"Angles",icon:"∠"},
+    {id:"curves",label:"Curves",icon:"∿"},
+    {id:"polygons",label:"Polygons",icon:"⬡"},
+  ];
+
+  const getTableData=()=>{
+    const imgData=databaseImages[currentImageIndex];
+    if(!imgData)return[];
+    
+    if(activeTable==="points"){
+      const allPoints=[];
+      imgData.images.forEach((img,imgIdx)=>{
+        const points=(img.markups||[]).filter(m=>m.type==="point");
+        points.forEach((pt,ptIdx)=>{
+          if(!allPoints[ptIdx])allPoints[ptIdx]={label:`P${ptIdx+1}`,values:[]};
+          const vp=vpts(pt);
+          allPoints[ptIdx].values[imgIdx]=vp.length>0?{x:vp[0].x,y:vp[0].y}:null;
+        });
+      });
+      return allPoints;
+    }else if(activeTable==="lines"){
+      const allLines=[];
+      imgData.images.forEach((img,imgIdx)=>{
+        const lines=[...(img.markups||[]).filter(m=>m.type==="line"),...(img.markups||[]).filter(m=>m.type==="parallel")];
+        lines.forEach((ln,lnIdx)=>{
+          if(!allLines[lnIdx])allLines[lnIdx]={label:ln.label||`Line${lnIdx+1}`,values:[]};
+          const meas=computeMeasurements(ln,img.calibration);
+          allLines[lnIdx].values[imgIdx]=meas.length;
+        });
+      });
+      return allLines;
+    }else if(activeTable==="angles"){
+      const allAngles=[];
+      imgData.images.forEach((img,imgIdx)=>{
+        const angles=[...(img.markups||[]).filter(m=>m.type==="angle3"),...(img.markups||[]).filter(m=>m.type==="angle4")];
+        angles.forEach((ang,angIdx)=>{
+          if(!allAngles[angIdx])allAngles[angIdx]={label:ang.label||`Angle${angIdx+1}`,values:[]};
+          const meas=computeMeasurements(ang,img.calibration);
+          allAngles[angIdx].values[imgIdx]=meas.angle;
+        });
+      });
+      return allAngles;
+    }else if(activeTable==="curves"){
+      const allCurves=[];
+      imgData.images.forEach((img,imgIdx)=>{
+        const curves=(img.markups||[]).filter(m=>m.type==="curve");
+        curves.forEach((cv,cvIdx)=>{
+          if(!allCurves[cvIdx])allCurves[cvIdx]={label:cv.label||`Curve${cvIdx+1}`,values:[]};
+          const meas=computeMeasurements(cv,img.calibration);
+          allCurves[cvIdx].values[imgIdx]=meas.length;
+        });
+      });
+      return allCurves;
+    }else if(activeTable==="polygons"){
+      const allPolys=[];
+      imgData.images.forEach((img,imgIdx)=>{
+        const polys=(img.markups||[]).filter(m=>m.type==="polygon");
+        polys.forEach((poly,polyIdx)=>{
+          if(!allPolys[polyIdx])allPolys[polyIdx]={label:poly.label||`Polygon${polyIdx+1}`,values:[]};
+          const meas=computeMeasurements(poly,img.calibration);
+          allPolys[polyIdx].values[imgIdx]=meas;
+        });
+      });
+      return allPolys;
+    }
+    return[];
+  };
+
+  return(
+    <div style={{padding:12}}>
+      <div style={{display:"flex",gap:4,marginBottom:12,flexWrap:"wrap"}}>
+        {tableTypes.map(type=>(
+          <button key={type.id} onClick={()=>setActiveTable(type.id)}
+            style={{padding:"6px 10px",borderRadius:6,border:"none",background:activeTable===type.id?t.acc:t.surf3,color:activeTable===type.id?(t.id==="light"?"#fff":t.bg):t.tx,cursor:"pointer",fontSize:11,fontWeight:600}}>
+            {type.icon} {type.label}
+          </button>
+        ))}
+      </div>
+      {databaseImages.length===0&&<div style={{color:t.tx3,fontSize:12,textAlign:"center",padding:20}}>No database images imported.</div>}
+      {databaseImages.length>0&&(
+        <div style={{overflowX:"auto"}}>
+          <table style={{width:"100%",fontSize:10,borderCollapse:"collapse"}}>
+            <thead>
+              <tr style={{borderBottom:`2px solid ${t.bdr}`}}>
+                <th style={{textAlign:"left",padding:6,color:t.tx2}}>Variable</th>
+                {databaseImages[currentImageIndex].images.map((img,idx)=>(
+                  <th key={idx} style={{textAlign:"center",padding:6,color:t.acc,minWidth:60}}>Image {idx+1}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {activeTable==="points"&&getTableData().map((row,rowIdx)=>(
+                <tr key={rowIdx}>
+                  <td style={{padding:4,borderBottom:`1px solid ${t.bdr}44`}}>
+                    <div style={{fontWeight:600,color:t.tx}}>{row.label}_X</div>
+                    <div style={{fontWeight:600,color:t.tx}}>{row.label}_Y</div>
+                  </td>
+                  {row.values.map((val,valIdx)=>(
+                    <td key={valIdx} style={{padding:4,textAlign:"center",borderBottom:`1px solid ${t.bdr}44`}}>
+                      <div style={{fontFamily:"'DM Mono',monospace",color:t.acc}}>{val?.x?.toFixed(1)??"—"}</div>
+                      <div style={{fontFamily:"'DM Mono',monospace",color:t.acc}}>{val?.y?.toFixed(1)??"—"}</div>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+              {activeTable==="angles"&&getTableData().map((row,rowIdx)=>(
+                <tr key={rowIdx}>
+                  <td style={{padding:4,borderBottom:`1px solid ${t.bdr}44`}}>
+                    <div style={{fontWeight:600,color:t.tx}}>{row.label}_deg</div>
+                    <div style={{fontWeight:600,color:t.tx}}>{row.label}_rad</div>
+                  </td>
+                  {row.values.map((val,valIdx)=>(
+                    <td key={valIdx} style={{padding:4,textAlign:"center",borderBottom:`1px solid ${t.bdr}44`}}>
+                      <div style={{fontFamily:"'DM Mono',monospace",color:t.acc}}>{val?.toFixed(1)??"—"}</div>
+                      <div style={{fontFamily:"'DM Mono',monospace",color:t.tx2}}>{val?(val*Math.PI/180).toFixed(3):"—"}</div>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+              {(activeTable==="lines"||activeTable==="curves")&&getTableData().map((row,rowIdx)=>(
+                <tr key={rowIdx}>
+                  <td style={{padding:4,borderBottom:`1px solid ${t.bdr}44`,fontWeight:600,color:t.tx}}>{row.label}</td>
+                  {row.values.map((val,valIdx)=>(
+                    <td key={valIdx} style={{padding:4,textAlign:"center",borderBottom:`1px solid ${t.bdr}44`,fontFamily:"'DM Mono',monospace",color:t.acc}}>
+                      {val?.toFixed(2)??"—"} mm
+                    </td>
+                  ))}
+                </tr>
+              ))}
+              {activeTable==="polygons"&&getTableData().map((row,rowIdx)=>(
+                <tr key={rowIdx}>
+                  <td style={{padding:4,borderBottom:`1px solid ${t.bdr}44`}}>
+                    <div style={{fontWeight:600,color:t.tx}}>{row.label}_area</div>
+                    <div style={{fontWeight:600,color:t.tx}}>{row.label}_perimeter</div>
+                  </td>
+                  {row.values.map((val,valIdx)=>(
+                    <td key={valIdx} style={{padding:4,textAlign:"center",borderBottom:`1px solid ${t.bdr}44`}}>
+                      <div style={{fontFamily:"'DM Mono',monospace",color:t.acc}}>{val?.area?.toFixed(2)??"—"} mm²</div>
+                      <div style={{fontFamily:"'DM Mono',monospace",color:t.tx2}}>{val?.perimeter?.toFixed(2)??"—"} mm</div>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {databaseImages.length>0&&<Btn t={t} small onClick={()=>exportTableCSV(activeTable)} style={{width:"100%",marginTop:12}}>⬇ Export CSV</Btn>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DATABASE STATS PANEL
+// ═══════════════════════════════════════════════════════════════════════════════
+function DatabaseStatsPanel({databaseImages,currentImageIndex,t}){
+  const[view,setView]=useState("tables");
+
+  const buildDataset=()=>{
+    const dataset=[];
+    const imgData=databaseImages[currentImageIndex];
+    if(!imgData)return dataset;
+    imgData.images.forEach((img,idx)=>{
+      const entry={id:`img_${idx}`,measurements:{},formulas:{},group:"default",timepoint:`T${idx+1}`,operator:"default"};
+      (img.markups||[]).forEach(m=>{
+        const meas=computeMeasurements(m,img.calibration);
+        const label=m.label||m.type;
+        Object.entries(meas).forEach(([k,v])=>{
+          entry.measurements[`${label}_${k}`]=v;
+        });
+      });
+      dataset.push(entry);
+    });
+    return dataset;
+  };
+
+  return(
+    <div style={{padding:12}}>
+      <div style={{display:"flex",gap:6,marginBottom:16}}>
+        <Btn t={t} small active={view==="tables"} onClick={()=>setView("tables")}>Registered Markups</Btn>
+        <Btn t={t} small active={view==="dashboard"} onClick={()=>setView("dashboard")}>Statistics Dashboard</Btn>
+      </div>
+      {view==="tables"&&<MarkupTablesPanel databaseImages={databaseImages} currentImageIndex={currentImageIndex} t={t} formatAngle={(v)=>v.toFixed(1)+"°"}/>}
+      {view==="dashboard"&&<StatsDashboard dataset={buildDataset()}/>}
+    </div>
+  );
+}
 function PinGate({t,project,onVerified,onCancel}){
   const[pin,setPin]=useState("");const[err,setErr]=useState(false);
   const verify=async()=>{const h=await hashPin(pin);if(h===project.accessControl.pinHash)onVerified();else{setErr(true);setPin("");}};
@@ -2060,6 +2522,12 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const[activeStudyId,setActiveStudyId]=useState(null);
   /** While set, reproducibility landmark points for this session are shown on canvas. */
   const[reproCollecting,setReproCollecting]=useState(null);
+
+  // Database mode states
+  const[databaseMode,setDatabaseMode]=useState(true); // Default to database mode
+  const[databaseImages,setDatabaseImages]=useState([]); // Array of {id, name, dataUrl, markups:[], calibration:{}, processing:{}}
+  const[currentImageIndex,setCurrentImageIndex]=useState(0);
+  const[showDatabaseImport,setShowDatabaseImport]=useState(false);
 
   useEffect(()=>{const fn=()=>setIsMobile(window.innerWidth<768);window.addEventListener("resize",fn);return()=>window.removeEventListener("resize",fn);},[]);
 
@@ -2143,6 +2611,19 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     }));
   };
   const updMarkup=(id,patch)=>{
+    if(databaseMode){
+      const currentDbImg=databaseImages[currentImageIndex];
+      const currentMarkups=currentDbImg?.markups||[];
+      const prevM=currentMarkups.find(m=>m.id===id);
+      const merged=prevM?{...prevM,...patch}:null;
+      const newMarkups=currentMarkups.map(m=>m.id===id?{...m,...patch}:m);
+      updateDatabaseImage(currentImageIndex,{markups:newMarkups});
+      if(merged?.repro?.measurementId&&patch.points){
+        const pt=vpts(merged)[0];
+        if(pt&&pt.x>-9000)syncReproStudyCoords(merged.repro,pt.x,pt.y);
+      }
+      return;
+    }
     const prevM=markups.find(m=>m.id===id);
     const merged=prevM?{...prevM,...patch}:null;
     updMarkups(ms=>ms.map(m=>m.id===id?{...m,...patch}:m));
@@ -2152,6 +2633,12 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     }
   };
   const delMarkup=id=>{
+    if(databaseMode){
+      const newMarkups=(databaseImages[currentImageIndex]?.markups||[]).filter(mm=>mm.id!==id);
+      updateDatabaseImage(currentImageIndex,{markups:newMarkups});
+      if(selectedId===id)setSelectedId(null);
+      return;
+    }
     const m=markups.find(x=>x.id===id);
     updMarkups(ms=>ms.filter(mm=>mm.id!==id));
     if(selectedId===id)setSelectedId(null);
@@ -2170,11 +2657,33 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     }
   };
   const addMarkup=partial=>{
+    const currentDbImg=databaseMode?databaseImages[currentImageIndex]:null;
+    const existingMarkups=currentDbImg?.markups||[];
+    const typeCount=(type)=>existingMarkups.filter(m=>m.type===type).length;
     const m={id:uid(),color:t.acc,width:1.5,style:"solid",size:6,label:"",definition:"",showLength:true,strokeColor:t.acc,fillColor:t.acc+"22",strokeWidth:1.5,visible:true,...partial};
+    if(partial.type==="point")m.label=`P${typeCount("point")+1}`;
+    if(partial.type==="line"||partial.type==="parallel")m.label=partial.label||`Line ${typeCount("line")+typeCount("parallel")+1}`;
+    if(partial.type==="curve")m.label=partial.label||`Trace ${typeCount("curve")+1}`;
+    if(partial.type==="angle3"||partial.type==="angle4")m.label=partial.label||`Angle ${typeCount("angle3")+typeCount("angle4")+1}`;
+    if(databaseMode){
+      const newMarkups=[...existingMarkups,m];
+      updateDatabaseImage(currentImageIndex,{markups:newMarkups});
+      setSelectedId(m.id);
+      return m;
+    }
     updMarkups(ms=>[...ms,m]);setSelectedId(m.id);return m;
   };
   const finalizeMarkup=draw=>{
-    const D={line:{color:t.acc,width:1.5,style:"solid",mode:"segment",label:`Line ${markups.filter(m=>m.type==="line").length+1}`,showLength:true},angle3:{color:"#f472b6",width:1.5},angle4:{color:"#c084fc",width:1.5},polygon:{strokeColor:t.acc,fillColor:t.acc+"22",strokeWidth:1.5},curve:{color:"#fb923c",width:1.5,label:`Trace ${markups.filter(m=>m.type==="curve").length+1}`},perp:{color:"#a78bfa",width:1.5}};
+    const currentDbImg=databaseMode?databaseImages[currentImageIndex]:null;
+    const existingMarkups=currentDbImg?.markups||[];
+    const D={
+      line:{color:t.acc,width:1.5,style:"solid",mode:"segment",label:`Line ${existingMarkups.filter(m=>m.type==="line").length+1}`,showLength:true},
+      angle3:{color:"#f472b6",width:1.5,label:`Angle ${existingMarkups.filter(m=>m.type==="angle3").length+1}`},
+      angle4:{color:"#c084fc",width:1.5,label:`Angle ${existingMarkups.filter(m=>m.type==="angle4").length+1}`},
+      polygon:{strokeColor:t.acc,fillColor:t.acc+"22",strokeWidth:1.5,label:`Polygon ${existingMarkups.filter(m=>m.type==="polygon").length+1}`},
+      curve:{color:"#fb923c",width:1.5,label:`Trace ${existingMarkups.filter(m=>m.type==="curve").length+1}`},
+      perp:{color:"#a78bfa",width:1.5,label:`Perp ${existingMarkups.filter(m=>m.type==="perp").length+1}`}
+    };
     addMarkup({...D[draw.type]||{},...draw});
   };
 
@@ -2199,7 +2708,25 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     const canvas=canvasRef.current;if(!canvas)return;
     const ctx=canvas.getContext("2d");ctx.clearRect(0,0,canvas.width,canvas.height);
     ctx.fillStyle=t.bg;ctx.fillRect(0,0,canvas.width,canvas.height);
-    if(project.images.length===0){
+    
+    const currentDbImg=databaseMode&&databaseImages.length>0?databaseImages[currentImageIndex]:null;
+    const activeMarkups=currentDbImg?.markups||[];
+    const activeCalibration=currentDbImg?.calibration||{done:false,pxPerMm:1};
+    const activeProcessing=currentDbImg?.processing||{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0};
+    const activeLutMode=currentDbImg?.lutMode||"gray";
+    const activeLutInvert=currentDbImg?.lutInvert||false;
+    
+    if(databaseMode&&currentDbImg){
+      const src=imgRefs.current[currentDbImg.id];
+      if(src){
+        const nw=src.naturalWidth||src.width||600,nh=src.naturalHeight||src.height||500;
+        ctx.save();
+        ctx.translate(pan.x,pan.y);
+        ctx.scale(zoom,zoom);
+        ctx.drawImage(src,0,0,nw,nh);
+        ctx.restore();
+      }
+    }else if(project.images.length===0){
       ctx.fillStyle=t.surf;ctx.fillRect(pan.x,pan.y,600*zoom,500*zoom);ctx.strokeStyle=t.bdr;ctx.lineWidth=1;ctx.strokeRect(pan.x,pan.y,600*zoom,500*zoom);
       ctx.fillStyle=t.tx3;ctx.font=`15px "DM Sans",sans-serif`;ctx.textAlign="center";ctx.fillText("Drop or open a cephalogram image",pan.x+300*zoom,pan.y+240*zoom);ctx.fillText("Open Image  •  drag & drop",pan.x+300*zoom,pan.y+265*zoom);ctx.textAlign="left";
     } else {
@@ -2214,25 +2741,27 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         ctx.restore();
       });
     }
-    markups.forEach(m=>drawMarkup(ctx,m,zoom,pan,calibration,selectedId,t,reproCollecting,canvasSize.current,angleMode));
+    const drawMarkups=databaseMode?activeMarkups:markups;
+    const drawCalibration=databaseMode?activeCalibration:calibration;
+    drawMarkups.forEach(m=>drawMarkup(ctx,m,zoom,pan,drawCalibration,selectedId,t,reproCollecting,canvasSize.current,angleMode));
     if(showDisplacement){
       if(!compareVersion){
         ctx.fillStyle="rgba(0,0,0,0.6)";ctx.fillRect(8,8,220,36);
         ctx.fillStyle="#ffd700";ctx.font="bold 12px 'DM Sans',sans-serif";
         ctx.fillText("⇝ Select a compare version in Layers panel",16,28);
       } else {
-        drawDisplacementVectors(ctx,markups,compareVersion.markups||[],zoom,pan);
+        drawDisplacementVectors(ctx,drawMarkups,compareVersion.markups||[],zoom,pan);
       }
     }
     if(currentDraw)drawInProgress(ctx,currentDraw,mousePos,zoom,pan,t);
     if(snapEnabled&&snapPos)drawSnapIndicator(ctx,snapPos,zoom,pan);
-    if(showScaleBar)drawScaleBar(ctx,zoom,calibration,canvas.width,canvas.height,t);
-    if(showLUT&&lutMode!=="gray")drawLUTLegend(ctx,lutMode,lutInvert,canvas.width,canvas.height,t);
+    if(showScaleBar)drawScaleBar(ctx,zoom,drawCalibration,canvas.width,canvas.height,t);
+    if(showLUT&&activeLutMode!=="gray")drawLUTLegend(ctx,activeLutMode,activeLutInvert,canvas.width,canvas.height,t);
     if(placingMode&&placingQueue.length>0&&placingIdx<placingQueue.length){
-      const m=markups.find(x=>x.id===placingQueue[placingIdx]);
+      const m=drawMarkups.find(x=>x.id===placingQueue[placingIdx]);
       if(m){ctx.save();ctx.fillStyle="rgba(0,0,0,0.8)";ctx.fillRect(0,0,canvas.width,36);ctx.fillStyle=t.acc;ctx.font=`bold 13px "DM Sans",sans-serif`;ctx.fillText(`📍 Placing: ${m.label}${m.definition?" — "+m.definition:""} · Click image · Esc to skip`,12,23);ctx.restore();}
     }
-  },[markups,selectedId,zoom,pan,project.images,calibration,t,currentDraw,mousePos,snapEnabled,snapPos,showScaleBar,showLUT,lutMode,lutInvert,placingMode,placingQueue,placingIdx,showDisplacement,compareVersion,getProcessed,reproCollecting,angleMode]);
+  },[markups,selectedId,zoom,pan,project.images,calibration,t,currentDraw,mousePos,snapEnabled,snapPos,showScaleBar,showLUT,lutMode,lutInvert,placingMode,placingQueue,placingIdx,showDisplacement,compareVersion,getProcessed,reproCollecting,angleMode,databaseMode,databaseImages,currentImageIndex]);
 
   useEffect(()=>{redraw();},[redraw]);
 
@@ -2250,6 +2779,56 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       };img.src=dataUrl;
     };reader.readAsDataURL(file);
   };
+
+  const loadDatabaseImages=async (files)=>{
+    const loaded=await Promise.all(files.map(file=>{
+      return new Promise((resolve)=>{
+        if(!file.type.startsWith("image/")){resolve(null);return;}
+        const reader=new FileReader();
+        reader.onload=e=>{
+          const dataUrl=e.target.result;const img=new Image();
+          img.onload=()=>{
+            resolve({id:uid(),name:file.name,dataUrl,markups:[],calibration:{done:false,pxPerMm:1,knownMm:""},processing:{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},lutMode:"gray",lutInvert:false});
+          };img.src=dataUrl;
+        };reader.readAsDataURL(file);
+      });
+    }));
+    const validImages=loaded.filter(Boolean);
+    if(validImages.length>0){
+      setDatabaseImages(validImages);
+      setCurrentImageIndex(0);
+      setDatabaseMode(true);
+      const firstImg=validImages[0];
+      imgRefs.current[firstImg.id]=await new Promise(r=>{const i=new Image();i.onload=()=>r(i);i.src=firstImg.dataUrl;});
+      const cw=canvasSize.current.w-80,ch=canvasSize.current.h-80;
+      const img=new Image();img.onload=()=>{const sc=Math.min(cw/(img.naturalWidth||600),ch/(img.naturalHeight||500),1);setZoom(sc);setPan({x:40,y:40});};img.src=firstImg.dataUrl;
+    }
+  };
+
+  const updateDatabaseImage=(index,patch)=>{
+    setDatabaseImages(prev=>prev.map((img,i)=>i===index?{...img,...patch}:img));
+  };
+
+  const navigateImage=(direction)=>{
+    if(direction==="next"&&currentImageIndex<databaseImages.length-1){
+      setCurrentImageIndex(prev=>prev+1);
+    }else if(direction==="prev"&&currentImageIndex>0){
+      setCurrentImageIndex(prev=>prev-1);
+    }
+  };
+
+  useEffect(()=>{
+    if(!databaseMode||databaseImages.length===0)return;
+    const currentDbImg=databaseImages[currentImageIndex];
+    if(!currentDbImg)return;
+    if(!imgRefs.current[currentDbImg.id]){
+      const img=new Image();
+      img.onload=()=>{imgRefs.current[currentDbImg.id]=img;redraw();};
+      img.src=currentDbImg.dataUrl;
+    }else{
+      redraw();
+    }
+  },[currentImageIndex,databaseMode]);
 
   const handleDrop=e=>{e.preventDefault();loadImage(e.dataTransfer.files[0]);};
 
@@ -2271,8 +2850,11 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
 
   const handleMouseDown=useCallback(e=>{
     if(e.button!==0)return;
+    const currentDbImg=databaseMode&&databaseImages.length>0?databaseImages[currentImageIndex]:null;
+    const dbMarkups=currentDbImg?.markups||[];
+    const activeMarkupsList=databaseMode?dbMarkups:markups;
     const sp=getCanvasPos(e);let ip=toImage(sp.x,sp.y);
-    ip=snapPoint(ip,markups,12/zoom,snapEnabled);
+    ip=snapPoint(ip,activeMarkupsList,12/zoom,snapEnabled);
     if(placingMode&&placingQueue.length>0&&placingIdx<placingQueue.length){
       const qid=placingQueue[placingIdx];
       updMarkup(qid,{points:[ip],placed:true});
@@ -2281,10 +2863,10 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     }
     if(activeTool==="pan"){isPanning.current=true;panStart.current={mx:e.clientX,my:e.clientY,px:pan.x,py:pan.y};return;}
     if(activeTool==="select"){
-      const hit=hitTest(markups,ip,zoom,reproCollecting);
+      const hit=hitTest(activeMarkupsList,ip,zoom,reproCollecting);
       setSelectedId(hit);
       if(hit){
-        const m=markups.find(x=>x.id===hit);
+        const m=activeMarkupsList.find(x=>x.id===hit);
         if(m?.locked){isDragging.current=false;return;}
         if(e.ctrlKey&&(m.type==="curve"||m.type==="polygon")){
           const vp=vpts(m);
@@ -2302,7 +2884,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
           if(bestIdx>=0&&vp.length>2){const newPoints=m.points.filter((_,i)=>i!==bestIdx);updMarkup(hit,{points:newPoints});}
           return;
         }
-        isDragging.current=true;dragMid.current=hit;dragStartState.current=JSON.stringify(markups);
+        isDragging.current=true;dragMid.current=hit;dragStartState.current=JSON.stringify(activeMarkupsList);
         let bi=0,bd=Infinity;(m.points||[]).forEach((p,i)=>{const d=dist(p,ip);if(d<bd){bd=d;bi=i;}});
         dragPtIdx.current=bi;dragStart.current=ip;
       }
@@ -2314,7 +2896,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         const{studyId,opId,trialIdx}=reproCollecting;
         const study=reproStudies.find(s=>s.id===studyId);
         if(study){
-          const n=markups.filter(m=>m.type==="point"&&m.repro&&m.repro.studyId===studyId&&m.repro.opId===opId&&m.repro.trialIdx===trialIdx).length;
+          const n=activeMarkupsList.filter(m=>m.type==="point"&&m.repro&&m.repro.studyId===studyId&&m.repro.opId===opId&&m.repro.trialIdx===trialIdx).length;
           const label=`L${n+1}`;
           const measurementId=uid();
           addMarkup({type:"point",points:[ip],label,color:t.acc,size:6,definition:"",repro:{studyId,opId,trialIdx,measurementId}});
@@ -2332,30 +2914,35 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         }
         return;
       }
-      const nNon=markups.filter(m=>m.type==="point"&&!m.repro).length;
+      const nNon=activeMarkupsList.filter(m=>m.type==="point"&&!m.repro).length;
       addMarkup({type:"point",points:[ip],label:`P${nNon+1}`,color:t.acc,size:6,definition:""});
       return;
     }
     if(activeTool==="ruler"){if(!currentDraw)setCurrentDraw({type:"ruler",points:[ip]});else{const ruler={...currentDraw,type:"ruler",points:[...currentDraw.points,ip],label:"Ruler"};setPendingRuler(ruler);addMarkup(ruler);setCurrentDraw(null);setShowCalib(true);}return;}
     if(activeTool==="parallel"){if(selectedMarkup&&(selectedMarkup.type==="line"||selectedMarkup.type==="parallel")){const vp=vpts(selectedMarkup);if(vp.length>=2){const dx=vp[1].x-vp[0].x,dy=vp[1].y-vp[0].y,len=Math.sqrt(dx*dx+dy*dy)||1,half=len/2;addMarkup({type:"parallel",points:[{x:ip.x-dx/len*half,y:ip.y-dy/len*half},{x:ip.x+dx/len*half,y:ip.y+dy/len*half}],color:"#34d399",width:1.5,style:"solid",label:`∥`,showLength:true});return;}}if(!currentDraw)setCurrentDraw({type:"line",points:[ip]});else{finalizeMarkup({...currentDraw,points:[...currentDraw.points,ip]});setCurrentDraw(null);}return;}
-    if(activeTool==="midpoint"){if(!currentDraw)setCurrentDraw({type:"midpoint",points:[ip]});else{const p1=currentDraw.points[0],p2=ip;if(p1.x>-9000&&p2.x>-9000){const mid={x:(p1.x+p2.x)/2,y:(p1.y+p2.y)/2};const n=markups.filter(m=>m.type==="point").length;addMarkup({type:"point",points:[mid],label:`M${n+1}`,color:"#fbbf24",size:6,definition:"Midpoint"});}setCurrentDraw(null);}return;}
-    if(activeTool==="perppoint"){if(!currentDraw)setCurrentDraw({type:"perppoint",points:[ip]});else if(currentDraw.points.length===1)setCurrentDraw({type:"perppoint",points:[currentDraw.points[0],ip]});else{const p1=currentDraw.points[0],p2=currentDraw.points[1],p3=ip;if(p1.x>-9000&&p2.x>-9000&&p3.x>-9000){const lx1=p2.x-p1.x,ly1=p2.y-p1.y;const lx2=-ly1,ly2=lx1;const perpPt={x:p3.x+lx2,y:p3.y+ly2};const n=markups.filter(m=>m.type==="line"||m.type==="perp").length+1;addMarkup({type:"line",mode:"segment",points:[perpPt,p3],color:"#f472b6",width:1.5,style:"solid",label:`⊥${n}`,showLength:true});}setCurrentDraw(null);}return;}
+    if(activeTool==="midpoint"){if(!currentDraw)setCurrentDraw({type:"midpoint",points:[ip]});else{const p1=currentDraw.points[0],p2=ip;if(p1.x>-9000&&p2.x>-9000){const mid={x:(p1.x+p2.x)/2,y:(p1.y+p2.y)/2};const n=activeMarkupsList.filter(m=>m.type==="point").length;addMarkup({type:"point",points:[mid],label:`M${n+1}`,color:"#fbbf24",size:6,definition:"Midpoint"});}setCurrentDraw(null);}return;}
+    if(activeTool==="perppoint"){if(!currentDraw)setCurrentDraw({type:"perppoint",points:[ip]});else if(currentDraw.points.length===1)setCurrentDraw({type:"perppoint",points:[currentDraw.points[0],ip]});else{const p1=currentDraw.points[0],p2=currentDraw.points[1],p3=ip;if(p1.x>-9000&&p2.x>-9000&&p3.x>-9000){const lx1=p2.x-p1.x,ly1=p2.y-p1.y;const lx2=-ly1,ly2=lx1;const perpPt={x:p3.x+lx2,y:p3.y+ly2};const n=activeMarkupsList.filter(m=>m.type==="line"||m.type==="perp").length+1;addMarkup({type:"line",mode:"segment",points:[perpPt,p3],color:"#f472b6",width:1.5,style:"solid",label:`⊥${n}`,showLength:true});}setCurrentDraw(null);}return;}
     if(activeTool==="arrow"){if(!currentDraw)setCurrentDraw({type:"arrow",points:[ip]});else{const p1=currentDraw.points[0],p2=ip;if(p1.x>-9000&&p2.x>-9000){addMarkup({type:"arrow",points:[p1,p2],color:"#34d399",width:2});}setCurrentDraw(null);}return;}
     if(["line","angle3","angle4","polygon","curve","perp"].includes(activeTool)){
       if(!currentDraw)setCurrentDraw({type:activeTool,points:[ip],curveStyle:["curve","polygon"].includes(activeTool)?curveMode:"linear"});
       else{const nps=[...currentDraw.points,ip];const need={line:2,angle3:3,angle4:4,perp:3}[activeTool];if(need&&nps.length>=need){finalizeMarkup({...currentDraw,points:nps});setCurrentDraw(null);}else setCurrentDraw({...currentDraw,points:nps});}return;}
-  },[activeTool,markups,zoom,pan,snapEnabled,currentDraw,selectedMarkup,curveMode,placingMode,placingQueue,placingIdx,reproCollecting,reproStudies]);
+  },[activeTool,markups,zoom,pan,snapEnabled,currentDraw,selectedMarkup,curveMode,placingMode,placingQueue,placingIdx,reproCollecting,reproStudies,databaseMode,databaseImages,currentImageIndex]);
 
   const handleMouseMove=useCallback(e=>{
+    const currentDbImg=databaseMode&&databaseImages.length>0?databaseImages[currentImageIndex]:null;
+    const dbMarkups=currentDbImg?.markups||[];
+    const activeMarkupsList=databaseMode?dbMarkups:markups;
     const sp=getCanvasPos(e);setMousePos(sp);
-    if(snapEnabled&&activeTool!=="select"&&activeTool!=="pan"){const ip=toImage(sp.x,sp.y);const sn=snapPoint(ip,markups,12/zoom,snapEnabled);setSnapPos((Math.abs(sn.x-ip.x)>0.1||Math.abs(sn.y-ip.y)>0.1)?sn:null);}else setSnapPos(null);
+    if(snapEnabled&&activeTool!=="select"&&activeTool!=="pan"){const ip=toImage(sp.x,sp.y);const sn=snapPoint(ip,activeMarkupsList,12/zoom,snapEnabled);setSnapPos((Math.abs(sn.x-ip.x)>0.1||Math.abs(sn.y-ip.y)>0.1)?sn:null);}else setSnapPos(null);
     if(isPanning.current&&panStart.current)setPan({x:panStart.current.px+(e.clientX-panStart.current.mx),y:panStart.current.py+(e.clientY-panStart.current.my)});
-    if(isDragging.current&&dragMid.current){const ip=toImage(sp.x,sp.y);const dx=ip.x-dragStart.current.x,dy=ip.y-dragStart.current.y;updMarkup(dragMid.current,{points:(markups.find(m=>m.id===dragMid.current)?.points||[]).map((p,i)=>i===dragPtIdx.current?{x:p.x+dx,y:p.y+dy}:p)});dragStart.current=ip;}
-  },[activeTool,markups,zoom,snapEnabled]);
+    if(isDragging.current&&dragMid.current){const ip=toImage(sp.x,sp.y);const dx=ip.x-dragStart.current.x,dy=ip.y-dragStart.current.y;updMarkup(dragMid.current,{points:(activeMarkupsList.find(m=>m.id===dragMid.current)?.points||[]).map((p,i)=>i===dragPtIdx.current?{x:p.x+dx,y:p.y+dy}:p)});dragStart.current=ip;}
+  },[activeTool,markups,zoom,snapEnabled,databaseMode,databaseImages,currentImageIndex]);
 
   const handleMouseUp=()=>{
+    const currentDbImg=databaseMode&&databaseImages.length>0?databaseImages[currentImageIndex]:null;
+    const activeMarkupsList=databaseMode?(currentDbImg?.markups||[]):markups;
     if(isDragging.current&&dragStartState.current){
-      const currentState=JSON.stringify(markups);
+      const currentState=JSON.stringify(activeMarkupsList);
       if(dragStartState.current!==currentState){
         undoStackRef.current.push(dragStartState.current);
         if(undoStackRef.current.length>50)undoStackRef.current.shift();
@@ -2372,6 +2959,19 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const handleTouchEnd=()=>{handleMouseUp();lastTouchDist.current=null;};
 
   const finalizeCalib=(mm,manualPpm)=>{
+    if(databaseMode){
+      const currentDbImg=databaseImages[currentImageIndex];
+      const currentMarkups=currentDbImg?.markups||[];
+      if(manualPpm){
+        updateDatabaseImage(currentImageIndex,{calibration:{done:true,pxPerMm:manualPpm,knownMm:mm}});
+        setShowCalib(false);
+        return;
+      }
+      const ruler=pendingRuler||currentMarkups.find(m=>m.type==="ruler");if(!ruler)return;const vp=vpts(ruler);if(vp.length<2)return;
+      updateDatabaseImage(currentImageIndex,{calibration:{done:true,pxPerMm:dist(vp[0],vp[1])/mm,knownMm:mm}});
+      setShowCalib(false);
+      return;
+    }
     if(manualPpm){updVer({calibration:{done:true,pxPerMm:manualPpm,knownMm:mm}});setShowCalib(false);return;}
     const ruler=pendingRuler||markups.find(m=>m.type==="ruler");if(!ruler)return;const vp=vpts(ruler);if(vp.length<2)return;
     updVer({calibration:{done:true,pxPerMm:dist(vp[0],vp[1])/mm,knownMm:mm}});setShowCalib(false);
@@ -2432,7 +3032,12 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         <div style={{width:1,height:20,background:t.bdr,flexShrink:0}}/>
         <Tag color={t.acc}>{project.projection?.toUpperCase()}</Tag>
         {project.meta?.anonymized&&<Tag color={t.ok}>🔒 Anon</Tag>}
-        {calibration.done&&<Tag color={t.ok}>⟺ {calibration.pxPerMm.toFixed(2)}px/mm</Tag>}
+        {calibration.done&&!databaseMode&&<Tag color={t.ok}>⟺ {calibration.pxPerMm.toFixed(2)}px/mm</Tag>}
+        {databaseMode&&<div style={{display:"flex",alignItems:"center",gap:4}}>
+          <button onClick={()=>navigateImage("prev")} disabled={currentImageIndex===0} style={{background:"none",border:`1px solid ${t.bdr}`,borderRadius:4,padding:"2px 8px",cursor:currentImageIndex===0?"not-allowed":"pointer",color:currentImageIndex===0?t.tx3:t.tx}}>◀</button>
+          <span style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:t.acc}}>{currentImageIndex+1} / {databaseImages.length}</span>
+          <button onClick={()=>navigateImage("next")} disabled={currentImageIndex>=databaseImages.length-1} style={{background:"none",border:`1px solid ${t.bdr}`,borderRadius:4,padding:"2px 8px",cursor:currentImageIndex>=databaseImages.length-1?"not-allowed":"pointer",color:currentImageIndex>=databaseImages.length-1?t.tx3:t.tx}}>▶</button>
+        </div>}
         {placingMode&&<Tag color={t.warn}>📍 {placingIdx+1}/{placingQueue.length}</Tag>}
         <div style={{flex:1}}/>
         {!isMobile&&<>
@@ -2444,6 +3049,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         <Btn t={t} small onClick={()=>openImgRef.current?.click()}>Open</Btn>
         {!isMobile&&<Btn t={t} small onClick={()=>stackImgRef.current?.click()}>+ Stack</Btn>}
         <Btn t={t} small onClick={()=>exportCephx(project)}>Save</Btn>
+        {!isMobile&&<Btn t={t} small onClick={()=>setShowDatabaseImport(true)}>Database</Btn>}
         {!isMobile&&<Btn t={t} small onClick={()=>setShowExport(true)}>Export</Btn>}
         {!isMobile&&<Btn t={t} small onClick={()=>setShowAnon(true)}>Anonymization</Btn>}
         <div style={{width:1,height:20,background:t.bdr,flexShrink:0}}/>
@@ -2575,14 +3181,45 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
               <div style={{flex:1,overflowY:"auto",scrollbarWidth:"none"}}>
                 <style>{`.panel-scroll::-webkit-scrollbar{display:none}`}</style>
                 <div className="panel-scroll">
-                  {rightPanel==="markups"&&<MarkupsPanel markups={markups} t={t} theme={theme} selectedId={selectedId} onSelect={setSelectedId} onDelete={delMarkup} onToggleVisible={id=>updMarkup(id,{visible:markups.find(m=>m.id===id)?.visible===false})} onToggleLock={id=>updMarkup(id,{locked:!markups.find(m=>m.id===id)?.locked})} calibration={calibration} placingMode={placingMode} placingQueue={placingQueue} placingIdx={placingIdx} onStopPlacing={()=>{setPlacingMode(false);setPlacingQueue([]);setPlacingIdx(0);}} onPausePlacing={()=>{setPlacingMode(false);}} onResumePlacing={()=>{setPlacingMode(true);}} onClear={()=>updVer({markups:[]})} onAddPoint={()=>{setActiveTool("point");setCurrentDraw(null);}} norms={norms} formatAngle={formatAngle} angleMode={angleMode} setAngleMode={setAngleMode}/>}
-                  {rightPanel==="measurements"&&<MeasurementsPanel allMeas={allMeas} t={t} calibration={calibration} norms={norms} onUpdateNorms={ns=>updVer({norms:ns})} onExportCSV={exportCSV} onOpenCalib={()=>setShowCalib(true)} formatAngle={formatAngle}/>}
+                  {rightPanel==="markups"&&(databaseMode?
+                    <MarkupsPanel 
+                      markups={databaseImages[currentImageIndex]?.markups||[]} 
+                      t={t} 
+                      theme={theme} 
+                      selectedId={selectedId} 
+                      onSelect={setSelectedId} 
+                      onDelete={(id)=>{const newMarkups=(databaseImages[currentImageIndex]?.markups||[]).filter(m=>m.id!==id);updateDatabaseImage(currentImageIndex,{markups:newMarkups});if(selectedId===id)setSelectedId(null);}} 
+                      onToggleVisible={(id)=>{const m=(databaseImages[currentImageIndex]?.markups||[]).find(m=>m.id===id);if(m)updateDatabaseImage(currentImageIndex,{markups:(databaseImages[currentImageIndex]?.markups||[]).map(mm=>mm.id===id?{...mm,visible:mm.visible===false}:mm)});}} 
+                      onToggleLock={(id)=>{const m=(databaseImages[currentImageIndex]?.markups||[]).find(m=>m.id===id);if(m)updateDatabaseImage(currentImageIndex,{markups:(databaseImages[currentImageIndex]?.markups||[]).map(mm=>mm.id===id?{...mm,locked:!m.locked}:mm)});}} 
+                      calibration={databaseImages[currentImageIndex]?.calibration||{done:false,pxPerMm:1}} 
+                      placingMode={false} placingQueue={[]} placingIdx={0} 
+                      onStopPlacing={()=>{}} onPausePlacing={()=>{}} onResumePlacing={()=>{}} 
+                      onClear={()=>updateDatabaseImage(currentImageIndex,{markups:[]})} 
+                      onAddPoint={()=>{setActiveTool("point");setCurrentDraw(null);}} 
+                      norms={[]} 
+                      formatAngle={formatAngle} 
+                      angleMode={angleMode} 
+                      setAngleMode={setAngleMode}
+                    />
+                    :<MarkupsPanel markups={markups} t={t} theme={theme} selectedId={selectedId} onSelect={setSelectedId} onDelete={delMarkup} onToggleVisible={id=>updMarkup(id,{visible:markups.find(m=>m.id===id)?.visible===false})} onToggleLock={id=>updMarkup(id,{locked:!markups.find(m=>m.id===id)?.locked})} calibration={calibration} placingMode={placingMode} placingQueue={placingQueue} placingIdx={placingIdx} onStopPlacing={()=>{setPlacingMode(false);setPlacingQueue([]);setPlacingIdx(0);}} onPausePlacing={()=>{setPlacingMode(false);}} onResumePlacing={()=>{setPlacingMode(true);}} onClear={()=>updVer({markups:[]})} onAddPoint={()=>{setActiveTool("point");setCurrentDraw(null);}} norms={norms} formatAngle={formatAngle} angleMode={angleMode} setAngleMode={setAngleMode}/>)}
+                  {rightPanel==="measurements"&&(databaseMode?
+                    <MeasurementsPanel 
+                      allMeas={(databaseImages[currentImageIndex]?.markups||[]).map(m=>({m,meas:computeMeasurements(m,databaseImages[currentImageIndex]?.calibration||{done:false,pxPerMm:1})})).filter(x=>Object.keys(x.meas).length>0)} 
+                      t={t} 
+                      calibration={databaseImages[currentImageIndex]?.calibration||{done:false,pxPerMm:1}} 
+                      norms={[]} 
+                      onUpdateNorms={()=>{}} 
+                      onExportCSV={()=>{}} 
+                      onOpenCalib={()=>setShowCalib(true)} 
+                      formatAngle={formatAngle}
+                    />
+                    :<MeasurementsPanel allMeas={allMeas} t={t} calibration={calibration} norms={norms} onUpdateNorms={ns=>updVer({norms:ns})} onExportCSV={exportCSV} onOpenCalib={()=>setShowCalib(true)} formatAngle={formatAngle}/>)}
                   {rightPanel==="formulas"&&<FormulasPanel formulas={formulas} t={t} scope={measScope} onAdd={()=>{setEditFormulaId(null);setShowFormulaEditor(true);}} onEdit={id=>{setEditFormulaId(id);setShowFormulaEditor(true);}} onDelete={id=>updVer({formulas:formulas.filter(f=>f.id!==id)})}/>}
                   {rightPanel==="image"&&<ImagePanel t={t} processing={processing} setProcessing={p=>updVer({processing:p})} lutMode={lutMode} setLutMode={m=>updVer({lutMode:m})} lutInvert={lutInvert} setLutInvert={v=>updVer({lutInvert:v})} showLUT={showLUT} setShowLUT={setShowLUT} showScaleBar={showScaleBar} setShowScaleBar={setShowScaleBar} calibration={calibration} onOpenCalib={()=>setShowCalib(true)} onReset={()=>updVer({processing:{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},lutMode:"gray",lutInvert:false})} onShowHist={()=>setShowHistogram(v=>!v)} showHistogram={showHistogram}/>}
                   {rightPanel==="layers"&&<LayersPanel t={t} images={project.images} onUpdateImages={imgs=>onUpdateProject({images:imgs})} onAddImage={e=>{if(e.target.files[0])loadImage(e.target.files[0],true);}} showDisplacement={showDisplacement} setShowDisplacement={setShowDisplacement} compareVersionId={compareVersionId} setCompareVersionId={setCompareVersionId} versions={project.versions} onShowAlign={()=>setShowAlign(true)} onShowTransform={()=>setShowTransform(true)}/>}
                   {rightPanel==="versions"&&<VersionsPanel project={project} t={t} onUpdateProject={onUpdateProject} onUpdateVersion={onUpdateVersion} onExportTemplate={v=>exportCepht({name:`${project.name}-${v.label}`,projection:project.projection,markups:v.markups||[],formulas:v.formulas||[],norms:v.norms||[]})}/>}
                   {rightPanel==="reproducibility"&&<ReproducibilityPanel t={t} markups={markups} studies={reproStudies} onUpdateStudies={setReproStudies} activeStudyId={activeStudyId} setActiveStudyId={setActiveStudyId} reproCollecting={reproCollecting} setReproCollecting={setReproCollecting}/>}
-                  {rightPanel==="statistics"&&<StatisticsPanel t={t} studies={reproStudies}/>}
+                  {rightPanel==="statistics"&&(databaseMode?<DatabaseStatsPanel databaseImages={databaseImages} currentImageIndex={currentImageIndex} t={t}/>:<StatisticsPanel t={t} studies={reproStudies}/>)}
                   {rightPanel==="templates"&&<TemplatesPanel t={t} projection={project.projection} onLoadTemplate={loadTemplate}/>}
                   {rightPanel==="themes"&&(
                     <div style={{padding:12}}>
@@ -2619,6 +3256,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       </div>
 
       {/* MODALS */}
+      {showDatabaseImport&&<Modal t={t} title="Database Mode - Import Images" onClose={()=>setShowDatabaseImport(false)}><DatabaseImportModal t={t} onImport={loadDatabaseImages} onClose={()=>setShowDatabaseImport(false)}/></Modal>}
       {showTemplatePicker&&<Modal t={t} title="" onClose={()=>setShowTemplatePicker(false)}><TemplatePickerModal t={t} projection={project.projection} onPick={handleTemplatePick} onClose={()=>setShowTemplatePicker(false)}/></Modal>}
       {showCalib&&<Modal t={t} title="Calibration" onClose={()=>setShowCalib(false)}><CalibModal t={t} calibration={calibration} onFinish={finalizeCalib}/></Modal>}
       {showExport&&<Modal t={t} title="Export" onClose={()=>setShowExport(false)}><div style={{display:"flex",flexDirection:"column",gap:10}}><Btn t={t} onClick={()=>{exportCSV();setShowExport(false);}}>Measurements CSV</Btn><Btn t={t} onClick={()=>{exportCephx(project);setShowExport(false);}}>Full Project .cephx</Btn><Btn t={t} onClick={()=>{exportThemeAsCepht(theme);setShowExport(false);}}>Theme .cepht</Btn></div></Modal>}
