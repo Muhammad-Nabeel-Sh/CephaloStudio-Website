@@ -1504,7 +1504,8 @@ function MarkupsPanel({markups,t,theme,selectedId,onSelect,onDelete,onToggleVisi
     {id:"angle",label:"Angles",types:["angle3","angle4"],icon:"∠",color:"#f472b6"},
     {id:"curve",label:"Open Curves",types:["curve"],icon:"∿",color:"#fb923c"},
     {id:"polygon",label:"Polygons",types:["polygon"],icon:"⬡",color:"#4ade80"},
-    {id:"other",label:"Measurements & Text",types:["perp","text"],icon:"⊥",color:"#a78bfa"},
+    {id:"other",label:"Measurements",types:["perp"],icon:"⊥",color:"#a78bfa"},
+    {id:"annotation",label:"Annotations",types:["arrow","text"],icon:"📝",color:"#fbbf24"},
   ];
   const toggle=id=>setCollapsed(c=>({...c,[id]:!c[id]}));
 
@@ -1587,6 +1588,8 @@ function MarkupsPanel({markups,t,theme,selectedId,onSelect,onDelete,onToggleVisi
                         {m.label||m.type}
                         {m.type==="curve"&&m.curveStyle==="bspline"&&<span style={{fontSize:9,color:t.tx3,marginLeft:4}}>[spline]</span>}
                         {m.type==="polygon"&&m.curveStyle==="bspline"&&<span style={{fontSize:9,color:t.tx3,marginLeft:4}}>[spline]</span>}
+                        {m.type==="text"&&m.text&&<span style={{fontSize:9,color:t.tx3,marginLeft:4}}>"{m.text.slice(0,15)}{m.text.length>15?"…":""}"</span>}
+                        {m.type==="arrow"&&<span style={{fontSize:9,color:t.tx3,marginLeft:4}}>→</span>}
                         {isLocked&&<span style={{fontSize:9,color:t.warn,marginLeft:4}}>[locked]</span>}
                       </div>
                       {ms&&!isHidden&&<div style={{fontSize:10,color:t.acc,fontFamily:"'DM Mono',monospace"}}>{ms}</div>}
@@ -2125,69 +2128,243 @@ function descriptiveStats$1(values){
 }
 
 function StatsDashboard({ dataset, t }) {
-  const [selectedVar, setSelectedVar] = useState("SNA");
+  const [selectedVar, setSelectedVar] = useState("");
+  const [selectedVar2, setSelectedVar2] = useState("");
   const [groupKey, setGroupKey] = useState("group");
+  const [vizType, setVizType] = useState("stats");
+  const scatterRef = useRef(null);
+  const boxRef = useRef(null);
 
   const variables = useMemo(()=>{
     if(!dataset.length) return [];
-    return Object.keys({
-      ...(dataset[0]?.measurements||{}),
-      ...(dataset[0]?.formulas||{})
+    const allVars = new Set();
+    dataset.forEach(entry => {
+      Object.keys(entry.measurements||{}).forEach(v => allVars.add(v));
+      Object.keys(entry.formulas||{}).forEach(v => allVars.add(v));
     });
+    return Array.from(allVars).sort();
   },[dataset]);
 
+  useEffect(()=>{
+    if(variables.length > 0 && !selectedVar) setSelectedVar(variables[0]);
+  },[variables, selectedVar]);
+
   const values = useMemo(()=> extractVariable$1(dataset, selectedVar), [dataset, selectedVar]);
+  const values2 = useMemo(()=> extractVariable$1(dataset, selectedVar2), [dataset, selectedVar2]);
   const stats = useMemo(()=> descriptiveStats$1(values), [values]);
   const grouped = useMemo(()=> groupBy$1(dataset, groupKey), [dataset, groupKey]);
+  const correlation = useMemo(()=>{
+    if(!selectedVar2 || values.length !== values2.length || values.length < 2) return null;
+    return correlation$1(values, values2);
+  },[values, values2]);
+
+  const linearReg = useMemo(()=>{
+    if(values.length !== values2.length || values.length < 2) return null;
+    const n = values.length;
+    const sumX = values.reduce((a,b)=>a+b,0);
+    const sumY = values2.reduce((a,b)=>a+b,0);
+    const sumXY = values.reduce((s,x,i)=>s+x*values2[i],0);
+    const sumX2 = values.reduce((s,x)=>s+x*x,0);
+    const slope = (n*sumXY - sumX*sumY)/(n*sumX2 - sumX*sumX);
+    const intercept = (sumY - slope*sumX)/n;
+    return {slope, intercept};
+  },[values, values2]);
+
+  useEffect(()=>{
+    if(vizType === "scatter" && scatterRef.current && values.length > 0 && values2.length > 0){
+      const canvas = scatterRef.current;
+      const ctx = canvas.getContext("2d");
+      const w = canvas.width;
+      const h = canvas.height;
+      const pad = 40;
+      ctx.clearRect(0,0,w,h);
+      ctx.fillStyle = t.surf2;
+      ctx.fillRect(0,0,w,h);
+      const xMin = Math.min(...values);
+      const xMax = Math.max(...values);
+      const yMin = Math.min(...values2);
+      const yMax = Math.max(...values2);
+      const xRange = xMax - xMin || 1;
+      const yRange = yMax - yMin || 1;
+      const sx = (x) => pad + ((x - xMin)/xRange)*(w - 2*pad);
+      const sy = (y) => h - pad - ((y - yMin)/yRange)*(h - 2*pad);
+      ctx.strokeStyle = t.bdr;
+      ctx.lineWidth = 1;
+      for(let i=0;i<=4;i++){
+        const xi = sx(xMin + (xRange*i)/4);
+        const yi = sy(yMin + (yRange*i)/4);
+        ctx.beginPath();
+        ctx.moveTo(xi, pad);
+        ctx.lineTo(xi, h-pad);
+        ctx.moveTo(pad, yi);
+        ctx.lineTo(w-pad, yi);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = t.tx3;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(pad, h-pad);
+      ctx.lineTo(w-pad, h-pad);
+      ctx.lineTo(w-pad, pad);
+      ctx.stroke();
+      if(linearReg){
+        const x1 = xMin, x2 = xMax;
+        const y1 = linearReg.slope*x1 + linearReg.intercept;
+        const y2 = linearReg.slope*x2 + linearReg.intercept;
+        ctx.strokeStyle = t.err;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(sx(x1), sy(y1));
+        ctx.lineTo(sx(x2), sy(y2));
+        ctx.stroke();
+      }
+      ctx.fillStyle = t.acc;
+      values.forEach((x,i)=>{
+        ctx.beginPath();
+        ctx.arc(sx(x), sy(values2[i]), 4, 0, Math.PI*2);
+        ctx.fill();
+      });
+      ctx.fillStyle = t.tx;
+      ctx.font = "10px 'DM Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(selectedVar, w/2, h-5);
+      ctx.save();
+      ctx.translate(12, h/2);
+      ctx.rotate(-Math.PI/2);
+      ctx.fillText(selectedVar2, 0, 0);
+      ctx.restore();
+    }
+  },[vizType, values, values2, linearReg, selectedVar, selectedVar2, t]);
+
+  useEffect(()=>{
+    if(vizType === "boxplot" && boxRef.current && values.length > 0){
+      const canvas = boxRef.current;
+      const ctx = canvas.getContext("2d");
+      const w = canvas.width;
+      const h = canvas.height;
+      const pad = 50;
+      ctx.clearRect(0,0,w,h);
+      ctx.fillStyle = t.surf2;
+      ctx.fillRect(0,0,w,h);
+      const sorted = [...values].sort((a,b)=>a-b);
+      const n = sorted.length;
+      const q1 = sorted[Math.floor(n*0.25)];
+      const med = sorted[Math.floor(n*0.5)];
+      const q3 = sorted[Math.floor(n*0.75)];
+      const iqr = q3 - q1;
+      const minVal = Math.max(sorted[0], q1 - 1.5*iqr);
+      const maxVal = Math.min(sorted[n-1], q3 + 1.5*iqr);
+      const range = maxVal - minVal || 1;
+      const scale = (v) => h - pad - ((v - minVal)/range)*(h - 2*pad);
+      const boxX = pad;
+      const boxW = w - 2*pad;
+      const boxY = Math.min(scale(q3), scale(q1));
+      const boxH = Math.abs(scale(q1) - scale(q3));
+      ctx.strokeStyle = t.tx;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(boxX + boxW/2, scale(minVal));
+      ctx.lineTo(boxX + boxW/2, boxY);
+      ctx.moveTo(boxX + boxW/2, boxY + boxH);
+      ctx.lineTo(boxX + boxW/2, scale(maxVal));
+      ctx.stroke();
+      ctx.strokeStyle = t.acc;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(boxX, boxY, boxW, boxH);
+      ctx.strokeStyle = t.err;
+      ctx.lineWidth = 2;
+      const midY = boxY + boxH/2;
+      ctx.beginPath();
+      ctx.moveTo(boxX, midY);
+      ctx.lineTo(boxX + boxW, midY);
+      ctx.stroke();
+      ctx.fillStyle = t.tx;
+      ctx.font = "10px 'DM Mono', monospace";
+      ctx.textAlign = "right";
+      [maxVal, q3, med, q1, minVal].forEach((v,i)=>{
+        const labels = ["Max", "Q3", "Median", "Q1", "Min"];
+        ctx.fillText(`${labels[i]}: ${v.toFixed(2)}`, boxX - 5, scale(v) + 3);
+      });
+      ctx.textAlign = "center";
+      ctx.fillStyle = t.tx;
+      ctx.fillText(selectedVar, w/2, 15);
+    }
+  },[vizType, values, selectedVar, t]);
 
   return (
     <div style={{padding:16}}>
       <h3 style={{fontSize:14,fontWeight:700,color:"inherit",marginBottom:12}}>Statistical Dashboard</h3>
+      <div style={{display:"flex",gap:4,marginBottom:12}}>
+        <button onClick={()=>setVizType("stats")} style={{flex:1,padding:"6px 8px",borderRadius:6,border:`1px solid ${vizType==="stats"?t.acc:t.bdr}`,background:vizType==="stats"?t.acc+"22":"transparent",color:vizType==="stats"?t.acc:t.tx,cursor:"pointer",fontSize:11}}>Stats</button>
+        <button onClick={()=>setVizType("scatter")} style={{flex:1,padding:"6px 8px",borderRadius:6,border:`1px solid ${vizType==="scatter"?t.acc:t.bdr}`,background:vizType==="scatter"?t.acc+"22":"transparent",color:vizType==="scatter"?t.acc:t.tx,cursor:"pointer",fontSize:11}}>Scatter</button>
+        <button onClick={()=>setVizType("boxplot")} style={{flex:1,padding:"6px 8px",borderRadius:6,border:`1px solid ${vizType==="boxplot"?t.acc:t.bdr}`,background:vizType==="boxplot"?t.acc+"22":"transparent",color:vizType==="boxplot"?t.acc:t.tx,cursor:"pointer",fontSize:11}}>Box Plot</button>
+      </div>
       <div style={{marginBottom:10}}>
         <label style={{fontSize:11,color:t.tx2,marginRight:8}}>Variable: </label>
         <select value={selectedVar} onChange={e=>setSelectedVar(e.target.value)} style={{padding:"4px 8px",border:`1px solid ${t.bdr}`,borderRadius:4,background:t.surf3,color:t.tx,fontSize:11}}>
           {variables.map(v => <option key={v} value={v}>{v}</option>)}
         </select>
       </div>
-      <div style={{marginBottom:20, padding:10, border:"1px solid "+t.bdr,borderRadius:8}}>
-        <strong style={{fontSize:11,color:t.tx}}>Descriptive Statistics</strong>
-        <div style={{fontSize:11,marginTop:6}}>N = {stats.n}</div>
-        <div style={{fontSize:11}}>Mean = {stats.mean?.toFixed(2)}</div>
-        <div style={{fontSize:11}}>SD = {stats.sd?.toFixed(2)}</div>
-        <div style={{fontSize:11}}>Median = {stats.median?.toFixed(2)}</div>
-        <div style={{fontSize:11}}>Range = {stats.range ? `${stats.range.min} – ${stats.range.max}` : "-"}</div>
-      </div>
-      <div style={{marginBottom:20}}>
-        <label style={{fontSize:11,color:t.tx2,marginRight:8}}>Group by: </label>
-        <select value={groupKey} onChange={e=>setGroupKey(e.target.value)} style={{padding:"4px 8px",border:`1px solid ${t.bdr}`,borderRadius:4,background:t.surf3,color:t.tx,fontSize:11}}>
-          <option value="group">Group</option>
-          <option value="timepoint">Timepoint</option>
-          <option value="operator">Operator</option>
-        </select>
-        {Object.entries(grouped).map(([g, cases])=>{
-          const vals = extractVariable$1(cases, selectedVar);
-          const s = descriptiveStats$1(vals);
-          return (
-            <div key={g} style={{marginTop:8, padding:8, border:"1px solid "+t.bdr,borderRadius:6}}>
-              <strong style={{fontSize:11,color:t.tx}}>{g}</strong>
-              <div style={{fontSize:10}}>Mean: {s.mean?.toFixed(2)}</div>
-              <div style={{fontSize:10}}>SD: {s.sd?.toFixed(2)}</div>
-            </div>
-          );
-        })}
-      </div>
-      <div style={{marginBottom:20}}>
-        <strong style={{fontSize:11,color:t.tx}}>Correlation (Quick)</strong>
-        {variables.slice(0,5).map(v=>{
-          const arr = extractVariable$1(dataset, v);
-          const r = correlation$1(values, arr);
-          return (
-            <div key={v} style={{fontSize:10,color:t.tx2}}>
-              {selectedVar} vs {v}: {r ? r.toFixed(2) : "-"}
-            </div>
-          );
-        })}
-      </div>
+      {vizType==="stats"&&(<>
+        <div style={{marginBottom:20, padding:10, border:"1px solid "+t.bdr,borderRadius:8}}>
+          <strong style={{fontSize:11,color:t.tx}}>Descriptive Statistics</strong>
+          <div style={{fontSize:11,marginTop:6}}>N = {stats.n}</div>
+          <div style={{fontSize:11}}>Mean = {stats.mean?.toFixed(2)}</div>
+          <div style={{fontSize:11}}>SD = {stats.sd?.toFixed(2)}</div>
+          <div style={{fontSize:11}}>Median = {stats.median?.toFixed(2)}</div>
+          <div style={{fontSize:11}}>Range = {stats.range ? `${stats.range.min.toFixed(2)} – ${stats.range.max.toFixed(2)}` : "-"}</div>
+        </div>
+        <div style={{marginBottom:20}}>
+          <label style={{fontSize:11,color:t.tx2,marginRight:8}}>Group by: </label>
+          <select value={groupKey} onChange={e=>setGroupKey(e.target.value)} style={{padding:"4px 8px",border:`1px solid ${t.bdr}`,borderRadius:4,background:t.surf3,color:t.tx,fontSize:11}}>
+            <option value="group">Group</option>
+            <option value="timepoint">Timepoint</option>
+            <option value="operator">Operator</option>
+          </select>
+          {Object.entries(grouped).map(([g, cases])=>{
+            const vals = extractVariable$1(cases, selectedVar);
+            const s = descriptiveStats$1(vals);
+            return (
+              <div key={g} style={{marginTop:8, padding:8, border:"1px solid "+t.bdr,borderRadius:6}}>
+                <strong style={{fontSize:11,color:t.tx}}>{g}</strong>
+                <div style={{fontSize:10}}>N: {s.n} | Mean: {s.mean?.toFixed(2)} | SD: {s.sd?.toFixed(2)}</div>
+              </div>
+            );
+          })}
+        </div>
+      </>)}
+      {vizType==="scatter"&&(<>
+        <div style={{marginBottom:10}}>
+          <label style={{fontSize:11,color:t.tx2,marginRight:8}}>X Variable: </label>
+          <select value={selectedVar} onChange={e=>setSelectedVar(e.target.value)} style={{padding:"4px 8px",border:`1px solid ${t.bdr}`,borderRadius:4,background:t.surf3,color:t.tx,fontSize:11}}>
+            {variables.map(v => <option key={v} value={v}>{v}</option>)}
+          </select>
+        </div>
+        <div style={{marginBottom:10}}>
+          <label style={{fontSize:11,color:t.tx2,marginRight:8}}>Y Variable: </label>
+          <select value={selectedVar2} onChange={e=>setSelectedVar2(e.target.value)} style={{padding:"4px 8px",border:`1px solid ${t.bdr}`,borderRadius:4,background:t.surf3,color:t.tx,fontSize:11}}>
+            <option value="">-- Select --</option>
+            {variables.map(v => <option key={v} value={v}>{v}</option>)}
+          </select>
+        </div>
+        {correlation !== null && (
+          <div style={{marginBottom:10, padding:8, border:"1px solid "+t.bdr,borderRadius:6,background:t.surf2}}>
+            <div style={{fontSize:11,color:t.tx}}><strong>r = {correlation.toFixed(4)}</strong></div>
+            <div style={{fontSize:10,color:t.tx2}}>r² = {(correlation*correlation).toFixed(4)}</div>
+            {linearReg && <div style={{fontSize:10,color:t.tx2}}>y = {linearReg.slope.toFixed(4)}x + {linearReg.intercept.toFixed(4)}</div>}
+          </div>
+        )}
+        <canvas ref={scatterRef} width={280} height={220} style={{border:"1px solid "+t.bdr,borderRadius:6,width:"100%",maxWidth:280}}/>
+      </>)}
+      {vizType==="boxplot"&&(<>
+        <div style={{marginBottom:10}}>
+          <label style={{fontSize:11,color:t.tx2,marginRight:8}}>Variable: </label>
+          <select value={selectedVar} onChange={e=>setSelectedVar(e.target.value)} style={{padding:"4px 8px",border:`1px solid ${t.bdr}`,borderRadius:4,background:t.surf3,color:t.tx,fontSize:11}}>
+            {variables.map(v => <option key={v} value={v}>{v}</option>)}
+          </select>
+        </div>
+        <canvas ref={boxRef} width={280} height={200} style={{border:"1px solid "+t.bdr,borderRadius:6,width:"100%",maxWidth:280}}/>
+      </>)}
     </div>
   );
 }
@@ -2370,13 +2547,15 @@ function MarkupTablesPanel({databaseImages,currentImageIndex,t,formatAngle}){
 
   return(
     <div>
-      <div style={{display:"flex",gap:4,marginBottom:12}}>
+      <div style={{display:"flex",gap:4,marginBottom:8}}>
         {tableTypes.map(tt=>(
           <button key={tt.id} onClick={()=>setActiveTable(tt.id)} style={{padding:"6px 12px",borderRadius:6,border:`1px solid ${activeTable===tt.id?t.acc:t.bdr}`,background:activeTable===tt.id?t.acc+"22":"transparent",color:activeTable===tt.id?t.acc:t.tx,cursor:"pointer",fontSize:12}}>
             {tt.icon} {tt.label}
           </button>
         ))}
-        <button onClick={()=>exportTableCSV(activeTable)} style={{marginLeft:"auto",padding:"6px 12px",borderRadius:6,border:`1px solid ${t.bdr}`,background:t.surf2,color:t.tx,cursor:"pointer",fontSize:12}}>Export CSV</button>
+      </div>
+      <div style={{marginBottom:12}}>
+        <button onClick={()=>exportTableCSV(activeTable)} style={{width:"100%",padding:"8px 12px",borderRadius:6,border:`1px solid ${t.bdr}`,background:t.surf2,color:t.tx,cursor:"pointer",fontSize:12,textAlign:"center"}}>⬇ Export CSV</button>
       </div>
       {tableData.length===0?<div style={{color:t.tx2,textAlign:"center",padding:20}}>No {activeTable} data</div>:(
         <div style={{overflowX:"auto"}}>
