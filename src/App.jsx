@@ -1504,8 +1504,7 @@ function MarkupsPanel({markups,t,theme,selectedId,onSelect,onDelete,onToggleVisi
     {id:"angle",label:"Angles",types:["angle3","angle4"],icon:"∠",color:"#f472b6"},
     {id:"curve",label:"Open Curves",types:["curve"],icon:"∿",color:"#fb923c"},
     {id:"polygon",label:"Polygons",types:["polygon"],icon:"⬡",color:"#4ade80"},
-    {id:"other",label:"Measurements",types:["perp"],icon:"⊥",color:"#a78bfa"},
-    {id:"annotation",label:"Annotations",types:["arrow","text"],icon:"📝",color:"#fbbf24"},
+    {id:"other",label:"Measurements & Text",types:["perp","text"],icon:"⊥",color:"#a78bfa"},
   ];
   const toggle=id=>setCollapsed(c=>({...c,[id]:!c[id]}));
 
@@ -1588,8 +1587,6 @@ function MarkupsPanel({markups,t,theme,selectedId,onSelect,onDelete,onToggleVisi
                         {m.label||m.type}
                         {m.type==="curve"&&m.curveStyle==="bspline"&&<span style={{fontSize:9,color:t.tx3,marginLeft:4}}>[spline]</span>}
                         {m.type==="polygon"&&m.curveStyle==="bspline"&&<span style={{fontSize:9,color:t.tx3,marginLeft:4}}>[spline]</span>}
-                        {m.type==="text"&&m.text&&<span style={{fontSize:9,color:t.tx3,marginLeft:4}}>"{m.text.slice(0,15)}{m.text.length>15?"…":""}"</span>}
-                        {m.type==="arrow"&&<span style={{fontSize:9,color:t.tx3,marginLeft:4}}>→</span>}
                         {isLocked&&<span style={{fontSize:9,color:t.warn,marginLeft:4}}>[locked]</span>}
                       </div>
                       {ms&&!isHidden&&<div style={{fontSize:10,color:t.acc,fontFamily:"'DM Mono',monospace"}}>{ms}</div>}
@@ -1893,193 +1890,6 @@ function Modal({t,title,children,onClose,wide}){
   );
 }
 
-function BatchStatsPanel({t,images,markups,calibration,onClose}){
-  const[groupBy,setGroupBy]=useState("label");
-  const allLabels=[...new Set(markups.map(m=>m.label).filter(Boolean))].sort();
-  const imageNames=Object.fromEntries(images.map((img,i)=>[img.id,img.name||`Image ${i+1}`]));
-
-  const getCoordX=(m)=>{const x=m.coordMm?.x??(calibration.done&&m.points?.[0]?m.points[0].x/calibration.pxPerMm:null);return x!==null?x.toFixed(2):"-";};
-  const getCoordY=(m)=>{const y=m.coordMm?.y??(calibration.done&&m.points?.[0]?m.points[0].y/calibration.pxPerMm:null);return y!==null?y.toFixed(2):"-";};
-  const getAngleDeg=(m)=>{const meas=computeMeasurements(m,calibration);return meas.angle!==undefined?meas.angle.toFixed(1):"-";};
-  const getAngleRad=(m)=>{const meas=computeMeasurements(m,calibration);return meas.angle!==undefined?(meas.angle*Math.PI/180).toFixed(3):"-";};
-  const getLength=(m)=>{const meas=computeMeasurements(m,calibration);return meas.length!==undefined?meas.length.toFixed(2):"-";};
-  const getArea=(m)=>{const meas=computeMeasurements(m,calibration);return meas.area!==undefined?meas.area.toFixed(2):"-";};
-  const getPerim=(m)=>{const meas=computeMeasurements(m,calibration);return meas.perimeter!==undefined?meas.perimeter.toFixed(2):"-";};
-
-  const getRows=()=>{
-    const rows=[];
-    if(groupBy==="label"){
-      allLabels.forEach(lbl=>{
-        const labelMarkups=markups.filter(m=>m.label===lbl);
-        const pts=labelMarkups.filter(m=>m.type==="point");
-        const angs=labelMarkups.filter(m=>m.type==="angle3"||m.type==="angle4");
-        const lines=labelMarkups.filter(m=>["line","parallel","perp","arrow"].includes(m.type));
-        const polys=labelMarkups.filter(m=>m.type==="polygon");
-        const curves=labelMarkups.filter(m=>m.type==="curve");
-        const hasAny=pts.length||angs.length||lines.length||polys.length||curves.length;
-        if(!hasAny)return;
-        rows.push({key:lbl,label:lbl,isHeader:true,markups:labelMarkups});
-        if(pts.length){rows.push({key:lbl+"-X",label:lbl,subLabel:"X",markups:pts});rows.push({key:lbl+"-Y",label:lbl,subLabel:"Y",markups:pts});}
-        if(angs.length){rows.push({key:lbl+"-Deg",label:lbl,subLabel:"Degree",markups:angs});rows.push({key:lbl+"-Rad",label:lbl,subLabel:"Radian",markups:angs});}
-        if(lines.length){rows.push({key:lbl+"-Len",label:lbl,subLabel:"Length",markups:lines});}
-        if(polys.length){rows.push({key:lbl+"-Area",label:lbl,subLabel:"Area",markups:polys});rows.push({key:lbl+"-Perim",label:lbl,subLabel:"Perimeter",markups:polys});}
-        if(curves.length){rows.push({key:lbl+"-CurveLen",label:lbl,subLabel:"Length",markups:curves});}
-      });
-    }else if(groupBy==="points"){
-      const pts=markups.filter(m=>m.type==="point");
-      rows.push({key:"pts-hdr",label:"Points",isHeader:true,markups:pts});
-      pts.forEach((m,i)=>{rows.push({key:"pt-"+i,label:m.label||"P"+(i+1),subLabel:"X",markups:[m]});rows.push({key:"pt-"+i+"-Y",label:m.label||"P"+(i+1),subLabel:"Y",markups:[m]});});
-    }else if(groupBy==="angles"){
-      const angs=markups.filter(m=>m.type==="angle3"||m.type==="angle4");
-      rows.push({key:"ang-hdr",label:"Angles",isHeader:true,markups:angs});
-      angs.forEach((m,i)=>{rows.push({key:"ang-"+i+"-D",label:m.label||"A"+(i+1),subLabel:"Degree",markups:[m]});rows.push({key:"ang-"+i+"-R",label:m.label||"A"+(i+1),subLabel:"Radian",markups:[m]});});
-    }else if(groupBy==="lines"){
-      const lines=markups.filter(m=>["line","parallel","perp","arrow"].includes(m.type));
-      rows.push({key:"lines-hdr",label:"Lines",isHeader:true,markups:lines});
-      lines.forEach((m,i)=>{rows.push({key:"line-"+i,label:m.label||"L"+(i+1),subLabel:"Length",markups:[m]});});
-    }else if(groupBy==="polygons"){
-      const polys=markups.filter(m=>m.type==="polygon");
-      rows.push({key:"poly-hdr",label:"Polygons",isHeader:true,markups:polys});
-      polys.forEach((m,i)=>{rows.push({key:"poly-"+i+"-A",label:m.label||"Poly"+(i+1),subLabel:"Area",markups:[m]});rows.push({key:"poly-"+i+"-P",label:m.label||"Poly"+(i+1),subLabel:"Perimeter",markups:[m]});});
-    }else if(groupBy==="curves"){
-      const curves=markups.filter(m=>m.type==="curve");
-      rows.push({key:"curve-hdr",label:"Curves",isHeader:true,markups:curves});
-      curves.forEach((m,i)=>{rows.push({key:"curve-"+i,label:m.label||"C"+(i+1),subLabel:"Length",markups:[m]});});
-    }
-    return rows;
-  };
-
-  const getCell=(row,imgId)=>{
-    const cms=row.markups.filter(m=>m.imageId===imgId);
-    if(!cms.length)return"-";
-    if(row.subLabel==="X")return cms.map(m=>getCoordX(m)).join(";");
-    if(row.subLabel==="Y")return cms.map(m=>getCoordY(m)).join(";");
-    if(row.subLabel==="Degree")return cms.map(m=>getAngleDeg(m)).join(";");
-    if(row.subLabel==="Radian")return cms.map(m=>getAngleRad(m)).join(";");
-    if(row.subLabel==="Length")return cms.map(m=>getLength(m)+"mm").join(";");
-    if(row.subLabel==="Area")return cms.map(m=>getArea(m)+"mm²").join(";");
-    if(row.subLabel==="Perimeter")return cms.map(m=>getPerim(m)+"mm").join(";");
-    return cms.length.toString();
-  };
-
-  const csvRows=[["Landmark","Measurement",...images.map(i=>i.name||imageNames[i.id])].join(",")];
-  getRows().forEach(r=>{if(r.isHeader)return;const row=[r.label,r.subLabel||""];images.forEach(img=>{row.push(getCell(r,img.id));});csvRows.push(row.join(","));});
-
-  return(
-    <div style={{maxHeight:"70vh",overflowY:"auto",padding:12}}>
-      <div style={{marginBottom:12,display:"flex",gap:6,flexWrap:"wrap"}}>
-        <span style={{fontSize:11,color:t.tx2}}>Group by:</span>
-        {[{id:"label",l:"Landmark"},{id:"points",l:"Points"},{id:"lines",l:"Lines"},{id:"angles",l:"Angles"},{id:"polygons",l:"Polygons"},{id:"curves",l:"Curves"}].map(o=>(
-          <button key={o.id} onClick={()=>setGroupBy(o.id)} style={{fontSize:11,padding:"4px 10px",borderRadius:4,border:`1px solid ${groupBy===o.id?t.acc:t.bdr}`,background:groupBy===o.id?t.accMuted:t.surf2,color:groupBy===o.id?t.acc:t.tx2,cursor:"pointer"}}>{o.l}</button>
-        ))}
-      </div>
-      <table style={{width:"100%",borderCollapse:"collapse",fontSize:11}}>
-        <thead><tr style={{borderBottom:`1px solid ${t.bdr}`}}>
-          <th style={{textAlign:"left",padding:8,color:t.tx2,position:"sticky",left:0,background:t.surf,zIndex:1,minWidth:80}}>Landmark</th>
-          <th style={{textAlign:"left",padding:8,color:t.tx2,minWidth:60}}>Meas.</th>
-          {images.map(img=><th key={img.id} style={{textAlign:"center",padding:8,color:t.tx2,minWidth:70}}>{imageNames[img.id]}</th>)}
-        </tr></thead>
-        <tbody>
-          {getRows().map((r,ri)=>(
-            <tr key={ri} style={{borderBottom:`1px solid ${t.bdr}${r.isHeader?"aa":"44"}`,background:r.isHeader?t.surf2:"transparent"}}>
-              <td style={{padding:6,fontWeight:r.isHeader?700:500,color:r.isHeader?t.acc:t.tx,fontFamily:"'DM Mono',monospace",position:"sticky",left:0,background:t.surf,zIndex:1,fontSize:r.isHeader?12:11}}>{r.label}</td>
-              <td style={{padding:6,fontWeight:400,color:r.isHeader?t.tx3:t.tx2,fontFamily:"'DM Mono',monospace",fontSize:10,fontStyle:r.isHeader?"italic":"normal"}}>{r.isHeader?"("+r.markups.length+")":r.subLabel}</td>
-              {images.map(img=><td key={img.id} style={{padding:6,textAlign:"center",fontFamily:"'DM Mono',monospace",color:r.isHeader?t.tx3:t.tx,fontSize:10}}>{r.isHeader?"-":getCell(r,img.id)}</td>)}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {getRows().length===0&&<div style={{padding:20,textAlign:"center",color:t.tx2}}>No data to display</div>}
-      <div style={{marginTop:12,display:"flex",gap:8}}>
-        <button onClick={()=>{const csv=csvRows.join("\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="batch_statistics.csv";a.click();}} style={{flex:1,padding:"8px 16px",background:t.acc,color:"#fff",border:"none",borderRadius:6,cursor:"pointer",fontWeight:600}}>Export CSV</button>
-        <button onClick={onClose} style={{flex:1,padding:"8px 16px",background:t.surf2,color:t.tx,border:`1px solid ${t.bdr}`,borderRadius:6,cursor:"pointer"}}>Close</button>
-      </div>
-    </div>
-  );
-}
-
-function statsMean(arr){if(!arr.length)return null;return arr.reduce((a,b)=>a+b,0)/arr.length;}
-function statsStd(arr){if(arr.length<2)return null;const m=statsMean(arr);return Math.sqrt(arr.reduce((s,x)=>s+(x-m)**2,0)/(arr.length-1));}
-function statsMedian(arr){if(!arr.length)return null;const s=[...arr].sort((a,b)=>a-b);const mid=Math.floor(s.length/2);return s.length%s?s[mid]:(s[mid-1]+s[mid])/2;}
-function statsRange(arr){if(!arr.length)return null;return{min:Math.min(...arr),max:Math.max(...arr)};}
-function statsCorrelation(x,y){if(x.length!==y.length||x.length<2)return null;const mx=statsMean(x),my=statsMean(y);const num=x.reduce((s,xi,i)=>s+(xi-mx)*(y[i]-my),0);const den=Math.sqrt(x.reduce((s,xi)=>s+(xi-mx)**2,0)*y.reduce((s,yi)=>s+(yi-my)**2,0));return den===0?null:num/den;}
-function statsGroupBy(dataset,key){return dataset.reduce((acc,item)=>{const k=item[key]||"undefined";if(!acc[k])acc[k]=[];acc[k].push(item);return acc;},{});}
-function statsExtract(dataset,variable){return dataset.map(c=>c.measurements?.[variable]??c.formulas?.[variable]).filter(v=>typeof v==="number");}
-function descriptiveStats(values){return{n:values.length,mean:statsMean(values),sd:statsStd(values),median:statsMedian(values),range:statsRange(values)};}
-
-function StatsDashboard({t,images,markups,calibration,onClose}){
-  const[variables,setVariables]=useState([]);
-  const[selectedVar,setSelectedVar]=useState("");
-  const[groupKey,setGroupKey]=useState("imageId");
-
-  useEffect(()=>{
-    const vars=new Set();
-    markups.forEach(m=>{
-      vars.add(m.label);
-      if(m.type==="point"){vars.add(m.label+"_X");vars.add(m.label+"_Y");}
-      else if(m.type==="angle3"||m.type==="angle4"){vars.add(m.label+"_Deg");vars.add(m.label+"_Rad");}
-      else if(["line","parallel","perp","arrow"].includes(m.type)){vars.add(m.label+"_Len");}
-      else if(m.type==="polygon"){vars.add(m.label+"_Area");vars.add(m.label+"_Perim");}
-      else if(m.type==="curve"){vars.add(m.label+"_Len");}
-    });
-    const vArr=Array.from(vars).sort();
-    setVariables(vArr);
-    if(vArr.length)setSelectedVar(vArr[0]);
-  },[markups]);
-
-  const getValue=(m,variable)=>{
-    if(variable.endsWith("_X")){const x=m.coordMm?.x??(calibration.done&&m.points?.[0]?m.points[0].x/calibration.pxPerMm:null);return x!==null?x:NaN;}
-    if(variable.endsWith("_Y")){const y=m.coordMm?.y??(calibration.done&&m.points?.[0]?m.points[0].y/calibration.pxPerMm:null);return y!==null?y:NaN;}
-    if(variable.endsWith("_Deg")){const meas=computeMeasurements(m,calibration);return meas.angle??NaN;}
-    if(variable.endsWith("_Rad")){const meas=computeMeasurements(m,calibration);return meas.angle?meas.angle*Math.PI/180:NaN;}
-    if(variable.endsWith("_Len")){const meas=computeMeasurements(m,calibration);return meas.length??NaN;}
-    if(variable.endsWith("_Area")){const meas=computeMeasurements(m,calibration);return meas.area??NaN;}
-    if(variable.endsWith("_Perim")){const meas=computeMeasurements(m,calibration);return meas.perimeter??NaN;}
-    return NaN;
-  };
-
-  const dataset=markups.map(m=>({markupId:m.id,imageId:m.imageId,label:m.label,type:m.type,measurements:{[selectedVar]:getValue(m,selectedVar)},group:"default",timepoint:m.imageId?images.findIndex(i=>i.id===m.imageId)+1:1,operator:"default"}));
-
-  const values=useMemo(()=>dataset.map(d=>d.measurements?.[selectedVar]).filter(v=>typeof v==="number"&&!isNaN(v)),[dataset,selectedVar]);
-  const stats=useMemo(()=>descriptiveStats(values),[values]);
-  const grouped=useMemo(()=>groupBy(dataset,"imageId"),[dataset]);
-
-  return(
-    <div style={{padding:16,maxHeight:"70vh",overflowY:"auto"}}>
-      <h3 style={{marginBottom:16}}>Statistical Dashboard</h3>
-      <div style={{marginBottom:16}}>
-        <label style={{fontSize:12,color:t.tx2}}>Variable: </label>
-        <select value={selectedVar} onChange={e=>setSelectedVar(e.target.value)} style={{background:t.surf2,border:`1px solid ${t.bdr}`,borderRadius:4,padding:"4px 8px",color:t.tx,fontSize:12}}>
-          {variables.map(v=><option key={v}>{v}</option>)}
-        </select>
-      </div>
-      <div style={{marginBottom:20,padding:12,border:`1px solid ${t.bdr}`,borderRadius:8,background:t.surf2}}>
-        <strong style={{fontSize:13,color:t.tx}}>Descriptive Statistics</strong>
-        <div style={{fontSize:12,color:t.tx2,marginTop:8}}>N = {stats.n}</div>
-        <div style={{fontSize:12,color:t.tx2}}>Mean = {stats.mean?.toFixed(3)??"-"}</div>
-        <div style={{fontSize:12,color:t.tx2}}>SD = {stats.sd?.toFixed(3)??"-"}</div>
-        <div style={{fontSize:12,color:t.tx2}}>Median = {stats.median?.toFixed(3)??"-"}</div>
-        <div style={{fontSize:12,color:t.tx2}}>Range = {stats.range?`${stats.range.min.toFixed(2)} – ${stats.range.max.toFixed(2)}`:"-"}</div>
-      </div>
-      <div style={{marginBottom:20}}>
-        <strong style={{fontSize:13,color:t.tx}}>By Image</strong>
-        {Object.entries(grouped).map(([imgId,items])=>{
-          const vals=items.map(d=>d.measurements?.[selectedVar]).filter(v=>typeof v==="number"&&!isNaN(v));
-          const s=descriptiveStats(vals);
-          const img=images.find(i=>i.id===imgId);
-          return(
-            <div key={imgId} style={{marginTop:8,padding:8,border:`1px solid ${t.bdr}`,borderRadius:4,background:t.surf}}>
-              <div style={{fontSize:12,fontWeight:600,color:t.acc}}>{img?.name||"Image "+imgId}</div>
-              <div style={{fontSize:11,color:t.tx2}}>Mean: {s.mean?.toFixed(3)??"-"} | SD: {s.sd?.toFixed(3)??"-"} | N: {s.n}</div>
-            </div>
-          );
-        })}
-      </div>
-      <button onClick={onClose} style={{padding:"8px 16px",background:t.surf2,color:t.tx,border:`1px solid ${t.bdr}`,borderRadius:6,cursor:"pointer"}}>Close</button>
-    </div>
-  );
-}
-
 function CalibModal({t,calibration,onFinish}){
   const[mm,setMm]=useState(String(calibration.knownMm||"10"));const[ppm,setPpm]=useState(String(calibration.pxPerMm||"1"));const[mode,setMode]=useState("ruler");
   return(
@@ -2197,9 +2007,8 @@ function FormulaEditor({t,formula,scope,onSave,onClose}){
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PIN GATE
+// DATABASE MODE MODAL
 // ═══════════════════════════════════════════════════════════════════════════════
-<<<<<<< HEAD
 function DatabaseImportModal({t,onImport,onClose}){
   const fileRef=useRef(null);
   const[files,setFiles]=useState([]);
@@ -2316,243 +2125,69 @@ function descriptiveStats$1(values){
 }
 
 function StatsDashboard({ dataset, t }) {
-  const [selectedVar, setSelectedVar] = useState("");
-  const [selectedVar2, setSelectedVar2] = useState("");
+  const [selectedVar, setSelectedVar] = useState("SNA");
   const [groupKey, setGroupKey] = useState("group");
-  const [vizType, setVizType] = useState("stats");
-  const scatterRef = useRef(null);
-  const boxRef = useRef(null);
 
   const variables = useMemo(()=>{
     if(!dataset.length) return [];
-    const allVars = new Set();
-    dataset.forEach(entry => {
-      Object.keys(entry.measurements||{}).forEach(v => allVars.add(v));
-      Object.keys(entry.formulas||{}).forEach(v => allVars.add(v));
+    return Object.keys({
+      ...(dataset[0]?.measurements||{}),
+      ...(dataset[0]?.formulas||{})
     });
-    return Array.from(allVars).sort();
   },[dataset]);
 
-  useEffect(()=>{
-    if(variables.length > 0 && !selectedVar) setSelectedVar(variables[0]);
-  },[variables, selectedVar]);
-
   const values = useMemo(()=> extractVariable$1(dataset, selectedVar), [dataset, selectedVar]);
-  const values2 = useMemo(()=> extractVariable$1(dataset, selectedVar2), [dataset, selectedVar2]);
   const stats = useMemo(()=> descriptiveStats$1(values), [values]);
   const grouped = useMemo(()=> groupBy$1(dataset, groupKey), [dataset, groupKey]);
-  const correlation = useMemo(()=>{
-    if(!selectedVar2 || values.length !== values2.length || values.length < 2) return null;
-    return correlation$1(values, values2);
-  },[values, values2]);
-
-  const linearReg = useMemo(()=>{
-    if(values.length !== values2.length || values.length < 2) return null;
-    const n = values.length;
-    const sumX = values.reduce((a,b)=>a+b,0);
-    const sumY = values2.reduce((a,b)=>a+b,0);
-    const sumXY = values.reduce((s,x,i)=>s+x*values2[i],0);
-    const sumX2 = values.reduce((s,x)=>s+x*x,0);
-    const slope = (n*sumXY - sumX*sumY)/(n*sumX2 - sumX*sumX);
-    const intercept = (sumY - slope*sumX)/n;
-    return {slope, intercept};
-  },[values, values2]);
-
-  useEffect(()=>{
-    if(vizType === "scatter" && scatterRef.current && values.length > 0 && values2.length > 0){
-      const canvas = scatterRef.current;
-      const ctx = canvas.getContext("2d");
-      const w = canvas.width;
-      const h = canvas.height;
-      const pad = 40;
-      ctx.clearRect(0,0,w,h);
-      ctx.fillStyle = t.surf2;
-      ctx.fillRect(0,0,w,h);
-      const xMin = Math.min(...values);
-      const xMax = Math.max(...values);
-      const yMin = Math.min(...values2);
-      const yMax = Math.max(...values2);
-      const xRange = xMax - xMin || 1;
-      const yRange = yMax - yMin || 1;
-      const sx = (x) => pad + ((x - xMin)/xRange)*(w - 2*pad);
-      const sy = (y) => h - pad - ((y - yMin)/yRange)*(h - 2*pad);
-      ctx.strokeStyle = t.bdr;
-      ctx.lineWidth = 1;
-      for(let i=0;i<=4;i++){
-        const xi = sx(xMin + (xRange*i)/4);
-        const yi = sy(yMin + (yRange*i)/4);
-        ctx.beginPath();
-        ctx.moveTo(xi, pad);
-        ctx.lineTo(xi, h-pad);
-        ctx.moveTo(pad, yi);
-        ctx.lineTo(w-pad, yi);
-        ctx.stroke();
-      }
-      ctx.strokeStyle = t.tx3;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(pad, h-pad);
-      ctx.lineTo(w-pad, h-pad);
-      ctx.lineTo(w-pad, pad);
-      ctx.stroke();
-      if(linearReg){
-        const x1 = xMin, x2 = xMax;
-        const y1 = linearReg.slope*x1 + linearReg.intercept;
-        const y2 = linearReg.slope*x2 + linearReg.intercept;
-        ctx.strokeStyle = t.err;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(sx(x1), sy(y1));
-        ctx.lineTo(sx(x2), sy(y2));
-        ctx.stroke();
-      }
-      ctx.fillStyle = t.acc;
-      values.forEach((x,i)=>{
-        ctx.beginPath();
-        ctx.arc(sx(x), sy(values2[i]), 4, 0, Math.PI*2);
-        ctx.fill();
-      });
-      ctx.fillStyle = t.tx;
-      ctx.font = "10px 'DM Mono', monospace";
-      ctx.textAlign = "center";
-      ctx.fillText(selectedVar, w/2, h-5);
-      ctx.save();
-      ctx.translate(12, h/2);
-      ctx.rotate(-Math.PI/2);
-      ctx.fillText(selectedVar2, 0, 0);
-      ctx.restore();
-    }
-  },[vizType, values, values2, linearReg, selectedVar, selectedVar2, t]);
-
-  useEffect(()=>{
-    if(vizType === "boxplot" && boxRef.current && values.length > 0){
-      const canvas = boxRef.current;
-      const ctx = canvas.getContext("2d");
-      const w = canvas.width;
-      const h = canvas.height;
-      const pad = 50;
-      ctx.clearRect(0,0,w,h);
-      ctx.fillStyle = t.surf2;
-      ctx.fillRect(0,0,w,h);
-      const sorted = [...values].sort((a,b)=>a-b);
-      const n = sorted.length;
-      const q1 = sorted[Math.floor(n*0.25)];
-      const med = sorted[Math.floor(n*0.5)];
-      const q3 = sorted[Math.floor(n*0.75)];
-      const iqr = q3 - q1;
-      const minVal = Math.max(sorted[0], q1 - 1.5*iqr);
-      const maxVal = Math.min(sorted[n-1], q3 + 1.5*iqr);
-      const range = maxVal - minVal || 1;
-      const scale = (v) => h - pad - ((v - minVal)/range)*(h - 2*pad);
-      const boxX = pad;
-      const boxW = w - 2*pad;
-      const boxY = Math.min(scale(q3), scale(q1));
-      const boxH = Math.abs(scale(q1) - scale(q3));
-      ctx.strokeStyle = t.tx;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(boxX + boxW/2, scale(minVal));
-      ctx.lineTo(boxX + boxW/2, boxY);
-      ctx.moveTo(boxX + boxW/2, boxY + boxH);
-      ctx.lineTo(boxX + boxW/2, scale(maxVal));
-      ctx.stroke();
-      ctx.strokeStyle = t.acc;
-      ctx.lineWidth = 2;
-      ctx.strokeRect(boxX, boxY, boxW, boxH);
-      ctx.strokeStyle = t.err;
-      ctx.lineWidth = 2;
-      const midY = boxY + boxH/2;
-      ctx.beginPath();
-      ctx.moveTo(boxX, midY);
-      ctx.lineTo(boxX + boxW, midY);
-      ctx.stroke();
-      ctx.fillStyle = t.tx;
-      ctx.font = "10px 'DM Mono', monospace";
-      ctx.textAlign = "right";
-      [maxVal, q3, med, q1, minVal].forEach((v,i)=>{
-        const labels = ["Max", "Q3", "Median", "Q1", "Min"];
-        ctx.fillText(`${labels[i]}: ${v.toFixed(2)}`, boxX - 5, scale(v) + 3);
-      });
-      ctx.textAlign = "center";
-      ctx.fillStyle = t.tx;
-      ctx.fillText(selectedVar, w/2, 15);
-    }
-  },[vizType, values, selectedVar, t]);
 
   return (
     <div style={{padding:16}}>
       <h3 style={{fontSize:14,fontWeight:700,color:"inherit",marginBottom:12}}>Statistical Dashboard</h3>
-      <div style={{display:"flex",gap:4,marginBottom:12}}>
-        <button onClick={()=>setVizType("stats")} style={{flex:1,padding:"6px 8px",borderRadius:6,border:`1px solid ${vizType==="stats"?t.acc:t.bdr}`,background:vizType==="stats"?t.acc+"22":"transparent",color:vizType==="stats"?t.acc:t.tx,cursor:"pointer",fontSize:11}}>Stats</button>
-        <button onClick={()=>setVizType("scatter")} style={{flex:1,padding:"6px 8px",borderRadius:6,border:`1px solid ${vizType==="scatter"?t.acc:t.bdr}`,background:vizType==="scatter"?t.acc+"22":"transparent",color:vizType==="scatter"?t.acc:t.tx,cursor:"pointer",fontSize:11}}>Scatter</button>
-        <button onClick={()=>setVizType("boxplot")} style={{flex:1,padding:"6px 8px",borderRadius:6,border:`1px solid ${vizType==="boxplot"?t.acc:t.bdr}`,background:vizType==="boxplot"?t.acc+"22":"transparent",color:vizType==="boxplot"?t.acc:t.tx,cursor:"pointer",fontSize:11}}>Box Plot</button>
-      </div>
       <div style={{marginBottom:10}}>
         <label style={{fontSize:11,color:t.tx2,marginRight:8}}>Variable: </label>
         <select value={selectedVar} onChange={e=>setSelectedVar(e.target.value)} style={{padding:"4px 8px",border:`1px solid ${t.bdr}`,borderRadius:4,background:t.surf3,color:t.tx,fontSize:11}}>
           {variables.map(v => <option key={v} value={v}>{v}</option>)}
         </select>
       </div>
-      {vizType==="stats"&&(<>
-        <div style={{marginBottom:20, padding:10, border:"1px solid "+t.bdr,borderRadius:8}}>
-          <strong style={{fontSize:11,color:t.tx}}>Descriptive Statistics</strong>
-          <div style={{fontSize:11,marginTop:6}}>N = {stats.n}</div>
-          <div style={{fontSize:11}}>Mean = {stats.mean?.toFixed(2)}</div>
-          <div style={{fontSize:11}}>SD = {stats.sd?.toFixed(2)}</div>
-          <div style={{fontSize:11}}>Median = {stats.median?.toFixed(2)}</div>
-          <div style={{fontSize:11}}>Range = {stats.range ? `${stats.range.min.toFixed(2)} – ${stats.range.max.toFixed(2)}` : "-"}</div>
-        </div>
-        <div style={{marginBottom:20}}>
-          <label style={{fontSize:11,color:t.tx2,marginRight:8}}>Group by: </label>
-          <select value={groupKey} onChange={e=>setGroupKey(e.target.value)} style={{padding:"4px 8px",border:`1px solid ${t.bdr}`,borderRadius:4,background:t.surf3,color:t.tx,fontSize:11}}>
-            <option value="group">Group</option>
-            <option value="timepoint">Timepoint</option>
-            <option value="operator">Operator</option>
-          </select>
-          {Object.entries(grouped).map(([g, cases])=>{
-            const vals = extractVariable$1(cases, selectedVar);
-            const s = descriptiveStats$1(vals);
-            return (
-              <div key={g} style={{marginTop:8, padding:8, border:"1px solid "+t.bdr,borderRadius:6}}>
-                <strong style={{fontSize:11,color:t.tx}}>{g}</strong>
-                <div style={{fontSize:10}}>N: {s.n} | Mean: {s.mean?.toFixed(2)} | SD: {s.sd?.toFixed(2)}</div>
-              </div>
-            );
-          })}
-        </div>
-      </>)}
-      {vizType==="scatter"&&(<>
-        <div style={{marginBottom:10}}>
-          <label style={{fontSize:11,color:t.tx2,marginRight:8}}>X Variable: </label>
-          <select value={selectedVar} onChange={e=>setSelectedVar(e.target.value)} style={{padding:"4px 8px",border:`1px solid ${t.bdr}`,borderRadius:4,background:t.surf3,color:t.tx,fontSize:11}}>
-            {variables.map(v => <option key={v} value={v}>{v}</option>)}
-          </select>
-        </div>
-        <div style={{marginBottom:10}}>
-          <label style={{fontSize:11,color:t.tx2,marginRight:8}}>Y Variable: </label>
-          <select value={selectedVar2} onChange={e=>setSelectedVar2(e.target.value)} style={{padding:"4px 8px",border:`1px solid ${t.bdr}`,borderRadius:4,background:t.surf3,color:t.tx,fontSize:11}}>
-            <option value="">-- Select --</option>
-            {variables.map(v => <option key={v} value={v}>{v}</option>)}
-          </select>
-        </div>
-        {correlation !== null && (
-          <div style={{marginBottom:10, padding:8, border:"1px solid "+t.bdr,borderRadius:6,background:t.surf2}}>
-            <div style={{fontSize:11,color:t.tx}}><strong>r = {correlation.toFixed(4)}</strong></div>
-            <div style={{fontSize:10,color:t.tx2}}>r² = {(correlation*correlation).toFixed(4)}</div>
-            {linearReg && <div style={{fontSize:10,color:t.tx2}}>y = {linearReg.slope.toFixed(4)}x + {linearReg.intercept.toFixed(4)}</div>}
-          </div>
-        )}
-        <canvas ref={scatterRef} width={280} height={220} style={{border:"1px solid "+t.bdr,borderRadius:6,width:"100%",maxWidth:280}}/>
-      </>)}
-      {vizType==="boxplot"&&(<>
-        <div style={{marginBottom:10}}>
-          <label style={{fontSize:11,color:t.tx2,marginRight:8}}>Variable: </label>
-          <select value={selectedVar} onChange={e=>setSelectedVar(e.target.value)} style={{padding:"4px 8px",border:`1px solid ${t.bdr}`,borderRadius:4,background:t.surf3,color:t.tx,fontSize:11}}>
-            {variables.map(v => <option key={v} value={v}>{v}</option>)}
-          </select>
-        </div>
-        <canvas ref={boxRef} width={280} height={200} style={{border:"1px solid "+t.bdr,borderRadius:6,width:"100%",maxWidth:280}}/>
-      </>)}
+      <div style={{marginBottom:20, padding:10, border:"1px solid "+t.bdr,borderRadius:8}}>
+        <strong style={{fontSize:11,color:t.tx}}>Descriptive Statistics</strong>
+        <div style={{fontSize:11,marginTop:6}}>N = {stats.n}</div>
+        <div style={{fontSize:11}}>Mean = {stats.mean?.toFixed(2)}</div>
+        <div style={{fontSize:11}}>SD = {stats.sd?.toFixed(2)}</div>
+        <div style={{fontSize:11}}>Median = {stats.median?.toFixed(2)}</div>
+        <div style={{fontSize:11}}>Range = {stats.range ? `${stats.range.min} – ${stats.range.max}` : "-"}</div>
+      </div>
+      <div style={{marginBottom:20}}>
+        <label style={{fontSize:11,color:t.tx2,marginRight:8}}>Group by: </label>
+        <select value={groupKey} onChange={e=>setGroupKey(e.target.value)} style={{padding:"4px 8px",border:`1px solid ${t.bdr}`,borderRadius:4,background:t.surf3,color:t.tx,fontSize:11}}>
+          <option value="group">Group</option>
+          <option value="timepoint">Timepoint</option>
+          <option value="operator">Operator</option>
+        </select>
+        {Object.entries(grouped).map(([g, cases])=>{
+          const vals = extractVariable$1(cases, selectedVar);
+          const s = descriptiveStats$1(vals);
+          return (
+            <div key={g} style={{marginTop:8, padding:8, border:"1px solid "+t.bdr,borderRadius:6}}>
+              <strong style={{fontSize:11,color:t.tx}}>{g}</strong>
+              <div style={{fontSize:10}}>Mean: {s.mean?.toFixed(2)}</div>
+              <div style={{fontSize:10}}>SD: {s.sd?.toFixed(2)}</div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{marginBottom:20}}>
+        <strong style={{fontSize:11,color:t.tx}}>Correlation (Quick)</strong>
+        {variables.slice(0,5).map(v=>{
+          const arr = extractVariable$1(dataset, v);
+          const r = correlation$1(values, arr);
+          return (
+            <div key={v} style={{fontSize:10,color:t.tx2}}>
+              {selectedVar} vs {v}: {r ? r.toFixed(2) : "-"}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -2735,15 +2370,13 @@ function MarkupTablesPanel({databaseImages,currentImageIndex,t,formatAngle}){
 
   return(
     <div>
-      <div style={{display:"flex",gap:4,marginBottom:8}}>
+      <div style={{display:"flex",gap:4,marginBottom:12}}>
         {tableTypes.map(tt=>(
           <button key={tt.id} onClick={()=>setActiveTable(tt.id)} style={{padding:"6px 12px",borderRadius:6,border:`1px solid ${activeTable===tt.id?t.acc:t.bdr}`,background:activeTable===tt.id?t.acc+"22":"transparent",color:activeTable===tt.id?t.acc:t.tx,cursor:"pointer",fontSize:12}}>
             {tt.icon} {tt.label}
           </button>
         ))}
-      </div>
-      <div style={{marginBottom:12}}>
-        <button onClick={()=>exportTableCSV(activeTable)} style={{width:"100%",padding:"8px 12px",borderRadius:6,border:`1px solid ${t.bdr}`,background:t.surf2,color:t.tx,cursor:"pointer",fontSize:12,textAlign:"center"}}>⬇ Export CSV</button>
+        <button onClick={()=>exportTableCSV(activeTable)} style={{marginLeft:"auto",padding:"6px 12px",borderRadius:6,border:`1px solid ${t.bdr}`,background:t.surf2,color:t.tx,cursor:"pointer",fontSize:12}}>Export CSV</button>
       </div>
       {tableData.length===0?<div style={{color:t.tx2,textAlign:"center",padding:20}}>No {activeTable} data</div>:(
         <div style={{overflowX:"auto"}}>
@@ -2808,8 +2441,6 @@ function DatabaseStatsPanel({databaseImages,currentImageIndex,t}){
     </div>
   );
 }
-=======
->>>>>>> 900e1b7b8e12a98fedd1f75b1ac5403fbe05a995
 function PinGate({t,project,onVerified,onCancel}){
   const[pin,setPin]=useState("");const[err,setErr]=useState(false);
   const verify=async()=>{const h=await hashPin(pin);if(h===project.accessControl.pinHash)onVerified();else{setErr(true);setPin("");}};
@@ -2861,11 +2492,12 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const[activeStudyId,setActiveStudyId]=useState(null);
   /** While set, reproducibility landmark points for this session are shown on canvas. */
   const[reproCollecting,setReproCollecting]=useState(null);
-  const[currentImageIdx,setCurrentImageIdx]=useState(0);
-  const[showBatchStats,setShowBatchStats]=useState(false);
-  const[showStatsDashboard,setShowStatsDashboard]=useState(false);
-  const[databaseMode,setDatabaseMode]=useState(true);
-  const[showBatchImport,setShowBatchImport]=useState(false);
+
+  // Database mode states
+  const[databaseMode,setDatabaseMode]=useState(false); // Default to off
+  const[databaseImages,setDatabaseImages]=useState([]); // Array of {id, name, dataUrl, markups:[], calibration:{}, processing:{}}
+  const[currentImageIndex,setCurrentImageIndex]=useState(0);
+  const[showDatabaseImport,setShowDatabaseImport]=useState(false);
 
   useEffect(()=>{const fn=()=>setIsMobile(window.innerWidth<768);window.addEventListener("resize",fn);return()=>window.removeEventListener("resize",fn);},[]);
 
@@ -2897,9 +2529,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const activeVersion=project.versions.find(v=>v.id===project.activeVersionId)||project.versions[0];
   const markups=activeVersion?.markups||[];
 
-  const allCalibrations=activeVersion?.calibrations||{};
-  const globalCalibration=activeVersion?.calibration||{done:false,pxPerMm:1};
-  const calibration=currentImage?(allCalibrations[currentImage.id]||globalCalibration):globalCalibration;
+  const calibration=activeVersion?.calibration||{done:false,pxPerMm:1};
   const processing=activeVersion?.processing||{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0};
   const lutMode=activeVersion?.lutMode||"gray";const lutInvert=activeVersion?.lutInvert||false;
   const formulas=activeVersion?.formulas||[];const norms=activeVersion?.norms||[];
@@ -2951,6 +2581,20 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     }));
   };
   const updMarkup=(id,patch)=>{
+    const useDb=databaseMode&&databaseImages.length>0&&!reproCollecting;
+    if(useDb){
+      const currentDbImg=databaseImages[currentImageIndex];
+      const currentMarkups=currentDbImg?.markups||[];
+      const prevM=currentMarkups.find(m=>m.id===id);
+      const merged=prevM?{...prevM,...patch}:null;
+      const newMarkups=currentMarkups.map(m=>m.id===id?{...m,...patch}:m);
+      updateDatabaseImage(currentImageIndex,{markups:newMarkups});
+      if(merged?.repro?.measurementId&&patch.points){
+        const pt=vpts(merged)[0];
+        if(pt&&pt.x>-9000)syncReproStudyCoords(merged.repro,pt.x,pt.y);
+      }
+      return;
+    }
     const prevM=markups.find(m=>m.id===id);
     const merged=prevM?{...prevM,...patch}:null;
     updMarkups(ms=>ms.map(m=>m.id===id?{...m,...patch}:m));
@@ -2960,6 +2604,13 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     }
   };
   const delMarkup=id=>{
+    const useDb=databaseMode&&databaseImages.length>0&&!reproCollecting;
+    if(useDb){
+      const newMarkups=(databaseImages[currentImageIndex]?.markups||[]).filter(mm=>mm.id!==id);
+      updateDatabaseImage(currentImageIndex,{markups:newMarkups});
+      if(selectedId===id)setSelectedId(null);
+      return;
+    }
     const m=markups.find(x=>x.id===id);
     updMarkups(ms=>ms.filter(mm=>mm.id!==id));
     if(selectedId===id)setSelectedId(null);
@@ -2978,20 +2629,34 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     }
   };
   const addMarkup=partial=>{
-    const m={id:uid(),color:t.acc,width:1.5,style:"solid",size:6,label:"",definition:"",showLength:true,strokeColor:t.acc,fillColor:t.acc+"22",strokeWidth:1.5,visible:true,imageId:databaseMode&&currentImage?currentImage.id:null,...partial};
+    const useDb=databaseMode&&databaseImages.length>0&&!reproCollecting;
+    const currentDbImg=useDb?databaseImages[currentImageIndex]:null;
+    const existingMarkups=useDb?(currentDbImg?.markups||[]):markups;
+    const typeCount=(type)=>existingMarkups.filter(m=>m.type===type).length;
+    const m={id:uid(),color:t.acc,width:1.5,style:"solid",size:6,label:"",definition:"",showLength:true,strokeColor:t.acc,fillColor:t.acc+"22",strokeWidth:1.5,visible:true,...partial};
+    if(partial.type==="point")m.label=`P${typeCount("point")+1}`;
+    if(partial.type==="line"||partial.type==="parallel")m.label=partial.label||`Line ${typeCount("line")+typeCount("parallel")+1}`;
+    if(partial.type==="curve")m.label=partial.label||`Trace ${typeCount("curve")+1}`;
+    if(partial.type==="angle3"||partial.type==="angle4")m.label=partial.label||`Angle ${typeCount("angle3")+typeCount("angle4")+1}`;
+    if(useDb){
+      const newMarkups=[...currentDbImg?.markups||[],m];
+      updateDatabaseImage(currentImageIndex,{markups:newMarkups});
+      setSelectedId(m.id);
+      return m;
+    }
     updMarkups(ms=>[...ms,m]);setSelectedId(m.id);return m;
   };
   const finalizeMarkup=draw=>{
+    const useDb=databaseMode&&databaseImages.length>0&&!reproCollecting;
+    const currentDbImg=useDb?databaseImages[currentImageIndex]:null;
+    const existingMarkups=useDb?(currentDbImg?.markups||[]):markups;
     const D={
-      line:{color:t.acc,width:1.5,style:"solid",mode:"segment",label:`Line ${imageMarkups.filter(m=>m.type==="line").length+1}`,showLength:true},
-      angle3:{color:"#f472b6",width:1.5,label:`Angle ${imageMarkups.filter(m=>m.type==="angle3").length+1}`},
-      angle4:{color:"#c084fc",width:1.5,label:`Angle ${imageMarkups.filter(m=>m.type==="angle4").length+1}`},
-      polygon:{strokeColor:t.acc,fillColor:t.acc+"22",strokeWidth:1.5,label:`Polygon ${imageMarkups.filter(m=>m.type==="polygon").length+1}`},
-      curve:{color:"#fb923c",width:1.5,label:`Trace ${imageMarkups.filter(m=>m.type==="curve").length+1}`},
-      perp:{color:"#a78bfa",width:1.5,label:`⊥ ${imageMarkups.filter(m=>m.type==="perp").length+1}`},
-      arrow:{color:"#34d399",width:2,label:`Arrow ${imageMarkups.filter(m=>m.type==="arrow").length+1}`},
-      parallel:{color:"#34d399",width:1.5,style:"solid",label:`∥ ${imageMarkups.filter(m=>m.type==="parallel").length+1}`,showLength:true},
-      ruler:{color:"#fbbf24",width:1.5,label:`Ruler ${imageMarkups.filter(m=>m.type==="ruler").length+1}`},
+      line:{color:t.acc,width:1.5,style:"solid",mode:"segment",label:`Line ${existingMarkups.filter(m=>m.type==="line").length+1}`,showLength:true},
+      angle3:{color:"#f472b6",width:1.5,label:`Angle ${existingMarkups.filter(m=>m.type==="angle3").length+1}`},
+      angle4:{color:"#c084fc",width:1.5,label:`Angle ${existingMarkups.filter(m=>m.type==="angle4").length+1}`},
+      polygon:{strokeColor:t.acc,fillColor:t.acc+"22",strokeWidth:1.5,label:`Polygon ${existingMarkups.filter(m=>m.type==="polygon").length+1}`},
+      curve:{color:"#fb923c",width:1.5,label:`Trace ${existingMarkups.filter(m=>m.type==="curve").length+1}`},
+      perp:{color:"#a78bfa",width:1.5,label:`Perp ${existingMarkups.filter(m=>m.type==="perp").length+1}`}
     };
     addMarkup({...D[draw.type]||{},...draw});
   };
@@ -3013,62 +2678,64 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     if(containerRef.current)obs.observe(containerRef.current);return()=>obs.disconnect();
   },[]);
 
-  const currentImage=databaseMode&&project.images.length>0?project.images[currentImageIdx]:null;
-  const imageMarkups=databaseMode&&currentImage?markups.filter(m=>m.imageId===currentImage.id):markups;
-
   const redraw=useCallback(()=>{
     const canvas=canvasRef.current;if(!canvas)return;
     const ctx=canvas.getContext("2d");ctx.clearRect(0,0,canvas.width,canvas.height);
     ctx.fillStyle=t.bg;ctx.fillRect(0,0,canvas.width,canvas.height);
-    if(project.images.length===0){
+    
+    const currentDbImg=databaseMode&&databaseImages.length>0?databaseImages[currentImageIndex]:null;
+    const activeMarkups=currentDbImg?.markups||[];
+    const activeCalibration=currentDbImg?.calibration||{done:false,pxPerMm:1};
+    const activeProcessing=currentDbImg?.processing||{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0};
+    const activeLutMode=currentDbImg?.lutMode||"gray";
+    const activeLutInvert=currentDbImg?.lutInvert||false;
+    
+    if(databaseMode&&currentDbImg){
+      const src=imgRefs.current[currentDbImg.id];
+      if(src){
+        const nw=src.naturalWidth||src.width||600,nh=src.naturalHeight||src.height||500;
+        ctx.save();
+        ctx.translate(pan.x,pan.y);
+        ctx.scale(zoom,zoom);
+        ctx.drawImage(src,0,0,nw,nh);
+        ctx.restore();
+      }
+    }else if(project.images.length===0){
       ctx.fillStyle=t.surf;ctx.fillRect(pan.x,pan.y,600*zoom,500*zoom);ctx.strokeStyle=t.bdr;ctx.lineWidth=1;ctx.strokeRect(pan.x,pan.y,600*zoom,500*zoom);
       ctx.fillStyle=t.tx3;ctx.font=`15px "DM Sans",sans-serif`;ctx.textAlign="center";ctx.fillText("Drop or open a cephalogram image",pan.x+300*zoom,pan.y+240*zoom);ctx.fillText("Open Image  •  drag & drop",pan.x+300*zoom,pan.y+265*zoom);ctx.textAlign="left";
     } else {
-      if(databaseMode&&currentImage){
-        const imgE=currentImage;
-        if(imgE.visible){
-          const src=getProcessed(imgE)||imgRefs.current[imgE.id];if(src){
-            const tf=imgE.transform||{tx:0,ty:0,rot:0,scale:1};const nw=src.naturalWidth||src.width||600,nh=src.naturalHeight||src.height||500;
-            ctx.save();ctx.globalAlpha=imgE.opacity??1;ctx.globalCompositeOperation=imgE.blendMode||"normal";
-            ctx.translate(pan.x+(imgE.dx||0)*zoom,pan.y+(imgE.dy||0)*zoom);
-            ctx.translate((nw/2+tf.tx)*zoom,(nh/2+tf.ty)*zoom);ctx.rotate(tf.rot||0);ctx.scale((tf.scale||1)*zoom,(tf.scale||1)*zoom);
-            ctx.drawImage(src,-nw/2,-nh/2);
-            if(imgE.color&&imgE.color!=="none"){ctx.globalCompositeOperation="color";ctx.fillStyle=imgE.color+"77";ctx.fillRect(-nw/2,-nh/2,nw,nh);}
-            ctx.restore();
-          }
-        }
-      }else{
-        project.images.forEach(imgE=>{
-          if(!imgE.visible)return;const src=getProcessed(imgE)||imgRefs.current[imgE.id];if(!src)return;
-          const tf=imgE.transform||{tx:0,ty:0,rot:0,scale:1};const nw=src.naturalWidth||src.width||600,nh=src.naturalHeight||src.height||500;
-          ctx.save();ctx.globalAlpha=imgE.opacity??1;ctx.globalCompositeOperation=imgE.blendMode||"normal";
-          ctx.translate(pan.x+(imgE.dx||0)*zoom,pan.y+(imgE.dy||0)*zoom);
-          ctx.translate((nw/2+tf.tx)*zoom,(nh/2+tf.ty)*zoom);ctx.rotate(tf.rot||0);ctx.scale((tf.scale||1)*zoom,(tf.scale||1)*zoom);
-          ctx.drawImage(src,-nw/2,-nh/2);
-          if(imgE.color&&imgE.color!=="none"){ctx.globalCompositeOperation="color";ctx.fillStyle=imgE.color+"77";ctx.fillRect(-nw/2,-nh/2,nw,nh);}
-          ctx.restore();
-        });
-      }
+      project.images.forEach(imgE=>{
+        if(!imgE.visible)return;const src=getProcessed(imgE)||imgRefs.current[imgE.id];if(!src)return;
+        const tf=imgE.transform||{tx:0,ty:0,rot:0,scale:1};const nw=src.naturalWidth||src.width||600,nh=src.naturalHeight||src.height||500;
+        ctx.save();ctx.globalAlpha=imgE.opacity??1;ctx.globalCompositeOperation=imgE.blendMode||"normal";
+        ctx.translate(pan.x+(imgE.dx||0)*zoom,pan.y+(imgE.dy||0)*zoom);
+        ctx.translate((nw/2+tf.tx)*zoom,(nh/2+tf.ty)*zoom);ctx.rotate(tf.rot||0);ctx.scale((tf.scale||1)*zoom,(tf.scale||1)*zoom);
+        ctx.drawImage(src,-nw/2,-nh/2);
+        if(imgE.color&&imgE.color!=="none"){ctx.globalCompositeOperation="color";ctx.fillStyle=imgE.color+"77";ctx.fillRect(-nw/2,-nh/2,nw,nh);}
+        ctx.restore();
+      });
     }
-    (databaseMode&&currentImage?imageMarkups:markups).forEach(m=>drawMarkup(ctx,m,zoom,pan,calibration,selectedId,t,reproCollecting,canvasSize.current,angleMode));
+    const drawMarkups=databaseMode&&databaseImages.length>0&&!reproCollecting?activeMarkups:markups;
+    const drawCalibration=databaseMode&&databaseImages.length>0&&!reproCollecting?activeCalibration:calibration;
+    drawMarkups.forEach(m=>drawMarkup(ctx,m,zoom,pan,drawCalibration,selectedId,t,reproCollecting,canvasSize.current,angleMode));
     if(showDisplacement){
       if(!compareVersion){
         ctx.fillStyle="rgba(0,0,0,0.6)";ctx.fillRect(8,8,220,36);
         ctx.fillStyle="#ffd700";ctx.font="bold 12px 'DM Sans',sans-serif";
         ctx.fillText("⇝ Select a compare version in Layers panel",16,28);
       } else {
-        drawDisplacementVectors(ctx,markups,compareVersion.markups||[],zoom,pan);
+        drawDisplacementVectors(ctx,drawMarkups,compareVersion.markups||[],zoom,pan);
       }
     }
     if(currentDraw)drawInProgress(ctx,currentDraw,mousePos,zoom,pan,t);
     if(snapEnabled&&snapPos)drawSnapIndicator(ctx,snapPos,zoom,pan);
-    if(showScaleBar)drawScaleBar(ctx,zoom,calibration,canvas.width,canvas.height,t);
-    if(showLUT&&lutMode!=="gray")drawLUTLegend(ctx,lutMode,lutInvert,canvas.width,canvas.height,t);
+    if(showScaleBar)drawScaleBar(ctx,zoom,drawCalibration,canvas.width,canvas.height,t);
+    if(showLUT&&activeLutMode!=="gray")drawLUTLegend(ctx,activeLutMode,activeLutInvert,canvas.width,canvas.height,t);
     if(placingMode&&placingQueue.length>0&&placingIdx<placingQueue.length){
-      const m=markups.find(x=>x.id===placingQueue[placingIdx]);
+      const m=drawMarkups.find(x=>x.id===placingQueue[placingIdx]);
       if(m){ctx.save();ctx.fillStyle="rgba(0,0,0,0.8)";ctx.fillRect(0,0,canvas.width,36);ctx.fillStyle=t.acc;ctx.font=`bold 13px "DM Sans",sans-serif`;ctx.fillText(`📍 Placing: ${m.label}${m.definition?" — "+m.definition:""} · Click image · Esc to skip`,12,23);ctx.restore();}
     }
-  },[markups,selectedId,zoom,pan,project.images,calibration,t,currentDraw,mousePos,snapEnabled,snapPos,showScaleBar,showLUT,lutMode,lutInvert,placingMode,placingQueue,placingIdx,showDisplacement,compareVersion,getProcessed,reproCollecting,angleMode,databaseMode,currentImage,imageMarkups]);
+  },[markups,selectedId,zoom,pan,project.images,calibration,t,currentDraw,mousePos,snapEnabled,snapPos,showScaleBar,showLUT,lutMode,lutInvert,placingMode,placingQueue,placingIdx,showDisplacement,compareVersion,getProcessed,reproCollecting,angleMode,databaseMode,databaseImages,currentImageIndex]);
 
   useEffect(()=>{redraw();},[redraw]);
 
@@ -3087,46 +2754,55 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     };reader.readAsDataURL(file);
   };
 
-  const loadImages=async (files)=>{
-    const validFiles=Array.from(files).filter(f=>f&&f.type.startsWith("image/"));
-    if(validFiles.length===0)return;
-    
-    const newEntries=[];
-    const loadFile=(file)=>new Promise((resolve)=>{
-      const reader=new FileReader();
-      reader.onload=e=>{
-        const dataUrl=e.target.result;const img=new Image();
-        img.onload=()=>{
-          const id=uid();imgRefs.current[id]=img;
-          const entry={id,name:file.name,dataUrl,dx:0,dy:0,opacity:1,blendMode:"normal",visible:true,color:"none",transform:{tx:0,ty:0,rot:0,scale:1}};
-          newEntries.push(entry);resolve();
-        };img.src=dataUrl;
-      };reader.readAsDataURL(file);
-    });
-    
-    await Promise.all(validFiles.map(f=>loadFile(f)));
-    if(newEntries.length>0){
-      onUpdateProject({images:[...project.images,...newEntries]});
+  const loadDatabaseImages=async (files)=>{
+    const loaded=await Promise.all(files.map(file=>{
+      return new Promise((resolve)=>{
+        if(!file.type.startsWith("image/")){resolve(null);return;}
+        const reader=new FileReader();
+        reader.onload=e=>{
+          const dataUrl=e.target.result;const img=new Image();
+          img.onload=()=>{
+            resolve({id:uid(),name:file.name,dataUrl,markups:[],calibration:{done:false,pxPerMm:1,knownMm:""},processing:{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},lutMode:"gray",lutInvert:false});
+          };img.src=dataUrl;
+        };reader.readAsDataURL(file);
+      });
+    }));
+    const validImages=loaded.filter(Boolean);
+    if(validImages.length>0){
+      setDatabaseImages(validImages);
+      setCurrentImageIndex(0);
+      setDatabaseMode(true);
+      const firstImg=validImages[0];
+      imgRefs.current[firstImg.id]=await new Promise(r=>{const i=new Image();i.onload=()=>r(i);i.src=firstImg.dataUrl;});
+      const cw=canvasSize.current.w-80,ch=canvasSize.current.h-80;
+      const img=new Image();img.onload=()=>{const sc=Math.min(cw/(img.naturalWidth||600),ch/(img.naturalHeight||500),1);setZoom(sc);setPan({x:40,y:40});};img.src=firstImg.dataUrl;
     }
   };
 
-  const exportCepha=(project)=>{
-    const payload={
-      format:"cepha",version:"1.0",exported:Date.now(),
-      name:project.name,projection:project.projection,meta:project.meta,
-      images:project.images.map(img=>({id:img.id,name:img.name,dataUrl:img.dataUrl,dx:img.dx||0,dy:img.dy||0,opacity:img.opacity||1,visible:img.visible!==false,color:img.color||"none",transform:img.transform||{tx:0,ty:0,rot:0,scale:1}})),
-      versions:project.versions.map(v=>({...v,markups:v.markups||[],formulas:v.formulas||[],norms:v.norm||v.norms||[],calibration:v.calibration||{done:false,pxPerMm:1},calibrations:v.calibrations||{}})),
-      activeVersionId:project.activeVersionId
-    };
-    const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}));
-    a.download=`${project.name.replace(/\s+/g,"_")}.cepha`;a.click();
+  const updateDatabaseImage=(index,patch)=>{
+    setDatabaseImages(prev=>prev.map((img,i)=>i===index?{...img,...patch}:img));
   };
 
-  const importCepha=(file,onLoad)=>{
-    const reader=new FileReader();
-    reader.onload=e=>{try{const d=JSON.parse(e.target.result);if(d.format==="cepha"&&d.versions){onLoad({...d,versions:d.versions.map(v=>({...v,markups:v.markups||[],formulas:v.formulas||[],norms:v.norm||v.norms||[]}))});alert("Dataset loaded!");}else alert("Invalid .cepha file");}catch{alert("Cannot parse file");}};
-    reader.readAsText(file);
+  const navigateImage=(direction)=>{
+    if(direction==="next"&&currentImageIndex<databaseImages.length-1){
+      setCurrentImageIndex(prev=>prev+1);
+    }else if(direction==="prev"&&currentImageIndex>0){
+      setCurrentImageIndex(prev=>prev-1);
+    }
   };
+
+  useEffect(()=>{
+    if(!databaseMode||databaseImages.length===0)return;
+    const currentDbImg=databaseImages[currentImageIndex];
+    if(!currentDbImg)return;
+    if(!imgRefs.current[currentDbImg.id]){
+      const img=new Image();
+      img.onload=()=>{imgRefs.current[currentDbImg.id]=img;redraw();};
+      img.src=currentDbImg.dataUrl;
+    }else{
+      redraw();
+    }
+  },[currentImageIndex,databaseMode]);
 
   const handleDrop=e=>{e.preventDefault();loadImage(e.dataTransfer.files[0]);};
 
@@ -3148,8 +2824,11 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
 
   const handleMouseDown=useCallback(e=>{
     if(e.button!==0)return;
+    const currentDbImg=databaseMode&&!reproCollecting&&databaseImages.length>0?databaseImages[currentImageIndex]:null;
+    const dbMarkups=currentDbImg?.markups||[];
+    const activeMarkupsList=databaseMode&&!reproCollecting?dbMarkups:markups;
     const sp=getCanvasPos(e);let ip=toImage(sp.x,sp.y);
-    ip=snapPoint(ip,markups,12/zoom,snapEnabled);
+    ip=snapPoint(ip,activeMarkupsList,12/zoom,snapEnabled);
     if(placingMode&&placingQueue.length>0&&placingIdx<placingQueue.length){
       const qid=placingQueue[placingIdx];
       updMarkup(qid,{points:[ip],placed:true});
@@ -3158,10 +2837,10 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     }
     if(activeTool==="pan"){isPanning.current=true;panStart.current={mx:e.clientX,my:e.clientY,px:pan.x,py:pan.y};return;}
     if(activeTool==="select"){
-      const hit=hitTest(markups,ip,zoom,reproCollecting);
+      const hit=hitTest(activeMarkupsList,ip,zoom,reproCollecting);
       setSelectedId(hit);
       if(hit){
-        const m=markups.find(x=>x.id===hit);
+        const m=activeMarkupsList.find(x=>x.id===hit);
         if(m?.locked){isDragging.current=false;return;}
         if(e.ctrlKey&&(m.type==="curve"||m.type==="polygon")){
           const vp=vpts(m);
@@ -3179,7 +2858,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
           if(bestIdx>=0&&vp.length>2){const newPoints=m.points.filter((_,i)=>i!==bestIdx);updMarkup(hit,{points:newPoints});}
           return;
         }
-        isDragging.current=true;dragMid.current=hit;dragStartState.current=JSON.stringify(markups);
+        isDragging.current=true;dragMid.current=hit;dragStartState.current=JSON.stringify(activeMarkupsList);
         let bi=0,bd=Infinity;(m.points||[]).forEach((p,i)=>{const d=dist(p,ip);if(d<bd){bd=d;bi=i;}});
         dragPtIdx.current=bi;dragStart.current=ip;
       }
@@ -3191,7 +2870,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         const{studyId,opId,trialIdx}=reproCollecting;
         const study=reproStudies.find(s=>s.id===studyId);
         if(study){
-          const n=markups.filter(m=>m.type==="point"&&m.repro&&m.repro.studyId===studyId&&m.repro.opId===opId&&m.repro.trialIdx===trialIdx).length;
+          const n=activeMarkupsList.filter(m=>m.type==="point"&&m.repro&&m.repro.studyId===studyId&&m.repro.opId===opId&&m.repro.trialIdx===trialIdx).length;
           const label=`L${n+1}`;
           const measurementId=uid();
           addMarkup({type:"point",points:[ip],label,color:t.acc,size:6,definition:"",repro:{studyId,opId,trialIdx,measurementId}});
@@ -3209,32 +2888,35 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         }
         return;
       }
-      const nNon=imageMarkups.filter(m=>m.type==="point"&&!m.repro).length;
-      const px=calibration.done?ip.x/calibration.pxPerMm:null;
-      const py=calibration.done?ip.y/calibration.pxPerMm:null;
-      addMarkup({type:"point",points:[ip],label:`P${nNon+1}`,color:t.acc,size:6,definition:"",coordMm:{x:px,y:py}});
+      const nNon=activeMarkupsList.filter(m=>m.type==="point"&&!m.repro).length;
+      addMarkup({type:"point",points:[ip],label:`P${nNon+1}`,color:t.acc,size:6,definition:""});
       return;
     }
     if(activeTool==="ruler"){if(!currentDraw)setCurrentDraw({type:"ruler",points:[ip]});else{const ruler={...currentDraw,type:"ruler",points:[...currentDraw.points,ip],label:"Ruler"};setPendingRuler(ruler);addMarkup(ruler);setCurrentDraw(null);setShowCalib(true);}return;}
     if(activeTool==="parallel"){if(selectedMarkup&&(selectedMarkup.type==="line"||selectedMarkup.type==="parallel")){const vp=vpts(selectedMarkup);if(vp.length>=2){const dx=vp[1].x-vp[0].x,dy=vp[1].y-vp[0].y,len=Math.sqrt(dx*dx+dy*dy)||1,half=len/2;addMarkup({type:"parallel",points:[{x:ip.x-dx/len*half,y:ip.y-dy/len*half},{x:ip.x+dx/len*half,y:ip.y+dy/len*half}],color:"#34d399",width:1.5,style:"solid",label:`∥`,showLength:true});return;}}if(!currentDraw)setCurrentDraw({type:"line",points:[ip]});else{finalizeMarkup({...currentDraw,points:[...currentDraw.points,ip]});setCurrentDraw(null);}return;}
-    if(activeTool==="midpoint"){if(!currentDraw)setCurrentDraw({type:"midpoint",points:[ip]});else{const p1=currentDraw.points[0],p2=ip;if(p1.x>-9000&&p2.x>-9000){const mid={x:(p1.x+p2.x)/2,y:(p1.y+p2.y)/2};const n=markups.filter(m=>m.type==="point").length;addMarkup({type:"point",points:[mid],label:`M${n+1}`,color:"#fbbf24",size:6,definition:"Midpoint"});}setCurrentDraw(null);}return;}
-    if(activeTool==="perppoint"){if(!currentDraw)setCurrentDraw({type:"perppoint",points:[ip]});else if(currentDraw.points.length===1)setCurrentDraw({type:"perppoint",points:[currentDraw.points[0],ip]});else{const p1=currentDraw.points[0],p2=currentDraw.points[1],p3=ip;if(p1.x>-9000&&p2.x>-9000&&p3.x>-9000){const lx1=p2.x-p1.x,ly1=p2.y-p1.y;const lx2=-ly1,ly2=lx1;const perpPt={x:p3.x+lx2,y:p3.y+ly2};const n=markups.filter(m=>m.type==="line"||m.type==="perp").length+1;addMarkup({type:"line",mode:"segment",points:[perpPt,p3],color:"#f472b6",width:1.5,style:"solid",label:`⊥${n}`,showLength:true});}setCurrentDraw(null);}return;}
+    if(activeTool==="midpoint"){if(!currentDraw)setCurrentDraw({type:"midpoint",points:[ip]});else{const p1=currentDraw.points[0],p2=ip;if(p1.x>-9000&&p2.x>-9000){const mid={x:(p1.x+p2.x)/2,y:(p1.y+p2.y)/2};const n=activeMarkupsList.filter(m=>m.type==="point").length;addMarkup({type:"point",points:[mid],label:`M${n+1}`,color:"#fbbf24",size:6,definition:"Midpoint"});}setCurrentDraw(null);}return;}
+    if(activeTool==="perppoint"){if(!currentDraw)setCurrentDraw({type:"perppoint",points:[ip]});else if(currentDraw.points.length===1)setCurrentDraw({type:"perppoint",points:[currentDraw.points[0],ip]});else{const p1=currentDraw.points[0],p2=currentDraw.points[1],p3=ip;if(p1.x>-9000&&p2.x>-9000&&p3.x>-9000){const lx1=p2.x-p1.x,ly1=p2.y-p1.y;const lx2=-ly1,ly2=lx1;const perpPt={x:p3.x+lx2,y:p3.y+ly2};const n=activeMarkupsList.filter(m=>m.type==="line"||m.type==="perp").length+1;addMarkup({type:"line",mode:"segment",points:[perpPt,p3],color:"#f472b6",width:1.5,style:"solid",label:`⊥${n}`,showLength:true});}setCurrentDraw(null);}return;}
     if(activeTool==="arrow"){if(!currentDraw)setCurrentDraw({type:"arrow",points:[ip]});else{const p1=currentDraw.points[0],p2=ip;if(p1.x>-9000&&p2.x>-9000){addMarkup({type:"arrow",points:[p1,p2],color:"#34d399",width:2});}setCurrentDraw(null);}return;}
     if(["line","angle3","angle4","polygon","curve","perp"].includes(activeTool)){
       if(!currentDraw)setCurrentDraw({type:activeTool,points:[ip],curveStyle:["curve","polygon"].includes(activeTool)?curveMode:"linear"});
       else{const nps=[...currentDraw.points,ip];const need={line:2,angle3:3,angle4:4,perp:3}[activeTool];if(need&&nps.length>=need){finalizeMarkup({...currentDraw,points:nps});setCurrentDraw(null);}else setCurrentDraw({...currentDraw,points:nps});}return;}
-  },[activeTool,markups,zoom,pan,snapEnabled,currentDraw,selectedMarkup,curveMode,placingMode,placingQueue,placingIdx,reproCollecting,reproStudies]);
+  },[activeTool,markups,zoom,pan,snapEnabled,currentDraw,selectedMarkup,curveMode,placingMode,placingQueue,placingIdx,reproCollecting,reproStudies,databaseMode,databaseImages,currentImageIndex]);
 
   const handleMouseMove=useCallback(e=>{
+    const currentDbImg=databaseMode&&!reproCollecting&&databaseImages.length>0?databaseImages[currentImageIndex]:null;
+    const dbMarkups=currentDbImg?.markups||[];
+    const activeMarkupsList=databaseMode&&!reproCollecting?dbMarkups:markups;
     const sp=getCanvasPos(e);setMousePos(sp);
-    if(snapEnabled&&activeTool!=="select"&&activeTool!=="pan"){const ip=toImage(sp.x,sp.y);const sn=snapPoint(ip,markups,12/zoom,snapEnabled);setSnapPos((Math.abs(sn.x-ip.x)>0.1||Math.abs(sn.y-ip.y)>0.1)?sn:null);}else setSnapPos(null);
+    if(snapEnabled&&activeTool!=="select"&&activeTool!=="pan"){const ip=toImage(sp.x,sp.y);const sn=snapPoint(ip,activeMarkupsList,12/zoom,snapEnabled);setSnapPos((Math.abs(sn.x-ip.x)>0.1||Math.abs(sn.y-ip.y)>0.1)?sn:null);}else setSnapPos(null);
     if(isPanning.current&&panStart.current)setPan({x:panStart.current.px+(e.clientX-panStart.current.mx),y:panStart.current.py+(e.clientY-panStart.current.my)});
-    if(isDragging.current&&dragMid.current){const ip=toImage(sp.x,sp.y);const dx=ip.x-dragStart.current.x,dy=ip.y-dragStart.current.y;updMarkup(dragMid.current,{points:(markups.find(m=>m.id===dragMid.current)?.points||[]).map((p,i)=>i===dragPtIdx.current?{x:p.x+dx,y:p.y+dy}:p)});dragStart.current=ip;}
-  },[activeTool,markups,zoom,snapEnabled]);
+    if(isDragging.current&&dragMid.current){const ip=toImage(sp.x,sp.y);const dx=ip.x-dragStart.current.x,dy=ip.y-dragStart.current.y;updMarkup(dragMid.current,{points:(activeMarkupsList.find(m=>m.id===dragMid.current)?.points||[]).map((p,i)=>i===dragPtIdx.current?{x:p.x+dx,y:p.y+dy}:p)});dragStart.current=ip;}
+  },[activeTool,markups,zoom,snapEnabled,databaseMode,databaseImages,currentImageIndex,reproCollecting]);
 
   const handleMouseUp=()=>{
+    const currentDbImg=databaseMode&&!reproCollecting&&databaseImages.length>0?databaseImages[currentImageIndex]:null;
+    const activeMarkupsList=databaseMode&&!reproCollecting?(currentDbImg?.markups||[]):markups;
     if(isDragging.current&&dragStartState.current){
-      const currentState=JSON.stringify(markups);
+      const currentState=JSON.stringify(activeMarkupsList);
       if(dragStartState.current!==currentState){
         undoStackRef.current.push(dragStartState.current);
         if(undoStackRef.current.length>50)undoStackRef.current.shift();
@@ -3251,24 +2933,23 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const handleTouchEnd=()=>{handleMouseUp();lastTouchDist.current=null;};
 
   const finalizeCalib=(mm,manualPpm)=>{
-    if(manualPpm){
-      if(databaseMode&&currentImage){
-        const newCalibs={...allCalibrations,[currentImage.id]:{done:true,pxPerMm:manualPpm,knownMm:mm}};
-        updVer({calibrations:newCalibs});
-      }else{
-        updVer({calibration:{done:true,pxPerMm:manualPpm,knownMm:mm}});
+    const useDb=databaseMode&&databaseImages.length>0&&!reproCollecting;
+    if(useDb){
+      const currentDbImg=databaseImages[currentImageIndex];
+      const currentMarkups=currentDbImg?.markups||[];
+      if(manualPpm){
+        updateDatabaseImage(currentImageIndex,{calibration:{done:true,pxPerMm:manualPpm,knownMm:mm}});
+        setShowCalib(false);
+        return;
       }
-      setShowCalib(false);return;
+      const ruler=pendingRuler||currentMarkups.find(m=>m.type==="ruler");if(!ruler)return;const vp=vpts(ruler);if(vp.length<2)return;
+      updateDatabaseImage(currentImageIndex,{calibration:{done:true,pxPerMm:dist(vp[0],vp[1])/mm,knownMm:mm}});
+      setShowCalib(false);
+      return;
     }
+    if(manualPpm){updVer({calibration:{done:true,pxPerMm:manualPpm,knownMm:mm}});setShowCalib(false);return;}
     const ruler=pendingRuler||markups.find(m=>m.type==="ruler");if(!ruler)return;const vp=vpts(ruler);if(vp.length<2)return;
-    const ppm=dist(vp[0],vp[1])/mm;
-    if(databaseMode&&currentImage){
-      const newCalibs={...allCalibrations,[currentImage.id]:{done:true,pxPerMm:ppm,knownMm:mm}};
-      updVer({calibrations:newCalibs});
-    }else{
-      updVer({calibration:{done:true,pxPerMm:ppm,knownMm:mm}});
-    }
-    setShowCalib(false);
+    updVer({calibration:{done:true,pxPerMm:dist(vp[0],vp[1])/mm,knownMm:mm}});setShowCalib(false);
   };
 
   const loadTemplate=(analysis)=>{
@@ -3304,15 +2985,15 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const cursorStyle={select:"default",pan:"grab",point:"crosshair",line:"crosshair",angle3:"crosshair",angle4:"crosshair",polygon:"crosshair",curve:"crosshair",perp:"crosshair",parallel:"crosshair",midpoint:"crosshair",perppoint:"crosshair",arrow:"crosshair",text:"text",ruler:"crosshair"}[activeTool]||"default";
   const availAnalyses=PREDEFINED[project.projection]||[];
 
-  const panelIcons={markups:"◉",measurements:"📏",formulas:"∑",image:"▦",layers:"⊞",versions:"☰",reproducibility:"↻",statistics:"σ",templates:"▤",themes:"◐"};
-  const panelTabs=[["markups","Markups"],["measurements","Measure"],["formulas","Formulas"],["image","Image"],["layers","Layers"],["versions","Versions"],["reproducibility","Reproducibility"],["statistics","Statistics"],["templates","Templates"],["themes","Themes"]];
+  const panelIcons={markups:"◉",measurements:"📏",formulas:"∑",image:"▦",layers:"⊞",versions:"☰",reproducibility:"↻",statistics:"σ",templates:"▤",themes:"◐","repro-stats":"≋"};
+  const panelTabs=[["markups","Markups"],["measurements","Measure"],["formulas","Formulas"],["image","Image"],["layers","Layers"],["versions","Versions"],["reproducibility","Reproducibility"],["statistics","Statistics"],["repro-stats","Repro Stats"],["templates","Templates"],["themes","Themes"]];
 
   return(
     <div style={{height:"100vh",display:"flex",flexDirection:"column",background:t.bg,color:t.tx,fontFamily:"'DM Sans',sans-serif",overflow:"hidden"}}>
       {/* hidden file inputs */}
       <input ref={openImgRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{if(e.target.files[0])loadImage(e.target.files[0]);e.target.value="";}}/>
-      <input ref={stackImgRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>{if(e.target.files)loadImages(e.target.files);e.target.value="";}}/>
-      <input ref={importRef} type="file" accept=".cephx,.cepha" style={{display:"none"}} onChange={e=>{if(e.target.files[0]){const f=e.target.files[0];if(f.name.endsWith(".cepha"))importCepha(f,p=>{onUpdateProject(p);setCurrentImageIdx(0);});else importCephx(f,p=>{onUpdateProject(p);});}e.target.value="";}}/>
+      <input ref={stackImgRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{if(e.target.files[0])loadImage(e.target.files[0],true);e.target.value="";}}/>
+      <input ref={importRef} type="file" accept=".cephx" style={{display:"none"}} onChange={e=>{if(e.target.files[0])importCephx(e.target.files[0],p=>{onUpdateProject(p);});e.target.value="";}}/>
 
       {/* TOP BAR */}
       <div style={{display:"flex",alignItems:"center",gap:6,padding:"0 10px",height:isMobile?42:46,background:t.surf,flexShrink:0,overflowX:"auto"}}>
@@ -3326,20 +3007,13 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         <div style={{width:1,height:20,background:t.bdr,flexShrink:0}}/>
         <Tag color={t.acc}>{project.projection?.toUpperCase()}</Tag>
         {project.meta?.anonymized&&<Tag color={t.ok}>🔒 Anon</Tag>}
-        {calibration.done&&<Tag color={t.ok}>⟺ {calibration.pxPerMm.toFixed(2)}px/mm</Tag>}
-        {placingMode&&<Tag color={t.warn}>📍 {placingIdx+1}/{placingQueue.length}</Tag>}
-        {project.images.length>0&&<div style={{display:"flex",alignItems:"center",gap:4,marginLeft:8,flexShrink:0}}>
-          <button onClick={()=>setCurrentImageIdx(i=>Math.max(0,i-1))} disabled={currentImageIdx===0} style={{background:"none",border:"none",color:t.tx,cursor:currentImageIdx===0?"default":"pointer",fontSize:12,padding:"2px 4px"}}>◀</button>
-          <span style={{fontSize:11,color:t.tx2,fontWeight:600,whiteSpace:"nowrap"}}>{currentImageIdx+1}/{project.images.length}</span>
-          <button onClick={()=>setCurrentImageIdx(i=>Math.min(project.images.length-1,i+1))} disabled={currentImageIdx===project.images.length-1} style={{background:"none",border:"none",color:t.tx,cursor:currentImageIdx===project.images.length-1?"default":"pointer",fontSize:12,padding:"2px 4px"}}>▶</button>
+        {calibration.done&&!databaseMode&&<Tag color={t.ok}>⟺ {calibration.pxPerMm.toFixed(2)}px/mm</Tag>}
+        {databaseMode&&<div style={{display:"flex",alignItems:"center",gap:4}}>
+          <button onClick={()=>navigateImage("prev")} disabled={currentImageIndex===0} style={{background:"none",border:`1px solid ${t.bdr}`,borderRadius:4,padding:"2px 8px",cursor:currentImageIndex===0?"not-allowed":"pointer",color:currentImageIndex===0?t.tx3:t.tx}}>◀</button>
+          <span style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:t.acc}}>{currentImageIndex+1} / {databaseImages.length}</span>
+          <button onClick={()=>navigateImage("next")} disabled={currentImageIndex>=databaseImages.length-1} style={{background:"none",border:`1px solid ${t.bdr}`,borderRadius:4,padding:"2px 8px",cursor:currentImageIndex>=databaseImages.length-1?"not-allowed":"pointer",color:currentImageIndex>=databaseImages.length-1?t.tx3:t.tx}}>▶</button>
         </div>}
-        <div style={{marginLeft:8,flexShrink:0,display:"flex",gap:4}}>
-          {databaseMode?
-            <Btn t={t} small onClick={()=>setDatabaseMode(false)} style={{background:t.warn,color:"#fff"}}>Exit DB</Btn>:
-            <Btn t={t} small onClick={()=>{setDatabaseMode(true);setCurrentImageIdx(0);}} style={{background:t.acc,color:"#fff"}}>DB Mode</Btn>
-          }
-          {databaseMode&&<Btn t={t} small onClick={()=>stackImgRef.current?.click()}>+ Add Images</Btn>}
-        </div>
+        {placingMode&&<Tag color={t.warn}>📍 {placingIdx+1}/{placingQueue.length}</Tag>}
         <div style={{flex:1}}/>
         {!isMobile&&<>
           <Btn t={t} small active={snapEnabled} onClick={()=>setSnapEnabled(v=>!v)}>⊙ Snap</Btn>
@@ -3350,6 +3024,14 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         <Btn t={t} small onClick={()=>openImgRef.current?.click()}>Open</Btn>
         {!isMobile&&<Btn t={t} small onClick={()=>stackImgRef.current?.click()}>+ Stack</Btn>}
         <Btn t={t} small onClick={()=>exportCephx(project)}>Save</Btn>
+        {!isMobile&&<div style={{display:"flex",alignItems:"center",gap:6}}>
+          <Btn t={t} small onClick={()=>setShowDatabaseImport(true)}>DB</Btn>
+          <button onClick={()=>{if(!databaseMode&&databaseImages.length===0)setShowDatabaseImport(true);else if(databaseMode){setDatabaseMode(false);setDatabaseImages([]);setCurrentImageIndex(0);}}} title={databaseImages.length===0?"Import images first":"Toggle Database Mode"} style={{background:"none",border:"none",cursor:databaseImages.length===0?"not-allowed":"pointer",padding:4,display:"flex",alignItems:"center",opacity:databaseImages.length===0?0.5:1}}>
+            <div style={{width:36,height:20,borderRadius:10,background:databaseMode?t.acc:t.surf3,border:`1px solid ${databaseMode?t.acc:t.bdr}`,position:"relative",transition:"all 0.2s"}}>
+              <div style={{width:16,height:16,borderRadius:8,background:databaseMode?(t.id==="light"?"#fff":t.bg):t.tx,position:"absolute",top:1,left:databaseMode?18:2,transition:"all 0.2s",boxShadow:"0 1px 3px rgba(0,0,0,3)"}}/>
+            </div>
+          </button>
+        </div>}
         {!isMobile&&<Btn t={t} small onClick={()=>setShowExport(true)}>Export</Btn>}
         {!isMobile&&<Btn t={t} small onClick={()=>setShowAnon(true)}>Anonymization</Btn>}
         <div style={{width:1,height:20,background:t.bdr,flexShrink:0}}/>
@@ -3481,22 +3163,46 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
               <div style={{flex:1,overflowY:"auto",scrollbarWidth:"none"}}>
                 <style>{`.panel-scroll::-webkit-scrollbar{display:none}`}</style>
                 <div className="panel-scroll">
-                  {rightPanel==="markups"&&<MarkupsPanel markups={markups} t={t} theme={theme} selectedId={selectedId} onSelect={setSelectedId} onDelete={delMarkup} onToggleVisible={id=>updMarkup(id,{visible:markups.find(m=>m.id===id)?.visible===false})} onToggleLock={id=>updMarkup(id,{locked:!markups.find(m=>m.id===id)?.locked})} calibration={calibration} placingMode={placingMode} placingQueue={placingQueue} placingIdx={placingIdx} onStopPlacing={()=>{setPlacingMode(false);setPlacingQueue([]);setPlacingIdx(0);}} onPausePlacing={()=>{setPlacingMode(false);}} onResumePlacing={()=>{setPlacingMode(true);}} onClear={()=>updVer({markups:[]})} onAddPoint={()=>{setActiveTool("point");setCurrentDraw(null);}} norms={norms} formatAngle={formatAngle} angleMode={angleMode} setAngleMode={setAngleMode}/>}
-                  {rightPanel==="measurements"&&<MeasurementsPanel allMeas={allMeas} t={t} calibration={calibration} norms={norms} onUpdateNorms={ns=>updVer({norms:ns})} onExportCSV={exportCSV} onOpenCalib={()=>setShowCalib(true)} formatAngle={formatAngle}/>}
+                  {rightPanel==="markups"&&(databaseMode?
+                    <MarkupsPanel 
+                      markups={databaseImages[currentImageIndex]?.markups||[]} 
+                      t={t} 
+                      theme={theme} 
+                      selectedId={selectedId} 
+                      onSelect={setSelectedId} 
+                      onDelete={(id)=>{const newMarkups=(databaseImages[currentImageIndex]?.markups||[]).filter(m=>m.id!==id);updateDatabaseImage(currentImageIndex,{markups:newMarkups});if(selectedId===id)setSelectedId(null);}} 
+                      onToggleVisible={(id)=>{const m=(databaseImages[currentImageIndex]?.markups||[]).find(m=>m.id===id);if(m)updateDatabaseImage(currentImageIndex,{markups:(databaseImages[currentImageIndex]?.markups||[]).map(mm=>mm.id===id?{...mm,visible:mm.visible===false}:mm)});}} 
+                      onToggleLock={(id)=>{const m=(databaseImages[currentImageIndex]?.markups||[]).find(m=>m.id===id);if(m)updateDatabaseImage(currentImageIndex,{markups:(databaseImages[currentImageIndex]?.markups||[]).map(mm=>mm.id===id?{...mm,locked:!m.locked}:mm)});}} 
+                      calibration={databaseImages[currentImageIndex]?.calibration||{done:false,pxPerMm:1}} 
+                      placingMode={false} placingQueue={[]} placingIdx={0} 
+                      onStopPlacing={()=>{}} onPausePlacing={()=>{}} onResumePlacing={()=>{}} 
+                      onClear={()=>updateDatabaseImage(currentImageIndex,{markups:[]})} 
+                      onAddPoint={()=>{setActiveTool("point");setCurrentDraw(null);}} 
+                      norms={[]} 
+                      formatAngle={formatAngle} 
+                      angleMode={angleMode} 
+                      setAngleMode={setAngleMode}
+                    />
+                    :<MarkupsPanel markups={markups} t={t} theme={theme} selectedId={selectedId} onSelect={setSelectedId} onDelete={delMarkup} onToggleVisible={id=>updMarkup(id,{visible:markups.find(m=>m.id===id)?.visible===false})} onToggleLock={id=>updMarkup(id,{locked:!markups.find(m=>m.id===id)?.locked})} calibration={calibration} placingMode={placingMode} placingQueue={placingQueue} placingIdx={placingIdx} onStopPlacing={()=>{setPlacingMode(false);setPlacingQueue([]);setPlacingIdx(0);}} onPausePlacing={()=>{setPlacingMode(false);}} onResumePlacing={()=>{setPlacingMode(true);}} onClear={()=>updVer({markups:[]})} onAddPoint={()=>{setActiveTool("point");setCurrentDraw(null);}} norms={norms} formatAngle={formatAngle} angleMode={angleMode} setAngleMode={setAngleMode}/>)}
+                  {rightPanel==="measurements"&&(databaseMode?
+                    <MeasurementsPanel 
+                      allMeas={(databaseImages[currentImageIndex]?.markups||[]).map(m=>({m,meas:computeMeasurements(m,databaseImages[currentImageIndex]?.calibration||{done:false,pxPerMm:1})})).filter(x=>Object.keys(x.meas).length>0)} 
+                      t={t} 
+                      calibration={databaseImages[currentImageIndex]?.calibration||{done:false,pxPerMm:1}} 
+                      norms={[]} 
+                      onUpdateNorms={()=>{}} 
+                      onExportCSV={()=>{}} 
+                      onOpenCalib={()=>setShowCalib(true)} 
+                      formatAngle={formatAngle}
+                    />
+                    :<MeasurementsPanel allMeas={allMeas} t={t} calibration={calibration} norms={norms} onUpdateNorms={ns=>updVer({norms:ns})} onExportCSV={exportCSV} onOpenCalib={()=>setShowCalib(true)} formatAngle={formatAngle}/>)}
                   {rightPanel==="formulas"&&<FormulasPanel formulas={formulas} t={t} scope={measScope} onAdd={()=>{setEditFormulaId(null);setShowFormulaEditor(true);}} onEdit={id=>{setEditFormulaId(id);setShowFormulaEditor(true);}} onDelete={id=>updVer({formulas:formulas.filter(f=>f.id!==id)})}/>}
                   {rightPanel==="image"&&<ImagePanel t={t} processing={processing} setProcessing={p=>updVer({processing:p})} lutMode={lutMode} setLutMode={m=>updVer({lutMode:m})} lutInvert={lutInvert} setLutInvert={v=>updVer({lutInvert:v})} showLUT={showLUT} setShowLUT={setShowLUT} showScaleBar={showScaleBar} setShowScaleBar={setShowScaleBar} calibration={calibration} onOpenCalib={()=>setShowCalib(true)} onReset={()=>updVer({processing:{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},lutMode:"gray",lutInvert:false})} onShowHist={()=>setShowHistogram(v=>!v)} showHistogram={showHistogram}/>}
                   {rightPanel==="layers"&&<LayersPanel t={t} images={project.images} onUpdateImages={imgs=>onUpdateProject({images:imgs})} onAddImage={e=>{if(e.target.files[0])loadImage(e.target.files[0],true);}} showDisplacement={showDisplacement} setShowDisplacement={setShowDisplacement} compareVersionId={compareVersionId} setCompareVersionId={setCompareVersionId} versions={project.versions} onShowAlign={()=>setShowAlign(true)} onShowTransform={()=>setShowTransform(true)}/>}
                   {rightPanel==="versions"&&<VersionsPanel project={project} t={t} onUpdateProject={onUpdateProject} onUpdateVersion={onUpdateVersion} onExportTemplate={v=>exportCepht({name:`${project.name}-${v.label}`,projection:project.projection,markups:v.markups||[],formulas:v.formulas||[],norms:v.norms||[]})}/>}
                   {rightPanel==="reproducibility"&&<ReproducibilityPanel t={t} markups={markups} studies={reproStudies} onUpdateStudies={setReproStudies} activeStudyId={activeStudyId} setActiveStudyId={setActiveStudyId} reproCollecting={reproCollecting} setReproCollecting={setReproCollecting}/>}
-                  {rightPanel==="statistics"&&(
-                    <div style={{padding:12}}>
-                      <div style={{marginBottom:12,display:"flex",gap:8}}>
-                        <Btn t={t} onClick={()=>setShowBatchStats(true)} style={{flex:1}}>Registered Markups</Btn>
-                        <Btn t={t} onClick={()=>setShowStatsDashboard(true)} style={{flex:1}}>Statistics Dashboard</Btn>
-                      </div>
-                      <StatisticsPanel t={t} studies={reproStudies}/>
-                    </div>
-                  )}
+                  {rightPanel==="statistics"&&(databaseMode?<DatabaseStatsPanel databaseImages={databaseImages} currentImageIndex={currentImageIndex} t={t}/>:<div style={{padding:12}}><div style={{fontSize:12,color:t.tx3,textAlign:"center"}}>Enable Database Mode to view statistics</div></div>)}
+                  {rightPanel==="repro-stats"&&<StatisticsPanel t={t} studies={reproStudies}/>}
                   {rightPanel==="templates"&&<TemplatesPanel t={t} projection={project.projection} onLoadTemplate={loadTemplate}/>}
                   {rightPanel==="themes"&&(
                     <div style={{padding:12}}>
@@ -3533,6 +3239,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       </div>
 
       {/* MODALS */}
+      {showDatabaseImport&&<Modal t={t} title="Database Mode - Import Images" onClose={()=>setShowDatabaseImport(false)}><DatabaseImportModal t={t} onImport={loadDatabaseImages} onClose={()=>setShowDatabaseImport(false)}/></Modal>}
       {showTemplatePicker&&<Modal t={t} title="" onClose={()=>setShowTemplatePicker(false)}><TemplatePickerModal t={t} projection={project.projection} onPick={handleTemplatePick} onClose={()=>setShowTemplatePicker(false)}/></Modal>}
       {showCalib&&<Modal t={t} title="Calibration" onClose={()=>setShowCalib(false)}><CalibModal t={t} calibration={calibration} onFinish={finalizeCalib}/></Modal>}
       {showExport&&<Modal t={t} title="Export" onClose={()=>setShowExport(false)}><div style={{display:"flex",flexDirection:"column",gap:10}}><Btn t={t} onClick={()=>{exportCSV();setShowExport(false);}}>Measurements CSV</Btn><Btn t={t} onClick={()=>{exportCephx(project);setShowExport(false);}}>Full Project .cephx</Btn><Btn t={t} onClick={()=>{exportThemeAsCepht(theme);setShowExport(false);}}>Theme .cepht</Btn></div></Modal>}
@@ -3542,26 +3249,6 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       {showTransform&&<Modal t={t} title="Image Transform" onClose={()=>setShowTransform(false)}><TransformModal t={t} images={project.images} onUpdateImages={imgs=>onUpdateProject({images:imgs})} onClose={()=>setShowTransform(false)}/></Modal>}
       {showFormulaEditor&&<Modal t={t} title={editFormulaId?"Edit Formula":"New Formula"} onClose={()=>setShowFormulaEditor(false)}><FormulaEditor t={t} formula={editFormulaId?formulas.find(f=>f.id===editFormulaId):null} scope={measScope} onSave={f=>{const newFs=editFormulaId?formulas.map(x=>x.id===editFormulaId?f:x):[...formulas,f];updVer({formulas:newFs});setShowFormulaEditor(false);}} onClose={()=>setShowFormulaEditor(false)}/></Modal>}
       {showHistogram&&<FloatingHistogram hist={computeHistogram(project.images[0]?imgRefs.current[project.images[0].id]:null)} t={t} lutMode={lutMode} lutInvert={lutInvert} processing={processing} onProcessingChange={p=>updVer({processing:p})} onClose={()=>setShowHistogram(false)}/>}
-      {showBatchStats&&<Modal t={t} title="Registered Markups" onClose={()=>setShowBatchStats(false)} wide>
-        <BatchStatsPanel t={t} images={project.images} markups={markups} calibration={calibration} onClose={()=>setShowBatchStats(false)}/>
-      </Modal>}
-      {showStatsDashboard&&<Modal t={t} title="Statistics Dashboard" onClose={()=>setShowStatsDashboard(false)} wide>
-        <StatsDashboard t={t} images={project.images} markups={markups} calibration={calibration} onClose={()=>setShowStatsDashboard(false)}/>
-      </Modal>}
-      {showBatchImport&&<Modal t={t} title="Batch Import Images" onClose={()=>setShowBatchImport(false)}>
-        <div style={{padding:20,textAlign:"center"}}>
-          <div style={{marginBottom:20,color:t.tx2,fontSize:13}}>Select multiple images to import for batch processing</div>
-          <label style={{display:"inline-block",padding:"20px 40px",border:`2px dashed ${t.bdr}`,borderRadius:12,cursor:"pointer",background:t.surf2}}>
-            <input type="file" accept="image/*" multiple style={{display:"none"}} onChange={e=>{if(e.target.files){loadImages(e.target.files);setShowBatchImport(false);}e.target.value="";}}/>
-            <div style={{fontSize:32,marginBottom:8}}>📁</div>
-            <div style={{color:t.tx,fontWeight:600}}>Click to Select Files</div>
-            <div style={{color:t.tx2,fontSize:11,marginTop:4}}>or drag and drop</div>
-          </label>
-          <div style={{marginTop:20}}>
-            <button onClick={()=>setShowBatchImport(false)} style={{padding:"8px 20px",background:t.surf2,color:t.tx,border:`1px solid ${t.bdr}`,borderRadius:6,cursor:"pointer"}}>Cancel</button>
-          </div>
-        </div>
-      </Modal>}
     </div>
   );
 }
