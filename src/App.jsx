@@ -1504,7 +1504,8 @@ function MarkupsPanel({markups,t,theme,selectedId,onSelect,onDelete,onToggleVisi
     {id:"angle",label:"Angles",types:["angle3","angle4"],icon:"∠",color:"#f472b6"},
     {id:"curve",label:"Open Curves",types:["curve"],icon:"∿",color:"#fb923c"},
     {id:"polygon",label:"Polygons",types:["polygon"],icon:"⬡",color:"#4ade80"},
-    {id:"other",label:"Measurements & Text",types:["perp","text"],icon:"⊥",color:"#a78bfa"},
+    {id:"other",label:"Measurements",types:["perp"],icon:"⊥",color:"#a78bfa"},
+    {id:"annotation",label:"Annotations",types:["arrow","text"],icon:"📝",color:"#fbbf24"},
   ];
   const toggle=id=>setCollapsed(c=>({...c,[id]:!c[id]}));
 
@@ -1587,6 +1588,8 @@ function MarkupsPanel({markups,t,theme,selectedId,onSelect,onDelete,onToggleVisi
                         {m.label||m.type}
                         {m.type==="curve"&&m.curveStyle==="bspline"&&<span style={{fontSize:9,color:t.tx3,marginLeft:4}}>[spline]</span>}
                         {m.type==="polygon"&&m.curveStyle==="bspline"&&<span style={{fontSize:9,color:t.tx3,marginLeft:4}}>[spline]</span>}
+                        {m.type==="text"&&m.text&&<span style={{fontSize:9,color:t.tx3,marginLeft:4}}>"{m.text.slice(0,15)}{m.text.length>15?"…":""}"</span>}
+                        {m.type==="arrow"&&<span style={{fontSize:9,color:t.tx3,marginLeft:4}}>→</span>}
                         {isLocked&&<span style={{fontSize:9,color:t.warn,marginLeft:4}}>[locked]</span>}
                       </div>
                       {ms&&!isHidden&&<div style={{fontSize:10,color:t.acc,fontFamily:"'DM Mono',monospace"}}>{ms}</div>}
@@ -2370,13 +2373,15 @@ function MarkupTablesPanel({databaseImages,currentImageIndex,t,formatAngle}){
 
   return(
     <div>
-      <div style={{display:"flex",gap:4,marginBottom:12}}>
+      <div style={{display:"flex",gap:4,marginBottom:8}}>
         {tableTypes.map(tt=>(
           <button key={tt.id} onClick={()=>setActiveTable(tt.id)} style={{padding:"6px 12px",borderRadius:6,border:`1px solid ${activeTable===tt.id?t.acc:t.bdr}`,background:activeTable===tt.id?t.acc+"22":"transparent",color:activeTable===tt.id?t.acc:t.tx,cursor:"pointer",fontSize:12}}>
             {tt.icon} {tt.label}
           </button>
         ))}
-        <button onClick={()=>exportTableCSV(activeTable)} style={{marginLeft:"auto",padding:"6px 12px",borderRadius:6,border:`1px solid ${t.bdr}`,background:t.surf2,color:t.tx,cursor:"pointer",fontSize:12}}>Export CSV</button>
+      </div>
+      <div style={{marginBottom:12}}>
+        <button onClick={()=>exportTableCSV(activeTable)} style={{width:"100%",padding:"8px 12px",borderRadius:6,border:`1px solid ${t.bdr}`,background:t.surf2,color:t.tx,cursor:"pointer",fontSize:12,textAlign:"center"}}>⬇ Export CSV</button>
       </div>
       {tableData.length===0?<div style={{color:t.tx2,textAlign:"center",padding:20}}>No {activeTable} data</div>:(
         <div style={{overflowX:"auto"}}>
@@ -2418,9 +2423,20 @@ function DatabaseStatsPanel({databaseImages,currentImageIndex,t}){
     const dataset=[];
     databaseImages.forEach((img,idx)=>{
       const entry={id:`img_${idx}`,measurements:{},formulas:{},group:"default",timepoint:`T${idx+1}`,operator:"default"};
+      const angle3Count={current:0};
+      const angle4Count={current:0};
       (img.markups||[]).forEach(m=>{
         const meas=computeMeasurements(m,img.calibration);
-        const label=m.label||m.type;
+        let label;
+        if(m.type==="angle3"){
+          angle3Count.current++;
+          label=`Angle_${angle3Count.current}`;
+        }else if(m.type==="angle4"){
+          angle4Count.current++;
+          label=`Inc_Angle_${angle4Count.current}`;
+        }else{
+          label=m.label||m.type;
+        }
         Object.entries(meas).forEach(([k,v])=>{
           entry.measurements[`${label}_${k}`]=v;
         });
@@ -2637,7 +2653,8 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     if(partial.type==="point")m.label=`P${typeCount("point")+1}`;
     if(partial.type==="line"||partial.type==="parallel")m.label=partial.label||`Line ${typeCount("line")+typeCount("parallel")+1}`;
     if(partial.type==="curve")m.label=partial.label||`Trace ${typeCount("curve")+1}`;
-    if(partial.type==="angle3"||partial.type==="angle4")m.label=partial.label||`Angle ${typeCount("angle3")+typeCount("angle4")+1}`;
+    if(partial.type==="angle3")m.label=partial.label||`Angle ${typeCount("angle3")+1}`;
+    if(partial.type==="angle4")m.label=partial.label||`Inc_Angle ${typeCount("angle4")+1}`;
     if(useDb){
       const newMarkups=[...currentDbImg?.markups||[],m];
       updateDatabaseImage(currentImageIndex,{markups:newMarkups});
@@ -2653,7 +2670,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     const D={
       line:{color:t.acc,width:1.5,style:"solid",mode:"segment",label:`Line ${existingMarkups.filter(m=>m.type==="line").length+1}`,showLength:true},
       angle3:{color:"#f472b6",width:1.5,label:`Angle ${existingMarkups.filter(m=>m.type==="angle3").length+1}`},
-      angle4:{color:"#c084fc",width:1.5,label:`Angle ${existingMarkups.filter(m=>m.type==="angle4").length+1}`},
+      angle4:{color:"#c084fc",width:1.5,label:`Inc_Angle ${existingMarkups.filter(m=>m.type==="angle4").length+1}`},
       polygon:{strokeColor:t.acc,fillColor:t.acc+"22",strokeWidth:1.5,label:`Polygon ${existingMarkups.filter(m=>m.type==="polygon").length+1}`},
       curve:{color:"#fb923c",width:1.5,label:`Trace ${existingMarkups.filter(m=>m.type==="curve").length+1}`},
       perp:{color:"#a78bfa",width:1.5,label:`Perp ${existingMarkups.filter(m=>m.type==="perp").length+1}`}
