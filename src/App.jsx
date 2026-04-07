@@ -1370,7 +1370,7 @@ function NewCaseForm({t,projection,onCreate,onCancel}){
             {type==="select-gender"?(
               <select value={d[k]} onChange={e=>upd(k,e.target.value)} style={{background:t.surf3,border:`1px solid ${t.bdr}`,borderRadius:4,padding:"4px 8px",color:t.tx,fontSize:12,width:"100%",fontFamily:"inherit"}}>
                 <option value="">Select gender…</option>
-                {["Male","Female","Non-binary","Other","Prefer not to say"].map(g=><option key={g} value={g}>{g}</option>)}
+                {["Male","Female"].map(g=><option key={g} value={g}>{g}</option>)}
               </select>
             ):(
               <input type={type||"text"} value={d[k]} onChange={e=>upd(k,e.target.value)}
@@ -2508,6 +2508,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const[activeStudyId,setActiveStudyId]=useState(null);
   /** While set, reproducibility landmark points for this session are shown on canvas. */
   const[reproCollecting,setReproCollecting]=useState(null);
+  const[spotlightMode,setSpotlightMode]=useState(false);
 
   // Database mode states
   const[databaseMode,setDatabaseMode]=useState(false); // Default to off
@@ -3002,7 +3003,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const cursorStyle={select:"default",pan:"grab",point:"crosshair",line:"crosshair",angle3:"crosshair",angle4:"crosshair",polygon:"crosshair",curve:"crosshair",perp:"crosshair",parallel:"crosshair",midpoint:"crosshair",perppoint:"crosshair",arrow:"crosshair",text:"text",ruler:"crosshair"}[activeTool]||"default";
   const availAnalyses=PREDEFINED[project.projection]||[];
 
-  const panelIcons={markups:"◉",measurements:"📏",formulas:"∑",image:"▦",layers:"⊞",versions:"☰",reproducibility:"↻",statistics:"σ",templates:"▤",themes:"◐","repro-stats":"≋"};
+  const panelIcons={markups:"◉",measurements:"📏",formulas:"∑",image:"▦",layers:"🗐",versions:"⏲",reproducibility:"↻",statistics:"𝛀",templates:"▤",themes:"◐","repro-stats":"𝛜"};
   const panelTabs=[["markups","Markups"],["measurements","Measure"],["formulas","Formulas"],["image","Image"],["layers","Layers"],["versions","Versions"],["reproducibility","Reproducibility"],["statistics","Statistics"],["repro-stats","Repro Stats"],["templates","Templates"],["themes","Themes"]];
 
   return(
@@ -3106,6 +3107,10 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
               <div style={{display:"flex",justifyContent:"center"}}>
                 <ToolBtn tool={{id:"ruler",icon:"⟺",label:"Ruler"}} active={activeTool==="ruler"} onClick={()=>{setActiveTool("ruler");setCurrentDraw(null);}} theme={theme} t={t}/>
               </div>
+              {/* Row 8b: Spotlight mode */}
+              <div style={{display:"flex",justifyContent:"center"}}>
+                <button onClick={()=>{const next=!spotlightMode;setSpotlightMode(next);if(project.images.length>0){const imgs=project.images.map(img=>{if(next){return{...img,opacityBeforeSpotlight:img.opacity||1,opacity:0.5};}return{...img,opacity:img.opacityBeforeSpotlight||1};});onUpdateProject({images:imgs});}}} title="Spotlight (reduce image opacity)" style={{width:42,height:42,borderRadius:8,border:"none",background:spotlightMode?t.acc:t.surf2,color:spotlightMode?(theme==="light"?"#fff":t.bg):t.tx,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:spotlightMode?`0 0 0 2px ${t.acc}`:"none"}}>💡</button>
+              </div>
               {/* Separator */}
               <div style={{width:"100%",height:1,background:t.bdr,margin:"4px 0"}}/>
               {/* Row 9: Undo | Redo */}
@@ -3154,13 +3159,13 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
             {/* Vertical tabs on left side */}
             <div style={{display:"flex",flexDirection:"column",alignItems:"center",paddingTop:8,flexShrink:0,background:t.surf2}}>
               {panelTabs.map(([id,label])=>{
-                const icons={markups:"◉",measurements:"📏",formulas:"∑",image:"▦",layers:"⊞",versions:"☰",reproducibility:"↻",statistics:"σ",templates:"▤",themes:"◐"};
+                const icons={markups:"◉",measurements:"📏",formulas:"∑",image:"▦",layers:"🗐",versions:"⏲",reproducibility:"↻",statistics:"𝛀",templates:"▤",themes:"◐","repro-stats":"𝛜"};
                 return(
                   <button key={id} onClick={()=>setRightPanel(id)} title={label}
                     onMouseEnter={e=>{if(rightPanel!==id)e.currentTarget.style.background=t.accMuted;e.currentTarget.style.color=t.acc;}}
                     onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color=rightPanel===id?t.acc:t.tx;}}
                     style={{width:52,minHeight:52,padding:"6px 4px",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,border:"none",background:"transparent",color:rightPanel===id?t.acc:t.tx,cursor:"pointer",borderRadius:8,marginBottom:4,transition:"all 0.15s",boxShadow:rightPanel===id?`inset 2px 0 0 ${t.acc}`:"none"}}>
-                    <span style={{fontSize:24}}>{icons[id]||"○"}</span>
+                    <span style={{fontSize:24}}>{icons[id]||"O"}</span>
                   </button>
                 );
               })}
@@ -3170,7 +3175,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
               {/* Panel header */}
               <div style={{padding:"12px 14px 10px",borderBottom:`1px solid ${t.bdr}`,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                 <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}>
-                  <span style={{fontSize:18}}>{panelIcons[rightPanel]||"○"}</span>
+                 <span style={{fontSize:18}}>{panelIcons[rightPanel]||"𝛜"}</span>
                   <span style={{fontSize:13,fontWeight:700,color:t.tx,textTransform:"capitalize",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{panelTabs.find(([id])=>id===rightPanel)?.[1]}</span>
                 </div>
                 <button onClick={()=>setRightPanelWidth(prev=>prev<440?440:320)} style={{background:"none",border:"none",color:t.tx2,cursor:"pointer",fontSize:14,padding:4}} title={rightPanelWidth<440?"Expand panel":"Collapse panel"}>
