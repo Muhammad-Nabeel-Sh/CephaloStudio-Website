@@ -529,11 +529,12 @@ function exportThemeAsCepht(currentTheme){
 // THEMES
 // ═══════════════════════════════════════════════════════════════════════════════
 const THEMES={
-  dark:{name:"GitHub Dark",id:"dark",bg:"#0d1117",surf:"#161b22",surf2:"#21262d",surf3:"#30363d",bdr:"#30363d",tx:"#c9d1d9",tx2:"#8b949e",tx3:"#6e7681",acc:"#58a6ff",acc2:"#388bfd",accMuted:"rgba(88,166,255,0.1)",err:"#f85149",ok:"#3fb950",warn:"#d29922",shadow:"rgba(0,0,0,0.4)",inHeader:true},
-  light:{name:"GitHub Light",id:"light",bg:"#e8eaed",surf:"#f6f8fa",surf2:"#ffffff",surf3:"#d0d7de",bdr:"#d0d7de",tx:"#24292f",tx2:"#57606a",tx3:"#8c959f",acc:"#0969da",acc2:"#0550ae",accMuted:"rgba(9,105,218,0.1)",err:"#cf222e",ok:"#1a7f37",warn:"#9a6700",shadow:"rgba(0,0,0,0.08)",inHeader:true},
   bluish:{name:"Plasticity",id:"bluish",bg:"#0f0f12",surf:"#1a1a22",surf2:"#252530",surf3:"#323242",bdr:"#404058",tx:"#e4e4ef",tx2:"#9999ad",tx3:"#6a6a80",acc:"#a855f7",acc2:"#9333ea",accMuted:"rgba(168,85,247,0.15)",err:"#f87171",ok:"#4ade80",warn:"#fbbf24",shadow:"rgba(0,0,0,0.6)",inHeader:true},
-  mocha:{name:"Mocha",id:"mocha",bg:"#37353e",surf:"#44444e",surf2:"#38383f",surf3:"#555560",bdr:"#555560",tx:"#d3dad9",tx2:"#a0a5a8",tx3:"#6e7476",acc:"#715a5a",acc2:"#8a6a6a",accMuted:"rgba(113,90,90,0.15)",err:"#e57373",ok:"#81c784",warn:"#ffb74d",shadow:"rgba(0,0,0,0.5)",inHeader:false},
-  sage:{name:"Sage",id:"sage",bg:"#d6dac8",surf:"#e8eadd",surf2:"#fbf3d5",surf3:"#c4cbb8",bdr:"#b8c0ad",tx:"#3a3a35",tx2:"#5c5c58",tx3:"#8a8a85",acc:"#9cafaa",acc2:"#7a9188",accMuted:"rgba(156,175,170,0.15)",err:"#d4847c",ok:"#7a9e7a",warn:"#c9a855",shadow:"rgba(0,0,0,0.1)",inHeader:false},
+  dark:{name:"GitHub Dark",id:"dark",bg:"#0d1117",surf:"#161b22",surf2:"#21262d",surf3:"#30363d",bdr:"#30363d",tx:"#c9d1d9",tx2:"#8b949e",tx3:"#6e7681",acc:"#58a6ff",acc2:"#388bfd",accMuted:"rgba(88,166,255,0.1)",err:"#f85149",ok:"#3fb950",warn:"#d29922",shadow:"rgba(0,0,0,0.4)",inHeader:true},
+  mocha:{name:"Mocha",id:"mocha",bg:"#37353e",surf:"#44444e",surf2:"#38383f",surf3:"#555560",bdr:"#555560",tx:"#d3dad9",tx2:"#a0a5a8",tx3:"#6e7476",acc:"#79763b",acc2:"#7b7729",accMuted:"rgba(113, 90, 90, 0.15)",err:"#e57373",ok:"#81c784",warn:"#ffb74d",shadow:"rgba(0, 0, 0, 0.5)",inHeader:false},
+  sage:{name:"Sage",id:"sage",bg:"#d6dac8",surf:"#e8eadd",surf2:"#fbf3d5",surf3:"#c4cbb8",bdr:"#b8c0ad",tx:"#3a3a35",tx2:"#5c5c58",tx3:"#8a8a85",acc:"#6b827c",acc2:"#7a9188",accMuted:"rgba(156,175,170,0.15)",err:"#d4847c",ok:"#7a9e7a",warn:"#c9a855",shadow:"rgba(0,0,0,0.1)",inHeader:false},
+  paper:{name:"Paper",id:"paper",bg:"#f5f5f5",surf:"#ffffff",surf2:"#e3e3e3",surf3:"#e8e8e8",bdr:"#d0d0d0",tx:"#1a1a1a",tx2:"#4a4a4a",tx3:"#787878",acc:"#2563eb",acc2:"#1d4ed8",accMuted:"rgba(37,99,235,0.12)",err:"#dc2626",ok:"#16a34a",warn:"#ca8a04",shadow:"rgba(0, 0, 0, 0.6)",inHeader:false},
+  light:{name:"GitHub Light",id:"light",bg:"#e8eaed",surf:"#f6f8fa",surf2:"#ffffff",surf3:"#d0d7de",bdr:"#d0d7de",tx:"#24292f",tx2:"#57606a",tx3:"#8c959f",acc:"#06a23d",acc2:"#078050",accMuted:"rgba(9,105,218,0.1)",err:"#cf222e",ok:"#1a7f37",warn:"#9a6700",shadow:"rgba(0,0,0,0.08)",inHeader:true},
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -2713,6 +2714,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       if(src){
         const nw=src.naturalWidth||src.width||600,nh=src.naturalHeight||src.height||500;
         ctx.save();
+        ctx.globalAlpha=currentDbImg.opacity??1;
         ctx.translate(pan.x,pan.y);
         ctx.scale(zoom,zoom);
         ctx.drawImage(src,0,0,nw,nh);
@@ -3115,7 +3117,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
               </div>
               {/* Row 8b: Spotlight mode */}
               <div style={{display:"flex",justifyContent:"center"}}>
-                <button onClick={()=>{const next=!spotlightMode;setSpotlightMode(next);if(project.images.length>0){const imgs=project.images.map(img=>{if(next){return{...img,opacityBeforeSpotlight:img.opacity||1,opacity:0.5};}return{...img,opacity:img.opacityBeforeSpotlight||1};});onUpdateProject({images:imgs});}}} title="Spotlight (reduce image opacity)" style={{width:42,height:42,borderRadius:8,border:"none",background:spotlightMode?t.acc:t.surf2,color:spotlightMode?(theme==="light"?"#fff":t.bg):t.tx,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:spotlightMode?`0 0 0 2px ${t.acc}`:"none"}}>💡</button>
+                <button onClick={()=>{const next=!spotlightMode;setSpotlightMode(next);if(databaseMode){setDatabaseImages(prev=>prev.map(img=>{if(next){return{...img,opacityBeforeSpotlight:img.opacity||1,opacity:0.5};}return{...img,opacity:img.opacityBeforeSpotlight||1};}));}else if(project.images.length>0){const imgs=project.images.map(img=>{if(next){return{...img,opacityBeforeSpotlight:img.opacity||1,opacity:0.5};}return{...img,opacity:img.opacityBeforeSpotlight||1};});onUpdateProject({images:imgs});}}} title="Spotlight (reduce image opacity)" style={{width:42,height:42,borderRadius:8,border:"none",background:spotlightMode?t.acc:t.surf2,color:spotlightMode?(theme==="light"?"#fff":t.bg):t.tx,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:spotlightMode?`0 0 0 2px ${t.acc}`:"none"}}>💡</button>
               </div>
               {/* Separator */}
               <div style={{width:"100%",height:1,background:t.bdr,margin:"4px 0"}}/>
