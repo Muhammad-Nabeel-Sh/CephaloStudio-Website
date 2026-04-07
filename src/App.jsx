@@ -1826,7 +1826,7 @@ function LayersPanel({t,images,onUpdateImages,onAddImage,showDisplacement,setSho
 // ═══════════════════════════════════════════════════════════════════════════════
 function VersionsPanel({project,t,onUpdateProject,onUpdateVersion,onExportTemplate}){
   const[lbl,setLbl]=useState("T1");const[nm,setNm]=useState("Follow-up");
-  const create=()=>{const v=mkVersion(lbl,nm);const src=project.versions.find(x=>x.id===project.activeVersionId);const nv={...v,calibration:src?.calibration,processing:src?.processing,lutMode:src?.lutMode,lutInvert:src?.lutInvert,analysisTemplate:src?.analysisTemplate};onUpdateProject({activeVersionId:nv.id,versions:[...project.versions,nv]});};
+  const create=()=>{const v=mkVersion(lbl,nm);const src=project.versions.find(x=>x.id===project.activeVersionId);const nv={...v,calibration:src?.calibration,processing:src?.processing,lutMode:src?.lutMode,lutInvert:src?.lutInvert,analysisTemplate:src?.analysisTemplate,markups:src?.markups||[],formulas:src?.formulas||[],norms:src?.norms||[]};onUpdateProject({activeVersionId:nv.id,versions:[...project.versions,nv]});};
   return(
     <div style={{padding:12}}>
       <PanelHeader t={t}>Version History ({project.versions.length})</PanelHeader>
@@ -2988,7 +2988,13 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     if(type==="analysis"&&analysis){loadTemplate(analysis);return;}
     if(type==="complete"&&analysis){loadTemplate(analysis);return;}
     if(type==="upload"&&file){
-      importCepht(file,d=>{if(d.markups)updVer({markups:d.markups,analysisTemplate:d.name||"Imported"});});
+      importCepht(file,d=>{
+        if(d.markups){
+          const newMarkups=d.markups.map(m=>({...m,id:uid(),points:[{x:-99999,y:-99999}],placed:false}));
+          updVer({markups:[...markups,...newMarkups],analysisTemplate:d.name||"Imported"});
+          setPlacingQueue(newMarkups.map(m=>m.id));setPlacingIdx(0);setPlacingMode(true);setRightPanel("markups");
+        }
+      });
     }
   };
 
@@ -3221,7 +3227,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
                   {rightPanel==="formulas"&&<FormulasPanel formulas={formulas} t={t} scope={measScope} onAdd={()=>{setEditFormulaId(null);setShowFormulaEditor(true);}} onEdit={id=>{setEditFormulaId(id);setShowFormulaEditor(true);}} onDelete={id=>updVer({formulas:formulas.filter(f=>f.id!==id)})}/>}
                   {rightPanel==="image"&&<ImagePanel t={t} processing={processing} setProcessing={p=>updVer({processing:p})} lutMode={lutMode} setLutMode={m=>updVer({lutMode:m})} lutInvert={lutInvert} setLutInvert={v=>updVer({lutInvert:v})} showLUT={showLUT} setShowLUT={setShowLUT} showScaleBar={showScaleBar} setShowScaleBar={setShowScaleBar} calibration={calibration} onOpenCalib={()=>setShowCalib(true)} onReset={()=>updVer({processing:{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},lutMode:"gray",lutInvert:false})} onShowHist={()=>setShowHistogram(v=>!v)} showHistogram={showHistogram}/>}
                   {rightPanel==="layers"&&<LayersPanel t={t} images={project.images} onUpdateImages={imgs=>onUpdateProject({images:imgs})} onAddImage={e=>{if(e.target.files[0])loadImage(e.target.files[0],true);}} showDisplacement={showDisplacement} setShowDisplacement={setShowDisplacement} compareVersionId={compareVersionId} setCompareVersionId={setCompareVersionId} versions={project.versions} onShowAlign={()=>setShowAlign(true)} onShowTransform={()=>setShowTransform(true)}/>}
-                  {rightPanel==="versions"&&<VersionsPanel project={project} t={t} onUpdateProject={onUpdateProject} onUpdateVersion={onUpdateVersion} onExportTemplate={v=>exportCepht({name:`${project.name}-${v.label}`,projection:project.projection,markups:v.markups||[],formulas:v.formulas||[],norms:v.norms||[]})}/>}
+                  {rightPanel==="versions"&&<VersionsPanel project={project} t={t} onUpdateProject={onUpdateProject} onUpdateVersion={onUpdateVersion} onExportTemplate={v=>exportCepht({name:`${project.name}`,projection:project.projection,markups:v.markups||[],formulas:v.formulas||[],norms:v.norms||[]})}/>}
                   {rightPanel==="reproducibility"&&<ReproducibilityPanel t={t} markups={markups} studies={reproStudies} onUpdateStudies={setReproStudies} activeStudyId={activeStudyId} setActiveStudyId={setActiveStudyId} reproCollecting={reproCollecting} setReproCollecting={setReproCollecting}/>}
                   {rightPanel==="statistics"&&(databaseMode?<DatabaseStatsPanel databaseImages={databaseImages} currentImageIndex={currentImageIndex} t={t}/>:<div style={{padding:12}}><div style={{fontSize:12,color:t.tx3,textAlign:"center"}}>Enable Database Mode to view statistics</div></div>)}
                   {rightPanel==="repro-stats"&&<StatisticsPanel t={t} studies={reproStudies}/>}
