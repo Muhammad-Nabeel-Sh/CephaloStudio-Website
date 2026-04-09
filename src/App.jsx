@@ -1,58 +1,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { SMV_CSV, OPG_CSV, csvToAnalysis, THEMES, TOOLS, PREDEFINED, LUT_PRESETS } from "./constants.js";
-import {
-  uid, clamp, dist, angle3pt, angle4pt, perpDist, polyArea, polyLen, vpts,
-  sampleSpline, splineArea, splineLen, getInfiniteLinePoints, computeMeasurements,
-  catmullRom, perpPoint, snapPoint, snapToLine, alignOnePoint, alignTwoPoints,
-  buildScope, evalFormula, normDeviation, deviationColor,
-  mean, variance, stdev, gammaLn, betaIncomplete, betaCF, tDistributeCDF,
-  tTestPaired, calculateICC, getICCInterpretation, dahlbergError, blandAltman
-} from "./utils.js";
+import { uid, clamp, dist, angle3pt, angle4pt, perpDist, polyArea, polyLen, vpts, sampleSpline, splineArea, splineLen, getInfiniteLinePoints, computeMeasurements, catmullRom, perpPoint, snapPoint, snapToLine, alignOnePoint, alignTwoPoints, buildScope, evalFormula, normDeviation, deviationColor, mean, variance, stdev, gammaLn, betaIncomplete, betaCF, tDistributeCDF, tTestPaired, calculateICC, getICCInterpretation, dahlbergError, blandAltman } from "./utils.js";
 import { getLUTColor, applyEdgeKernel, processImageToCanvas, computeHistogram, FloatingHistogram } from "./imageUtils.jsx";
+import { useKatex, KatexSpan, LatexFloatingPanel } from "./hooks.jsx";
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// KATEX LOADER
-// ═══════════════════════════════════════════════════════════════════════════════
-function useKatex() {
-  const [loaded, setLoaded] = useState(!!window.katex);
-  useEffect(() => {
-    if (window.katex) { setLoaded(true); return; }
-    if (!document.getElementById("katex-css")) {
-      const l = document.createElement("link");
-      l.id = "katex-css"; l.rel = "stylesheet";
-      l.href = "https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css";
-      document.head.appendChild(l);
-    }
-    if (!document.getElementById("katex-js")) {
-      const s = document.createElement("script");
-      s.id = "katex-js";
-      s.src = "https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.js";
-      s.onload = () => setLoaded(true);
-      document.head.appendChild(s);
-    }
-  }, []);
-  return loaded;
-}
-
-function KatexSpan({ latex, block = false, large = false, fontSize }) {
-  const loaded = useKatex();
-  const ref = useRef(null);
-  useEffect(() => {
-    if (!loaded || !ref.current || !window.katex) return;
-    try {
-      window.katex.render(latex, ref.current, {
-        throwOnError: false, displayMode: block,
-        output: "html",
-      });
-    } catch {}
-  }, [latex, block, loaded]);
-  const size = fontSize ? `${fontSize}pt` : (large ? "2.4rem" : "inherit");
-  return (
-    <span ref={ref}
-      style={{ fontSize: size, fontFamily: "inherit", display: block ? "block" : "inline" }}
-    />
-  );
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // GEOMETRY
@@ -216,23 +167,6 @@ function ToolBtn({tool,active,onClick,theme,t,style}){
 // FLOATING HISTOGRAM
 // ═══════════════════════════════════════════════════════════════════════════════
 // FloatingHistogram imported from imageUtils.jsx
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// LATEX FLOATING PANEL
-// ═══════════════════════════════════════════════════════════════════════════════
-function LatexFloatingPanel({latex,onClose}){
-  return(
-    <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.8)",zIndex:300,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={onClose}>
-      <div onClick={e=>e.stopPropagation()} style={{background:"#ffffff",borderRadius:16,padding:"48px 60px",maxWidth:"80vw",minWidth:360,boxShadow:"0 32px 80px rgba(0,0,0,0.5)",position:"relative"}}>
-        <button onClick={onClose} style={{position:"absolute",top:12,right:16,background:"none",border:"none",color:"#666",cursor:"pointer",fontSize:22,lineHeight:1}}>×</button>
-        <div style={{color:"#111",fontSize:"40pt",fontFamily:"'KaTeX_Main',serif",textAlign:"center",lineHeight:1.4}}>
-          <KatexSpan latex={latex} block fontSize={40}/>
-        </div>
-        <div style={{marginTop:24,padding:"8px 12px",background:"#f5f5f5",borderRadius:6,fontFamily:"monospace",fontSize:12,color:"#555",textAlign:"center",wordBreak:"break-all"}}>{latex}</div>
-      </div>
-    </div>
-  );
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CANVAS DRAWING
