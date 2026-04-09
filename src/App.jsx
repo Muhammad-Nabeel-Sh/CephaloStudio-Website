@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import * as math from "mathjs";
 import { SMV_CSV, OPG_CSV, csvToAnalysis, THEMES, TOOLS, PREDEFINED, LUT_PRESETS } from "./constants.js";
 import {
   uid, clamp, dist, angle3pt, angle4pt, perpDist, polyArea, polyLen, vpts,
@@ -9,7 +8,7 @@ import {
   mean, variance, stdev, gammaLn, betaIncomplete, betaCF, tDistributeCDF,
   tTestPaired, calculateICC, getICCInterpretation, dahlbergError, blandAltman
 } from "./utils.js";
-import { getLUTColor, applyEdgeKernel, processImageToCanvas, computeHistogram } from "./imageUtils.js";
+import { getLUTColor, applyEdgeKernel, processImageToCanvas, computeHistogram, FloatingHistogram } from "./imageUtils.jsx";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // KATEX LOADER
@@ -216,64 +215,7 @@ function ToolBtn({tool,active,onClick,theme,t,style}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // FLOATING HISTOGRAM
 // ═══════════════════════════════════════════════════════════════════════════════
-function FloatingHistogram({hist,t,lutMode,lutInvert,processing,onProcessingChange,onClose}){
-  const[pos,setPos]=useState({x:60,y:60});const[size,setSize]=useState({w:380,h:280});
-  const[dragging,setDragging]=useState(false);const[resizing,setResizing]=useState(false);
-  const dragRef=useRef(null);const histCanvas=useRef(null);
-
-  useEffect(()=>{
-    const c=histCanvas.current;if(!c)return;
-    const ctx=c.getContext("2d"),W=c.width,H=c.height;
-    ctx.clearRect(0,0,W,H);ctx.fillStyle=t.surf3;ctx.fillRect(0,0,W,H);
-    const max=Math.max(...hist,1);
-    for(let i=0;i<256;i++){
-      const h=hist[i]/max*H,x=i/256*W,bw=Math.max(1,W/256);
-      const[r,g,b]=getLUTColor(i,lutMode,lutInvert);
-      ctx.fillStyle=`rgba(${r},${g},${b},0.8)`;ctx.fillRect(x,H-h,bw+0.5,h);
-    }
-    if(processing.windowWidth>0){
-      const lo=processing.windowCenter-processing.windowWidth/2,hi=processing.windowCenter+processing.windowWidth/2;
-      const x0=lo/255*W,x1=hi/255*W;
-      ctx.fillStyle="rgba(255,255,255,0.07)";ctx.fillRect(x0,0,x1-x0,H);
-      ctx.strokeStyle="#ffffff66";ctx.lineWidth=1;ctx.setLineDash([3,3]);
-      ctx.beginPath();ctx.moveTo(x0,0);ctx.lineTo(x0,H);ctx.moveTo(x1,0);ctx.lineTo(x1,H);ctx.stroke();ctx.setLineDash([]);
-    }
-    ctx.strokeStyle=t.bdr;ctx.lineWidth=1;ctx.strokeRect(0,0,W,H);
-  },[hist,lutMode,lutInvert,processing,t,size]);
-
-  const onHeaderMD=e=>{setDragging(true);dragRef.current={mx:e.clientX,my:e.clientY,px:pos.x,py:pos.y};};
-  useEffect(()=>{
-    if(!dragging&&!resizing)return;
-    const mm=e=>{
-      if(dragging&&dragRef.current)setPos({x:dragRef.current.px+(e.clientX-dragRef.current.mx),y:dragRef.current.py+(e.clientY-dragRef.current.my)});
-      if(resizing&&dragRef.current)setSize({w:Math.max(260,dragRef.current.pw+(e.clientX-dragRef.current.mx)),h:Math.max(200,dragRef.current.ph+(e.clientY-dragRef.current.my))});
-    };
-    const mu=()=>{setDragging(false);setResizing(false);};
-    window.addEventListener("mousemove",mm);window.addEventListener("mouseup",mu);
-    return()=>{window.removeEventListener("mousemove",mm);window.removeEventListener("mouseup",mu);};
-  },[dragging,resizing]);
-
-  const hh=Math.max(80,size.h-140);
-  return(
-    <div style={{position:"fixed",left:pos.x,top:pos.y,width:size.w,background:t.surf,border:`1px solid ${t.bdr}`,borderRadius:10,boxShadow:`0 8px 32px ${t.shadow}`,zIndex:200,display:"flex",flexDirection:"column",overflow:"hidden"}}>
-      <div onMouseDown={onHeaderMD} style={{padding:"8px 12px",background:t.surf2,borderBottom:`1px solid ${t.bdr}`,cursor:"move",display:"flex",justifyContent:"space-between",alignItems:"center",userSelect:"none"}}>
-        <span style={{fontSize:12,fontWeight:700,color:t.tx}}>Histogram</span>
-        <button onClick={onClose} style={{background:"none",border:"none",color:t.tx2,cursor:"pointer",fontSize:16,lineHeight:1}}>×</button>
-      </div>
-      <div style={{padding:"10px 12px",flex:1,overflowY:"auto"}}>
-        <canvas ref={histCanvas} width={size.w-24} height={hh} style={{width:"100%",borderRadius:4,display:"block",marginBottom:10}}/>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6}}>
-          <Sld label="Win Center" value={processing.windowCenter} min={0} max={255} onChange={v=>onProcessingChange({...processing,windowCenter:v})} t={t}/>
-          <Sld label="Win Width" value={processing.windowWidth} min={0} max={255} onChange={v=>onProcessingChange({...processing,windowWidth:v})} t={t}/>
-          <Sld label="Brightness" value={processing.brightness} min={-128} max={128} onChange={v=>onProcessingChange({...processing,brightness:v})} t={t}/>
-          <Sld label="Contrast" value={processing.contrast} min={-100} max={200} onChange={v=>onProcessingChange({...processing,contrast:v})} t={t}/>
-        </div>
-      </div>
-      <div onMouseDown={e=>{setResizing(true);dragRef.current={mx:e.clientX,my:e.clientY,pw:size.w,ph:size.h};}}
-        style={{position:"absolute",right:0,bottom:0,width:16,height:16,cursor:"se-resize",background:`linear-gradient(135deg,transparent 50%,${t.bdr} 50%)`,borderBottomRightRadius:10}}/>
-    </div>
-  );
-}
+// FloatingHistogram imported from imageUtils.jsx
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // LATEX FLOATING PANEL
