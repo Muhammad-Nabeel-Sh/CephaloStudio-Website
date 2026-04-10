@@ -152,7 +152,7 @@ function drawLine(ctx, m, sp, isSel, t, cal, zoom, canvasSize){
   const cw = canvasSize?.w || 800, ch = canvasSize?.h || 600;
   const linePts = isInfinite ? getInfiniteLinePoints(sp[0], sp[1], cw, ch) : [sp[0], sp[1]];
   
-  ctx.strokeStyle = m.color || t.acc;
+  ctx.strokeStyle = "#e20644";
   ctx.lineWidth = (m.width || 1.5) * Math.sqrt(zoom);
   
   if(m.style === "dashed") ctx.setLineDash([8 * zoom, 4 * zoom]);
@@ -179,8 +179,11 @@ function drawLine(ctx, m, sp, isSel, t, cal, zoom, canvasSize){
     if(ip.length >= 2){
       const d = dist(ip[0], ip[1]) / cal.pxPerMm;
       const mid = { x: (sp[0].x + sp[1].x) / 2, y: (sp[0].y + sp[1].y) / 2 };
+      // ctx.globalCompositeOperation = 'xor';
       ctx.font = `${clamp(10 * Math.sqrt(zoom), 8, 14)}px "DM Mono",monospace`;
-      ctx.fillStyle = m.color || t.acc;
+      ctx.fillStyle = "#e20644";
+      
+      
       drawMeasLabel(ctx, d.toFixed(1) + " mm", mid.x + 10, mid.y - 15);
     }
   }
