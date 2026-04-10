@@ -6,10 +6,17 @@ function isReproPointVisible(m, reproCollecting){
 }
 
 export function drawMeasLabel(ctx, text, x, y){
-  ctx.shadowColor="rgba(0,0,0,0)";
-  ctx.shadowBlur=5;
+  const metrics = ctx.measureText(text);
+  const padding = 6;
+  const bgHeight = 14;
+  
+  ctx.fillStyle = "rgba(42, 41, 41, 0.85)";
+  ctx.fillRect(x - padding, y - bgHeight + 2, metrics.width + padding * 2, bgHeight + 4);
+  
+  const prevFill = ctx.fillStyle;
+  ctx.fillStyle = "#fbbf24";
   ctx.fillText(text, x, y);
-  ctx.shadowBlur=0;
+  ctx.fillStyle = prevFill;
 }
 
 export function drawMarkup(ctx, m, zoom, pan, cal, sel, t, reproCollecting, canvasSize, angleMode){
@@ -116,7 +123,7 @@ function drawPoint(ctx, m, sp, isSel, t, zoom, pan){
   
   if(m.label){
     const fs = clamp(11 * Math.sqrt(zoom), 9, 16);
-    ctx.font = `bold ${fs}px "DM Mono",monospace`;
+    ctx.font = `bold ${fs}px "Arial",monospace`;
     ctx.fillStyle = m.color || t.acc;
     drawMeasLabel(ctx, m.label, p.x + r + 3, p.y - r - 1);
   }
@@ -152,7 +159,7 @@ function drawLine(ctx, m, sp, isSel, t, cal, zoom, canvasSize){
   const cw = canvasSize?.w || 800, ch = canvasSize?.h || 600;
   const linePts = isInfinite ? getInfiniteLinePoints(sp[0], sp[1], cw, ch) : [sp[0], sp[1]];
   
-  ctx.strokeStyle = "#e20644";
+  ctx.strokeStyle = "#a706e2";
   ctx.lineWidth = (m.width || 1.5) * Math.sqrt(zoom);
   
   if(m.style === "dashed") ctx.setLineDash([8 * zoom, 4 * zoom]);
@@ -180,8 +187,8 @@ function drawLine(ctx, m, sp, isSel, t, cal, zoom, canvasSize){
       const d = dist(ip[0], ip[1]) / cal.pxPerMm;
       const mid = { x: (sp[0].x + sp[1].x) / 2, y: (sp[0].y + sp[1].y) / 2 };
       // ctx.globalCompositeOperation = 'xor';
-      ctx.font = `${clamp(10 * Math.sqrt(zoom), 8, 14)}px "DM Mono",monospace`;
-      ctx.fillStyle = "#e20644";
+      ctx.font = `${clamp(10 * Math.sqrt(zoom), 8, 14)}px "Arial",monospace`;
+      ctx.fillStyle = "#a706e2";
       
       
       drawMeasLabel(ctx, d.toFixed(1) + " mm", mid.x + 10, mid.y - 15);
@@ -191,7 +198,7 @@ function drawLine(ctx, m, sp, isSel, t, cal, zoom, canvasSize){
 
   if(isSel && m.locked){
     const mid = { x: (sp[0].x + sp[1].x) / 2, y: (sp[0].y + sp[1].y) / 2 };
-    ctx.font = `${clamp(10 * Math.sqrt(zoom), 8, 14)}px "DM Mono",monospace`;
+    ctx.font = `${clamp(10 * Math.sqrt(zoom), 8, 14)}px "Arial",monospace`;
     ctx.fillStyle = "#f59e0b";
     drawMeasLabel(ctx, "🔒", mid.x + 5, mid.y + 28);
   }
@@ -231,7 +238,7 @@ function drawAngle3(ctx, m, sp, isSel, t, cal, zoom, fmtAngle){
   
   const ang = angle3pt(ip[0], ip[1], ip[2]);
   const midA = (startA + endA) / 2;
-  ctx.font = `bold ${clamp(11 * Math.sqrt(zoom), 9, 15)}px "DM Mono",monospace`;
+  ctx.font = `bold ${clamp(11 * Math.sqrt(zoom), 9, 15)}px "Arial",monospace`;
   ctx.fillStyle = m.color || "#f472b6";
   drawMeasLabel(ctx, fmtAngle(ang), sp[1].x + Math.cos(midA) * (arcR + 16), sp[1].y + Math.sin(midA) * (arcR + 16));
 }
@@ -239,7 +246,7 @@ function drawAngle3(ctx, m, sp, isSel, t, cal, zoom, fmtAngle){
 function drawAngle4(ctx, m, sp, t, fmtAngle, zoom){
   if(sp.length < 4){ ctx.restore(); return; }
   
-  ctx.strokeStyle = m.color || "#c084fc";
+  ctx.strokeStyle = m.color || "#f472b6";
   ctx.lineWidth = (m.width || 1.5) * Math.sqrt(zoom);
   ctx.setLineDash([]);
   
@@ -258,8 +265,8 @@ function drawAngle4(ctx, m, sp, t, fmtAngle, zoom){
   const cx = (sp[0].x + sp[1].x + sp[2].x + sp[3].x) / 4;
   const cy = (sp[0].y + sp[1].y + sp[2].y + sp[3].y) / 4;
   
-  ctx.font = `bold ${clamp(11 * Math.sqrt(zoom), 9, 15)}px "DM Mono",monospace`;
-  ctx.fillStyle = m.color || "#c084fc";
+  ctx.font = `bold ${clamp(11 * Math.sqrt(zoom), 9, 15)}px "Arial",monospace`;
+  ctx.fillStyle = m.color || "#f472b6";
   drawMeasLabel(ctx, fmtAngle(ang), cx, cy - 8);
 }
 
@@ -300,7 +307,7 @@ function drawPolygon(ctx, m, sp, isSel, t, cal, zoom){
     const cx = sp.reduce((s, p) => s + p.x, 0) / sp.length;
     const cy = sp.reduce((s, p) => s + p.y, 0) / sp.length;
     const area = (m.curveStyle === "bspline" ? splineArea(ip) : polyArea(ip)) / cal.pxPerMm ** 2;
-    ctx.font = `${clamp(10 * Math.sqrt(zoom), 8, 14)}px "DM Mono",monospace`;
+    ctx.font = `${clamp(10 * Math.sqrt(zoom), 8, 14)}px "Arial",monospace`;
     ctx.fillStyle = m.strokeColor || t.acc;
     drawMeasLabel(ctx, area.toFixed(1) + " mm²", cx - 20, cy);
   }
@@ -308,7 +315,7 @@ function drawPolygon(ctx, m, sp, isSel, t, cal, zoom){
   if(m.label){
     const cx = sp.reduce((s, p) => s + p.x, 0) / sp.length;
     const cy = sp.reduce((s, p) => s + p.y, 0) / sp.length;
-    ctx.font = `bold ${clamp(10 * Math.sqrt(zoom), 8, 14)}px "DM Mono",monospace`;
+    ctx.font = `bold ${clamp(10 * Math.sqrt(zoom), 8, 14)}px "Arial",monospace`;
     ctx.fillStyle = m.strokeColor || t.acc;
     drawMeasLabel(ctx, m.label, cx - 20, cy + 16);
   }
@@ -346,7 +353,7 @@ function drawCurve(ctx, m, sp, isSel, t, cal, zoom){
     const ip = vpts(m);
     const lp = sp[Math.floor(sp.length / 2)];
     const len = (m.curveStyle === "bspline" && ip.length >= 3 ? splineLen(ip, false) : polyLen(ip, false)) / cal.pxPerMm;
-    ctx.font = `${clamp(10 * Math.sqrt(zoom), 8, 14)}px "DM Mono",monospace`;
+    ctx.font = `${clamp(10 * Math.sqrt(zoom), 8, 14)}px "Arial",monospace`;
     ctx.fillStyle = m.color || "#fb923c";
     drawMeasLabel(ctx, len.toFixed(1) + " mm", lp.x + 5, lp.y - 8);
   }
@@ -399,7 +406,7 @@ function drawPerp(ctx, m, sp, t, cal, zoom, pan){
         const pd = perpDist(ip[2], ip[0], ip[1]) / cal.pxPerMm;
         const lx = (sp[2].x + fs.x) / 2;
         const ly = (sp[2].y + fs.y) / 2;
-        ctx.font = `bold ${clamp(10 * Math.sqrt(zoom), 8, 14)}px "DM Mono",monospace`;
+        ctx.font = `bold ${clamp(10 * Math.sqrt(zoom), 8, 14)}px "Arial",monospace`;
         ctx.fillStyle = m.color || "#a78bfa";
         drawMeasLabel(ctx, pd.toFixed(1) + " mm", lx + 5, ly);
       }
@@ -449,7 +456,7 @@ function drawRuler(ctx, m, sp, t, zoom){
   });
   
   const mid = { x: (sp[0].x + sp[1].x) / 2, y: (sp[0].y + sp[1].y) / 2 };
-  ctx.font = `bold ${clamp(11 * Math.sqrt(zoom), 9, 15)}px "DM Mono",monospace`;
+  ctx.font = `bold ${clamp(11 * Math.sqrt(zoom), 9, 15)}px "Arial",monospace`;
   ctx.fillStyle = "#facc15";
   drawMeasLabel(ctx, m.label || "ruler", mid.x + 5, mid.y - 8);
 }
@@ -576,7 +583,7 @@ export function drawScaleBar(ctx, zoom, cal, cw, ch){
   ctx.lineTo(x0 + bw, y0 + 4);
   ctx.stroke();
   ctx.fillStyle = "#fff";
-  ctx.font = `bold 10px "DM Mono",monospace`;
+  ctx.font = `bold 10px "Arial",monospace`;
   ctx.textAlign = "center";
   ctx.fillText(`${mm} mm`, x0 + bw/2, y0 - 8);
   ctx.textAlign = "left";
@@ -603,14 +610,14 @@ export function drawLUTLegend(ctx, lutMode, lutInvert, cw, ch, t, LUT_PRESETS){
   ctx.strokeRect(bx, by, bw, bh);
   
   ctx.fillStyle = "#fff";
-  ctx.font = `9px "DM Mono",monospace`;
+  ctx.font = `9px "Arial",monospace`;
   ctx.textAlign = "left";
   for(let i = 0; i <= 4; i++){
     const y = by + bh * i / 4;
     ctx.fillText(Math.round(255 * (1 - i/4)), bx + bw + 4, y + 3);
   }
   ctx.fillStyle = t.acc;
-  ctx.font = `bold 9px "DM Mono",monospace`;
+  ctx.font = `bold 9px "Arial",monospace`;
   ctx.textAlign = "center";
   ctx.fillText(`${preset.name}${lutInvert ? " ⇅" : ""}`, bx + bw/2, by + bh + 16);
   ctx.textAlign = "left";
@@ -683,7 +690,7 @@ export function drawDisplacementVectors(ctx, m1arr, m2arr, zoom, pan){
     ctx.stroke();
     
     ctx.fillStyle = "#ffd700";
-    ctx.font = `${clamp(9 * Math.sqrt(zoom), 7, 12)}px "DM Mono",monospace`;
+    ctx.font = `${clamp(9 * Math.sqrt(zoom), 7, 12)}px "Arial",monospace`;
     ctx.fillText(len.toFixed(1) + "px", (p1.x + p2.x) / 2 + 4, (p1.y + p2.y) / 2 - 4);
   });
   
