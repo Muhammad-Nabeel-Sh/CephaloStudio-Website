@@ -1410,7 +1410,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const[activeTool,setActiveTool]=useState("select");const[curveMode,setCurveMode]=useState("linear");
   const[snapEnabled,setSnapEnabled]=useState(true);const[showScaleBar,setShowScaleBar]=useState(false);
   const[showLUT,setShowLUT]=useState(false);const[showHistogram,setShowHistogram]=useState(false);
-  const[showDisplacement,setShowDisplacement]=useState(false);const[compareVersionId,setCompareVersionId]=useState(null);
+  const[showAnnotations,setShowAnnotations]=useState(true);const[annotationSize,setAnnotationSize]=useState(1);const[showDisplacement,setShowDisplacement]=useState(false);const[compareVersionId,setCompareVersionId]=useState(null);
   const[rightPanel,setRightPanel]=useState("markups");
   const[showCalib,setShowCalib]=useState(false);const[pendingRuler,setPendingRuler]=useState(null);
   const[showExport,setShowExport]=useState(false);const[showAnon,setShowAnon]=useState(false);
@@ -1655,7 +1655,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     }
     const drawMarkups=databaseMode&&databaseImages.length>0&&!reproCollecting?activeMarkups:markups;
     const drawCalibration=databaseMode&&databaseImages.length>0&&!reproCollecting?activeCalibration:calibration;
-    drawMarkups.forEach(m=>drawMarkup(ctx,m,zoom,pan,drawCalibration,selectedId,t,reproCollecting,canvasSize.current,angleMode));
+    drawMarkups.forEach(m=>drawMarkup(ctx,m,zoom,pan,drawCalibration,selectedId,t,reproCollecting,canvasSize.current,angleMode,showAnnotations,annotationSize));
     if(showDisplacement){
       if(!compareVersion){
         ctx.fillStyle="rgba(0,0,0,0.6)";ctx.fillRect(8,8,220,36);
@@ -1673,7 +1673,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       const m=drawMarkups.find(x=>x.id===placingQueue[placingIdx]);
       if(m){ctx.save();ctx.fillStyle="rgba(0,0,0,0.8)";ctx.fillRect(0,0,canvas.width,36);ctx.fillStyle=t.acc;ctx.font=`bold 13px "DM Sans",sans-serif`;ctx.fillText(`📍 Placing: ${m.label}${m.definition?" — "+m.definition:""} · Click image · Esc to skip`,12,23);ctx.restore();}
     }
-  },[markups,selectedId,zoom,pan,project.images,calibration,t,currentDraw,mousePos,snapEnabled,snapPos,showScaleBar,showLUT,lutMode,lutInvert,placingMode,placingQueue,placingIdx,showDisplacement,compareVersion,getProcessed,reproCollecting,angleMode,databaseMode,databaseImages,currentImageIndex]);
+  },[markups,selectedId,zoom,pan,project.images,calibration,t,currentDraw,mousePos,snapEnabled,snapPos,showScaleBar,showLUT,showAnnotations,annotationSize,lutMode,lutInvert,placingMode,placingQueue,placingIdx,showDisplacement,compareVersion,getProcessed,reproCollecting,angleMode,databaseMode,databaseImages,currentImageIndex]);
 
   useEffect(()=>{redraw();},[redraw]);
 
@@ -1962,6 +1962,8 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         {!isMobile&&<>
           <Btn t={t} small active={snapEnabled} onClick={()=>setSnapEnabled(v=>!v)}>⊙ Snap</Btn>
           <Btn t={t} small active={showScaleBar} onClick={()=>setShowScaleBar(v=>!v)}>⟺</Btn>
+          <Btn t={t} small active={showAnnotations} onClick={()=>setShowAnnotations(v=>!v)}>Aa</Btn>
+          {showAnnotations&&<input type="range" min="0.5" max="2" step="0.1" value={annotationSize} onChange={e=>setAnnotationSize(+e.target.value)} style={{width:60,marginLeft:4,accentColor:t.acc}} title={`Annotation size: ${annotationSize.toFixed(1)}`}/>}
           {project.images.length>1&&<Btn t={t} small active={showDisplacement} onClick={()=>setShowDisplacement(v=>!v)}>⇝ Vec</Btn>}
           <div style={{width:1,height:20,background:t.bdr}}/>
         </>}

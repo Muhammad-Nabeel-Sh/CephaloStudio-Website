@@ -5,21 +5,28 @@ function isReproPointVisible(m, reproCollecting){
   return m.repro.studyId === reproCollecting.studyId && m.repro.opId === reproCollecting.opId && m.repro.trialIdx === reproCollecting.trialIdx;
 }
 
-export function drawMeasLabel(ctx, text, x, y){
+export function drawMeasLabel(ctx, text, x, y, showAnnotations = true, annotationSize = 1){
+  if(!showAnnotations) return;
+  
+  const fontSize = 10 * annotationSize;
+  const prevFont = ctx.font;
+  ctx.font = `${fontSize}px "DM Mono",monospace`;
+  
   const metrics = ctx.measureText(text);
-  const padding = 6;
-  const bgHeight = 14;
+  const padding = 3 * annotationSize;
+  const bgHeight = 14 * annotationSize;
   
   ctx.fillStyle = "rgba(42, 41, 41, 0.85)";
   ctx.fillRect(x - padding, y - bgHeight + 2, metrics.width + padding * 2, bgHeight + 4);
   
   const prevFill = ctx.fillStyle;
-  ctx.fillStyle = "#fbbf24";
+  ctx.fillStyle = "#fff";
   ctx.fillText(text, x, y);
   ctx.fillStyle = prevFill;
+  ctx.font = prevFont;
 }
 
-export function drawMarkup(ctx, m, zoom, pan, cal, sel, t, reproCollecting, canvasSize, angleMode){
+export function drawMarkup(ctx, m, zoom, pan, cal, sel, t, reproCollecting, canvasSize, angleMode, showAnnotations = true, annotationSize = 1){
   if(m.visible === false) return;
   if(m.type === "point" && m.repro && !isReproPointVisible(m, reproCollecting)) return;
   
@@ -41,42 +48,42 @@ export function drawMarkup(ctx, m, zoom, pan, cal, sel, t, reproCollecting, canv
   
   switch(m.type){
     case "point":
-      drawPoint(ctx, m, sp, isSel, t, zoom, pan);
+      drawPoint(ctx, m, sp, isSel, t, zoom, pan, showAnnotations, annotationSize);
       break;
     case "arrow":
       drawArrow(ctx, m, sp, t, zoom);
       break;
     case "line":
     case "parallel":
-      drawLine(ctx, m, sp, isSel, t, cal, zoom, canvasSize);
+      drawLine(ctx, m, sp, isSel, t, cal, zoom, canvasSize, showAnnotations, annotationSize);
       break;
     case "angle3":
-      drawAngle3(ctx, m, sp, isSel, t, cal, zoom, fmtAngle);
+      drawAngle3(ctx, m, sp, isSel, t, cal, zoom, fmtAngle, showAnnotations, annotationSize);
       break;
     case "angle4":
-      drawAngle4(ctx, m, sp, t, fmtAngle, zoom);
+      drawAngle4(ctx, m, sp, t, fmtAngle, zoom, showAnnotations, annotationSize);
       break;
     case "polygon":
-      drawPolygon(ctx, m, sp, isSel, t, cal, zoom);
+      drawPolygon(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize);
       break;
     case "curve":
-      drawCurve(ctx, m, sp, isSel, t, cal, zoom);
+      drawCurve(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize);
       break;
     case "perp":
-      drawPerp(ctx, m, sp, t, cal, zoom, pan);
+      drawPerp(ctx, m, sp, t, cal, zoom, pan, showAnnotations, annotationSize);
       break;
     case "text":
-      drawText(ctx, m, sp, isSel, t, zoom);
+      drawText(ctx, m, sp, isSel, t, zoom, showAnnotations, annotationSize);
       break;
     case "ruler":
-      drawRuler(ctx, m, sp, t, zoom);
+      drawRuler(ctx, m, sp, t, zoom, showAnnotations, annotationSize);
       break;
   }
   
   ctx.restore();
 }
 
-function drawPoint(ctx, m, sp, isSel, t, zoom, pan){
+function drawPoint(ctx, m, sp, isSel, t, zoom, pan, showAnnotations, annotationSize = 1){
   const p = sp[0], r = (m.size || 6) * Math.sqrt(zoom);
   
   if(m.arrowFrom && m.arrowFrom.x > -9000){
@@ -121,11 +128,11 @@ function drawPoint(ctx, m, sp, isSel, t, zoom, pan){
   ctx.lineTo(p.x, p.y + r * 1.9);
   ctx.stroke();
   
-  if(m.label){
-    const fs = clamp(11 * Math.sqrt(zoom), 9, 16);
-    ctx.font = `bold ${fs}px "Arial",monospace`;
+  if(m.label && showAnnotations){
+    const fs = clamp(11 * Math.sqrt(zoom) * annotationSize, 9, 16);
+    ctx.font = `bold ${fs}px "DM Mono",monospace`;
     ctx.fillStyle = m.color || t.acc;
-    drawMeasLabel(ctx, m.label, p.x + r + 3, p.y - r - 1);
+    drawMeasLabel(ctx, m.label, p.x + r + 3, p.y - r - 1, showAnnotations, annotationSize);
   }
 }
 
@@ -152,7 +159,7 @@ function drawArrow(ctx, m, sp, t, zoom){
   ctx.fill();
 }
 
-function drawLine(ctx, m, sp, isSel, t, cal, zoom, canvasSize){
+function drawLine(ctx, m, sp, isSel, t, cal, zoom, canvasSize, showAnnotations, annotationSize = 1){
   if(sp.length < 2){ ctx.restore(); return; }
   
   const isInfinite = m.mode === "infinite";
@@ -181,30 +188,26 @@ function drawLine(ctx, m, sp, isSel, t, cal, zoom, canvasSize){
     ctx.stroke();
   }
   
-  if((m.type === "line" || m.type === "parallel") && !isInfinite || m.type === "perp"){
+  if(showAnnotations && (m.type === "line" || m.type === "parallel") && !isInfinite && cal?.done && cal.pxPerMm){
     const ip = vpts(m);
     if(ip.length >= 2){
       const d = dist(ip[0], ip[1]) / cal.pxPerMm;
       const mid = { x: (sp[0].x + sp[1].x) / 2, y: (sp[0].y + sp[1].y) / 2 };
-      // ctx.globalCompositeOperation = 'xor';
-      ctx.font = `${clamp(10 * Math.sqrt(zoom), 8, 14)}px "Arial",monospace`;
+      ctx.font = `${clamp(10 * Math.sqrt(zoom) * annotationSize, 8, 14)}px "DM Mono",monospace`;
       ctx.fillStyle = "#a706e2";
-      
-      
-      drawMeasLabel(ctx, d.toFixed(1) + " mm", mid.x + 10, mid.y - 15);
+      drawMeasLabel(ctx, d.toFixed(1) + " mm", mid.x + 10, mid.y - 15, showAnnotations, annotationSize);
     }
   }
   
-
-  if(isSel && m.locked){
+  if(isSel && m.locked && showAnnotations){
     const mid = { x: (sp[0].x + sp[1].x) / 2, y: (sp[0].y + sp[1].y) / 2 };
-    ctx.font = `${clamp(10 * Math.sqrt(zoom), 8, 14)}px "Arial",monospace`;
+    ctx.font = `${clamp(10 * Math.sqrt(zoom) * annotationSize, 8, 14)}px "DM Mono",monospace`;
     ctx.fillStyle = "#f59e0b";
-    drawMeasLabel(ctx, "🔒", mid.x + 5, mid.y + 28);
+    drawMeasLabel(ctx, "🔒", mid.x + 5, mid.y + 28, showAnnotations, annotationSize);
   }
 }
 
-function drawAngle3(ctx, m, sp, isSel, t, cal, zoom, fmtAngle){
+function drawAngle3(ctx, m, sp, isSel, t, cal, zoom, fmtAngle, showAnnotations, annotationSize = 1){
   if(sp.length < 3){ ctx.restore(); return; }
   
   ctx.strokeStyle = m.color || "#f472b6";
@@ -236,14 +239,16 @@ function drawAngle3(ctx, m, sp, isSel, t, cal, zoom, fmtAngle){
   ctx.lineWidth = (m.width || 1.5) * 0.8 * Math.sqrt(zoom);
   ctx.stroke();
   
-  const ang = angle3pt(ip[0], ip[1], ip[2]);
-  const midA = (startA + endA) / 2;
-  ctx.font = `bold ${clamp(11 * Math.sqrt(zoom), 9, 15)}px "Arial",monospace`;
-  ctx.fillStyle = m.color || "#f472b6";
-  drawMeasLabel(ctx, fmtAngle(ang), sp[1].x + Math.cos(midA) * (arcR + 16), sp[1].y + Math.sin(midA) * (arcR + 16));
+  if(showAnnotations){
+    const ang = angle3pt(ip[0], ip[1], ip[2]);
+    const midA = (startA + endA) / 2;
+    ctx.font = `bold ${clamp(11 * Math.sqrt(zoom), 9, 15)}px "Arial",monospace`;
+    ctx.fillStyle = m.color || "#f472b6";
+    drawMeasLabel(ctx, fmtAngle(ang), sp[1].x + Math.cos(midA) * (arcR + 16), sp[1].y + Math.sin(midA) * (arcR + 16), showAnnotations, annotationSize);
+  }
 }
 
-function drawAngle4(ctx, m, sp, t, fmtAngle, zoom){
+function drawAngle4(ctx, m, sp, t, fmtAngle, zoom, showAnnotations, annotationSize = 1){
   if(sp.length < 4){ ctx.restore(); return; }
   
   ctx.strokeStyle = m.color || "#f472b6";
@@ -260,17 +265,19 @@ function drawAngle4(ctx, m, sp, t, fmtAngle, zoom){
   ctx.lineTo(sp[3].x, sp[3].y);
   ctx.stroke();
   
-  const ip = vpts(m);
-  const ang = angle4pt(ip[0], ip[1], ip[2], ip[3]);
-  const cx = (sp[0].x + sp[1].x + sp[2].x + sp[3].x) / 4;
-  const cy = (sp[0].y + sp[1].y + sp[2].y + sp[3].y) / 4;
-  
-  ctx.font = `bold ${clamp(11 * Math.sqrt(zoom), 9, 15)}px "Arial",monospace`;
-  ctx.fillStyle = m.color || "#f472b6";
-  drawMeasLabel(ctx, fmtAngle(ang), cx, cy - 8);
+  if(showAnnotations){
+    const ip = vpts(m);
+    const ang = angle4pt(ip[0], ip[1], ip[2], ip[3]);
+    const cx = (sp[0].x + sp[1].x + sp[2].x + sp[3].x) / 4;
+    const cy = (sp[0].y + sp[1].y + sp[2].y + sp[3].y) / 4;
+    
+    ctx.font = `bold ${clamp(11 * Math.sqrt(zoom), 9, 15)}px "Arial",monospace`;
+    ctx.fillStyle = m.color || "#f472b6";
+    drawMeasLabel(ctx, fmtAngle(ang), cx, cy - 8, showAnnotations, annotationSize);
+  }
 }
 
-function drawPolygon(ctx, m, sp, isSel, t, cal, zoom){
+function drawPolygon(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize = 1){
   if(sp.length < 2){ ctx.restore(); return; }
   
   ctx.beginPath();
@@ -302,26 +309,26 @@ function drawPolygon(ctx, m, sp, isSel, t, cal, zoom){
     });
   }
   
-  if(cal?.done && sp.length >= 3){
+  if(showAnnotations && cal?.done && sp.length >= 3){
     const ip = vpts(m);
     const cx = sp.reduce((s, p) => s + p.x, 0) / sp.length;
     const cy = sp.reduce((s, p) => s + p.y, 0) / sp.length;
     const area = (m.curveStyle === "bspline" ? splineArea(ip) : polyArea(ip)) / cal.pxPerMm ** 2;
     ctx.font = `${clamp(10 * Math.sqrt(zoom), 8, 14)}px "Arial",monospace`;
     ctx.fillStyle = m.strokeColor || t.acc;
-    drawMeasLabel(ctx, area.toFixed(1) + " mm²", cx - 20, cy);
+    drawMeasLabel(ctx, area.toFixed(1) + " mm²", cx - 20, cy, showAnnotations, annotationSize);
   }
   
-  if(m.label){
+  if(m.label && showAnnotations){
     const cx = sp.reduce((s, p) => s + p.x, 0) / sp.length;
     const cy = sp.reduce((s, p) => s + p.y, 0) / sp.length;
     ctx.font = `bold ${clamp(10 * Math.sqrt(zoom), 8, 14)}px "Arial",monospace`;
     ctx.fillStyle = m.strokeColor || t.acc;
-    drawMeasLabel(ctx, m.label, cx - 20, cy + 16);
+    drawMeasLabel(ctx, m.label, cx - 20, cy + 16, showAnnotations, annotationSize);
   }
 }
 
-function drawCurve(ctx, m, sp, isSel, t, cal, zoom){
+function drawCurve(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize = 1){
   if(sp.length < 2){ ctx.restore(); return; }
   
   if(m.style === "dashed") ctx.setLineDash([8 * zoom, 4 * zoom]);
@@ -349,17 +356,17 @@ function drawCurve(ctx, m, sp, isSel, t, cal, zoom){
     });
   }
   
-  if(cal?.done){
+  if(showAnnotations && cal?.done){
     const ip = vpts(m);
     const lp = sp[Math.floor(sp.length / 2)];
     const len = (m.curveStyle === "bspline" && ip.length >= 3 ? splineLen(ip, false) : polyLen(ip, false)) / cal.pxPerMm;
     ctx.font = `${clamp(10 * Math.sqrt(zoom), 8, 14)}px "Arial",monospace`;
     ctx.fillStyle = m.color || "#fb923c";
-    drawMeasLabel(ctx, len.toFixed(1) + " mm", lp.x + 5, lp.y - 8);
+    drawMeasLabel(ctx, len.toFixed(1) + " mm", lp.x + 5, lp.y - 8, showAnnotations, annotationSize);
   }
 }
 
-function drawPerp(ctx, m, sp, t, cal, zoom, pan){
+function drawPerp(ctx, m, sp, t, cal, zoom, pan, showAnnotations, annotationSize = 1){
   if(sp.length < 2){ ctx.restore(); return; }
   
   ctx.strokeStyle = m.color || "#a78bfa";
@@ -370,7 +377,7 @@ function drawPerp(ctx, m, sp, t, cal, zoom, pan){
   ctx.lineTo(sp[1].x, sp[1].y);
   ctx.stroke();
   
-  if(sp.length >= 3){
+  if(sp.length >= 3 && showAnnotations){
     const ip = vpts(m);
     if(ip.length >= 3){
       const ax = ip[0].x, ay = ip[0].y;
@@ -408,13 +415,13 @@ function drawPerp(ctx, m, sp, t, cal, zoom, pan){
         const ly = (sp[2].y + fs.y) / 2;
         ctx.font = `bold ${clamp(10 * Math.sqrt(zoom), 8, 14)}px "Arial",monospace`;
         ctx.fillStyle = m.color || "#a78bfa";
-        drawMeasLabel(ctx, pd.toFixed(1) + " mm", lx + 5, ly);
+        drawMeasLabel(ctx, pd.toFixed(1) + " mm", lx + 5, ly, showAnnotations, annotationSize);
       }
     }
   }
 }
 
-function drawText(ctx, m, sp, isSel, t, zoom){
+function drawText(ctx, m, sp, isSel, t, zoom, showAnnotations, annotationSize = 1){
   if(!sp.length){ ctx.restore(); return; }
   
   const p = sp[0];
@@ -436,7 +443,7 @@ function drawText(ctx, m, sp, isSel, t, zoom){
   }
 }
 
-function drawRuler(ctx, m, sp, t, zoom){
+function drawRuler(ctx, m, sp, t, zoom, showAnnotations, annotationSize = 1){
   if(sp.length < 2){ ctx.restore(); return; }
   
   ctx.strokeStyle = "#facc15";
@@ -455,10 +462,12 @@ function drawRuler(ctx, m, sp, t, zoom){
     ctx.stroke();
   });
   
-  const mid = { x: (sp[0].x + sp[1].x) / 2, y: (sp[0].y + sp[1].y) / 2 };
-  ctx.font = `bold ${clamp(11 * Math.sqrt(zoom), 9, 15)}px "Arial",monospace`;
-  ctx.fillStyle = "#facc15";
-  drawMeasLabel(ctx, m.label || "ruler", mid.x + 5, mid.y - 8);
+  if(showAnnotations){
+    const mid = { x: (sp[0].x + sp[1].x) / 2, y: (sp[0].y + sp[1].y) / 2 };
+    ctx.font = `bold ${clamp(11 * Math.sqrt(zoom), 9, 15)}px "Arial",monospace`;
+    ctx.fillStyle = "#facc15";
+    drawMeasLabel(ctx, m.label || "ruler", mid.x + 5, mid.y - 8, showAnnotations, annotationSize);
+  }
 }
 
 export function drawInProgress(ctx, draw, mp, zoom, pan, t){
