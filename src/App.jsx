@@ -1667,7 +1667,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     }
     if(currentDraw)drawInProgress(ctx,currentDraw,mousePos,zoom,pan,t);
     if(snapEnabled&&snapPos)drawSnapIndicator(ctx,snapPos,zoom,pan);
-    if(showScaleBar)drawScaleBar(ctx,zoom,drawCalibration,canvas.width,canvas.height,t);
+    if(showScaleBar)drawScaleBar(ctx,zoom,drawCalibration,canvas.width,canvas.height);
     if(showLUT&&activeLutMode!=="gray")drawLUTLegend(ctx,activeLutMode,activeLutInvert,canvas.width,canvas.height,t);
     if(placingMode&&placingQueue.length>0&&placingIdx<placingQueue.length){
       const m=drawMarkups.find(x=>x.id===placingQueue[placingIdx]);

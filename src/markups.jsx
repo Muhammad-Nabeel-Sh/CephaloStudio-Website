@@ -6,7 +6,7 @@ function isReproPointVisible(m, reproCollecting){
 }
 
 export function drawMeasLabel(ctx, text, x, y){
-  ctx.shadowColor="rgba(0,0,0,0.9)";
+  ctx.shadowColor="rgba(0,0,0,0)";
   ctx.shadowBlur=5;
   ctx.fillText(text, x, y);
   ctx.shadowBlur=0;
@@ -174,23 +174,18 @@ function drawLine(ctx, m, sp, isSel, t, cal, zoom, canvasSize){
     ctx.stroke();
   }
   
-  if(m.label){
-    const mid = { x: (sp[0].x + sp[1].x) / 2, y: (sp[0].y + sp[1].y) / 2 };
-    let labelText = m.label;
-    
-    if((m.type === "line" || m.type === "parallel") && !isInfinite){
-      const ip = vpts(m);
-      if(ip.length >= 2 && cal?.done && cal.pxPerMm){
-        const d = dist(ip[0], ip[1]) / cal.pxPerMm;
-        labelText = `${m.label} (${d.toFixed(1)}mm)`;
-      }
+  if((m.type === "line" || m.type === "parallel") && !isInfinite || m.type === "perp"){
+    const ip = vpts(m);
+    if(ip.length >= 2){
+      const d = dist(ip[0], ip[1]) / cal.pxPerMm;
+      const mid = { x: (sp[0].x + sp[1].x) / 2, y: (sp[0].y + sp[1].y) / 2 };
+      ctx.font = `${clamp(10 * Math.sqrt(zoom), 8, 14)}px "DM Mono",monospace`;
+      ctx.fillStyle = m.color || t.acc;
+      drawMeasLabel(ctx, d.toFixed(1) + " mm", mid.x + 10, mid.y - 15);
     }
-    
-    ctx.font = `bold ${clamp(10 * Math.sqrt(zoom), 8, 14)}px "DM Mono",monospace`;
-    ctx.fillStyle = m.color || t.acc;
-    drawMeasLabel(ctx, labelText, mid.x + 5, mid.y + 14);
   }
   
+
   if(isSel && m.locked){
     const mid = { x: (sp[0].x + sp[1].x) / 2, y: (sp[0].y + sp[1].y) / 2 };
     ctx.font = `${clamp(10 * Math.sqrt(zoom), 8, 14)}px "DM Mono",monospace`;
@@ -493,7 +488,6 @@ export function drawInProgress(ctx, draw, mp, zoom, pan, t){
     
     const lx1 = p2.x - p1.x, ly1 = p2.y - p1.y;
     const lx2 = -ly1, ly2 = lx1;
-    const len = 200;
     
     ctx.setLineDash([]);
     ctx.strokeStyle = "#f472b6";
@@ -555,7 +549,7 @@ export function drawInProgress(ctx, draw, mp, zoom, pan, t){
   ctx.restore();
 }
 
-export function drawScaleBar(ctx, zoom, cal, cw, ch, t){
+export function drawScaleBar(ctx, zoom, cal, cw, ch){
   if(!cal?.done) return;
   
   const pxPerMm = cal.pxPerMm * zoom;
