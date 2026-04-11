@@ -16,8 +16,9 @@ export function drawMeasLabel(ctx, text, x, y, showAnnotations = true, annotatio
   const padding = 3 * annotationSize;
   const bgHeight = 14 * annotationSize;
   
-  ctx.fillStyle = "rgba(42, 41, 41, 0.85)";
-  ctx.fillRect(x - padding, y - bgHeight + 2, metrics.width + padding * 2, bgHeight + 4);
+  ctx.fillStyle = "rgba(46, 46, 46, 0.85)";
+  ctx.roundRect(x - padding, y - bgHeight + 2, metrics.width + padding * 2, bgHeight + 4 , 5);
+  ctx.fill();
   
   const prevFill = ctx.fillStyle;
   ctx.fillStyle = "#fff";
@@ -242,7 +243,7 @@ function drawAngle3(ctx, m, sp, isSel, t, cal, zoom, fmtAngle, showAnnotations, 
   if(showAnnotations){
     const ang = angle3pt(ip[0], ip[1], ip[2]);
     const midA = (startA + endA) / 2;
-    ctx.font = `bold ${clamp(11 * Math.sqrt(zoom), 9, 15)}px "Arial",monospace`;
+    ctx.font = `bold ${clamp(11 * Math.sqrt(zoom), 9, 15)}px "DM Mono",monospace`;
     ctx.fillStyle = m.color || "#f472b6";
     drawMeasLabel(ctx, fmtAngle(ang), sp[1].x + Math.cos(midA) * (arcR + 16), sp[1].y + Math.sin(midA) * (arcR + 16), showAnnotations, annotationSize);
   }
@@ -271,7 +272,7 @@ function drawAngle4(ctx, m, sp, t, fmtAngle, zoom, showAnnotations, annotationSi
     const cx = (sp[0].x + sp[1].x + sp[2].x + sp[3].x) / 4;
     const cy = (sp[0].y + sp[1].y + sp[2].y + sp[3].y) / 4;
     
-    ctx.font = `bold ${clamp(11 * Math.sqrt(zoom), 9, 15)}px "Arial",monospace`;
+    ctx.font = `bold ${clamp(11 * Math.sqrt(zoom), 9, 15)}px "DM Mono",monospace`;
     ctx.fillStyle = m.color || "#f472b6";
     drawMeasLabel(ctx, fmtAngle(ang), cx, cy - 8, showAnnotations, annotationSize);
   }
@@ -314,7 +315,7 @@ function drawPolygon(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotatio
     const cx = sp.reduce((s, p) => s + p.x, 0) / sp.length;
     const cy = sp.reduce((s, p) => s + p.y, 0) / sp.length;
     const area = (m.curveStyle === "bspline" ? splineArea(ip) : polyArea(ip)) / cal.pxPerMm ** 2;
-    ctx.font = `${clamp(10 * Math.sqrt(zoom), 8, 14)}px "Arial",monospace`;
+    ctx.font = `${clamp(10 * Math.sqrt(zoom), 8, 14)}px "DM Mono",monospace`;
     ctx.fillStyle = m.strokeColor || t.acc;
     drawMeasLabel(ctx, area.toFixed(1) + " mm²", cx - 20, cy, showAnnotations, annotationSize);
   }
@@ -322,7 +323,7 @@ function drawPolygon(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotatio
   if(m.label && showAnnotations){
     const cx = sp.reduce((s, p) => s + p.x, 0) / sp.length;
     const cy = sp.reduce((s, p) => s + p.y, 0) / sp.length;
-    ctx.font = `bold ${clamp(10 * Math.sqrt(zoom), 8, 14)}px "Arial",monospace`;
+    ctx.font = `bold ${clamp(10 * Math.sqrt(zoom), 8, 14)}px "DM Mono",monospace`;
     ctx.fillStyle = m.strokeColor || t.acc;
     drawMeasLabel(ctx, m.label, cx - 20, cy + 16, showAnnotations, annotationSize);
   }
@@ -360,7 +361,7 @@ function drawCurve(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationS
     const ip = vpts(m);
     const lp = sp[Math.floor(sp.length / 2)];
     const len = (m.curveStyle === "bspline" && ip.length >= 3 ? splineLen(ip, false) : polyLen(ip, false)) / cal.pxPerMm;
-    ctx.font = `${clamp(10 * Math.sqrt(zoom), 8, 14)}px "Arial",monospace`;
+    ctx.font = `${clamp(10 * Math.sqrt(zoom), 8, 14)}px "DM Mono",monospace`;
     ctx.fillStyle = m.color || "#fb923c";
     drawMeasLabel(ctx, len.toFixed(1) + " mm", lp.x + 5, lp.y - 8, showAnnotations, annotationSize);
   }
@@ -413,7 +414,7 @@ function drawPerp(ctx, m, sp, t, cal, zoom, pan, showAnnotations, annotationSize
         const pd = perpDist(ip[2], ip[0], ip[1]) / cal.pxPerMm;
         const lx = (sp[2].x + fs.x) / 2;
         const ly = (sp[2].y + fs.y) / 2;
-        ctx.font = `bold ${clamp(10 * Math.sqrt(zoom), 8, 14)}px "Arial",monospace`;
+        ctx.font = `bold ${clamp(10 * Math.sqrt(zoom), 8, 14)}px "DM Mono",monospace`;
         ctx.fillStyle = m.color || "#a78bfa";
         drawMeasLabel(ctx, pd.toFixed(1) + " mm", lx + 5, ly, showAnnotations, annotationSize);
       }
@@ -421,7 +422,7 @@ function drawPerp(ctx, m, sp, t, cal, zoom, pan, showAnnotations, annotationSize
   }
 }
 
-function drawText(ctx, m, sp, isSel, t, zoom, showAnnotations, annotationSize = 1){
+function drawText(ctx, m, sp, isSel, t, zoom){
   if(!sp.length){ ctx.restore(); return; }
   
   const p = sp[0];
@@ -464,7 +465,7 @@ function drawRuler(ctx, m, sp, t, zoom, showAnnotations, annotationSize = 1){
   
   if(showAnnotations){
     const mid = { x: (sp[0].x + sp[1].x) / 2, y: (sp[0].y + sp[1].y) / 2 };
-    ctx.font = `bold ${clamp(11 * Math.sqrt(zoom), 9, 15)}px "Arial",monospace`;
+    ctx.font = `bold ${clamp(11 * Math.sqrt(zoom), 9, 15)}px "DM Mono",monospace`;
     ctx.fillStyle = "#facc15";
     drawMeasLabel(ctx, m.label || "ruler", mid.x + 5, mid.y - 8, showAnnotations, annotationSize);
   }
@@ -592,7 +593,7 @@ export function drawScaleBar(ctx, zoom, cal, cw, ch){
   ctx.lineTo(x0 + bw, y0 + 4);
   ctx.stroke();
   ctx.fillStyle = "#fff";
-  ctx.font = `bold 10px "Arial",monospace`;
+  ctx.font = `bold 10px "DM Mono",monospace`;
   ctx.textAlign = "center";
   ctx.fillText(`${mm} mm`, x0 + bw/2, y0 - 8);
   ctx.textAlign = "left";
@@ -619,14 +620,14 @@ export function drawLUTLegend(ctx, lutMode, lutInvert, cw, ch, t, LUT_PRESETS){
   ctx.strokeRect(bx, by, bw, bh);
   
   ctx.fillStyle = "#fff";
-  ctx.font = `9px "Arial",monospace`;
+  ctx.font = `9px "DM Mono",monospace`;
   ctx.textAlign = "left";
   for(let i = 0; i <= 4; i++){
     const y = by + bh * i / 4;
     ctx.fillText(Math.round(255 * (1 - i/4)), bx + bw + 4, y + 3);
   }
   ctx.fillStyle = t.acc;
-  ctx.font = `bold 9px "Arial",monospace`;
+  ctx.font = `bold 9px "DM Mono",monospace`;
   ctx.textAlign = "center";
   ctx.fillText(`${preset.name}${lutInvert ? " ⇅" : ""}`, bx + bw/2, by + bh + 16);
   ctx.textAlign = "left";
@@ -699,7 +700,7 @@ export function drawDisplacementVectors(ctx, m1arr, m2arr, zoom, pan){
     ctx.stroke();
     
     ctx.fillStyle = "#ffd700";
-    ctx.font = `${clamp(9 * Math.sqrt(zoom), 7, 12)}px "Arial",monospace`;
+    ctx.font = `${clamp(9 * Math.sqrt(zoom), 7, 12)}px "DM Mono",monospace`;
     ctx.fillText(len.toFixed(1) + "px", (p1.x + p2.x) / 2 + 4, (p1.y + p2.y) / 2 - 4);
   });
   

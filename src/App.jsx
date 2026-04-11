@@ -166,7 +166,7 @@ function HomePage({t,theme,setTheme,projects,onOpen,onCreate,onImport}){
       {/* HEADER */}
       <header style={{padding:"18px 28px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"absolute",top:0,left:0,right:0,zIndex:10}}>
         <div style={{display:"flex",alignItems:"center",gap:12}}>
-          <div style={{width:36,height:36,borderRadius:8,background:t.acc,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>⊛</div>
+          <div style={{width:50,height:50,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}><img src="public\favicon.svg" alt="Website Icon" width="48" height="48"/> </div>
           <div><div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:20,letterSpacing:-0.5,color:t.tx}}>CephaloStudio</div><div style={{fontSize:10,color:t.tx2,letterSpacing:1,textTransform:"uppercase",fontWeight:600}}>Advanced Cephalometric Analysis</div></div>
         </div>
         <div style={{display:"flex",gap:6,alignItems:"center"}}>
