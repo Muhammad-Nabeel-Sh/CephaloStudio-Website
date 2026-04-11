@@ -320,13 +320,13 @@ function drawPolygon(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotatio
     drawMeasLabel(ctx, area.toFixed(1) + " mm²", cx - 20, cy, showAnnotations, annotationSize);
   }
   
-  if(m.label && showAnnotations){
-    const cx = sp.reduce((s, p) => s + p.x, 0) / sp.length;
-    const cy = sp.reduce((s, p) => s + p.y, 0) / sp.length;
-    ctx.font = `bold ${clamp(10 * Math.sqrt(zoom), 8, 14)}px "DM Mono",monospace`;
-    ctx.fillStyle = m.strokeColor || t.acc;
-    drawMeasLabel(ctx, m.label, cx - 20, cy + 16, showAnnotations, annotationSize);
-  }
+  // if(m.label && showAnnotations){
+  //   const cx = sp.reduce((s, p) => s + p.x, 0) / sp.length;
+  //   const cy = sp.reduce((s, p) => s + p.y, 0) / sp.length;
+  //   ctx.font = `bold ${clamp(10 * Math.sqrt(zoom), 8, 14)}px "DM Mono",monospace`;
+  //   ctx.fillStyle = m.strokeColor || t.acc;
+  //   drawMeasLabel(ctx, m.label, cx - 20, cy + 16, showAnnotations, annotationSize);
+  // }
 }
 
 function drawCurve(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize = 1){
