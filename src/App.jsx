@@ -1246,7 +1246,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     };
     const newMarkup={...D[draw.type]||{},...draw};
     if(draw.replacingId){
-      updMarkup(draw.replacingId,newMarkup);
+      updMarkup(draw.replacingId,{points:draw.points,placed:true,curveStyle:draw.curveStyle});
       setReplacingId(null);
     }else{
       addMarkup(newMarkup);
@@ -1789,7 +1789,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
                       angleMode={angleMode} 
                       setAngleMode={setAngleMode}
                     />
-                    :<MarkupsPanel markups={markups} t={t} theme={theme} selectedId={selectedId} onSelect={setSelectedId} onDelete={delMarkup} onToggleVisible={id=>updMarkup(id,{visible:markups.find(m=>m.id===id)?.visible===false})} onToggleLock={id=>updMarkup(id,{locked:!markups.find(m=>m.id===id)?.locked})} onToggleLabel={id=>updMarkup(id,{noLabel:!markups.find(m=>m.id===id)?.noLabel})} calibration={calibration} placingMode={placingMode} placingQueue={placingQueue} placingIdx={placingIdx} onStopPlacing={()=>{setPlacingMode(false);setPlacingQueue([]);setPlacingIdx(0);}} onPausePlacing={()=>{setPlacingMode(false);}} onResumePlacing={()=>{setPlacingMode(true);}} onClear={()=>updVer({markups:[]})} onAddPoint={()=>{setActiveTool("point");setCurrentDraw(null);}} norms={norms} formatAngle={formatAngle} angleMode={angleMode} setAngleMode={setAngleMode} onReplace={(type,id)=>{setReplacingId(id);setActiveTool(type);setCurrentDraw(null);setSelectedId(null);}}/>)}
+                    :<MarkupsPanel markups={markups} t={t} theme={theme} selectedId={selectedId} onSelect={setSelectedId} onDelete={delMarkup} onToggleVisible={id=>updMarkup(id,{visible:markups.find(m=>m.id===id)?.visible===false})} onToggleLock={id=>updMarkup(id,{locked:!markups.find(m=>m.id===id)?.locked})} onToggleLabel={id=>updMarkup(id,{noLabel:!markups.find(m=>m.id===id)?.noLabel})} calibration={calibration} placingMode={placingMode} placingQueue={placingQueue} placingIdx={placingIdx} onStopPlacing={()=>{setPlacingMode(false);setPlacingQueue([]);setPlacingIdx(0);}} onPausePlacing={()=>{setPlacingMode(false);}} onResumePlacing={()=>{setPlacingMode(true);}} onClear={()=>updVer({markups:[]})} onAddPoint={()=>{setActiveTool("point");setCurrentDraw(null);}} norms={norms} formatAngle={formatAngle} angleMode={angleMode} setAngleMode={setAngleMode} onReplace={(type,id)=>{if(replacingId===id){setReplacingId(null);setActiveTool("select");}else{setReplacingId(id);setActiveTool(type);}setCurrentDraw(null);}} replacingId={replacingId}/>)}
                   {rightPanel==="measurements"&&(databaseMode?
                     <MeasurementsPanel 
                       allMeas={(databaseImages[currentImageIndex]?.markups||[]).map(m=>({m,meas:computeMeasurements(m,databaseImages[currentImageIndex]?.calibration||{done:false,pxPerMm:1})})).filter(x=>Object.keys(x.meas).length>0)} 
