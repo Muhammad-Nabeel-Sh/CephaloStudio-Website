@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { uid, computeMeasurements, normDeviation, deviationColor, evalFormula } from "./utils.js";
-import { LUT_PRESETS } from "./constants.js";
+import { LUT_PRESETS, PREDEFINED, THEMES } from "./constants.js";
 import { KatexSpan, LatexFloatingPanel } from "./hooks.jsx";
 import { Btn, Tag, Sld, PropRow, Inp, Divider, PanelHeader } from "./ui.jsx";
 
@@ -361,6 +361,116 @@ export function MarkupProps({ m, t, theme, onUpdate, onDelete, calibration, onPa
       {["line", "angle3", "angle4", "curve", "perp", "parallel"].includes(m.type) && <PropRow label="Width" t={t}><input type="range" min="0.5" max="6" step="0.5" value={m.width || 1.5} onChange={e => onUpdate({ width: +e.target.value })} style={{ width: "100%", accentColor: t.acc }} /></PropRow>}
       {(m.type === "line" || m.type === "parallel") && <><PropRow label="Dash" t={t}><select value={m.style || "solid"} onChange={e => onUpdate({ style: e.target.value })} style={{ background: t.surf3, border: `1px solid ${t.bdr}`, borderRadius: 4, padding: "3px 6px", color: t.tx, fontSize: 12, width: "100%", fontFamily: "inherit" }}><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></PropRow><PropRow label="Type" t={t}><div style={{ display: "flex", gap: 4 }}>{["segment", "infinite"].map(s => <button key={s} onClick={() => onUpdate({ mode: s })} style={{ padding: "2px 8px", fontSize: 10, border: `1px solid ${t.bdr}`, borderRadius: 4, background: m.mode === s ? t.acc : "transparent", color: m.mode === s ? (theme === "light" ? "#fff" : t.bg) : t.tx, cursor: "pointer", fontWeight: 600 }}>{s === "segment" ? "2-Point" : "Infinite"}</button>)}</div></PropRow><PropRow label="∥ Clone" t={t}><Btn t={t} small onClick={onParallel} style={{ fontSize: 10 }}>Create Parallel</Btn></PropRow></>}
       {Object.keys(meas).length > 0 && <div style={{ marginTop: 10, padding: 8, background: t.surf3, borderRadius: 6 }}>{Object.entries(meas).map(([k, v]) => <div key={k} style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: t.tx2 }}><span style={{ textTransform: "capitalize" }}>{k}</span><span style={{ fontFamily: "'DM Mono',monospace", color: t.acc }}>{k === "angle" ? formatAngle(v) : v.toFixed(2) + (k === "area" ? " mm²" : " mm")}</span></div>)}</div>}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TEMPLATES PANEL
+// ═══════════════════════════════════════════════════════════════════════════════
+export function TemplatesPanel({ t, projection, onLoadTemplate }) {
+  const allTemplates = PREDEFINED[projection] || [];
+  const uniqueTemplates = allTemplates.filter((tmpl, idx, self) => idx === self.findIndex(t => t.name === tmpl.name));
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
+
+  const handleLoad = (tmpl, e) => {
+    e?.stopPropagation();
+    onLoadTemplate(tmpl);
+  };
+
+  if (selectedTemplate) {
+    const sections = [];
+    if (selectedTemplate.pts?.length > 0) sections.push({ type: "Landmarks", icon: "◉", items: selectedTemplate.pts.map(pt => ({ label: pt.l, def: pt.def, color: pt.color, type: "point" })) });
+    if (selectedTemplate.lines?.length > 0) sections.push({ type: "Lines", icon: "⟋", items: selectedTemplate.lines.map(ln => ({ label: ln.l, def: ln.def, color: ln.color, type: "line" })) });
+    if (selectedTemplate.angles?.length > 0) sections.push({ type: "Angles", icon: "∠", items: selectedTemplate.angles.map(ang => ({ label: ang.l, def: ang.def, color: ang.color, type: "angle" })) });
+    if (selectedTemplate.distances?.length > 0) sections.push({ type: "Distances", icon: "↔", items: selectedTemplate.distances.map(dist => ({ label: dist.l, def: dist.def, color: dist.color, type: "distance" })) });
+    if (selectedTemplate.planes?.length > 0) sections.push({ type: "Planes", icon: "▭", items: selectedTemplate.planes.map(pl => ({ label: pl.l, def: pl.def, color: pl.color, type: "plane" })) });
+
+    const totalItems = sections.reduce((sum, s) => sum + s.items.length, 0);
+
+    return (
+      <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+        <div style={{ padding: "10px 12px", borderBottom: `1px solid ${t.bdr}`, display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          <button onClick={() => setSelectedTemplate(null)} style={{ background: "none", border: "none", color: t.tx2, cursor: "pointer", fontSize: 18, padding: 4, display: "flex", alignItems: "center" }}>←</button>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: t.tx, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{selectedTemplate.name}</div>
+            <div style={{ fontSize: 10, color: t.tx2 }}>{totalItems} items</div>
+          </div>
+          <button onClick={(e) => handleLoad(selectedTemplate, e)} style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: t.acc, color: t.bg, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Load</button>
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
+          {sections.map(sec => (
+            <div key={sec.type} style={{ marginBottom: 20 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+                <span style={{ fontSize: 14, color: t.acc }}>{sec.icon}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: t.tx, textTransform: "uppercase", letterSpacing: 0.5 }}>{sec.type}</span>
+                <span style={{ fontSize: 9, color: t.tx3, background: t.surf2, padding: "1px 6px", borderRadius: 4 }}>{sec.items.length}</span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {sec.items.map((item, i) => (
+                  <div key={i} style={{ padding: 12, borderRadius: 8, background: t.surf2, border: `1px solid ${item.color || t.bdr}44` }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                      <div style={{ width: 10, height: 10, borderRadius: item.type === "angle" ? "2px" : "50%", background: item.color || t.acc, flexShrink: 0 }} />
+                      <div style={{ fontSize: 13, fontWeight: 700, color: t.tx, fontFamily: "'DM Mono',monospace" }}>{item.label}</div>
+                    </div>
+                    <div style={{ fontSize: 11, color: t.tx2, lineHeight: 1.5 }}>{item.def || "—"}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ padding: 12 }}>
+      <div style={{ fontSize: 11, color: t.tx2, marginBottom: 12, lineHeight: 1.45 }}>
+        Browse cephalometric analysis templates. Click a template to view landmarks with definitions. Click <strong>Load</strong> to add points to your workspace.
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {uniqueTemplates.map(tmpl => {
+          const totalPts = tmpl.pts?.length || 0;
+          return (
+            <div key={tmpl.name} onClick={() => setSelectedTemplate(tmpl)} style={{ padding: "12px", borderRadius: 8, background: t.surf2, border: `1px solid ${t.bdr}`, cursor: "pointer", display: "flex", alignItems: "center", gap: 10, transition: "border-color 0.15s" }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: t.tx, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tmpl.name}</div>
+                <div style={{ fontSize: 10, color: t.tx2 }}>{totalPts} landmarks</div>
+              </div>
+              <button onClick={(e) => handleLoad(tmpl, e)} style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: t.acc, color: t.bg, fontSize: 10, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>Load</button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════���════════════════
+// THEMES PANEL
+// ═══════════════════════════════════════════════════════════════════════════════
+export function ThemesPanel({ t, theme, setTheme }) {
+  return (
+    <div style={{ padding: 12 }}>
+      <div style={{ fontSize: 11, color: t.tx2, marginBottom: 12, lineHeight: 1.45 }}>
+        Choose a color theme for the interface.
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {Object.values(THEMES).map(th => (
+          <div key={th.id} onClick={() => setTheme(th.id)} style={{ padding: 12, borderRadius: 8, background: theme === th.id ? t.accMuted : t.surf2, border: `1px solid ${theme === th.id ? t.acc : t.bdr}`, cursor: "pointer", display: "flex", alignItems: "center", gap: 12, transition: "all 0.15s" }}>
+            <div style={{ width: 48, height: 32, borderRadius: 6, background: th.bg, border: `1px solid ${th.bdr}`, display: "flex", flexDirection: "column", gap: 2, padding: 4, flexShrink: 0 }}>
+              <div style={{ flex: 1, display: "flex", gap: 2 }}><div style={{ flex: 1, background: th.surf, borderRadius: 2 }} /><div style={{ flex: 1, background: th.surf2, borderRadius: 2 }} /></div>
+              <div style={{ height: 6, background: `linear-gradient(90deg, ${th.acc} 0%, ${th.err} 50%, ${th.ok} 100%)`, borderRadius: 2 }} />
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: t.tx, marginBottom: 2 }}>{th.name}</div>
+              <div style={{ fontSize: 10, color: t.tx2 }}>Click to apply</div>
+            </div>
+            {theme === th.id && <div style={{ color: t.acc, fontSize: 16 }}>✓</div>}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
