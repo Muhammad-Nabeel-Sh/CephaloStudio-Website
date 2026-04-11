@@ -99,7 +99,8 @@ export function Inp({ value, onChange, t, type = "text", placeholder = "" }) {
         color: t.tx,
         fontSize: 12,
         width: "100%",
-        fontFamily: "inherit"
+        fontFamily: "inherit",
+        boxSizing: "border-box"
       }}
     />
   );
