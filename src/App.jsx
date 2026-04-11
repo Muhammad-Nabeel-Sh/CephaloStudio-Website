@@ -88,12 +88,13 @@ function importCepht(file,onLoad){
   reader.onload=e=>{try{const d=JSON.parse(e.target.result);if(d.format==="cepht")onLoad(d);else alert("Invalid .cepht file");}catch{alert("Cannot parse template");}};
   reader.readAsText(file);
 }
-function exportThemeAsCepht(currentTheme){
-  const theme=THEMES[currentTheme];
-  const template={name:`${theme.name} Theme`,projection:"lateral",markups:[],formulas:[],norms:[]};
-  const payload={format:"cepht",version:"1.0",exported:Date.now(),theme,isThemeExport:true,...template};
+function exportTemplateAsCepht(project,templateName){
+  const allMarkups=project.versions[0]?.markups||[];
+  const markupsToExport=allMarkups.map(m=>({type:m.type,label:m.label,definition:m.definition,color:m.color,visible:m.visible}));
+  const template={name:templateName,projection:project.projection,markups:markupsToExport,formulas:project.versions[0]?.formulas||[],norms:project.versions[0]?.norms||[]};
+  const payload={format:"cepht",version:"1.0",exported:Date.now(),...template};
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}));
-  a.download=`${theme.name.replace(/\s+/g,"_")}_theme.cepht`;a.click();
+  a.download=`${templateName.replace(/\s+/g,"_")}.cepht`;a.click();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1801,7 +1802,13 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
                   {rightPanel==="reproducibility"&&<ReproducibilityPanel t={t} markups={markups} studies={reproStudies} onUpdateStudies={setReproStudies} activeStudyId={activeStudyId} setActiveStudyId={setActiveStudyId} reproCollecting={reproCollecting} setReproCollecting={setReproCollecting}/>}
                   {rightPanel==="statistics"&&(databaseMode?<DatabaseStatsPanel databaseImages={databaseImages} currentImageIndex={currentImageIndex} t={t}/>:<div style={{padding:12}}><div style={{fontSize:12,color:t.tx3,textAlign:"center"}}>Enable Database Mode to view statistics</div></div>)}
                   {rightPanel==="repro-stats"&&<StatisticsPanel t={t} studies={reproStudies}/>}
-                  {rightPanel==="templates"&&<TemplatesPanel t={t} projection={project.projection} onLoadTemplate={loadTemplate}/>}
+                  {rightPanel==="templates"&&<TemplatesPanel t={t} projection={project.projection} onLoadTemplate={loadTemplate} onImportCepht={data=>{
+          if(data.markups){
+            const newMarkups=data.markups.map(m=>({...m,id:uid(),points:[{x:-99999,y:-99999}],placed:false}));
+            updVer({markups:[...markups,...newMarkups],formulas:[...formulas,...(data.formulas||[])],norms:[...(project.versions[0]?.norms||[]),...(data.norms||[])],analysisTemplate:data.name||"Imported"});
+            setPlacingQueue(newMarkups.map(m=>m.id));setPlacingIdx(0);setPlacingMode(true);setRightPanel("markups");
+          }
+        }}/>}
                   {rightPanel==="themes"&&<ThemesPanel t={t} theme={theme} setTheme={setTheme}/>}
                 </div>
               </div>
@@ -1819,7 +1826,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       {showDatabaseImport&&<Modal t={t} title="Database Mode - Import Images" onClose={()=>setShowDatabaseImport(false)}><DatabaseImportModal t={t} onImport={loadDatabaseImages} onClose={()=>setShowDatabaseImport(false)}/></Modal>}
       {showTemplatePicker&&<Modal t={t} title="" onClose={()=>setShowTemplatePicker(false)}><TemplatePickerModal t={t} projection={project.projection} onPick={handleTemplatePick} onClose={()=>setShowTemplatePicker(false)}/></Modal>}
       {showCalib&&<Modal t={t} title="Calibration" onClose={()=>setShowCalib(false)}><CalibModal t={t} calibration={calibration} onFinish={finalizeCalib}/></Modal>}
-      {showExport&&<Modal t={t} title="Export" onClose={()=>setShowExport(false)}><div style={{display:"flex",flexDirection:"column",gap:10}}><Btn t={t} onClick={()=>{exportCSV();setShowExport(false);}}>Measurements CSV</Btn><Btn t={t} onClick={()=>{exportCephx(project);setShowExport(false);}}>Full Project .cephx</Btn><Btn t={t} onClick={()=>{exportThemeAsCepht(theme);setShowExport(false);}}>Theme .cepht</Btn></div></Modal>}
+      {showExport&&<Modal t={t} title="Export" onClose={()=>setShowExport(false)}><div style={{display:"flex",flexDirection:"column",gap:10}}><Btn t={t} onClick={()=>{exportCSV();setShowExport(false);}}>Measurements CSV</Btn><Btn t={t} onClick={()=>{exportCephx(project);setShowExport(false);}}>Full Project .cephx</Btn><Btn t={t} onClick={()=>{const name=window.prompt("Template name:",project.name+" Template");if(name){exportTemplateAsCepht(project,name);setShowExport(false);}}}>Template .cepht</Btn></div></Modal>}
       {pendingTextPos&&<Modal t={t} title="Text Annotation" onClose={()=>setPendingTextPos(null)}><TextModal t={t} defaultColor="#fbbf24" onConfirm={(txt,opts)=>{addMarkup({type:"text",points:[pendingTextPos],text:txt,...opts});setPendingTextPos(null);}} onCancel={()=>setPendingTextPos(null)}/></Modal>}
       {showAnon&&<Modal t={t} title="Anonymization & Access" onClose={()=>setShowAnon(false)}><AnonModal t={t} project={project} onUpdateProject={onUpdateProject} onClose={()=>setShowAnon(false)}/></Modal>}
       {showAlign&&<Modal t={t} title="Point-Based Alignment" onClose={()=>setShowAlign(false)}><AlignModal t={t} markups={markups} images={project.images} onUpdateImages={imgs=>onUpdateProject({images:imgs})} onClose={()=>setShowAlign(false)}/></Modal>}

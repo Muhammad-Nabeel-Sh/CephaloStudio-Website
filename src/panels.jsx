@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { uid, computeMeasurements, normDeviation, deviationColor, evalFormula } from "./utils.js";
 import { LUT_PRESETS, PREDEFINED, THEMES } from "./constants.js";
 import { KatexSpan, LatexFloatingPanel } from "./hooks.jsx";
@@ -368,7 +368,7 @@ export function MarkupProps({ m, t, theme, onUpdate, onDelete, calibration, onPa
 // ═══════════════════════════════════════════════════════════════════════════════
 // TEMPLATES PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
-export function TemplatesPanel({ t, projection, onLoadTemplate }) {
+export function TemplatesPanel({ t, projection, onLoadTemplate, onImportCepht }) {
   const allTemplates = PREDEFINED[projection] || [];
   const uniqueTemplates = allTemplates.filter((tmpl, idx, self) => idx === self.findIndex(t => t.name === tmpl.name));
   const [selectedTemplate, setSelectedTemplate] = useState(null);
@@ -424,10 +424,16 @@ export function TemplatesPanel({ t, projection, onLoadTemplate }) {
     );
   }
 
+  const cephtInputRef = useRef(null);
+
   return (
     <div style={{ padding: 12 }}>
-      <div style={{ fontSize: 11, color: t.tx2, marginBottom: 12, lineHeight: 1.45 }}>
-        Browse cephalometric analysis templates. Click a template to view landmarks with definitions. Click <strong>Load</strong> to add points to your workspace.
+      <input type="file" ref={cephtInputRef} accept=".cepht" style={{ display: "none" }} onChange={e => { const file = e.target.files?.[0]; if (file && onImportCepht) { const reader = new FileReader(); reader.onload = ev => { try { const data = JSON.parse(ev.target.result); if (data.format === "cepht") onImportCepht(data); else alert("Invalid .cepht file"); } catch { alert("Cannot parse file"); } }; reader.readAsText(file); } e.target.value = ""; }} />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ fontSize: 11, color: t.tx2, lineHeight: 1.45, flex: 1 }}>
+          Browse cephalometric analysis templates. Click a template to view landmarks with definitions. Click <strong>Load</strong> to add points to your workspace.
+        </div>
+        <button onClick={() => cephtInputRef.current?.click()} style={{ marginLeft: 8, padding: "4px 10px", borderRadius: 6, border: `1px solid ${t.bdr}`, background: t.surf2, color: t.tx, fontSize: 10, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>Import .cepht</button>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {uniqueTemplates.map(tmpl => {
