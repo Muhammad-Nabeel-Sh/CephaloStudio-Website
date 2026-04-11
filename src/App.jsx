@@ -1055,7 +1055,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
 
   const[zoom,setZoom]=useState(1);const[pan,setPan]=useState({x:40,y:40});
   const[mousePos,setMousePos]=useState(null);const[snapPos,setSnapPos]=useState(null);
-  const[selectedId,setSelectedId]=useState(null);const[currentDraw,setCurrentDraw]=useState(null);
+  const[selectedId,setSelectedId]=useState(null);const[replacingId,setReplacingId]=useState(null);const[currentDraw,setCurrentDraw]=useState(null);
   const[activeTool,setActiveTool]=useState("select");const[curveMode,setCurveMode]=useState("linear");
   const[snapEnabled,setSnapEnabled]=useState(true);const[showScaleBar,setShowScaleBar]=useState(false);
   const[showLUT,setShowLUT]=useState(false);const[showHistogram,setShowHistogram]=useState(false);
@@ -1244,7 +1244,13 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       curve:{color:"#fb923c",width:1.5,label:`Trace ${existingMarkups.filter(m=>m.type==="curve").length+1}`},
       perp:{color:"#a78bfa",width:1.5,label:`Perp ${existingMarkups.filter(m=>m.type==="perp").length+1}`}
     };
-    addMarkup({...D[draw.type]||{},...draw});
+    const newMarkup={...D[draw.type]||{},...draw};
+    if(draw.replacingId){
+      updMarkup(draw.replacingId,newMarkup);
+      setReplacingId(null);
+    }else{
+      addMarkup(newMarkup);
+    }
   };
 
   // load images
@@ -1453,6 +1459,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     }
     if(activeTool==="text"){setPendingTextPos(ip);return;}
     if(activeTool==="point"){
+      if(replacingId){updMarkup(replacingId,{points:[ip],placed:true});setReplacingId(null);return;}
       if(reproCollecting){
         const{studyId,opId,trialIdx}=reproCollecting;
         const study=reproStudies.find(s=>s.id===studyId);
@@ -1485,9 +1492,9 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     if(activeTool==="perppoint"){if(!currentDraw)setCurrentDraw({type:"perppoint",points:[ip]});else if(currentDraw.points.length===1)setCurrentDraw({type:"perppoint",points:[currentDraw.points[0],ip]});else{const p1=currentDraw.points[0],p2=currentDraw.points[1],p3=ip;if(p1.x>-9000&&p2.x>-9000&&p3.x>-9000){const lx1=p2.x-p1.x,ly1=p2.y-p1.y;const lx2=-ly1,ly2=lx1;const perpPt={x:p3.x+lx2,y:p3.y+ly2};const n=activeMarkupsList.filter(m=>m.type==="line"||m.type==="perp").length+1;addMarkup({type:"line",mode:"segment",points:[perpPt,p3],color:"#f472b6",width:1.5,style:"solid",label:`⊥${n}`,showLength:true});}setCurrentDraw(null);}return;}
     if(activeTool==="arrow"){if(!currentDraw)setCurrentDraw({type:"arrow",points:[ip]});else{const p1=currentDraw.points[0],p2=ip;if(p1.x>-9000&&p2.x>-9000){addMarkup({type:"arrow",points:[p1,p2],color:"#34d399",width:2});}setCurrentDraw(null);}return;}
     if(["line","angle3","angle4","polygon","curve","perp"].includes(activeTool)){
-      if(!currentDraw)setCurrentDraw({type:activeTool,points:[ip],curveStyle:["curve","polygon"].includes(activeTool)?curveMode:"linear"});
+      if(!currentDraw)setCurrentDraw({type:activeTool,points:[ip],curveStyle:["curve","polygon"].includes(activeTool)?curveMode:"linear",replacingId});
       else{const nps=[...currentDraw.points,ip];const need={line:2,angle3:3,angle4:4,perp:3}[activeTool];if(need&&nps.length>=need){finalizeMarkup({...currentDraw,points:nps});setCurrentDraw(null);}else setCurrentDraw({...currentDraw,points:nps});}return;}
-  },[activeTool,markups,zoom,pan,snapEnabled,currentDraw,selectedMarkup,curveMode,placingMode,placingQueue,placingIdx,reproCollecting,reproStudies,databaseMode,databaseImages,currentImageIndex]);
+  },[activeTool,markups,zoom,pan,snapEnabled,currentDraw,selectedMarkup,curveMode,placingMode,placingQueue,placingIdx,reproCollecting,reproStudies,databaseMode,databaseImages,currentImageIndex,replacingId]);
 
   const handleMouseMove=useCallback(e=>{
     const currentDbImg=databaseMode&&!reproCollecting&&databaseImages.length>0?databaseImages[currentImageIndex]:null;
@@ -1782,7 +1789,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
                       angleMode={angleMode} 
                       setAngleMode={setAngleMode}
                     />
-                    :<MarkupsPanel markups={markups} t={t} theme={theme} selectedId={selectedId} onSelect={setSelectedId} onDelete={delMarkup} onToggleVisible={id=>updMarkup(id,{visible:markups.find(m=>m.id===id)?.visible===false})} onToggleLock={id=>updMarkup(id,{locked:!markups.find(m=>m.id===id)?.locked})} onToggleLabel={id=>updMarkup(id,{noLabel:!markups.find(m=>m.id===id)?.noLabel})} calibration={calibration} placingMode={placingMode} placingQueue={placingQueue} placingIdx={placingIdx} onStopPlacing={()=>{setPlacingMode(false);setPlacingQueue([]);setPlacingIdx(0);}} onPausePlacing={()=>{setPlacingMode(false);}} onResumePlacing={()=>{setPlacingMode(true);}} onClear={()=>updVer({markups:[]})} onAddPoint={()=>{setActiveTool("point");setCurrentDraw(null);}} norms={norms} formatAngle={formatAngle} angleMode={angleMode} setAngleMode={setAngleMode}/>)}
+                    :<MarkupsPanel markups={markups} t={t} theme={theme} selectedId={selectedId} onSelect={setSelectedId} onDelete={delMarkup} onToggleVisible={id=>updMarkup(id,{visible:markups.find(m=>m.id===id)?.visible===false})} onToggleLock={id=>updMarkup(id,{locked:!markups.find(m=>m.id===id)?.locked})} onToggleLabel={id=>updMarkup(id,{noLabel:!markups.find(m=>m.id===id)?.noLabel})} calibration={calibration} placingMode={placingMode} placingQueue={placingQueue} placingIdx={placingIdx} onStopPlacing={()=>{setPlacingMode(false);setPlacingQueue([]);setPlacingIdx(0);}} onPausePlacing={()=>{setPlacingMode(false);}} onResumePlacing={()=>{setPlacingMode(true);}} onClear={()=>updVer({markups:[]})} onAddPoint={()=>{setActiveTool("point");setCurrentDraw(null);}} norms={norms} formatAngle={formatAngle} angleMode={angleMode} setAngleMode={setAngleMode} onReplace={(type,id)=>{setReplacingId(id);setActiveTool(type);setCurrentDraw(null);setSelectedId(null);}}/>)}
                   {rightPanel==="measurements"&&(databaseMode?
                     <MeasurementsPanel 
                       allMeas={(databaseImages[currentImageIndex]?.markups||[]).map(m=>({m,meas:computeMeasurements(m,databaseImages[currentImageIndex]?.calibration||{done:false,pxPerMm:1})})).filter(x=>Object.keys(x.meas).length>0)} 

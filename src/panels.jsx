@@ -7,7 +7,7 @@ import { Btn, Tag, Sld, PropRow, Inp, Divider, PanelHeader } from "./ui.jsx";
 // ═══════════════════════════════════════════════════════════════════════════════
 // MARKUPS PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
-export function MarkupsPanel({ markups, t, theme, selectedId, onSelect, onDelete, onToggleVisible, onToggleLock, onToggleLabel, calibration, placingMode, placingQueue, placingIdx, onStopPlacing, onPausePlacing, onResumePlacing, onClear, onAddPoint, norms, formatAngle, angleMode, setAngleMode }) {
+export function MarkupsPanel({ markups, t, theme, selectedId, onSelect, onDelete, onToggleVisible, onToggleLock, onToggleLabel, calibration, placingMode, placingQueue, placingIdx, onStopPlacing, onPausePlacing, onResumePlacing, onClear, onAddPoint, norms, formatAngle, angleMode, setAngleMode, onReplace }) {
   const [collapsed, setCollapsed] = useState({});
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [sign, unit] = angleMode?.split("-") || ["signed", "deg"];
@@ -97,7 +97,7 @@ export function MarkupsPanel({ markups, t, theme, selectedId, onSelect, onDelete
                     <button onClick={() => onToggleLabel(m.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, flexShrink: 0 }} title={m.noLabel ? "Show label" : "Hide label"}>
                       <span style={{ fontSize: 10, color: m.noLabel ? t.tx3 : t.acc }}>{m.noLabel ? "Aa" : "Aa"}</span>
                     </button>
-                    <div onClick={() => onSelect(m.id === selectedId ? null : m.id)} style={{ flex: 1, minWidth: 0, cursor: "pointer" }}>
+                    <div onClick={() => onReplace ? onReplace(m.type, m.id) : (onSelect(m.id === selectedId ? null : m.id))} style={{ flex: 1, minWidth: 0, cursor: "pointer" }}>
                       <div style={{ fontSize: 12, fontWeight: 600, color: isHidden ? t.tx3 : t.tx, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {isPlacing && <span style={{ color: t.warn, marginRight: 4 }}>📍</span>}
                         {unplaced && !isPlacing && <span style={{ color: t.tx3, marginRight: 4 }}>○</span>}
