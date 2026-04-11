@@ -7,46 +7,6 @@ import { Btn, Tag, Sld, PropRow, Inp, Divider, PanelHeader } from "./ui.jsx";
 import { drawMarkup, drawInProgress, drawScaleBar, drawLUTLegend, drawSnapIndicator, drawDisplacementVectors, hitTest } from "./markups.jsx";
 import { MarkupsPanel, MeasurementsPanel, FormulasPanel, ImagePanel, LayersPanel, MarkupProps, TemplatesPanel, ThemesPanel } from "./panels.jsx";
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// HOME PAGE (V1 design restored)
-// ═══════════════════════════════════════════════════════════════════════════════
-// IMAGE PROCESSING + LUT
-// ═══════════════════════════════════════════════════════════════════════════════
-// Image processing functions imported from imageUtils.js
-
-// LUT_PRESETS imported from constants.js
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// SPLINE DRAW
-// ═══════════════════════════════════════════════════════════════════════════════
-// catmullRom imported from utils.js
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// SNAP
-// ═══════════════════════════════════════════════════════════════════════════════
-// snap functions imported from utils.js
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// ALIGNMENT
-// ═══════════════════════════════════════════════════════════════════════════════
-// alignment functions imported from utils.js
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// FORMULA ENGINE
-// ═══════════════════════════════════════════════════════════════════════════════
-// formula functions imported from utils.js
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// NORMS
-// ═══════════════════════════════════════════════════════════════════════════════
-// norm functions imported from utils.js
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// REPRODUCIBILITY STATISTICS
-// ═══════════════════════════════════════════════════════════════════════════════
-// Statistics functions imported from utils.js
-
-// ═══════════════════════════════════════════════════════════════════════════════
 // PROJECT MODEL
 // ═══════════════════════════════════════════════════════════════════════════════
 function mkVersion(label="T0",name="Initial"){
@@ -98,21 +58,6 @@ function exportTemplateAsCepht(project,templateName){
   a.download=`${templateName.replace(/\s+/g,"_")}.cepht`;a.click();
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// THEMES
-// ═══════════════════════════════════════════════════════════════════════════════
-// THEMES imported from constants.js
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// TOOLS
-// ═══════════════════════════════════════════════════════════════════════════════
-// PREDEFINED ANALYSES
-// ═══════════════════════════════════════════════════════════════════════════════
-// PREDEFINED imported from constants.js
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// SHARED UI - imported from ui.jsx
-// ═══════════════════════════════════════════════════════════════════════════════
 // TOOL BUTTON WITH HOVER EFFECT
 // ═══════════════════════════════════════════════════════════════════════════════
 function ToolBtn({tool,active,onClick,theme,t,style}){
@@ -133,12 +78,6 @@ function ToolBtn({tool,active,onClick,theme,t,style}){
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// FLOATING HISTOGRAM
-// ═══════════════════════════════════════════════════════════════════════════════
-// FloatingHistogram imported from imageUtils.jsx
-
-// ═══════════════════════════════════════════════════════════════════════════════
 // CANVAS DRAWING
 // ═══════════════════════════════════════════════════════════════════════════════
 /** Reproducibility trial points: only visible while that trial/operator session is actively collecting. */
