@@ -35,7 +35,7 @@ export function drawMeasLabelX(ctx, text, x, y, showAnnotations = true, annotati
   ctx.font = `${fontSize}px "DM Mono",monospace`;
   
   const prevFill = ctx.fillStyle;
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = "#00c3ff";
   ctx.fillText(text, x, y);
   ctx.fillStyle = prevFill;
   ctx.font = prevFont;
@@ -201,7 +201,14 @@ function drawLine(ctx, m, sp, isSel, t, cal, zoom, canvasSize, showAnnotations, 
     ctx.moveTo(linePts[0].x, linePts[0].y);
     ctx.lineTo(linePts[1].x, linePts[1].y);
     ctx.stroke();
+    sp.forEach(p => {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+      ctx.fillStyle =  t.color || "#ba1c1c";
+      ctx.fill();
+    });
   }
+
   
   if(showAnnotations && (m.type === "line" || m.type === "parallel") && !isInfinite && cal?.done && cal.pxPerMm){
     const ip = vpts(m);
@@ -319,7 +326,7 @@ function drawPolygon(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotatio
     sp.forEach(p => {
       ctx.beginPath();
       ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
-      ctx.fillStyle = "#fff";
+      ctx.fillStyle = t.color || "#ba1c1c";
       ctx.fill();
     });
   }
@@ -358,7 +365,7 @@ function drawCurve(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationS
     sp.forEach(p => {
       ctx.beginPath();
       ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-      ctx.fillStyle = "#fff";
+      ctx.fillStyle =  t.color || "#ba1c1c";
       ctx.fill();
     });
   }

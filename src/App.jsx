@@ -89,8 +89,9 @@ function importCepht(file,onLoad){
   reader.readAsText(file);
 }
 function exportTemplateAsCepht(project,templateName){
+  const excludedTypes=["perp","parallel","arrow","text","ruler"];
   const allMarkups=project.versions[0]?.markups||[];
-  const markupsToExport=allMarkups.map(m=>({type:m.type,label:m.label,definition:m.definition,color:m.color,visible:m.visible}));
+  const markupsToExport=allMarkups.filter(m=>!excludedTypes.includes(m.type)).map(m=>({type:m.type,label:m.label,definition:m.definition,color:m.color,visible:m.visible}));
   const template={name:templateName,projection:project.projection,markups:markupsToExport,formulas:project.versions[0]?.formulas||[],norms:project.versions[0]?.norms||[]};
   const payload={format:"cepht",version:"1.0",exported:Date.now(),...template};
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}));
@@ -1601,7 +1602,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
           <span style={{fontSize:18}}>←</span>
         </button>
         <button onClick={onHome} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:5,padding:"4px 8px",borderRadius:6,flexShrink:0}}>
-          <span style={{fontSize:18}}>⊛</span>
+          <span><img src="public\favicon.svg" alt="Website Icon" width="48" height="48" borderTop="25px"/> </span>
           {!isMobile&&<span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,color:t.tx,fontSize:17}}>CephaloStudio</span>}
         </button>
         <div style={{width:1,height:20,background:t.bdr,flexShrink:0}}/>
