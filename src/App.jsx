@@ -1541,7 +1541,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
           <span style={{fontSize:18}}>←</span>
         </button>
         <button onClick={onHome} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:5,padding:"4px 8px",borderRadius:6,flexShrink:0}}>
-          <span><img src="public\favicon.svg" alt="Website Icon" width="48" height="48" borderTop="25px"/> </span>
+          <span><img src="\favicon.svg" alt="Website Icon" width="48" height="48" borderTop="25px"/> </span>
           {!isMobile&&<span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,color:t.tx,fontSize:17}}>CephaloStudio</span>}
         </button>
         <div style={{width:1,height:20,background:t.bdr,flexShrink:0}}/>
