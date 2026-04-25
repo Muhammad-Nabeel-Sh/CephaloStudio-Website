@@ -108,8 +108,8 @@ function HomePage({t,theme,setTheme,projects,onOpen,onCreate,onImport}){
       {/* HEADER */}
       <header style={{padding:"18px 28px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"absolute",top:0,left:0,right:0,zIndex:10}}>
         <div style={{display:"flex",alignItems:"center",gap:12}}>
-          <div style={{width:50,height:50,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}><img src="public\favicon.svg" alt="Website Icon" width="48" height="48"/> </div>
-          <div><div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:20,letterSpacing:-0.5,color:t.tx}}>CephaloStudio</div><div style={{fontSize:10,color:t.tx2,letterSpacing:1,textTransform:"uppercase",fontWeight:600}}>Advanced Cephalometric Analysis</div></div>
+          <div style={{width:50,height:50,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}><img src="\favicon.svg" alt="Website Icon" width="48" height="48"/> </div>
+          <div><div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:20,letterSpacing:-0.5,color:t.tx}}>Cephalometry Studio</div><div style={{fontSize:10,color:t.tx2,letterSpacing:1,textTransform:"uppercase",fontWeight:600}}>Advanced Cephalometric Analysis</div></div>
         </div>
         <div style={{display:"flex",gap:6,alignItems:"center"}}>
           {Object.values(THEMES).filter(th=>th.inHeader).map(th=>(<button key={th.id} onClick={()=>setTheme(th.id)} title={th.name} style={{width:28,height:28,borderRadius:6,border:theme===th.id?`2px solid ${t.acc}`:`1px solid ${t.bdr}`,background:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{width:12,height:12,borderRadius:3,background:th.bg,border:`1px solid ${th.acc}`,boxShadow:theme===th.id?`0 0 0 2px ${t.acc}`:"none"}}/></button>))}
@@ -207,7 +207,7 @@ function HomePage({t,theme,setTheme,projects,onOpen,onCreate,onImport}){
       <div style={{background:t.bg,borderTop:`1px solid ${t.bdr}`,padding:"20px 32px 28px"}}>
         <div style={{maxWidth:1100,margin:"0 auto",textAlign:"center"}}>
           <p style={{fontSize:11,color:t.tx3,lineHeight:1.6,margin:0}}>
-            CephaloStudio is intended for research and educational purposes only. It is not approved or cleared for clinical diagnosis or treatment planning. <br /> Clinical decisions should not be made solely on the basis of measurements produced by this software.
+            Cephalometry Studio is intended for research and educational purposes only. It is not approved or cleared for clinical diagnosis or treatment planning. <br /> Clinical decisions should not be made solely on the basis of measurements produced by this software.
           </p>
         </div>
       </div>
@@ -1542,7 +1542,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         </button>
         <button onClick={onHome} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:5,padding:"4px 8px",borderRadius:6,flexShrink:0}}>
           <span><img src="\favicon.svg" alt="Website Icon" width="48" height="48" borderTop="25px"/> </span>
-          {!isMobile&&<span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,color:t.tx,fontSize:17}}>CephaloStudio</span>}
+          {!isMobile&&<span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,color:t.tx,fontSize:17}}>Cephalometry Studio</span>}
         </button>
         <div style={{width:1,height:20,background:t.bdr,flexShrink:0}}/>
         <Tag color={t.acc}>{project.projection?.toUpperCase()}</Tag>
@@ -2293,7 +2293,7 @@ function StatisticsPanel({t,studies}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // ROOT
 // ═══════════════════════════════════════════════════════════════════════════════
-export default function CephaloStudio(){
+export default function Cephalometry Studio(){
   const[theme,setTheme]=useState("bluish");const t={...THEMES[theme],id:theme};
   const[projects,setProjects]=useState([]);const[activeId,setActiveId]=useState(null);const[pinVerified,setPinVerified]=useState({});
 
