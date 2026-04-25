@@ -2293,7 +2293,7 @@ function StatisticsPanel({t,studies}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // ROOT
 // ═══════════════════════════════════════════════════════════════════════════════
-export default function Cephalometry Studio(){
+export default function CephalometryStudio(){
   const[theme,setTheme]=useState("bluish");const t={...THEMES[theme],id:theme};
   const[projects,setProjects]=useState([]);const[activeId,setActiveId]=useState(null);const[pinVerified,setPinVerified]=useState({});
 
