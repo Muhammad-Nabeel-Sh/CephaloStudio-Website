@@ -152,7 +152,7 @@ function HomePage({t,theme,setTheme,projects,onOpen,onCreate,onImport}){
           <div style={{fontSize:11,color:t.tx2,marginBottom:8,lineHeight:1.6}}>
             This website was developed by <strong style={{color:t.tx}}>Dr. Muhammad Nabeel Shaesha</strong>,<br/>
             Teaching Assistant at the Prosthodontics Department, PUA<br/>
-            Currently enrolled in Masters of Prosthodontics and Implantology Program, PUA
+            Currently enrolled in Masters of Prosthodontics and Implantology Program, PUA  
           </div>
           <div style={{fontSize:10,color:t.tx3,marginTop:12,marginBottom:16}}>Built with the help of</div>
           <div style={{display:"flex",justifyContent:"center",gap:8,flexWrap:"wrap",alignItems:"center"}}>
