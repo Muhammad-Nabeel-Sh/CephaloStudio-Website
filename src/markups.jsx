@@ -181,7 +181,7 @@ function drawLine(ctx, m, sp, isSel, t, cal, zoom, canvasSize, showAnnotations, 
   const cw = canvasSize?.w || 800, ch = canvasSize?.h || 600;
   const linePts = isInfinite ? getInfiniteLinePoints(sp[0], sp[1], cw, ch) : [sp[0], sp[1]];
   
-  ctx.strokeStyle = "#a706e2";
+  ctx.strokeStyle = m.color || t.acc;
   ctx.lineWidth = (m.width || 1.5) * Math.sqrt(zoom);
   
   if(m.style === "dashed") ctx.setLineDash([8 * zoom, 4 * zoom]);
@@ -216,7 +216,7 @@ function drawLine(ctx, m, sp, isSel, t, cal, zoom, canvasSize, showAnnotations, 
       const d = dist(ip[0], ip[1]) / cal.pxPerMm;
       const mid = { x: (sp[0].x + sp[1].x) / 2, y: (sp[0].y + sp[1].y) / 2 };
       ctx.font = `${clamp(10 * Math.sqrt(zoom) * annotationSize, 8, 14)}px "DM Mono",monospace`;
-      ctx.fillStyle = "#a706e2";
+      ctx.fillStyle = m.color || t.acc;
       drawMeasLabel(ctx, d.toFixed(1) + " mm", mid.x + 10, mid.y - 15, showAnnotations, annotationSize, m);
     }
   }

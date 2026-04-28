@@ -13,13 +13,13 @@ export const dist = (a, b) => Math.sqrt((b.x - a.x) ** 2 + (b.y - a.y) ** 2);
 export const angle3pt = (p1, vtx, p2) => {
   const u = { x: p1.x - vtx.x, y: p1.y - vtx.y }, w = { x: p2.x - vtx.x, y: p2.y - vtx.y };
   const cross = u.x * w.y - u.y * w.x;
-  return Math.atan2(cross, u.x * w.x + u.y * w.y) * 180 / Math.PI;
+  return Math.abs(Math.atan2(cross, u.x * w.x + u.y * w.y) * 180 / Math.PI);
 };
 
 export const angle4pt = (p1, p2, p3, p4) => {
   const d1 = { x: p2.x - p1.x, y: p2.y - p1.y }, d2 = { x: p4.x - p3.x, y: p4.y - p3.y };
   const cross = d1.x * d2.y - d1.y * d2.x;
-  return Math.atan2(cross, d1.x * d2.x + d1.y * d2.y) * 180 / Math.PI;
+  return Math.abs(Math.atan2(cross, d1.x * d2.x + d1.y * d2.y) * 180 / Math.PI);
 };
 
 export const perpDist = (pt, a, b) => {

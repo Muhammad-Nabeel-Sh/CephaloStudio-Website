@@ -1062,7 +1062,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const compareVersion=project.versions.find(v=>v.id===compareVersionId);
 
   const updVer=patch=>onUpdateVersion(activeVersion.id,patch);
-  const angleMode=activeVersion?.angleMode||"signed-deg";
+  const angleMode=activeVersion?.angleMode||"abs-deg";
   const setAngleMode=m=>updVer({angleMode:m});
   const formatAngle=(v)=>{
     const[sign,unit]=angleMode.split("-");
