@@ -1048,7 +1048,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const isPanning=useRef(false);const panStart=useRef(null);
   const isDragging=useRef(false);const dragStart=useRef(null);const dragStartState=useRef(null);
   const dragMid=useRef(null);const dragPtIdx=useRef(null);
-  const canvasSize=useRef({w:800,h:600});const lastTouchDist=useRef(null);const twoFingerPanState=useRef({panning:false,startPan:null,startTouchDist:null});const mobileTapPoints=useRef([]);const lastTapTime=useRef(0);const touchHandled=useRef(false);const isDrawingMultiPoint=useRef(false);
+  const canvasSize=useRef({w:800,h:600});const lastTouchDist=useRef(null);
   const undoStackRef=useRef([]);
   const redoStackRef=useRef([]);
 
@@ -1358,7 +1358,6 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
 
   const handleMouseDown=useCallback(e=>{
     if(e.button!==0)return;
-    if(touchHandled.current)return;
     const currentDbImg=databaseMode&&!reproCollecting&&databaseImages.length>0?databaseImages[currentImageIndex]:null;
     const dbMarkups=currentDbImg?.markups||[];
     const activeMarkupsList=databaseMode&&!reproCollecting?dbMarkups:markups;
@@ -1464,76 +1463,9 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   };
   const handleDblClick=()=>{if((activeTool==="polygon"||activeTool==="curve")&&currentDraw?.points.length>=2){finalizeMarkup(currentDraw);setCurrentDraw(null);}};
   useEffect(()=>{const c=canvasRef.current;if(!c)return;const onWheel=e=>{if(Math.abs(e.deltaY)>0.1||Math.abs(e.deltaX)>0.1){e.preventDefault();e.stopPropagation();const sp=getCanvasPos(e),f=e.deltaY>0?0.9:1.1,nz=clamp(zoom*f,0.05,15);setPan(prev=>({x:sp.x-(sp.x-prev.x)*(nz/zoom),y:sp.y-(sp.y-prev.y)*(nz/zoom)}));setZoom(nz);}};c.addEventListener("wheel",onWheel,{passive:false});return()=>c.removeEventListener("wheel",onWheel);},[zoom]);
-  const handleTouchStart=e=>{
-    e.preventDefault();
-    touchHandled.current=true;
-    setTimeout(()=>touchHandled.current=false,310);
-    if(e.touches.length===1){
-      const t=e.touches[0];
-      const now=Date.now();
-      if(now-lastTapTime.current<150&&!isDrawingMultiPoint.current)return;
-      lastTapTime.current=now;
-      const rect=canvasRef.current.getBoundingClientRect();
-      const screenPos={x:t.clientX-rect.left,y:t.clientY-rect.top};
-      const imagePos=toImage(screenPos.x,screenPos.y);
-      const tool=activeTool;
-      const points=mobileTapPoints.current;
-      const isMultiPoint={polygon:true,curve:true}[tool];
-      if(isMultiPoint){
-        isDrawingMultiPoint.current=true;
-        points.push(screenPos);
-        setCurrentDraw(prev=>{
-          const newPoints=[...((prev?.points)||[]),imagePos];
-          return{...prev,type:tool,points:newPoints};
-        });
-        return;
-      }
-      const minPointsFinish={line:2,angle3:3,angle4:4,perp:3,ruler:2}[tool]||999;
-      if(points.length<minPointsFinish){
-        points.push(screenPos);
-        setCurrentDraw(prev=>{
-          const newPoints=[...((prev?.points)||[]),imagePos];
-          return{...prev,type:tool,points:newPoints};
-        });
-        if(points.length>=minPointsFinish){
-          finalizeMarkup({type:tool,points:points.map(p=>toImage(p.x,p.y))});
-          points.length=0;
-        }
-      }
-    }
-    if(e.touches.length===2){
-      twoFingerPanState.current={panning:true,startPan:{...pan},startTouchDist:Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY)};
-      lastTouchDist.current=twoFingerPanState.current.startTouchDist;
-    }
-  };
-  const handleTouchMove=e=>{
-    e.preventDefault();
-    if(e.touches.length===2&&twoFingerPanState.current.panning){
-      const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
-      const f=d/twoFingerPanState.current.startTouchDist;
-      const nz=clamp(zoom*f,0.05,15);
-      const cx=(e.touches[0].clientX+e.touches[1].clientX)/2,cy=(e.touches[0].clientY+e.touches[1].clientY)/2;
-      const r=canvasRef.current.getBoundingClientRect();
-      const sp={x:cx-r.left,y:cy-r.top};
-      setPan(prev=>({x:sp.x-(sp.x-prev.x)*(nz/zoom),y:sp.y-(sp.y-prev.y)*(nz/zoom)}));
-      setZoom(nz);
-      twoFingerPanState.current.startTouchDist=d;
-    }
-};
-  const handleTouchEnd=()=>{
-    if(isDrawingMultiPoint.current&&mobileTapPoints.current.length>=2){
-      if(Date.now()-lastTapTime.current<300){
-        finalizeMarkup({type:activeTool,points:mobileTapPoints.current.map(p=>toImage(p.x,p.y))});
-        mobileTapPoints.current=[];
-        setCurrentDraw(null);
-      }
-    }
-    isDrawingMultiPoint.current=false;
-    if(twoFingerPanState.current.panning){
-      twoFingerPanState.current={panning:false,startPan:null,startTouchDist:null};
-      lastTouchDist.current=null;
-    }
-  };
+  const handleTouchStart=e=>{e.preventDefault();if(e.touches.length===1){const t2=e.touches[0];handleMouseDown({button:0,clientX:t2.clientX,clientY:t2.clientY});}if(e.touches.length===2)lastTouchDist.current=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);};
+  const handleTouchMove=e=>{e.preventDefault();if(e.touches.length===1){const t2=e.touches[0];handleMouseMove({clientX:t2.clientX,clientY:t2.clientY});}if(e.touches.length===2&&lastTouchDist.current){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);const f=d/lastTouchDist.current,nz=clamp(zoom*f,0.05,15);const cx=(e.touches[0].clientX+e.touches[1].clientX)/2,cy=(e.touches[0].clientY+e.touches[1].clientY)/2;const r=canvasRef.current.getBoundingClientRect();const sp={x:cx-r.left,y:cy-r.top};setPan(prev=>({x:sp.x-(sp.x-prev.x)*(nz/zoom),y:sp.y-(sp.y-prev.y)*(nz/zoom)}));setZoom(nz);lastTouchDist.current=d;}};
+  const handleTouchEnd=()=>{handleMouseUp();lastTouchDist.current=null;};
 
   const finalizeCalib=(mm,manualPpm)=>{
     const useDb=databaseMode&&databaseImages.length>0&&!reproCollecting;
