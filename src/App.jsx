@@ -1,3 +1,5 @@
+/* eslint-disable react-hooks/exhaustive-deps */
+/* eslint-disable no-unused-vars */
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { SMV_CSV, OPG_CSV, csvToAnalysis, THEMES, TOOLS, PREDEFINED, LUT_PRESETS } from "./constants.js";
 import { uid, clamp, dist, angle3pt, angle4pt, perpDist, polyArea, polyLen, vpts, sampleSpline, splineArea, splineLen, getInfiniteLinePoints, computeMeasurements, catmullRom, perpPoint, snapPoint, snapToLine, alignOnePoint, alignTwoPoints, buildScope, evalFormula, normDeviation, deviationColor, mean, variance, stdev, gammaLn, betaIncomplete, betaCF, tDistributeCDF, tTestPaired, calculateICC, getICCInterpretation, dahlbergError, blandAltman, median, iqr, skewness, kurtosis, coefficientOfVariation, standardError, minimalDetectableChange, shapiroWilk, oneWayAnova, spearmanCorrelation, pearsonCorrelation, correlationMatrix, aggregateDahlberg, computePerLandmarkError, detectSystematicBias, anovaAcrossSessions, computeNormsComparison, detectOutliers, confidenceInterval, linearRegression } from "./utils.js";

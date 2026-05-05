@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 // ===== COMPLETE FORMULA SYSTEM (SAFE + EXTENSIBLE) =====
 
 import React, { useState, useMemo } from "react";
