@@ -2643,7 +2643,9 @@ function DatabaseDashboard({t,databaseImages}){
     return result;
   },[dataset,variables]);
 
-  const corrVarsAll=useMemo(()=>variables.filter(v=>extractVar(v).length>=3),[dataset,variables,extractVar]);
+  const corrVarsAll=useMemo(()=>{
+    return variables.filter(v=>{let c=0;dataset.forEach(d=>{if(typeof d.measurements?.[v]==="number")c++;});return c>=3;});
+  },[dataset,variables]);
   const[corrSelected,setCorrSelected]=useState([]);
   const corrVars=useMemo(()=>{
     const selected=corrSelected.filter(v=>corrVarsAll.includes(v));
@@ -2651,8 +2653,10 @@ function DatabaseDashboard({t,databaseImages}){
   },[corrVarsAll,corrSelected]);
   const corrMatrix=useMemo(()=>{
     if(corrVars.length<2)return null;
-    return correlationMatrix(corrVars.map(v=>extractVar(v)));
-  },[corrVars,extractVar]);
+    const paired=dataset.filter(c=>corrVars.every(v=>typeof c.measurements?.[v]==="number"));
+    if(paired.length<2)return null;
+    return correlationMatrix(corrVars.map(v=>paired.map(c=>c.measurements[v])));
+  },[corrVars,dataset]);
 
   const selectAll=()=>setCorrSelected([...corrVarsAll]);
   const clearAll=()=>setCorrSelected([]);
@@ -2686,11 +2690,11 @@ function DatabaseDashboard({t,databaseImages}){
 
   const regResult=useMemo(()=>{
     if(!regX||!regY)return null;
-    const xVals=extractVar(regX),yVals=extractVar(regY);
-    const n=Math.min(xVals.length,yVals.length);
-    if(n<3)return null;
-    return linearRegression(xVals.slice(0,n),yVals.slice(0,n));
-  },[regX,regY,extractVar]);
+    const xVals=[],yVals=[];
+    dataset.forEach(c=>{const xv=c.measurements?.[regX],yv=c.measurements?.[regY];if(typeof xv==="number"&&typeof yv==="number"){xVals.push(xv);yVals.push(yv);}});
+    if(xVals.length<3)return null;
+    return linearRegression(xVals,yVals);
+  },[regX,regY,dataset]);
 
   useEffect(()=>{
     if(!histModalOpen||!histCanvasRef.current||!histVar)return;
@@ -2953,10 +2957,10 @@ function DatabaseDashboard({t,databaseImages}){
             <div style={{fontSize:10,fontWeight:700,color:t.tx2,marginBottom:6}}>Quick Correlations</div>
             {corrVars.slice(0,6).map((v,i)=>{
               if(i===0)return null;
-              const arr1=extractVar(corrVars[0]);const arr2=extractVar(v);
-              const minLen=Math.min(arr1.length,arr2.length);
-              const r=pearsonCorrelation(arr1.slice(0,minLen),arr2.slice(0,minLen));
-              const sp=spearmanCorrelation(arr1.slice(0,minLen),arr2.slice(0,minLen));
+              const a1=[],a2=[];
+              dataset.forEach(c=>{const xv=c.measurements?.[corrVars[0]],yv=c.measurements?.[v];if(typeof xv==="number"&&typeof yv==="number"){a1.push(xv);a2.push(yv);}});
+              const r=pearsonCorrelation(a1,a2);
+              const sp=spearmanCorrelation(a1,a2);
               return(<div key={v} style={{fontSize:10,color:t.tx2,display:"flex",justifyContent:"space-between"}}><span>{corrVars[0]||"—"} vs {v}</span><span>r={r?r.toFixed(2):"-"} | ρ={sp!=null?sp.toFixed(2):"-"}</span></div>);
             })}
           </div>

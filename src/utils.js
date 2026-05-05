@@ -653,10 +653,10 @@ export function linearRegression(xVals, yVals) {
   const sse = ssyy - (ssxy ** 2) / ssxx;
   const seSlope = Math.sqrt(sse / (n - 2) / ssxx);
   const seIntercept = seSlope * Math.sqrt((1 / n) * xVals.reduce((s, x) => s + x * x, 0));
-  const tSlope = seSlope > 0 ? slope / seSlope : 0;
-  const tIntercept = seIntercept > 0 ? intercept / seIntercept : 0;
+  const tSlope = seSlope < 1e-15 ? Infinity : slope / seSlope;
+  const tIntercept = seIntercept < 1e-15 ? Infinity : intercept / seIntercept;
   const df = n - 2;
-  const pValue = 2 * (1 - tDistributeCDF(Math.abs(tSlope), df));
+  const pValue = isFinite(tSlope) ? 2 * (1 - tDistributeCDF(Math.abs(tSlope), df)) : 0;
   const seResidual = Math.sqrt(sse / (n - 2));
   return { slope, intercept, r2, r, seSlope, seIntercept, tSlope, tIntercept, pValue, significant: pValue < 0.05, seResidual, n, equation: `y = ${slope.toFixed(4)}x + ${intercept.toFixed(4)}` };
 }
