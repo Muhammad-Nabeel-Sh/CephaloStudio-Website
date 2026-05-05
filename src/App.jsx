@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { SMV_CSV, OPG_CSV, csvToAnalysis, THEMES, TOOLS, PREDEFINED, LUT_PRESETS } from "./constants.js";
-import { uid, clamp, dist, angle3pt, angle4pt, perpDist, polyArea, polyLen, vpts, sampleSpline, splineArea, splineLen, getInfiniteLinePoints, computeMeasurements, catmullRom, perpPoint, snapPoint, snapToLine, alignOnePoint, alignTwoPoints, buildScope, evalFormula, normDeviation, deviationColor, mean, variance, stdev, gammaLn, betaIncomplete, betaCF, tDistributeCDF, tTestPaired, calculateICC, getICCInterpretation, dahlbergError, blandAltman, median, iqr, skewness, kurtosis, coefficientOfVariation, standardError, minimalDetectableChange, shapiroWilk, oneWayAnova, spearmanCorrelation, pearsonCorrelation, correlationMatrix, aggregateDahlberg, computePerLandmarkError, detectSystematicBias, anovaAcrossSessions, computeNormsComparison } from "./utils.js";
+import { uid, clamp, dist, angle3pt, angle4pt, perpDist, polyArea, polyLen, vpts, sampleSpline, splineArea, splineLen, getInfiniteLinePoints, computeMeasurements, catmullRom, perpPoint, snapPoint, snapToLine, alignOnePoint, alignTwoPoints, buildScope, evalFormula, normDeviation, deviationColor, mean, variance, stdev, gammaLn, betaIncomplete, betaCF, tDistributeCDF, tTestPaired, calculateICC, getICCInterpretation, dahlbergError, blandAltman, median, iqr, skewness, kurtosis, coefficientOfVariation, standardError, minimalDetectableChange, shapiroWilk, oneWayAnova, spearmanCorrelation, pearsonCorrelation, correlationMatrix, aggregateDahlberg, computePerLandmarkError, detectSystematicBias, anovaAcrossSessions, computeNormsComparison, detectOutliers, confidenceInterval, linearRegression } from "./utils.js";
 import { getLUTColor, applyEdgeKernel, processImageToCanvas, computeHistogram, FloatingHistogram } from "./imageUtils.jsx";
 import { useKatex, KatexSpan, LatexFloatingPanel } from "./hooks.jsx";
 import { Btn, Tag, Sld, PropRow, Inp, Divider, PanelHeader } from "./ui.jsx";
@@ -2395,7 +2395,7 @@ function StudyDashboard({t,studies}){
             <button type="button" onClick={()=>setMetric("x")} style={{padding:"4px 10px",border:`1px solid ${metric==="x"?t.acc:t.bdr}`,borderRadius:6,background:metric==="x"?t.accMuted:t.surf3,color:metric==="x"?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}}>X (px)</button>
             <button type="button" onClick={()=>setMetric("y")} style={{padding:"4px 10px",border:`1px solid ${metric==="y"?t.acc:t.bdr}`,borderRadius:6,background:metric==="y"?t.accMuted:t.surf3,color:metric==="y"?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}}>Y (px)</button>
           </div>
-          <div style={{display:"flex",gap:4,marginBottom:12,overflowX:"auto",paddingBottom:4}}>
+          <div style={{display:"flex",gap:4,marginBottom:12,flexWrap:"wrap"}}>
             {tabs.map(([id,label])=>(<button key={id} onClick={()=>setTab(id)} style={{padding:"5px 10px",borderRadius:6,border:`1px solid ${tab===id?t.acc:t.bdr}`,background:tab===id?t.acc+"18":"transparent",color:tab===id?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{label}</button>))}
           </div>
 
@@ -2657,6 +2657,100 @@ function DatabaseDashboard({t,databaseImages}){
   const selectAll=()=>setCorrSelected([...corrVarsAll]);
   const clearAll=()=>setCorrSelected([]);
 
+  const[analyticsTab,setAnalyticsTab]=useState("outliers");
+  const[outlierVar,setOutlierVar]=useState("");
+  const[outlierMethod,setOutlierMethod]=useState("iqr");
+  const[ciVar,setCiVar]=useState("");
+  const[ciConf,setCiConf]=useState(0.95);
+  const[regX,setRegX]=useState("");
+  const[regY,setRegY]=useState("");
+  const[histVar,setHistVar]=useState("");
+  const[histModalOpen,setHistModalOpen]=useState(false);
+  const histCanvasRef=useRef(null);
+  const[norms,setNorms]=useState([]);
+  const[newNorm,setNewNorm]=useState({label:"",mean:"",sd:""});
+
+  const outlierResult=useMemo(()=>{
+    if(!outlierVar)return null;
+    const vals=extractVar(outlierVar);
+    if(vals.length<4)return null;
+    return detectOutliers(vals,outlierMethod);
+  },[outlierVar,outlierMethod,extractVar]);
+
+  const ciResult=useMemo(()=>{
+    if(!ciVar)return null;
+    const vals=extractVar(ciVar);
+    if(vals.length<2)return null;
+    return confidenceInterval(vals,ciConf);
+  },[ciVar,ciConf,extractVar]);
+
+  const regResult=useMemo(()=>{
+    if(!regX||!regY)return null;
+    const xVals=extractVar(regX),yVals=extractVar(regY);
+    const n=Math.min(xVals.length,yVals.length);
+    if(n<3)return null;
+    return linearRegression(xVals.slice(0,n),yVals.slice(0,n));
+  },[regX,regY,extractVar]);
+
+  useEffect(()=>{
+    if(!histModalOpen||!histCanvasRef.current||!histVar)return;
+    const canvas=histCanvasRef.current;
+    const vals=extractVar(histVar);
+    if(!vals.length||vals.length<3)return;
+    const W=560,H=360,padL=60,padR=20,padT=30,padB=50;
+    const cw=W-padL-padR,ch=H-padT-padB;
+    const dpr=window.devicePixelRatio||1;
+    canvas.width=W*dpr;canvas.height=H*dpr;
+    canvas.style.width=W+"px";canvas.style.height=H+"px";
+    const ctx=canvas.getContext("2d");
+    ctx.scale(dpr,dpr);
+    ctx.fillStyle=t.bg;ctx.fillRect(0,0,W,H);
+    const mn=Math.min(...vals),mx=Math.max(...vals);
+    const numBins=Math.max(5,Math.min(20,Math.ceil(Math.sqrt(vals.length))));
+    const binW=(mx-mn)/numBins||1;
+    const bins=Array(numBins).fill(0);
+    vals.forEach(v=>{let b=Math.floor((v-mn)/binW);if(b>=numBins)b=numBins-1;if(b<0)b=0;bins[b]++;});
+    const maxBin=Math.max(...bins);
+    ctx.strokeStyle=t.bdr;ctx.lineWidth=0.5;
+    for(let i=0;i<=4;i++){
+      const y=padT+ch-(i/4)*ch;
+      ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(padL+cw,y);ctx.stroke();
+      ctx.fillStyle=t.tx2;ctx.font="9px 'DM Mono',monospace";ctx.textAlign="right";ctx.textBaseline="middle";
+      ctx.fillText(Math.round(maxBin*i/4),padL-6,y);
+    }
+    const barW=cw/numBins;
+    bins.forEach((count,i)=>{
+      const x=padL+i*barW,h=maxBin>0?(count/maxBin)*ch:0;
+      const ratio=count/maxBin;
+      ctx.fillStyle=`rgba(59,130,246,${(0.3+ratio*0.5).toFixed(2)})`;
+      ctx.fillRect(x+1,padT+ch-h,barW-2,h);
+      ctx.strokeStyle=t.bdr;ctx.lineWidth=0.5;ctx.strokeRect(x+1,padT+ch-h,barW-2,h);
+      const binStart=mn+i*binW;
+      ctx.fillStyle=t.tx2;ctx.font="7px 'DM Mono',monospace";ctx.textAlign="center";ctx.textBaseline="top";
+      if(numBins<=12||i%2===0)ctx.fillText(binStart.toFixed(1),x+barW/2,padT+ch+4);
+    });
+    ctx.fillStyle=t.tx;ctx.font="bold 9px 'DM Sans',sans-serif";ctx.textAlign="center";ctx.textBaseline="bottom";
+    ctx.fillText(`${histVar} — n=${vals.length}, ${numBins} bins`,padL+cw/2,padT-6);
+    const m=mean(vals),s=stdev(vals,m);
+    ctx.fillStyle=t.acc;ctx.font="8px 'DM Mono',monospace";ctx.textAlign="left";
+    ctx.fillText(`μ=${m.toFixed(2)} σ=${s.toFixed(2)}`,padL+4,padT+10);
+  },[histModalOpen,histVar,t,extractVar]);
+
+  const downloadHistPNG=()=>{
+    if(!histCanvasRef.current)return;
+    const link=document.createElement("a");
+    link.download=`histogram_${histVar}.png`;
+    link.href=histCanvasRef.current.toDataURL("image/png");
+    link.click();
+  };
+
+  const addNorm=()=>{
+    if(!newNorm.label||!newNorm.mean||!newNorm.sd)return;
+    setNorms(prev=>[...prev,{...newNorm,mean:parseFloat(newNorm.mean),sd:parseFloat(newNorm.sd)}]);
+    setNewNorm({label:"",mean:"",sd:""});
+  };
+  const removeNorm=(idx)=>setNorms(prev=>prev.filter((_,i)=>i!==idx));
+
   useEffect(()=>{
     if(!corrModalOpen||!corrCanvasRef.current||!corrMatrix)return;
     const canvas=corrCanvasRef.current;
@@ -2714,7 +2808,7 @@ function DatabaseDashboard({t,databaseImages}){
     link.click();
   };
 
-  const tabs=[["overview","Overview"],["descriptive","Descriptive"],["grouping","Grouping"],["correlation","Correlation"],["export","Export"]];
+  const tabs=[["overview","Overview"],["descriptive","Descriptive"],["grouping","Grouping"],["correlation","Correlation"],["analytics","Analytics"],["export","Export"]];
 
   const landmarkVars=useMemo(()=>variables.filter(v=>/_x$/.test(v)),[variables]);
   const measVars=useMemo(()=>variables.filter(v=>!/_x$/.test(v)&&!/_y$/.test(v)),[variables]);
@@ -2723,7 +2817,7 @@ function DatabaseDashboard({t,databaseImages}){
 
   return(
     <div>
-      <div style={{display:"flex",gap:4,marginBottom:12,overflowX:"auto",paddingBottom:4}}>
+      <div style={{display:"flex",gap:4,marginBottom:12,flexWrap:"wrap"}}>
         {tabs.map(([id,label])=>(<button key={id} onClick={()=>setTab(id)} style={{padding:"5px 10px",borderRadius:6,border:`1px solid ${tab===id?t.acc:t.bdr}`,background:tab===id?t.acc+"18":"transparent",color:tab===id?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{label}</button>))}
       </div>
 
@@ -2866,6 +2960,202 @@ function DatabaseDashboard({t,databaseImages}){
               return(<div key={v} style={{fontSize:10,color:t.tx2,display:"flex",justifyContent:"space-between"}}><span>{corrVars[0]||"—"} vs {v}</span><span>r={r?r.toFixed(2):"-"} | ρ={sp!=null?sp.toFixed(2):"-"}</span></div>);
             })}
           </div>
+        </div>
+      )}
+
+      {tab==="analytics"&&(
+        <div>
+          <div style={{display:"flex",gap:4,marginBottom:12,flexWrap:"wrap"}}>
+            {[["outliers","Outliers"],["ci","Confidence Intervals"],["regression","Linear Regression"],["histogram","Histogram"],["norms","Normative Comparison"]].map(([id,label])=>(<button key={id} onClick={()=>setAnalyticsTab(id)} style={{padding:"5px 10px",borderRadius:6,border:`1px solid ${analyticsTab===id?t.acc:t.bdr}`,background:analyticsTab===id?t.acc+"18":"transparent",color:analyticsTab===id?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{label}</button>))}
+          </div>
+
+          {analyticsTab==="outliers"&&(
+            <div>
+              <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:8}}>Outlier Detection</div>
+              <div style={{display:"flex",gap:8,marginBottom:10,alignItems:"flex-end"}}>
+                <div><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Variable</div>
+                  <select value={outlierVar} onChange={e=>setOutlierVar(e.target.value)} style={{width:200,padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
+                    <option value="">— Select —</option>
+                    {corrVarsAll.map(v=><option key={v} value={v}>{v}</option>)}
+                  </select>
+                </div>
+                <div><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Method</div>
+                  <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                    <button onClick={()=>setOutlierMethod("iqr")} style={{padding:"5px 8px",borderRadius:6,border:`1px solid ${outlierMethod==="iqr"?t.acc:t.bdr}`,background:outlierMethod==="iqr"?t.acc+"18":"transparent",color:outlierMethod==="iqr"?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}}>IQR</button>
+                    <button onClick={()=>setOutlierMethod("zscore")} style={{padding:"5px 8px",borderRadius:6,border:`1px solid ${outlierMethod==="zscore"?t.acc:t.bdr}`,background:outlierMethod==="zscore"?t.acc+"18":"transparent",color:outlierMethod==="zscore"?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}}>Z-Score</button>
+                  </div>
+                </div>
+              </div>
+              {outlierResult?(
+                <div>
+                  <div style={{padding:10,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`,marginBottom:8}}>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,fontSize:10}}>
+                      <span style={{color:t.tx2}}>Total values</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc}}>{outlierResult.values.length}</span>
+                      <span style={{color:t.tx2}}>Outliers found</span><span style={{fontFamily:"'DM Mono',monospace",color:outlierResult.outliers.length>0?t.err:t.ok}}>{outlierResult.outliers.length}</span>
+                      {outlierMethod==="zscore"?(<>
+                        <span style={{color:t.tx2}}>Mean ± SD</span><span style={{fontFamily:"'DM Mono',monospace"}}>{outlierResult.mean?.toFixed(3)} ± {outlierResult.sd?.toFixed(3)}</span>
+                      </>):(<>
+                        <span style={{color:t.tx2}}>Q1 / Q3</span><span style={{fontFamily:"'DM Mono',monospace"}}>{outlierResult.q1?.toFixed(2)} / {outlierResult.q3?.toFixed(2)}</span>
+                        <span style={{color:t.tx2}}>IQR</span><span style={{fontFamily:"'DM Mono',monospace"}}>{outlierResult.iqr?.toFixed(3)}</span>
+                        <span style={{color:t.tx2}}>Bounds</span><span style={{fontFamily:"'DM Mono',monospace"}}>{outlierResult.bounds?.[0]?.toFixed(2)} – {outlierResult.bounds?.[1]?.toFixed(2)}</span>
+                      </>)}
+                    </div>
+                  </div>
+                  {outlierResult.outliers.length>0&&(
+                    <div style={{padding:10,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
+                      <div style={{fontSize:10,fontWeight:700,color:t.err,marginBottom:6}}>Flagged Outliers</div>
+                      <div style={{overflowX:"auto"}}>
+                        <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
+                          <thead><tr style={{borderBottom:`1px solid ${t.bdr}`}}><th style={{textAlign:"left",padding:4,color:t.tx2}}>Image</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Value</th>{outlierMethod==="zscore"&&<th style={{textAlign:"right",padding:4,color:t.tx2}}>Z-Score</th>}<th style={{textAlign:"right",padding:4,color:t.tx2}}>Deviation</th></tr></thead>
+                          <tbody>{outlierResult.outliers.map(o=>{
+                            const img=databaseImages[o.i];
+                            const dev=mean&&outlierResult.values?((o.v-mean(outlierResult.values))/stdev(outlierResult.values,mean(outlierResult.values))*100):null;
+                            return(<tr key={o.i} style={{borderBottom:`1px solid ${t.bdr}44`}}><td style={{padding:4,color:t.tx}}>{img?img.name||`Image ${o.i+1}`:`#${o.i}`}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:t.err}}>{o.v.toFixed(3)}</td>{outlierMethod==="zscore"&&<td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:t.err}}>{o.zScore?.toFixed(2)}</td>}<td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{dev!=null?`${dev>0?"+":""}${dev.toFixed(1)}%`:"—"}</td></tr>);
+                          })}</tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ):<div style={{color:t.tx3,fontSize:11,textAlign:"center",padding:12}}>{!outlierVar?"Select a variable.":"Need 4+ data points."}</div>}
+            </div>
+          )}
+
+          {analyticsTab==="ci"&&(
+            <div>
+              <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:8}}>Confidence Intervals</div>
+              <div style={{display:"flex",gap:8,marginBottom:10,alignItems:"flex-end"}}>
+                <div><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Variable</div>
+                  <select value={ciVar} onChange={e=>setCiVar(e.target.value)} style={{width:200,padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
+                    <option value="">— Select —</option>
+                    {corrVarsAll.map(v=><option key={v} value={v}>{v}</option>)}
+                  </select>
+                </div>
+                <div><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Confidence</div>
+                  <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
+                    {[0.90,0.95,0.99].map(c=>(<button key={c} onClick={()=>setCiConf(c)} style={{padding:"5px 8px",borderRadius:6,border:`1px solid ${ciConf===c?t.acc:t.bdr}`,background:ciConf===c?t.acc+"18":"transparent",color:ciConf===c?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}}>{(c*100).toFixed(0)}%</button>))}
+                  </div>
+                </div>
+              </div>
+              {ciResult?(
+                <div style={{padding:12,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:10}}>
+                    <span style={{color:t.tx2}}>Sample mean</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:600}}>{ciResult.mean.toFixed(4)}</span>
+                    <span style={{color:t.tx2}}>Standard deviation</span><span style={{fontFamily:"'DM Mono',monospace"}}>{ciResult.sd.toFixed(4)}</span>
+                    <span style={{color:t.tx2}}>Standard error</span><span style={{fontFamily:"'DM Mono',monospace"}}>{ciResult.se.toFixed(4)}</span>
+                    <span style={{color:t.tx2}}>Sample size</span><span style={{fontFamily:"'DM Mono',monospace"}}>{ciResult.n}</span>
+                    <div style={{gridColumn:"span 2",marginTop:8,paddingTop:8,borderTop:`1px solid ${t.bdr}`}}><span style={{color:t.tx2,fontWeight:600}}>{(ciConf*100).toFixed(0)}% CI: </span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700,fontSize:12}}>[{ciResult.lower.toFixed(4)}, {ciResult.upper.toFixed(4)}]</span><span style={{color:t.tx3,fontSize:9,marginLeft:8}}>±{ciResult.margin.toFixed(4)}</span></div>
+                  </div>
+                </div>
+              ):<div style={{color:t.tx3,fontSize:11,textAlign:"center",padding:12}}>{!ciVar?"Select a variable.":"Need 2+ data points."}</div>}
+            </div>
+          )}
+
+          {analyticsTab==="regression"&&(
+            <div>
+              <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:8}}>Linear Regression</div>
+              <div style={{display:"flex",gap:8,marginBottom:10,alignItems:"flex-end"}}>
+                <div><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>X Variable (Predictor)</div>
+                  <select value={regX} onChange={e=>setRegX(e.target.value)} style={{width:200,padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
+                    <option value="">— Select —</option>
+                    {corrVarsAll.map(v=><option key={v} value={v}>{v}</option>)}
+                  </select>
+                </div>
+                <div><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Y Variable (Outcome)</div>
+                  <select value={regY} onChange={e=>setRegY(e.target.value)} style={{width:200,padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
+                    <option value="">— Select —</option>
+                    {corrVarsAll.map(v=><option key={v} value={v}>{v}</option>)}
+                  </select>
+                </div>
+              </div>
+              {regResult?(
+                <div>
+                  <div style={{padding:12,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`,marginBottom:10}}>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,fontSize:10}}>
+                      <span style={{color:t.tx2}}>Equation</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700,gridColumn:"span 2"}}>{regResult.equation}</span>
+                      <span style={{color:t.tx2}}>R²</span><span style={{fontFamily:"'DM Mono',monospace",color:regResult.r2>0.7?t.ok:regResult.r2>0.4?t.warn:t.err,fontWeight:600}}>{regResult.r2.toFixed(4)}</span>
+                      <span style={{color:t.tx2}}>Pearson r</span><span style={{fontFamily:"'DM Mono',monospace"}}>{regResult.r.toFixed(4)}</span>
+                      <span style={{color:t.tx2}}>Slope</span><span style={{fontFamily:"'DM Mono',monospace"}}>{regResult.slope.toFixed(4)} ± {regResult.seSlope?.toFixed(4)}</span>
+                      <span style={{color:t.tx2}}>Intercept</span><span style={{fontFamily:"'DM Mono',monospace"}}>{regResult.intercept.toFixed(4)} ± {regResult.seIntercept?.toFixed(4)}</span>
+                      <span style={{color:t.tx2}}>p-value</span><span style={{fontFamily:"'DM Mono',monospace",color:regResult.significant?t.ok:t.err,fontWeight:600}}>{regResult.pValue.toFixed(6)}</span>
+                      <span style={{color:t.tx2}}>Significant?</span><span style={{fontWeight:600,color:regResult.significant?t.ok:t.err}}>{regResult.significant?"Yes (p<0.05)":"No"}</span>
+                      <span style={{color:t.tx2}}>Residual SE</span><span style={{fontFamily:"'DM Mono',monospace"}}>{regResult.seResidual?.toFixed(4)}</span>
+                      <span style={{color:t.tx2}}>Sample size</span><span style={{fontFamily:"'DM Mono',monospace"}}>{regResult.n}</span>
+                    </div>
+                  </div>
+                </div>
+              ):<div style={{color:t.tx3,fontSize:11,textAlign:"center",padding:12}}>{!regX||!regY?"Select X and Y variables.":"Need 3+ paired data points."}</div>}
+            </div>
+          )}
+
+          {analyticsTab==="histogram"&&(
+            <div>
+              <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:8}}>Distribution Histogram</div>
+              <div style={{display:"flex",gap:8,marginBottom:10,alignItems:"flex-end"}}>
+                <div><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Variable</div>
+                  <select value={histVar} onChange={e=>setHistVar(e.target.value)} style={{width:200,padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
+                    <option value="">— Select —</option>
+                    {corrVarsAll.map(v=><option key={v} value={v}>{v}</option>)}
+                  </select>
+                </div>
+                {histVar&&<button onClick={()=>setHistModalOpen(true)} style={{padding:"5px 10px",borderRadius:6,border:`1px solid ${t.bdr}`,background:"transparent",color:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}}>⛶ Enlarge</button>}
+                {histVar&&<button onClick={downloadHistPNG} style={{padding:"5px 10px",borderRadius:6,border:`1px solid ${t.bdr}`,background:"transparent",color:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}}>⬇ PNG</button>}
+              </div>
+              {histVar&&(
+                <div style={{display:"flex",justifyContent:"center"}}>
+                  <canvas ref={histCanvasRef} style={{borderRadius:8,border:`1px solid ${t.bdr}`,maxWidth:"100%"}} width={560} height={360}/>
+                </div>
+              )}
+              {!histVar&&<div style={{color:t.tx3,fontSize:11,textAlign:"center",padding:12}}>Select a variable to see its distribution.</div>}
+            </div>
+          )}
+
+          {analyticsTab==="norms"&&(
+            <div>
+              <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:6}}>Normative Comparison</div>
+              <div style={{fontSize:10,color:t.tx3,marginBottom:10}}>Add published cephalometric norms (mean ± SD in mm). The system will compare your sample mean against each norm.</div>
+              <div style={{display:"flex",gap:6,marginBottom:10,alignItems:"flex-end"}}>
+                <div><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Label</div>
+                  <input value={newNorm.label} onChange={e=>setNewNorm(p=>({...p,label:e.target.value}))} placeholder="e.g. SNA" style={{width:80,padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}/>
+                </div>
+                <div><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Mean (mm)</div>
+                  <input value={newNorm.mean} onChange={e=>setNewNorm(p=>({...p,mean:e.target.value}))} placeholder="82.0" style={{width:80,padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}/>
+                </div>
+                <div><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>SD (mm)</div>
+                  <input value={newNorm.sd} onChange={e=>setNewNorm(p=>({...p,sd:e.target.value}))} placeholder="3.0" style={{width:80,padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}/>
+                </div>
+                <button onClick={addNorm} style={{padding:"5px 12px",borderRadius:6,border:"none",background:t.acc,color:"#fff",cursor:"pointer",fontSize:11,fontWeight:600}}>+ Add</button>
+              </div>
+              {norms.length>0&&(
+                <div style={{marginBottom:12}}>
+                  <div style={{overflowX:"auto"}}>
+                    <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
+                      <thead><tr style={{borderBottom:`1px solid ${t.bdr}`}}><th style={{textAlign:"left",padding:4,color:t.tx2}}>Label</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Norm Mean</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Norm SD</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Action</th></tr></thead>
+                      <tbody>{norms.map((n,i)=>(<tr key={i} style={{borderBottom:`1px solid ${t.bdr}44`}}><td style={{padding:4,color:t.tx,fontWeight:600}}>{n.label}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{n.mean.toFixed(1)} mm</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{n.sd.toFixed(1)} mm</td><td style={{padding:4,textAlign:"right"}}><button onClick={()=>removeNorm(i)} style={{padding:"2px 6px",borderRadius:4,border:"none",background:t.err+"22",color:t.err,cursor:"pointer",fontSize:9}}>✕</button></td></tr>))}</tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+              {norms.length>0&&(
+                <div>
+                  <div style={{fontSize:10,fontWeight:700,color:t.tx,marginBottom:6}}>Comparison Results</div>
+                  <div style={{overflowX:"auto"}}>
+                    <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
+                      <thead><tr style={{borderBottom:`1px solid ${t.bdr}`}}><th style={{textAlign:"left",padding:4,color:t.tx2}}>Norm</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Sample Mean</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Norm Mean</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Deviation</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Z-Score</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Within ±2SD?</th></tr></thead>
+                      <tbody>{norms.map((n,i)=>{
+                        const match=descriptive.find(d=>d.var.toLowerCase().includes(n.label.toLowerCase()));
+                        if(!match||!match.mean)return(<tr key={i} style={{borderBottom:`1px solid ${t.bdr}44`}}><td style={{padding:4,color:t.tx,fontWeight:600}}>{n.label}</td><td colSpan={5} style={{padding:4,textAlign:"center",color:t.tx3}}>No matching measurement in sample</td></tr>);
+                        const ppm=1;
+                        const z=n.sd>0?(match.mean/ppm-n.mean)/n.sd:null;
+                        const within=z!==null&&Math.abs(z)<=2;
+                        return(<tr key={i} style={{borderBottom:`1px solid ${t.bdr}44`}}><td style={{padding:4,color:t.tx,fontWeight:600}}>{n.label}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{match.mean?.toFixed(2)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{n.mean.toFixed(1)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{z!==null?(match.mean/ppm-n.mean).toFixed(2):"-"}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:z!=null?z>0?t.acc:t.err:t.tx3}}>{z!=null?z.toFixed(2):"-"}</td><td style={{padding:4,textAlign:"right",fontWeight:600,color:within?t.ok:t.err}}>{within?"Yes":"No"}</td></tr>);
+                      })}</tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

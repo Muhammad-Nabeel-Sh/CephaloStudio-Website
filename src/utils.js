@@ -606,3 +606,57 @@ export function computeNormsComparison(descriptiveStats, norms, calibration) {
     return { ...ds, statMm, statSDMm, normMean: normMeanMm, normSD: normSDMm, normZ: z, withinNorm: z !== null && Math.abs(z) <= 2, deviation: z !== null ? statMm - normMeanMm : null };
   });
 }
+
+export function detectOutliers(arr, method = "iqr") {
+  if (arr.length < 4) return { outliers: [], values: arr };
+  const indexed = arr.map((v, i) => ({ v, i }));
+  if (method === "zscore") {
+    const m = mean(arr), s = stdev(arr, m);
+    if (s === 0) return { outliers: [], values: arr };
+    const outliers = indexed.filter(x => Math.abs(x.v - m) / s > 2).map(x => ({ ...x, zScore: (x.v - m) / s }));
+    return { outliers, values: arr, mean: m, sd: s };
+  }
+  const sorted = [...arr].sort((a, b) => a - b);
+  const q1Idx = Math.floor(sorted.length * 0.25), q3Idx = Math.floor(sorted.length * 0.75);
+  const q1 = sorted[q1Idx], q3 = sorted[q3Idx], iqrVal = q3 - q1;
+  const lo = q1 - 1.5 * iqrVal, hi = q3 + 1.5 * iqrVal;
+  const outliers = indexed.filter(x => x.v < lo || x.v > hi).map(x => ({ ...x }));
+  return { outliers, values: arr, q1, q3, iqr: iqrVal, bounds: [lo, hi] };
+}
+
+export function confidenceInterval(arr, confidence = 0.95) {
+  const n = arr.length;
+  if (n < 2) return null;
+  const m = mean(arr), s = stdev(arr, m);
+  if (s === 0) return { mean: m, sd: 0, lower: m, upper: m, margin: 0, n, confidence };
+  const se = s / Math.sqrt(n);
+  const tVals = { 0.90: 1.645, 0.95: 1.96, 0.99: 2.576 };
+  const z = tVals[confidence] || 1.96;
+  const margin = z * se;
+  return { mean: m, sd: s, se, lower: m - margin, upper: m + margin, margin, n, confidence };
+}
+
+export function linearRegression(xVals, yVals) {
+  if (xVals.length !== yVals.length || xVals.length < 3) return null;
+  const n = xVals.length;
+  const mx = mean(xVals), my = mean(yVals);
+  let ssxy = 0, ssxx = 0, ssyy = 0;
+  for (let i = 0; i < n; i++) {
+    const dx = xVals[i] - mx, dy = yVals[i] - my;
+    ssxy += dx * dy; ssxx += dx * dx; ssyy += dy * dy;
+  }
+  if (ssxx === 0 || ssyy === 0) return null;
+  const slope = ssxy / ssxx;
+  const intercept = my - slope * mx;
+  const r2 = (ssxy ** 2) / (ssxx * ssyy);
+  const r = Math.sqrt(r2) * (slope >= 0 ? 1 : -1);
+  const sse = ssyy - (ssxy ** 2) / ssxx;
+  const seSlope = Math.sqrt(sse / (n - 2) / ssxx);
+  const seIntercept = seSlope * Math.sqrt((1 / n) * xVals.reduce((s, x) => s + x * x, 0));
+  const tSlope = seSlope > 0 ? slope / seSlope : 0;
+  const tIntercept = seIntercept > 0 ? intercept / seIntercept : 0;
+  const df = n - 2;
+  const pValue = 2 * (1 - tDistributeCDF(Math.abs(tSlope), df));
+  const seResidual = Math.sqrt(sse / (n - 2));
+  return { slope, intercept, r2, r, seSlope, seIntercept, tSlope, tIntercept, pValue, significant: pValue < 0.05, seResidual, n, equation: `y = ${slope.toFixed(4)}x + ${intercept.toFixed(4)}` };
+}
