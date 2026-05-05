@@ -375,6 +375,7 @@ export function TemplatesPanel({ t, projection, onLoadTemplate, onImportCepht })
   const allTemplates = PREDEFINED[projection] || [];
   const uniqueTemplates = allTemplates.filter((tmpl, idx, self) => idx === self.findIndex(t => t.name === tmpl.name));
   const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const cephtInputRef = useRef(null);
 
   const handleLoad = (tmpl, e) => {
     e?.stopPropagation();
@@ -388,20 +389,23 @@ export function TemplatesPanel({ t, projection, onLoadTemplate, onImportCepht })
     if (selectedTemplate.angles?.length > 0) sections.push({ type: "Angles", icon: "∠", items: selectedTemplate.angles.map(ang => ({ label: ang.l, def: ang.def, color: ang.color, type: "angle" })) });
     if (selectedTemplate.distances?.length > 0) sections.push({ type: "Distances", icon: "↔", items: selectedTemplate.distances.map(dist => ({ label: dist.l, def: dist.def, color: dist.color, type: "distance" })) });
     if (selectedTemplate.planes?.length > 0) sections.push({ type: "Planes", icon: "▭", items: selectedTemplate.planes.map(pl => ({ label: pl.l, def: pl.def, color: pl.color, type: "plane" })) });
+    if (selectedTemplate.projections?.length > 0) sections.push({ type: "Projections", icon: "▦", items: selectedTemplate.projections.map(p => ({ label: p.name, def: p.def, color: p.color, type: "projection" })) });
 
     const totalItems = sections.reduce((sum, s) => sum + s.items.length, 0);
+    const displayName = selectedTemplate.name || selectedTemplate.group;
 
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
         <div style={{ padding: "10px 12px", borderBottom: `1px solid ${t.bdr}`, display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
           <button onClick={() => setSelectedTemplate(null)} style={{ background: "none", border: "none", color: t.tx2, cursor: "pointer", fontSize: 18, padding: 4, display: "flex", alignItems: "center" }}>←</button>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: t.tx, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{selectedTemplate.name}</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: t.tx, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{displayName}</div>
             <div style={{ fontSize: 10, color: t.tx2 }}>{totalItems} items</div>
           </div>
-          <button onClick={(e) => handleLoad(selectedTemplate, e)} style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: t.acc, color: t.bg, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Load</button>
+          {selectedTemplate.pts && <button onClick={(e) => handleLoad(selectedTemplate, e)} style={{ padding: "6px 12px", borderRadius: 6, border: "none", background: t.acc, color: t.bg, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>Load</button>}
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
+          {totalItems === 0 && <div style={{ fontSize: 12, color: t.tx2, textAlign: "center", padding: "20px 0" }}>No details available for this template.</div>}
           {sections.map(sec => (
             <div key={sec.type} style={{ marginBottom: 20 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
@@ -427,8 +431,6 @@ export function TemplatesPanel({ t, projection, onLoadTemplate, onImportCepht })
     );
   }
 
-  const cephtInputRef = useRef(null);
-
   return (
     <div style={{ padding: 12 }}>
       <input type="file" ref={cephtInputRef} accept=".cepht" style={{ display: "none" }} onChange={e => { const file = e.target.files?.[0]; if (file && onImportCepht) { const reader = new FileReader(); reader.onload = ev => { try { const data = JSON.parse(ev.target.result); if (data.format === "cepht") onImportCepht(data); else alert("Invalid .cepht file"); } catch { alert("Cannot parse file"); } }; reader.readAsText(file); } e.target.value = ""; }} />
@@ -440,14 +442,15 @@ export function TemplatesPanel({ t, projection, onLoadTemplate, onImportCepht })
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {uniqueTemplates.map(tmpl => {
-          const totalPts = tmpl.pts?.length || 0;
+          const displayName = tmpl.name || tmpl.group;
+          const totalPts = tmpl.pts?.length || tmpl.projections?.length || 0;
           return (
-            <div key={tmpl.name} onClick={() => setSelectedTemplate(tmpl)} style={{ padding: "12px", borderRadius: 8, background: t.surf2, border: `1px solid ${t.bdr}`, cursor: "pointer", display: "flex", alignItems: "center", gap: 10, transition: "border-color 0.15s" }}>
+            <div key={displayName} onClick={() => setSelectedTemplate(tmpl)} style={{ padding: "12px", borderRadius: 8, background: t.surf2, border: `1px solid ${t.bdr}`, cursor: "pointer", display: "flex", alignItems: "center", gap: 10, transition: "border-color 0.15s" }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: t.tx, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{tmpl.name}</div>
-                <div style={{ fontSize: 10, color: t.tx2 }}>{totalPts} landmarks</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: t.tx, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{displayName}</div>
+                <div style={{ fontSize: 10, color: t.tx2 }}>{totalPts} items</div>
               </div>
-              <button onClick={(e) => handleLoad(tmpl, e)} style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: t.acc, color: t.bg, fontSize: 10, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>Load</button>
+              {tmpl.pts && <button onClick={(e) => handleLoad(tmpl, e)} style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: t.acc, color: t.bg, fontSize: 10, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>Load</button>}
             </div>
           );
         })}
