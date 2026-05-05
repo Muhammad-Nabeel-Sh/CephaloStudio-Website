@@ -2249,7 +2249,7 @@ function StatisticsPanel({t,studies,databaseImages,formatAngle}){
   const showStudy=source==="study";
 
   return(
-    <div style={{padding:12}}>
+    <div style={{padding:12,maxWidth:"100%",overflow:"hidden"}}>
       <div style={{display:"flex",gap:6,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
         <button onClick={()=>setSource(showStudy?"database":"study")} style={{padding:"5px 10px",borderRadius:6,border:`1px solid ${t.bdr}`,background:showStudy?"transparent":t.acc+"18",color:showStudy?t.tx2:t.acc,cursor:"pointer",fontSize:10,fontWeight:600}}>{showStudy?"Database Mode →":"← Study Mode"}</button>
         <span style={{fontSize:10,color:t.tx3}}>{showStudy?"Study Mode":"Database Mode"} — {showStudy?(studies?.length||0)+" studies":(databaseImages?.length||0)+" images"}</span>
@@ -2380,7 +2380,7 @@ function StudyDashboard({t,studies}){
   if(!studies.length)return(<div style={{color:t.tx3,fontSize:12,textAlign:"center",padding:20}}>No studies yet. Create and complete a study in Reproducibility first.</div>);
 
   return(
-    <div>
+    <div style={{maxWidth:"100%",overflow:"hidden"}}>
       <div style={{marginBottom:12}}>
         <div style={{fontSize:10,color:t.tx2,marginBottom:4}}>Study</div>
         <select value={selectedId||""} onChange={e=>setSelectedId(e.target.value||null)} style={{width:"100%",padding:"6px 8px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:12}}>
@@ -2403,7 +2403,7 @@ function StudyDashboard({t,studies}){
             <div>
               <div style={{marginBottom:12,padding:10,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
                 <div style={{fontSize:10,fontWeight:700,color:t.tx,marginBottom:6}}>Overview</div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,fontSize:10}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:6,fontSize:10}}>
                   <span style={{color:t.tx2}}>Design</span><span>{study.type==="intra"?"Intra-operator":"Inter-operator"}</span>
                   <span style={{color:t.tx2}}>Status</span><span style={{color:study.status==="completed"?t.ok:t.warn}}>{study.status||"—"}</span>
                   <span style={{color:t.tx2}}>Landmarks</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc}}>{labels.length}</span>
@@ -2416,7 +2416,7 @@ function StudyDashboard({t,studies}){
               </div>
               {icc&&(<div style={{marginBottom:12,padding:10,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
                 <div style={{fontSize:10,fontWeight:700,color:t.tx,marginBottom:6}}>Reliability Summary</div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,fontSize:10}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:6,fontSize:10}}>
                   <span style={{color:t.tx2}}>ICC (absolute)</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700}}>{icc.ICC_Absolute?.toFixed(4)}</span>
                   <span style={{color:t.tx2}}>Interpretation</span><span style={{color:icc.ICC_Absolute>=0.9?t.ok:icc.ICC_Absolute>=0.75?t.warn:t.err,fontWeight:600}}>{icc.interpretation}</span>
                   {sem!==null&&<><span style={{color:t.tx2}}>SEM</span><span style={{fontFamily:"'DM Mono',monospace"}}>{sem.toFixed(4)} px</span></>}
@@ -2425,7 +2425,7 @@ function StudyDashboard({t,studies}){
               </div>)}
               {anovaRes&&(<div style={{marginBottom:12,padding:10,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
                 <div style={{fontSize:10,fontWeight:700,color:t.tx,marginBottom:6}}>ANOVA (across sessions)</div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,fontSize:10}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:6,fontSize:10}}>
                   <span style={{color:t.tx2}}>F</span><span style={{fontFamily:"'DM Mono',monospace"}}>{anovaRes.F.toFixed(4)}</span>
                   <span style={{color:t.tx2}}>p-value</span><span style={{fontFamily:"'DM Mono',monospace",color:anovaRes.significant?t.err:t.ok,fontWeight:700}}>{anovaRes.pValue.toFixed(6)}</span>
                   <span style={{color:t.tx2}}>Result</span><span style={{color:anovaRes.significant?t.err:t.ok,fontWeight:600}}>{anovaRes.significant?"Significant bias":"No significant bias"}</span>
@@ -2433,7 +2433,7 @@ function StudyDashboard({t,studies}){
               </div>)}
               {dahl&&(<div style={{padding:10,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
                 <div style={{fontSize:10,fontWeight:700,color:t.tx,marginBottom:6}}>Aggregate Error</div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,fontSize:10}}>
+                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:6,fontSize:10}}>
                   <span style={{color:t.tx2}}>Dahlberg</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700}}>{dahl.error.toFixed(4)} px</span>
                   <span style={{color:t.tx2}}>Paired landmarks</span><span style={{fontFamily:"'DM Mono',monospace"}}>{vals1.length}</span>
                 </div>
@@ -2488,13 +2488,13 @@ function StudyDashboard({t,studies}){
               <div style={{marginBottom:12}}>
                 <div style={{fontSize:10,color:t.tx2,marginBottom:4}}>Pairwise comparison</div>
                 {study.type==="intra"&&(
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8}}>
                     <div><div style={{fontSize:9,color:t.tx3,marginBottom:2}}>Trial A</div><select value={pa} onChange={e=>setPairA(+e.target.value)} style={{width:"100%",padding:"6px 8px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>{(study.operators[0]?.trials||[]).map((tr,i)=>(<option key={i} value={i}>Trial {i+1}</option>))}</select></div>
                     <div><div style={{fontSize:9,color:t.tx3,marginBottom:2}}>Trial B</div><select value={pb} onChange={e=>setPairB(+e.target.value)} style={{width:"100%",padding:"6px 8px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>{(study.operators[0]?.trials||[]).map((tr,i)=>(<option key={i} value={i}>Trial {i+1}</option>))}</select></div>
                   </div>
                 )}
                 {study.type==="inter"&&(
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8}}>
                     <div><div style={{fontSize:9,color:t.tx3,marginBottom:2}}>Operator A</div><select value={pa} onChange={e=>setPairA(+e.target.value)} style={{width:"100%",padding:"6px 8px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>{study.operators.map((op,i)=>(<option key={op.id} value={i}>{op.name||`Operator ${i+1}`}</option>))}</select></div>
                     <div><div style={{fontSize:9,color:t.tx3,marginBottom:2}}>Operator B</div><select value={pb} onChange={e=>setPairB(+e.target.value)} style={{width:"100%",padding:"6px 8px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>{study.operators.map((op,i)=>(<option key={op.id} value={i}>{op.name||`Operator ${i+1}`}</option>))}</select></div>
                   </div>
@@ -2816,7 +2816,7 @@ function DatabaseDashboard({t,databaseImages}){
   if(!databaseImages.length)return(<div style={{color:t.tx3,fontSize:12,textAlign:"center",padding:20}}>No images in database mode.</div>);
 
   return(
-    <div>
+    <div style={{maxWidth:"100%",overflow:"hidden"}}>
       <div style={{display:"flex",gap:4,marginBottom:12,flexWrap:"wrap"}}>
         {tabs.map(([id,label])=>(<button key={id} onClick={()=>setTab(id)} style={{padding:"5px 10px",borderRadius:6,border:`1px solid ${tab===id?t.acc:t.bdr}`,background:tab===id?t.acc+"18":"transparent",color:tab===id?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{label}</button>))}
       </div>
@@ -2825,7 +2825,7 @@ function DatabaseDashboard({t,databaseImages}){
         <div>
           <div style={{marginBottom:12,padding:10,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
             <div style={{fontSize:10,fontWeight:700,color:t.tx,marginBottom:6}}>Database Overview</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,fontSize:10}}>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:6,fontSize:10}}>
               <span style={{color:t.tx2}}>Images</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc}}>{databaseImages.length}</span>
               <span style={{color:t.tx2}}>Total variables</span><span style={{fontFamily:"'DM Mono',monospace"}}>{variables.length}</span>
               <span style={{color:t.tx2}}>Landmark coords</span><span style={{fontFamily:"'DM Mono',monospace"}}>{landmarkVars.length} pts</span>
@@ -2926,7 +2926,7 @@ function DatabaseDashboard({t,databaseImages}){
                 <button onClick={clearAll} style={{padding:"2px 6px",borderRadius:4,border:`1px solid ${t.bdr}`,background:"transparent",color:t.tx2,cursor:"pointer",fontSize:9}}>None</button>
               </div>
             </div>
-            <div style={{maxHeight:140,overflowY:"auto",display:"grid",gridTemplateColumns:"1fr 1fr",gap:"2px 10px"}}>
+            <div style={{maxHeight:140,overflowY:"auto",display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:"2px 10px"}}>
               {corrVarsAll.map(v=>(
                 <label key={v} style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer",padding:"2px 4px",borderRadius:4,fontSize:9,color:corrSelected.includes(v)?t.tx:t.tx3,transition:"color .15s"}}>
                   <input type="checkbox" checked={corrSelected.includes(v)} onChange={e=>setCorrSelected(prev=>e.target.checked?[...new Set([...prev,v])]:prev.filter(x=>x!==v))} style={{accentColor:t.acc,width:12,height:12}}/>
@@ -2972,14 +2972,14 @@ function DatabaseDashboard({t,databaseImages}){
           {analyticsTab==="outliers"&&(
             <div>
               <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:8}}>Outlier Detection</div>
-              <div style={{display:"flex",gap:8,marginBottom:10,alignItems:"flex-end"}}>
-                <div><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Variable</div>
-                  <select value={outlierVar} onChange={e=>setOutlierVar(e.target.value)} style={{width:200,padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
+              <div style={{display:"flex",gap:8,marginBottom:10,alignItems:"flex-end",flexWrap:"wrap"}}>
+                <div style={{flex:"1 1 180px",minWidth:140}}><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Variable</div>
+                  <select value={outlierVar} onChange={e=>setOutlierVar(e.target.value)} style={{width:"100%",padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
                     <option value="">— Select —</option>
                     {corrVarsAll.map(v=><option key={v} value={v}>{v}</option>)}
                   </select>
                 </div>
-                <div><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Method</div>
+                <div style={{flex:"1 1 140px",minWidth:100}}><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Method</div>
                   <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                     <button onClick={()=>setOutlierMethod("iqr")} style={{padding:"5px 8px",borderRadius:6,border:`1px solid ${outlierMethod==="iqr"?t.acc:t.bdr}`,background:outlierMethod==="iqr"?t.acc+"18":"transparent",color:outlierMethod==="iqr"?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}}>IQR</button>
                     <button onClick={()=>setOutlierMethod("zscore")} style={{padding:"5px 8px",borderRadius:6,border:`1px solid ${outlierMethod==="zscore"?t.acc:t.bdr}`,background:outlierMethod==="zscore"?t.acc+"18":"transparent",color:outlierMethod==="zscore"?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}}>Z-Score</button>
@@ -2989,7 +2989,7 @@ function DatabaseDashboard({t,databaseImages}){
               {outlierResult?(
                 <div>
                   <div style={{padding:10,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`,marginBottom:8}}>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,fontSize:10}}>
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:6,fontSize:10}}>
                       <span style={{color:t.tx2}}>Total values</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc}}>{outlierResult.values.length}</span>
                       <span style={{color:t.tx2}}>Outliers found</span><span style={{fontFamily:"'DM Mono',monospace",color:outlierResult.outliers.length>0?t.err:t.ok}}>{outlierResult.outliers.length}</span>
                       {outlierMethod==="zscore"?(<>
@@ -3024,14 +3024,14 @@ function DatabaseDashboard({t,databaseImages}){
           {analyticsTab==="ci"&&(
             <div>
               <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:8}}>Confidence Intervals</div>
-              <div style={{display:"flex",gap:8,marginBottom:10,alignItems:"flex-end"}}>
-                <div><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Variable</div>
-                  <select value={ciVar} onChange={e=>setCiVar(e.target.value)} style={{width:200,padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
+              <div style={{display:"flex",gap:8,marginBottom:10,alignItems:"flex-end",flexWrap:"wrap"}}>
+                <div style={{flex:"1 1 180px",minWidth:140}}><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Variable</div>
+                  <select value={ciVar} onChange={e=>setCiVar(e.target.value)} style={{width:"100%",padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
                     <option value="">— Select —</option>
                     {corrVarsAll.map(v=><option key={v} value={v}>{v}</option>)}
                   </select>
                 </div>
-                <div><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Confidence</div>
+                <div style={{flex:"1 1 180px",minWidth:140}}><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Confidence</div>
                   <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
                     {[0.90,0.95,0.99].map(c=>(<button key={c} onClick={()=>setCiConf(c)} style={{padding:"5px 8px",borderRadius:6,border:`1px solid ${ciConf===c?t.acc:t.bdr}`,background:ciConf===c?t.acc+"18":"transparent",color:ciConf===c?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}}>{(c*100).toFixed(0)}%</button>))}
                   </div>
@@ -3039,12 +3039,12 @@ function DatabaseDashboard({t,databaseImages}){
               </div>
               {ciResult?(
                 <div style={{padding:12,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,fontSize:10}}>
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8,fontSize:10}}>
                     <span style={{color:t.tx2}}>Sample mean</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:600}}>{ciResult.mean.toFixed(4)}</span>
                     <span style={{color:t.tx2}}>Standard deviation</span><span style={{fontFamily:"'DM Mono',monospace"}}>{ciResult.sd.toFixed(4)}</span>
                     <span style={{color:t.tx2}}>Standard error</span><span style={{fontFamily:"'DM Mono',monospace"}}>{ciResult.se.toFixed(4)}</span>
                     <span style={{color:t.tx2}}>Sample size</span><span style={{fontFamily:"'DM Mono',monospace"}}>{ciResult.n}</span>
-                    <div style={{gridColumn:"span 2",marginTop:8,paddingTop:8,borderTop:`1px solid ${t.bdr}`}}><span style={{color:t.tx2,fontWeight:600}}>{(ciConf*100).toFixed(0)}% CI: </span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700,fontSize:12}}>[{ciResult.lower.toFixed(4)}, {ciResult.upper.toFixed(4)}]</span><span style={{color:t.tx3,fontSize:9,marginLeft:8}}>±{ciResult.margin.toFixed(4)}</span></div>
+                    <div style={{gridColumn:"1/-1",marginTop:8,paddingTop:8,borderTop:`1px solid ${t.bdr}`}}><span style={{color:t.tx2,fontWeight:600}}>{(ciConf*100).toFixed(0)}% CI: </span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700,fontSize:12}}>[{ciResult.lower.toFixed(4)}, {ciResult.upper.toFixed(4)}]</span><span style={{color:t.tx3,fontSize:9,marginLeft:8}}>±{ciResult.margin.toFixed(4)}</span></div>
                   </div>
                 </div>
               ):<div style={{color:t.tx3,fontSize:11,textAlign:"center",padding:12}}>{!ciVar?"Select a variable.":"Need 2+ data points."}</div>}
@@ -3054,15 +3054,15 @@ function DatabaseDashboard({t,databaseImages}){
           {analyticsTab==="regression"&&(
             <div>
               <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:8}}>Linear Regression</div>
-              <div style={{display:"flex",gap:8,marginBottom:10,alignItems:"flex-end"}}>
-                <div><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>X Variable (Predictor)</div>
-                  <select value={regX} onChange={e=>setRegX(e.target.value)} style={{width:200,padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
+              <div style={{display:"flex",gap:8,marginBottom:10,alignItems:"flex-end",flexWrap:"wrap"}}>
+                <div style={{flex:"1 1 180px",minWidth:140}}><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>X Variable (Predictor)</div>
+                  <select value={regX} onChange={e=>setRegX(e.target.value)} style={{width:"100%",padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
                     <option value="">— Select —</option>
                     {corrVarsAll.map(v=><option key={v} value={v}>{v}</option>)}
                   </select>
                 </div>
-                <div><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Y Variable (Outcome)</div>
-                  <select value={regY} onChange={e=>setRegY(e.target.value)} style={{width:200,padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
+                <div style={{flex:"1 1 180px",minWidth:140}}><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Y Variable (Outcome)</div>
+                  <select value={regY} onChange={e=>setRegY(e.target.value)} style={{width:"100%",padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
                     <option value="">— Select —</option>
                     {corrVarsAll.map(v=><option key={v} value={v}>{v}</option>)}
                   </select>
@@ -3071,8 +3071,8 @@ function DatabaseDashboard({t,databaseImages}){
               {regResult?(
                 <div>
                   <div style={{padding:12,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`,marginBottom:10}}>
-                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,fontSize:10}}>
-                      <span style={{color:t.tx2}}>Equation</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700,gridColumn:"span 2"}}>{regResult.equation}</span>
+                    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:6,fontSize:10}}>
+                      <span style={{color:t.tx2}}>Equation</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700,gridColumn:"1/-1"}}>{regResult.equation}</span>
                       <span style={{color:t.tx2}}>R²</span><span style={{fontFamily:"'DM Mono',monospace",color:regResult.r2>0.7?t.ok:regResult.r2>0.4?t.warn:t.err,fontWeight:600}}>{regResult.r2.toFixed(4)}</span>
                       <span style={{color:t.tx2}}>Pearson r</span><span style={{fontFamily:"'DM Mono',monospace"}}>{regResult.r.toFixed(4)}</span>
                       <span style={{color:t.tx2}}>Slope</span><span style={{fontFamily:"'DM Mono',monospace"}}>{regResult.slope.toFixed(4)} ± {regResult.seSlope?.toFixed(4)}</span>
@@ -3091,9 +3091,9 @@ function DatabaseDashboard({t,databaseImages}){
           {analyticsTab==="histogram"&&(
             <div>
               <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:8}}>Distribution Histogram</div>
-              <div style={{display:"flex",gap:8,marginBottom:10,alignItems:"flex-end"}}>
-                <div><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Variable</div>
-                  <select value={histVar} onChange={e=>setHistVar(e.target.value)} style={{width:200,padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
+              <div style={{display:"flex",gap:8,marginBottom:10,alignItems:"flex-end",flexWrap:"wrap"}}>
+                <div style={{flex:"1 1 180px",minWidth:140}}><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Variable</div>
+                  <select value={histVar} onChange={e=>setHistVar(e.target.value)} style={{width:"100%",padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
                     <option value="">— Select —</option>
                     {corrVarsAll.map(v=><option key={v} value={v}>{v}</option>)}
                   </select>
@@ -3114,15 +3114,15 @@ function DatabaseDashboard({t,databaseImages}){
             <div>
               <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:6}}>Normative Comparison</div>
               <div style={{fontSize:10,color:t.tx3,marginBottom:10}}>Add published cephalometric norms (mean ± SD in mm). The system will compare your sample mean against each norm.</div>
-              <div style={{display:"flex",gap:6,marginBottom:10,alignItems:"flex-end"}}>
-                <div><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Label</div>
-                  <input value={newNorm.label} onChange={e=>setNewNorm(p=>({...p,label:e.target.value}))} placeholder="e.g. SNA" style={{width:80,padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}/>
+              <div style={{display:"flex",gap:6,marginBottom:10,alignItems:"flex-end",flexWrap:"wrap"}}>
+                <div style={{flex:"1 1 70px",minWidth:60}}><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Label</div>
+                  <input value={newNorm.label} onChange={e=>setNewNorm(p=>({...p,label:e.target.value}))} placeholder="e.g. SNA" style={{width:"100%",padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}/>
                 </div>
-                <div><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Mean (mm)</div>
-                  <input value={newNorm.mean} onChange={e=>setNewNorm(p=>({...p,mean:e.target.value}))} placeholder="82.0" style={{width:80,padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}/>
+                <div style={{flex:"1 1 70px",minWidth:60}}><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Mean (mm)</div>
+                  <input value={newNorm.mean} onChange={e=>setNewNorm(p=>({...p,mean:e.target.value}))} placeholder="82.0" style={{width:"100%",padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}/>
                 </div>
-                <div><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>SD (mm)</div>
-                  <input value={newNorm.sd} onChange={e=>setNewNorm(p=>({...p,sd:e.target.value}))} placeholder="3.0" style={{width:80,padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}/>
+                <div style={{flex:"1 1 70px",minWidth:60}}><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>SD (mm)</div>
+                  <input value={newNorm.sd} onChange={e=>setNewNorm(p=>({...p,sd:e.target.value}))} placeholder="3.0" style={{width:"100%",padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}/>
                 </div>
                 <button onClick={addNorm} style={{padding:"5px 12px",borderRadius:6,border:"none",background:t.acc,color:"#fff",cursor:"pointer",fontSize:11,fontWeight:600}}>+ Add</button>
               </div>
