@@ -1032,47 +1032,6 @@ function MarkupTablesPanel({databaseImages,currentImageIndex,t,formatAngle}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // DATABASE STATS PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
-function DatabaseStatsPanel({databaseImages,currentImageIndex,t}){
-  const[view,setView]=useState("tables");
-
-  const buildDataset=()=>{
-    const dataset=[];
-    databaseImages.forEach((img,idx)=>{
-      const entry={id:`img_${idx}`,measurements:{},formulas:{},group:"default",timepoint:`T${idx+1}`,operator:"default"};
-      const angle3Count={current:0};
-      const angle4Count={current:0};
-      (img.markups||[]).forEach(m=>{
-        const meas=computeMeasurements(m,img.calibration);
-        let label;
-        if(m.type==="angle3"){
-          angle3Count.current++;
-          label=`Angle_${angle3Count.current}`;
-        }else if(m.type==="angle4"){
-          angle4Count.current++;
-          label=`Inc_Angle_${angle4Count.current}`;
-        }else{
-          label=m.label||m.type;
-        }
-        Object.entries(meas).forEach(([k,v])=>{
-          entry.measurements[`${label}_${k}`]=v;
-        });
-      });
-      dataset.push(entry);
-    });
-    return dataset;
-  };
-
-  return(
-    <div style={{padding:12}}>
-      <div style={{display:"flex",gap:6,marginBottom:16}}>
-        <Btn t={t} small active={view==="tables"} onClick={()=>setView("tables")}>Registered Markups</Btn>
-        <Btn t={t} small active={view==="dashboard"} onClick={()=>setView("dashboard")}>Statistics Dashboard</Btn>
-      </div>
-      {view==="tables"&&<MarkupTablesPanel databaseImages={databaseImages} currentImageIndex={currentImageIndex} t={t} formatAngle={(v)=>v.toFixed(1)+"°"}/>}
-      {view==="dashboard"&&<StatsDashboard dataset={buildDataset()} t={t}/>}
-    </div>
-  );
-}
 function PinGate({t,project,onVerified,onCancel}){
   const[pin,setPin]=useState("");const[err,setErr]=useState(false);
   const verify=async()=>{const h=await hashPin(pin);if(h===project.accessControl.pinHash)onVerified();else{setErr(true);setPin("");}};
@@ -1633,8 +1592,8 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const cursorStyle={select:"default",pan:"grab",point:"crosshair",line:"crosshair",angle3:"crosshair",angle4:"crosshair",polygon:"crosshair",curve:"crosshair",perp:"crosshair",parallel:"crosshair",midpoint:"crosshair",perppoint:"crosshair",arrow:"crosshair",text:"text",ruler:"crosshair"}[activeTool]||"default";
   const availAnalyses=PREDEFINED[project.projection]||[];
 
-  const panelIcons={markups:"◉",measurements:"📏",formulas:"∑",image:"▦",layers:"🗐",versions:"⏲",reproducibility:"↻",statistics:"𝛀",templates:"▤",themes:"◐","repro-stats":"𝛜"};
-  const panelTabs=[["markups","Markups"],["measurements","Measure"],["formulas","Formulas"],["image","Image"],["layers","Layers"],["versions","Versions"],["reproducibility","Reproducibility"],["statistics","Statistics"],["repro-stats","Repro Stats"],["templates","Templates"],["themes","Themes"]];
+  const panelIcons={markups:"◉",measurements:"📏",formulas:"∑",image:"▦",layers:"🗐",versions:"⏲",reproducibility:"↻",statistics:"𝛀",templates:"▤",themes:"◐"};
+  const panelTabs=[["markups","Markups"],["measurements","Measure"],["formulas","Formulas"],["image","Image"],["layers","Layers"],["versions","Versions"],["reproducibility","Reproducibility"],["statistics","Statistics"],["templates","Templates"],["themes","Themes"]];
 
   return(
     <div style={{height:"100vh",display:"flex",flexDirection:"column",background:t.bg,color:t.tx,fontFamily:"'DM Sans',sans-serif",overflow:"hidden"}}>
@@ -1791,7 +1750,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
             {/* Vertical tabs on left side */}
             <div style={{display:"flex",flexDirection:"column",alignItems:"center",paddingTop:8,flexShrink:0,background:t.surf2}}>
               {panelTabs.map(([id,label])=>{
-                const icons={markups:"◉",measurements:"📏",formulas:"∑",image:"▦",layers:"🗐",versions:"⏲",reproducibility:"↻",statistics:"𝛀",templates:"▤",themes:"◐","repro-stats":"𝛜"};
+                const icons={markups:"◉",measurements:"📏",formulas:"∑",image:"▦",layers:"🗐",versions:"⏲",reproducibility:"↻",statistics:"𝛀",templates:"▤",themes:"◐"};
                 return(
                   <button key={id} onClick={()=>setRightPanel(id)} title={label}
                     onMouseEnter={e=>{if(rightPanel!==id)e.currentTarget.style.background=t.accMuted;e.currentTarget.style.color=t.acc;}}
@@ -1855,8 +1814,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
                   {rightPanel==="layers"&&<LayersPanel t={t} images={project.images} onUpdateImages={imgs=>onUpdateProject({images:imgs})} onAddImage={e=>{if(e.target.files[0])loadImage(e.target.files[0],true);}} showDisplacement={showDisplacement} setShowDisplacement={setShowDisplacement} compareVersionId={compareVersionId} setCompareVersionId={setCompareVersionId} versions={project.versions} onShowAlign={()=>setShowAlign(true)} onShowTransform={()=>setShowTransform(true)}/>}
                   {rightPanel==="versions"&&<VersionsPanel project={project} t={t} onUpdateProject={onUpdateProject} onUpdateVersion={onUpdateVersion} onExportTemplate={v=>exportCepht({name:`${project.name}`,projection:project.projection,markups:v.markups||[],formulas:v.formulas||[],norms:v.norms||[]})}/>}
                   {rightPanel==="reproducibility"&&<ReproducibilityPanel t={t} markups={markups} studies={reproStudies} onUpdateStudies={setReproStudies} activeStudyId={activeStudyId} setActiveStudyId={setActiveStudyId} reproCollecting={reproCollecting} setReproCollecting={setReproCollecting}/>}
-                  {rightPanel==="statistics"&&(databaseMode?<DatabaseStatsPanel databaseImages={databaseImages} currentImageIndex={currentImageIndex} t={t}/>:<div style={{padding:12}}><div style={{fontSize:12,color:t.tx3,textAlign:"center"}}>Enable Database Mode to view statistics</div></div>)}
-                  {rightPanel==="repro-stats"&&<StatisticsPanel t={t} studies={reproStudies}/>}
+                  {rightPanel==="statistics"&&<StatisticsPanel t={t} studies={reproStudies} databaseMode={databaseMode} databaseImages={databaseImages} currentImageIndex={currentImageIndex} formatAngle={formatAngle}/>}
                   {rightPanel==="templates"&&<TemplatesPanel t={t} projection={project.projection} onLoadTemplate={loadTemplate} onImportCepht={data=>{
           if(data.markups){
             const newMarkups=data.markups.map(m=>({...m,id:uid(),points:[{x:-99999,y:-99999}],placed:false}));
@@ -2283,7 +2241,44 @@ function exportFullStatsReport(study,metric,labels,descriptive,perLandmark,biase
   a.download=`${String(study.name).replace(/\s+/g,"_")}_full_report.csv`;a.click();
 }
 
-function StatisticsPanel({t,studies}){
+function StatisticsPanel({t,studies,databaseMode,databaseImages,currentImageIndex,formatAngle}){
+  const[source,setSource]=useState(studies?.length>0?"study":"database");
+
+  if(source==="database"&&databaseImages?.length>0){
+    return(
+      <div style={{padding:12}}>
+        <div style={{display:"flex",gap:6,marginBottom:12}}>
+          <button onClick={()=>setSource("study")} style={{padding:"5px 10px",borderRadius:6,border:`1px solid ${t.bdr}`,background:"transparent",color:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}}>← Study Mode</button>
+          <span style={{fontSize:10,color:t.tx3,alignSelf:"center"}}>Database Mode — {databaseImages.length} images loaded</span>
+        </div>
+        <DatabaseModeStats t={t} databaseImages={databaseImages} currentImageIndex={currentImageIndex} formatAngle={formatAngle}/>
+      </div>
+    );
+  }
+
+  if(source==="database"&&(!databaseImages||databaseImages.length===0)){
+    return(
+      <div style={{padding:12}}>
+        <div style={{display:"flex",gap:6,marginBottom:12}}>
+          <button onClick={()=>setSource("study")} style={{padding:"5px 10px",borderRadius:6,border:`1px solid ${t.bdr}`,background:"transparent",color:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}}>← Study Mode</button>
+        </div>
+        <div style={{color:t.tx3,fontSize:12,textAlign:"center",padding:20}}>Database mode is not active or no images loaded. Switch to Study Mode or enable Database Mode.</div>
+      </div>
+    );
+  }
+
+  return(
+    <div style={{padding:12}}>
+      <div style={{display:"flex",gap:6,marginBottom:12}}>
+        {(databaseMode||databaseImages?.length>0)&&<button onClick={()=>setSource("database")} style={{padding:"5px 10px",borderRadius:6,border:`1px solid ${t.bdr}`,background:"transparent",color:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}}>Database Mode →</button>}
+        <span style={{fontSize:10,color:t.tx3,alignSelf:"center"}}>Study Mode — Reproducibility Statistics</span>
+      </div>
+      <StudyModeStats t={t} studies={studies||[]}/>
+    </div>
+  );
+}
+
+function StudyModeStats({t,studies}){
   const[selectedId,setSelectedId]=useState(null);
   const[metric,setMetric]=useState("x");
   const[pairA,setPairA]=useState(0);
@@ -2339,7 +2334,7 @@ function StatisticsPanel({t,studies}){
   const tabs=[["overview","Overview"],["descriptive","Descriptive"],["errors","Per-Landmark"],["inferential","Inferential"],["norms","Norms"],["export","Export"]];
 
   return(
-    <div style={{padding:12}}>
+    <div>
       <div style={{fontSize:11,color:t.tx2,marginBottom:12,lineHeight:1.45}}>
         Select a study with recorded landmark sessions. Statistics include descriptive, error metrics, normality tests, ANOVA, and clinical norms comparison.
       </div>
@@ -2680,6 +2675,38 @@ function StatisticsPanel({t,studies}){
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function DatabaseModeStats({t,databaseImages,currentImageIndex,formatAngle}){
+  const[view,setView]=useState("tables");
+  const buildDataset=()=>{
+    const dataset=[];
+    databaseImages.forEach((img,idx)=>{
+      const entry={id:`img_${idx}`,measurements:{},formulas:{},group:"default",timepoint:`T${idx+1}`,operator:"default"};
+      const angle3Count={current:0};
+      const angle4Count={current:0};
+      (img.markups||[]).forEach(m=>{
+        const meas=computeMeasurements(m,img.calibration);
+        let label;
+        if(m.type==="angle3"){angle3Count.current++;label=`Angle_${angle3Count.current}`;}
+        else if(m.type==="angle4"){angle4Count.current++;label=`Inc_Angle_${angle4Count.current}`;}
+        else{label=m.label||m.type;}
+        Object.entries(meas).forEach(([k,v])=>{entry.measurements[`${label}_${k}`]=v;});
+      });
+      dataset.push(entry);
+    });
+    return dataset;
+  };
+  return(
+    <div>
+      <div style={{display:"flex",gap:6,marginBottom:16}}>
+        <Btn t={t} small active={view==="tables"} onClick={()=>setView("tables")}>Registered Markups</Btn>
+        <Btn t={t} small active={view==="dashboard"} onClick={()=>setView("dashboard")}>Statistics Dashboard</Btn>
+      </div>
+      {view==="tables"&&<MarkupTablesPanel databaseImages={databaseImages} currentImageIndex={currentImageIndex} t={t} formatAngle={formatAngle}/>}
+      {view==="dashboard"&&<StatsDashboard dataset={buildDataset()} t={t}/>}
     </div>
   );
 }
