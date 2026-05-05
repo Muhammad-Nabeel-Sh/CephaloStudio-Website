@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { SMV_CSV, OPG_CSV, csvToAnalysis, THEMES, TOOLS, PREDEFINED, LUT_PRESETS } from "./constants.js";
-import { uid, clamp, dist, angle3pt, angle4pt, perpDist, polyArea, polyLen, vpts, sampleSpline, splineArea, splineLen, getInfiniteLinePoints, computeMeasurements, catmullRom, perpPoint, snapPoint, snapToLine, alignOnePoint, alignTwoPoints, buildScope, evalFormula, normDeviation, deviationColor, mean, variance, stdev, gammaLn, betaIncomplete, betaCF, tDistributeCDF, tTestPaired, calculateICC, getICCInterpretation, dahlbergError, blandAltman } from "./utils.js";
+import { uid, clamp, dist, angle3pt, angle4pt, perpDist, polyArea, polyLen, vpts, sampleSpline, splineArea, splineLen, getInfiniteLinePoints, computeMeasurements, catmullRom, perpPoint, snapPoint, snapToLine, alignOnePoint, alignTwoPoints, buildScope, evalFormula, normDeviation, deviationColor, mean, variance, stdev, gammaLn, betaIncomplete, betaCF, tDistributeCDF, tTestPaired, calculateICC, getICCInterpretation, dahlbergError, blandAltman, median, iqr, skewness, kurtosis, coefficientOfVariation, standardError, minimalDetectableChange, shapiroWilk, oneWayAnova, spearmanCorrelation, pearsonCorrelation, correlationMatrix, aggregateDahlberg, computePerLandmarkError, detectSystematicBias, anovaAcrossSessions, computeNormsComparison } from "./utils.js";
 import { getLUTColor, applyEdgeKernel, processImageToCanvas, computeHistogram, FloatingHistogram } from "./imageUtils.jsx";
 import { useKatex, KatexSpan, LatexFloatingPanel } from "./hooks.jsx";
 import { Btn, Tag, Sld, PropRow, Inp, Divider, PanelHeader } from "./ui.jsx";
@@ -627,18 +627,24 @@ function extractVariable$1(dataset, variable){
 }
 
 function descriptiveStats$1(values){
+  if(!values.length) return {n:0,mean:null,sd:null,median:null,range:null,cv:null,skew:null};
+  const m = mean$1(values);
+  const s = std$1(values);
   return {
     n: values.length,
-    mean: mean$1(values),
-    sd: std$1(values),
+    mean: m,
+    sd: s,
     median: median$1(values),
-    range: range$1(values)
+    range: range$1(values),
+    cv: m!==0?(s/Math.abs(m))*100:null,
+    skew: values.length>=3?skewness(values):null
   };
 }
 
 function StatsDashboard({ dataset, t }) {
   const [selectedVar, setSelectedVar] = useState("SNA");
   const [groupKey, setGroupKey] = useState("group");
+  const [showCorr, setShowCorr] = useState(false);
 
   const variables = useMemo(()=>{
     if(!dataset.length) return [];
@@ -652,6 +658,35 @@ function StatsDashboard({ dataset, t }) {
   const stats = useMemo(()=> descriptiveStats$1(values), [values]);
   const grouped = useMemo(()=> groupBy$1(dataset, groupKey), [dataset, groupKey]);
 
+  const corrMatrix = useMemo(()=>{
+    if(!showCorr||variables.length<2) return null;
+    const varDatasets = variables.slice(0,12).map(v=>extractVariable$1(dataset,v).filter(x=>x!=null));
+    const validPairs = varDatasets.filter(v=>v.length>=3);
+    if(validPairs.length<2) return null;
+    return correlationMatrix(validPairs);
+  },[dataset,variables,showCorr]);
+
+  const corrVars = useMemo(()=>{
+    if(!showCorr) return [];
+    return variables.slice(0,12).filter(v=>{
+      const vals = extractVariable$1(dataset,v).filter(x=>x!=null);
+      return vals.length>=3;
+    });
+  },[dataset,variables,showCorr]);
+
+  const boxPlotData = useMemo(()=>{
+    return variables.slice(0,8).map(v=>{
+      const vals = extractVariable$1(dataset,v).filter(x=>x!=null);
+      if(vals.length<3) return null;
+      const sorted = [...vals].sort((a,b)=>a-b);
+      const q1 = sorted[Math.floor(sorted.length*0.25)];
+      const q3 = sorted[Math.floor(sorted.length*0.75)];
+      const med = sorted.length%2?sorted[Math.floor(sorted.length/2)]:(sorted[sorted.length/2-1]+sorted[sorted.length/2])/2;
+      const iqrVal = q3-q1;
+      return {var:v,n:vals.length,min:sorted[0],q1,median:med,q3,max:sorted[sorted.length-1],iqr:iqrVal,outliers:vals.filter(x=>x<q1-1.5*iqrVal||x>q3+1.5*iqrVal)};
+    }).filter(Boolean);
+  },[dataset,variables]);
+
   return (
     <div style={{padding:16}}>
       <h3 style={{fontSize:14,fontWeight:700,color:"inherit",marginBottom:12}}>Statistical Dashboard</h3>
@@ -663,11 +698,15 @@ function StatsDashboard({ dataset, t }) {
       </div>
       <div style={{marginBottom:20, padding:10, border:"1px solid "+t.bdr,borderRadius:8}}>
         <strong style={{fontSize:11,color:t.tx}}>Descriptive Statistics</strong>
-        <div style={{fontSize:11,marginTop:6}}>N = {stats.n}</div>
-        <div style={{fontSize:11}}>Mean = {stats.mean?.toFixed(2)}</div>
-        <div style={{fontSize:11}}>SD = {stats.sd?.toFixed(2)}</div>
-        <div style={{fontSize:11}}>Median = {stats.median?.toFixed(2)}</div>
-        <div style={{fontSize:11}}>Range = {stats.range ? `${stats.range.min} – ${stats.range.max}` : "-"}</div>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,fontSize:11,marginTop:6}}>
+          <span style={{color:t.tx2}}>N</span><span>{stats.n}</span>
+          <span style={{color:t.tx2}}>Mean</span><span>{stats.mean?.toFixed(2)}</span>
+          <span style={{color:t.tx2}}>SD</span><span>{stats.sd?.toFixed(2)}</span>
+          <span style={{color:t.tx2}}>Median</span><span>{stats.median?.toFixed(2)}</span>
+          <span style={{color:t.tx2}}>Range</span><span>{stats.range ? `${stats.range.min} – ${stats.range.max}` : "-"}</span>
+          {stats.cv!=null&&<><span style={{color:t.tx2}}>CV%</span><span>{stats.cv.toFixed(2)}%</span></>}
+          {stats.skew!=null&&<><span style={{color:t.tx2}}>Skewness</span><span>{stats.skew.toFixed(3)}</span></>}
+        </div>
       </div>
       <div style={{marginBottom:20}}>
         <label style={{fontSize:11,color:t.tx2,marginRight:8}}>Group by: </label>
@@ -682,20 +721,88 @@ function StatsDashboard({ dataset, t }) {
           return (
             <div key={g} style={{marginTop:8, padding:8, border:"1px solid "+t.bdr,borderRadius:6}}>
               <strong style={{fontSize:11,color:t.tx}}>{g}</strong>
-              <div style={{fontSize:10}}>Mean: {s.mean?.toFixed(2)}</div>
-              <div style={{fontSize:10}}>SD: {s.sd?.toFixed(2)}</div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,fontSize:10,marginTop:4}}>
+                <span style={{color:t.tx2}}>Mean</span><span>{s.mean?.toFixed(2)}</span>
+                <span style={{color:t.tx2}}>SD</span><span>{s.sd?.toFixed(2)}</span>
+                <span style={{color:t.tx2}}>N</span><span>{s.n}</span>
+              </div>
             </div>
           );
         })}
       </div>
+      {boxPlotData.length>1&&(
+        <div style={{marginBottom:20,padding:10,border:"1px solid "+t.bdr,borderRadius:8}}>
+          <strong style={{fontSize:11,color:t.tx}}>Distribution Summary (Box Plot Data)</strong>
+          <div style={{overflowX:"auto",marginTop:8}}>
+            <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
+              <thead>
+                <tr style={{borderBottom:`1px solid ${t.bdr}`}}>
+                  <th style={{textAlign:"left",padding:4,color:t.tx2}}>Variable</th>
+                  <th style={{textAlign:"right",padding:4,color:t.tx2}}>N</th>
+                  <th style={{textAlign:"right",padding:4,color:t.tx2}}>Min</th>
+                  <th style={{textAlign:"right",padding:4,color:t.tx2}}>Q1</th>
+                  <th style={{textAlign:"right",padding:4,color:t.tx2}}>Median</th>
+                  <th style={{textAlign:"right",padding:4,color:t.tx2}}>Q3</th>
+                  <th style={{textAlign:"right",padding:4,color:t.tx2}}>Max</th>
+                  <th style={{textAlign:"right",padding:4,color:t.tx2}}>IQR</th>
+                  <th style={{textAlign:"right",padding:4,color:t.tx2}}>Outliers</th>
+                </tr>
+              </thead>
+              <tbody>
+                {boxPlotData.map(bp=>(
+                  <tr key={bp.var} style={{borderBottom:`1px solid ${t.bdr}44`}}>
+                    <td style={{padding:4,color:t.tx,fontWeight:600}}>{bp.var}</td>
+                    <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{bp.n}</td>
+                    <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{bp.min.toFixed(2)}</td>
+                    <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{bp.q1.toFixed(2)}</td>
+                    <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:t.acc}}>{bp.median.toFixed(2)}</td>
+                    <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{bp.q3.toFixed(2)}</td>
+                    <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{bp.max.toFixed(2)}</td>
+                    <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{bp.iqr.toFixed(2)}</td>
+                    <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:bp.outliers.length>0?t.warn:t.ok}}>{bp.outliers.length}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
       <div style={{marginBottom:20}}>
-        <strong style={{fontSize:11,color:t.tx}}>Correlation (Quick)</strong>
+        <button onClick={()=>setShowCorr(!showCorr)} style={{width:"100%",padding:"8px",borderRadius:6,border:`1px solid ${t.bdr}`,background:showCorr?t.acc+"18":t.surf2,color:t.tx,cursor:"pointer",fontSize:12,textAlign:"center"}}>{showCorr?"Hide":"Show"} Correlation Matrix</button>
+        {showCorr&&corrMatrix&&corrVars.length>=2&&(
+          <div style={{marginTop:10,overflowX:"auto"}}>
+            <table style={{width:"100%",fontSize:8,borderCollapse:"collapse"}}>
+              <thead>
+                <tr><th style={{padding:3,color:t.tx2}}></th>{corrVars.map(v=><th key={v} style={{padding:3,color:t.acc,fontFamily:"'DM Mono',monospace",writingMode:"vertical-lr",textAlign:"left"}}>{v}</th>)}</tr>
+              </thead>
+              <tbody>
+                {corrMatrix.map((row,i)=>(
+                  <tr key={i}><td style={{padding:3,color:t.tx,fontWeight:600}}>{corrVars[i]}</td>{row.map((v,j)=>{
+                    const abs=v!=null?Math.abs(v):0;
+                    let bg="transparent";
+                    let clr=t.tx3;
+                    if(v!=null){
+                      if(v>0){clr=t.acc;bg=`rgba(59,130,246,${(abs*0.3).toFixed(2)})`;}
+                      else{clr=t.err;bg=`rgba(239,68,68,${(abs*0.3).toFixed(2)})`;}
+                    }
+                    return <td key={j} style={{padding:3,textAlign:"center",fontFamily:"'DM Mono',monospace",background:bg,color:clr}}>{v!=null?v.toFixed(2):"-"}</td>;
+                  })}</tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+      <div style={{marginBottom:20}}>
+        <strong style={{fontSize:11,color:t.tx}}>Quick Correlations</strong>
         {variables.slice(0,5).map(v=>{
           const arr = extractVariable$1(dataset, v);
           const r = correlation$1(values, arr);
+          const rs = spearmanCorrelation(values.filter((_,i)=>arr[i]!=null).map((val,i)=>{const a=arr.filter(x=>x!=null);return a[i];}),arr.filter(x=>x!=null));
           return (
-            <div key={v} style={{fontSize:10,color:t.tx2}}>
-              {selectedVar} vs {v}: {r ? r.toFixed(2) : "-"}
+            <div key={v} style={{fontSize:10,color:t.tx2,display:"flex",justifyContent:"space-between"}}>
+              <span>{selectedVar} vs {v}</span>
+              <span>r={r?r.toFixed(2):"-"} | ρ={rs!=null?rs.toFixed(2):"-"}</span>
             </div>
           );
         })}
@@ -2106,11 +2213,82 @@ function exportReproTablesCsv(study){
   a.click();
 }
 
+function exportDescriptiveCsv(study,metric,descriptive){
+  const rows=[["Landmark","n","Mean","SD","Median","CV%","Min","Max","Skewness","Kurtosis","Shapiro_W","Shapiro_p","Normal"]];
+  descriptive.forEach(r=>{
+    rows.push([r.lab,r.n,r.mean!==null?r.mean.toFixed(4):"",r.sd!==null?r.sd.toFixed(4):"",r.median!==null?r.median.toFixed(4):"",r.cv!==null?r.cv.toFixed(4):"",r.min!==null?r.min.toFixed(4):"",r.max!==null?r.max.toFixed(4):"",r.skew!==null?r.skew.toFixed(4):"",r.kurt!==null?r.kurt.toFixed(4):"",r.shapiro?r.shapiro.W.toFixed(4):"",r.shapiro?r.shapiro.pValue.toFixed(4):"",r.shapiro?String(r.shapiro.normal):""]);
+  });
+  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+  a.download=`${String(study.name).replace(/\s+/g,"_")}_descriptive.csv`;a.click();
+}
+
+function exportErrorMetricsCsv(perLandmark){
+  const rows=[["Landmark","n","Mean_Diff","SD_Diff","Dahlberg","Abs_Mean","CV%"]];
+  perLandmark.forEach(r=>{rows.push([r.lab,r.n,r.meanDiff.toFixed(4),r.sdDiff.toFixed(4),r.dahlberg.toFixed(4),r.absMean.toFixed(4),r.cv!==null?r.cv.toFixed(4):""]);});
+  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+  a.download="error_metrics.csv";a.click();
+}
+
+function exportFullStatsReport(study,metric,labels,descriptive,perLandmark,biases,icc,dahl,bland,tTest,anovaRes,sem,mdc){
+  const rows=[];
+  rows.push(["CephaloStudio Statistical Report"]);
+  rows.push(["Study",study.name]);
+  rows.push(["Design",study.type==="intra"?"Intra-operator":"Inter-operator"]);
+  rows.push(["Metric",metric.toUpperCase()]);
+  rows.push(["Date",new Date().toISOString()]);
+  rows.push([]);
+  rows.push(["=== DESCRIPTIVE STATISTICS ==="]);
+  rows.push(["Landmark","n","Mean","SD","Median","CV%","Min","Max"]);
+  descriptive.forEach(r=>{rows.push([r.lab,r.n,r.mean?.toFixed(4),r.sd?.toFixed(4),r.median?.toFixed(4),r.cv?.toFixed(4),r.min?.toFixed(4),r.max?.toFixed(4)]);});
+  rows.push([]);
+  rows.push(["=== RELIABILITY ==="]);
+  rows.push(["ICC (Absolute)",icc?.ICC_Absolute?.toFixed(4)]);
+  rows.push(["ICC (Consistency)",icc?.ICC_Consistency?.toFixed(4)]);
+  rows.push(["Interpretation",icc?.interpretation]);
+  rows.push(["SEM",sem?.toFixed(4)]);
+  rows.push(["MDC (95%)",mdc?.toFixed(4)]);
+  rows.push([]);
+  rows.push(["=== ERROR METRICS ==="]);
+  rows.push(["Dahlberg Error",dahl?.error?.toFixed(4)]);
+  rows.push(["Bland-Altman Mean Diff",bland?.meanDiff?.toFixed(4)]);
+  rows.push(["Bland-Altman SD",bland?.stdDiff?.toFixed(4)]);
+  rows.push(["Bland-Altman Lower LoA",bland?.lowerLOA?.toFixed(4)]);
+  rows.push(["Bland-Altman Upper LoA",bland?.upperLOA?.toFixed(4)]);
+  rows.push([]);
+  rows.push(["=== PAIRED T-TEST ==="]);
+  rows.push(["t",tTest?.t?.toFixed(4)]);
+  rows.push(["df",tTest?.df]);
+  rows.push(["p-value",tTest?.pValue?.toFixed(6)]);
+  rows.push(["Significant",tTest?.significant?"Yes":"No"]);
+  rows.push([]);
+  rows.push(["=== ANOVA ==="]);
+  rows.push(["F",anovaRes?.F?.toFixed(4)]);
+  rows.push(["p-value",anovaRes?.pValue?.toFixed(6)]);
+  rows.push(["Significant",anovaRes?.significant?"Yes":"No"]);
+  rows.push([]);
+  rows.push(["=== PER-LANDMARK ERRORS ==="]);
+  rows.push(["Landmark","n","Mean Diff","SD Diff","Dahlberg","Abs Mean","CV%"]);
+  perLandmark.forEach(r=>{rows.push([r.lab,r.n,r.meanDiff.toFixed(4),r.sdDiff.toFixed(4),r.dahlberg.toFixed(4),r.absMean.toFixed(4),r.cv?.toFixed(4)]);});
+  rows.push([]);
+  rows.push(["=== SYSTEMATIC BIAS ==="]);
+  rows.push(["Comparison","t","p-value","Significant"]);
+  biases.forEach(b=>{rows.push([b.pair,b.t.toFixed(4),b.pValue.toFixed(6),b.significant?"Yes":"No"]);});
+  const csv=rows.map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(",")).join("\n");
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+  a.download=`${String(study.name).replace(/\s+/g,"_")}_full_report.csv`;a.click();
+}
+
 function StatisticsPanel({t,studies}){
   const[selectedId,setSelectedId]=useState(null);
   const[metric,setMetric]=useState("x");
   const[pairA,setPairA]=useState(0);
   const[pairB,setPairB]=useState(1);
+  const[tab,setTab]=useState("overview");
 
   const study=studies.find(s=>s.id===selectedId);
   const labels=reproAllLabels(study||{operators:[]});
@@ -2125,6 +2303,9 @@ function StatisticsPanel({t,studies}){
   const dahl=vals1.length>=2&&vals1.length===vals2.length?dahlbergError(vals1,vals2):null;
   const bland=vals1.length>=2&&vals1.length===vals2.length?blandAltman(vals1,vals2):null;
   const tTest=vals1.length>=2&&vals1.length===vals2.length?tTestPaired(vals1,vals2):null;
+  const shapiro=vals1.length>=3?shapiroWilk(vals1):null;
+  const shapiro2=vals2.length>=3?shapiroWilk(vals2):null;
+  const spearman=spearmanCorrelation(vals1,vals2);
 
   const descriptive=!study||!labels.length?[]:labels.map(lab=>{
     const vals=[];
@@ -2139,15 +2320,28 @@ function StatisticsPanel({t,studies}){
         if(m)vals.push(metric==="x"?m.x:m.y);
       });
     }
-    if(!vals.length)return{lab,n:0,mean:null,sd:null,min:null,max:null};
-    const m0=mean(vals),s=stdev(vals,m0);
-    return{lab,n:vals.length,mean:m0,sd:s,min:Math.min(...vals),max:Math.max(...vals)};
+    if(!vals.length)return{lab,n:0,mean:null,sd:null,min:null,max:null,median:null,iqrVal:null,skew:null,kurt:null,cv:null};
+    const m0=mean(vals),s=stdev(vals,m0),md=median(vals),iq=iqr(vals);
+    const cv=coefficientOfVariation(vals);
+    const sk=vals.length>=3?skewness(vals):null;
+    const kt=vals.length>=4?kurtosis(vals):null;
+    const sw=vals.length>=3?shapiroWilk(vals):null;
+    return{lab,n:vals.length,mean:m0,sd:s,min:Math.min(...vals),max:Math.max(...vals),median:md,iqrVal:iq.iqr,skew:sk,kurt:kt,cv,shapiro:sw};
   });
+
+  const perLandmark=study?computePerLandmarkError(study,metric,labels):[];
+  const biases=study?detectSystematicBias(study,metric,labels):[];
+  const anovaRes=study?anovaAcrossSessions(study,metric,labels):null;
+  const sem=icc?standardError(vals1,icc.ICC_Absolute):null;
+  const mdc=sem?minimalDetectableChange(sem):null;
+  const normsComp=computeNormsComparison(descriptive,study?.norms||[],{pxPerMm:1});
+
+  const tabs=[["overview","Overview"],["descriptive","Descriptive"],["errors","Per-Landmark"],["inferential","Inferential"],["norms","Norms"],["export","Export"]];
 
   return(
     <div style={{padding:12}}>
       <div style={{fontSize:11,color:t.tx2,marginBottom:12,lineHeight:1.45}}>
-        Select a study with recorded landmark sessions. Descriptive statistics use all sessions for the chosen <strong>X</strong> or <strong>Y</strong> coordinate. ICC uses every session as a rater column; Dahlberg, Bland–Altman, and the paired t-test compare the two sessions you pick below (defaults: trial 1 vs 2, or operator 1 vs 2).
+        Select a study with recorded landmark sessions. Statistics include descriptive, error metrics, normality tests, ANOVA, and clinical norms comparison.
       </div>
       {studies.length===0&&<div style={{color:t.tx3,fontSize:12,textAlign:"center",padding:20}}>No studies yet. Create and complete a study in Reproducibility first.</div>}
       {studies.length>0&&(
@@ -2161,128 +2355,327 @@ function StatisticsPanel({t,studies}){
           </div>
           {study&&(
             <>
-              <div style={{marginBottom:12,padding:10,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
-                <div style={{fontSize:10,fontWeight:700,color:t.tx,marginBottom:6}}>Overview</div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,fontSize:10}}>
-                  <span style={{color:t.tx2}}>Design</span><span>{study.type==="intra"?"Intra-operator":"Inter-operator"}</span>
-                  <span style={{color:t.tx2}}>Status</span><span style={{color:study.status==="completed"?t.ok:t.warn}}>{study.status||"—"}</span>
-                  <span style={{color:t.tx2}}>Landmarks</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc}}>{labels.length}</span>
-                </div>
-                <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}>
-                  <Btn t={t} small onClick={()=>exportReproTablesCsv(study)}>⬇ Download tables (.csv)</Btn>
-                </div>
+              <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
+                <button type="button" onClick={()=>setMetric("x")} style={{padding:"4px 10px",border:`1px solid ${metric==="x"?t.acc:t.bdr}`,borderRadius:6,background:metric==="x"?t.accMuted:t.surf3,color:metric==="x"?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}}>X (px)</button>
+                <button type="button" onClick={()=>setMetric("y")} style={{padding:"4px 10px",border:`1px solid ${metric==="y"?t.acc:t.bdr}`,borderRadius:6,background:metric==="y"?t.accMuted:t.surf3,color:metric==="y"?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}}>Y (px)</button>
               </div>
-              <div style={{marginBottom:12}}>
-                <div style={{fontSize:10,color:t.tx2,marginBottom:4}}>Coordinate for analysis</div>
-                <div style={{display:"flex",gap:6}}>
-                  <button type="button" onClick={()=>setMetric("x")} style={{flex:1,padding:"6px",border:`1px solid ${metric==="x"?t.acc:t.bdr}`,borderRadius:6,background:metric==="x"?t.accMuted:t.surf3,color:metric==="x"?t.acc:t.tx2,cursor:"pointer",fontSize:11}}>X (px)</button>
-                  <button type="button" onClick={()=>setMetric("y")} style={{flex:1,padding:"6px",border:`1px solid ${metric==="y"?t.acc:t.bdr}`,borderRadius:6,background:metric==="y"?t.accMuted:t.surf3,color:metric==="y"?t.acc:t.tx2,cursor:"pointer",fontSize:11}}>Y (px)</button>
-                </div>
+              <div style={{display:"flex",gap:4,marginBottom:12,overflowX:"auto",paddingBottom:4}}>
+                {tabs.map(([id,label])=>(
+                  <button key={id} onClick={()=>setTab(id)} style={{padding:"5px 10px",borderRadius:6,border:`1px solid ${tab===id?t.acc:t.bdr}`,background:tab===id?t.acc+"18":"transparent",color:tab===id?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{label}</button>
+                ))}
               </div>
-              <div style={{marginBottom:12}}>
-                <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:6}}>Descriptive statistics ({metric.toUpperCase()}, px)</div>
-                <div style={{overflowX:"auto"}}>
-                  <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
-                    <thead>
-                      <tr style={{borderBottom:`1px solid ${t.bdr}`}}>
-                        <th style={{textAlign:"left",padding:4,color:t.tx2}}>Landmark</th>
-                        <th style={{textAlign:"right",padding:4,color:t.tx2}}>n</th>
-                        <th style={{textAlign:"right",padding:4,color:t.tx2}}>Mean</th>
-                        <th style={{textAlign:"right",padding:4,color:t.tx2}}>SD</th>
-                        <th style={{textAlign:"right",padding:4,color:t.tx2}}>Min</th>
-                        <th style={{textAlign:"right",padding:4,color:t.tx2}}>Max</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {descriptive.map(row=>(
-                        <tr key={row.lab} style={{borderBottom:`1px solid ${t.bdr}44`}}>
-                          <td style={{padding:4,color:t.tx,fontWeight:600}}>{row.lab}</td>
-                          <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.n}</td>
-                          <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:t.acc}}>{row.mean!==null?row.mean.toFixed(3):"—"}</td>
-                          <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.sd!==null?row.sd.toFixed(3):"—"}</td>
-                          <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.min!==null?row.min.toFixed(2):"—"}</td>
-                          <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.max!==null?row.max.toFixed(2):"—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              <div style={{marginBottom:12}}>
-                <div style={{fontSize:10,color:t.tx2,marginBottom:4}}>Pairwise comparison (Dahlberg, Bland–Altman, paired t)</div>
-                {study.type==="intra"&&(
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                    <div>
-                      <div style={{fontSize:9,color:t.tx3,marginBottom:2}}>Trial A</div>
-                      <select value={pa} onChange={e=>setPairA(+e.target.value)} style={{width:"100%",padding:"6px 8px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
-                        {(study.operators[0]?.trials||[]).map((tr,i)=>(<option key={i} value={i}>Trial {i+1}</option>))}
-                      </select>
-                    </div>
-                    <div>
-                      <div style={{fontSize:9,color:t.tx3,marginBottom:2}}>Trial B</div>
-                      <select value={pb} onChange={e=>setPairB(+e.target.value)} style={{width:"100%",padding:"6px 8px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
-                        {(study.operators[0]?.trials||[]).map((tr,i)=>(<option key={i} value={i}>Trial {i+1}</option>))}
-                      </select>
-                    </div>
-                  </div>
-                )}
-                {study.type==="inter"&&(
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                    <div>
-                      <div style={{fontSize:9,color:t.tx3,marginBottom:2}}>Operator A</div>
-                      <select value={pa} onChange={e=>setPairA(+e.target.value)} style={{width:"100%",padding:"6px 8px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
-                        {study.operators.map((op,i)=>(<option key={op.id} value={i}>{op.name||`Operator ${i+1}`}</option>))}
-                      </select>
-                    </div>
-                    <div>
-                      <div style={{fontSize:9,color:t.tx3,marginBottom:2}}>Operator B</div>
-                      <select value={pb} onChange={e=>setPairB(+e.target.value)} style={{width:"100%",padding:"6px 8px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
-                        {study.operators.map((op,i)=>(<option key={op.id} value={i}>{op.name||`Operator ${i+1}`}</option>))}
-                      </select>
-                    </div>
-                  </div>
-                )}
-                <div style={{fontSize:9,color:t.tx3,marginTop:6}}>Paired rows: {vals1.length} landmarks with both values</div>
-              </div>
-              <div style={{border:`1px solid ${t.bdr}`,borderRadius:8,background:t.surf2,padding:12}}>
-                <div style={{fontSize:11,fontWeight:700,color:t.acc,marginBottom:10}}>Inferential tests</div>
-                <div style={{marginBottom:12}}>
-                  <div style={{fontSize:10,fontWeight:700,color:t.tx2,marginBottom:6}}>Intraclass correlation (ICC)</div>
-                  {icc?(
-                    <div style={{fontSize:11}}>
-                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>ICC (absolute agreement)</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700}}>{icc.ICC_Absolute?.toFixed(4)??"—"}</span></div>
-                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>ICC (consistency)</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700}}>{icc.ICC_Consistency?.toFixed(4)??"—"}</span></div>
-                      <div style={{padding:"6px 8px",borderRadius:4,background:t.accMuted,color:t.acc,fontWeight:600,textAlign:"center",fontSize:10}}>{icc.interpretation}</div>
-                    </div>
-                  ):<div style={{color:t.tx3,fontSize:11}}>Need at least two complete sessions and matching landmarks on every session for ICC.</div>}
-                </div>
-                <div style={{marginBottom:12}}>
-                  <div style={{fontSize:10,fontWeight:700,color:t.tx2,marginBottom:6}}>Dahlberg error</div>
-                  {dahl?<div style={{display:"flex",justifyContent:"space-between",fontSize:11}}><span>Random error (paired)</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700}}>{dahl.error.toFixed(4)} px</span></div>:<div style={{color:t.tx3,fontSize:11}}>Need two sessions with the same landmarks.</div>}
-                </div>
-                <div style={{marginBottom:12}}>
-                  <div style={{fontSize:10,fontWeight:700,color:t.tx2,marginBottom:6}}>Paired t-test</div>
-                  {tTest?(
-                    <div style={{fontSize:11}}>
-                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>t</span><span style={{fontFamily:"'DM Mono',monospace",color:t.tx}}>{tTest.t.toFixed(4)}</span></div>
-                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>df</span><span style={{fontFamily:"'DM Mono',monospace",color:t.tx}}>{tTest.df}</span></div>
-                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>p-value</span><span style={{fontFamily:"'DM Mono',monospace",color:tTest.significant?t.err:t.ok,fontWeight:700}}>{tTest.pValue.toFixed(6)}</span></div>
-                      <div style={{padding:"6px 8px",borderRadius:4,background:tTest.significant?t.err+"22":t.ok+"22",color:tTest.significant?t.err:t.ok,fontWeight:600,textAlign:"center"}}>{tTest.significant?"Significant (p < 0.05)":"Not significant"}</div>
-                    </div>
-                  ):<div style={{color:t.tx3,fontSize:11}}>Cannot compute (need paired observations).</div>}
-                </div>
+
+              {tab==="overview"&&(
                 <div>
-                  <div style={{fontSize:10,fontWeight:700,color:t.tx2,marginBottom:6}}>Bland–Altman</div>
-                  {bland?(
-                    <div style={{fontSize:11}}>
-                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>Mean difference</span><span style={{fontFamily:"'DM Mono',monospace",color:t.tx}}>{bland.meanDiff.toFixed(4)}</span></div>
-                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>SD of differences</span><span style={{fontFamily:"'DM Mono',monospace",color:t.tx}}>{bland.stdDiff.toFixed(4)}</span></div>
-                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>Lower LoA</span><span style={{fontFamily:"'DM Mono',monospace",color:t.warn}}>{bland.lowerLOA.toFixed(4)}</span></div>
-                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>Upper LoA</span><span style={{fontFamily:"'DM Mono',monospace",color:t.warn}}>{bland.upperLOA.toFixed(4)}</span></div>
+                  <div style={{marginBottom:12,padding:10,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
+                    <div style={{fontSize:10,fontWeight:700,color:t.tx,marginBottom:6}}>Overview</div>
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,fontSize:10}}>
+                      <span style={{color:t.tx2}}>Design</span><span>{study.type==="intra"?"Intra-operator":"Inter-operator"}</span>
+                      <span style={{color:t.tx2}}>Status</span><span style={{color:study.status==="completed"?t.ok:t.warn}}>{study.status||"—"}</span>
+                      <span style={{color:t.tx2}}>Landmarks</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc}}>{labels.length}</span>
+                      <span style={{color:t.tx2}}>Sessions</span><span style={{fontFamily:"'DM Mono',monospace"}}>{study.type==="intra"?(study.operators[0]?.trials||[]).length:study.operators.length}</span>
                     </div>
-                  ):<div style={{color:t.tx3,fontSize:11}}>Cannot compute.</div>}
+                    <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}>
+                      <Btn t={t} small onClick={()=>exportReproTablesCsv(study)}>⬇ Download tables (.csv)</Btn>
+                      <Btn t={t} small onClick={()=>exportFullStatsReport(study,metric,labels,descriptive,perLandmark,biases,icc,dahl,bland,tTest,anovaRes,sem,mdc)}>⬇ Full report</Btn>
+                    </div>
+                  </div>
+                  {icc&&(
+                    <div style={{marginBottom:12,padding:10,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
+                      <div style={{fontSize:10,fontWeight:700,color:t.tx,marginBottom:6}}>Reliability Summary</div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,fontSize:10}}>
+                        <span style={{color:t.tx2}}>ICC (absolute)</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700}}>{icc.ICC_Absolute?.toFixed(4)}</span>
+                        <span style={{color:t.tx2}}>Interpretation</span><span style={{color:icc.ICC_Absolute>=0.9?t.ok:icc.ICC_Absolute>=0.75?t.warn:t.err,fontWeight:600}}>{icc.interpretation}</span>
+                        {sem!==null&&<><span style={{color:t.tx2}}>SEM</span><span style={{fontFamily:"'DM Mono',monospace"}}>{sem.toFixed(4)} px</span></>}
+                        {mdc!==null&&<><span style={{color:t.tx2}}>MDC (95%)</span><span style={{fontFamily:"'DM Mono',monospace"}}>{mdc.toFixed(4)} px</span></>}
+                      </div>
+                    </div>
+                  )}
+                  {anovaRes&&(
+                    <div style={{marginBottom:12,padding:10,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
+                      <div style={{fontSize:10,fontWeight:700,color:t.tx,marginBottom:6}}>ANOVA (across sessions)</div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,fontSize:10}}>
+                        <span style={{color:t.tx2}}>F</span><span style={{fontFamily:"'DM Mono',monospace"}}>{anovaRes.F.toFixed(4)}</span>
+                        <span style={{color:t.tx2}}>p-value</span><span style={{fontFamily:"'DM Mono',monospace",color:anovaRes.significant?t.err:t.ok,fontWeight:700}}>{anovaRes.pValue.toFixed(6)}</span>
+                        <span style={{color:t.tx2}}>Result</span><span style={{color:anovaRes.significant?t.err:t.ok,fontWeight:600}}>{anovaRes.significant?"Significant bias":"No significant bias"}</span>
+                      </div>
+                    </div>
+                  )}
+                  {dahl&&(
+                    <div style={{padding:10,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
+                      <div style={{fontSize:10,fontWeight:700,color:t.tx,marginBottom:6}}>Aggregate Error</div>
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,fontSize:10}}>
+                        <span style={{color:t.tx2}}>Dahlberg</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700}}>{dahl.error.toFixed(4)} px</span>
+                        <span style={{color:t.tx2}}>Paired landmarks</span><span style={{fontFamily:"'DM Mono',monospace"}}>{vals1.length}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
+              )}
+
+              {tab==="descriptive"&&(
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:6}}>Descriptive Statistics ({metric.toUpperCase()}, px)</div>
+                  <div style={{overflowX:"auto",marginBottom:12}}>
+                    <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
+                      <thead>
+                        <tr style={{borderBottom:`1px solid ${t.bdr}`}}>
+                          <th style={{textAlign:"left",padding:4,color:t.tx2}}>Landmark</th>
+                          <th style={{textAlign:"right",padding:4,color:t.tx2}}>n</th>
+                          <th style={{textAlign:"right",padding:4,color:t.tx2}}>Mean</th>
+                          <th style={{textAlign:"right",padding:4,color:t.tx2}}>SD</th>
+                          <th style={{textAlign:"right",padding:4,color:t.tx2}}>Median</th>
+                          <th style={{textAlign:"right",padding:4,color:t.tx2}}>CV%</th>
+                          <th style={{textAlign:"right",padding:4,color:t.tx2}}>Min</th>
+                          <th style={{textAlign:"right",padding:4,color:t.tx2}}>Max</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {descriptive.map(row=>(
+                          <tr key={row.lab} style={{borderBottom:`1px solid ${t.bdr}44`}}>
+                            <td style={{padding:4,color:t.tx,fontWeight:600}}>{row.lab}</td>
+                            <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.n}</td>
+                            <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:t.acc}}>{row.mean!==null?row.mean.toFixed(3):"—"}</td>
+                            <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.sd!==null?row.sd.toFixed(3):"—"}</td>
+                            <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.median!==null?row.median.toFixed(3):"—"}</td>
+                            <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.cv!==null?row.cv.toFixed(2):"—"}</td>
+                            <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.min!==null?row.min.toFixed(2):"—"}</td>
+                            <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.max!==null?row.max.toFixed(2):"—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:6}}>Normality (Shapiro–Wilk)</div>
+                  <div style={{overflowX:"auto"}}>
+                    <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
+                      <thead>
+                        <tr style={{borderBottom:`1px solid ${t.bdr}`}}>
+                          <th style={{textAlign:"left",padding:4,color:t.tx2}}>Landmark</th>
+                          <th style={{textAlign:"right",padding:4,color:t.tx2}}>W</th>
+                          <th style={{textAlign:"right",padding:4,color:t.tx2}}>p-value</th>
+                          <th style={{textAlign:"right",padding:4,color:t.tx2}}>Normal?</th>
+                          <th style={{textAlign:"right",padding:4,color:t.tx2}}>Skew</th>
+                          <th style={{textAlign:"right",padding:4,color:t.tx2}}>Kurtosis</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {descriptive.filter(r=>r.shapiro).map(row=>(
+                          <tr key={row.lab} style={{borderBottom:`1px solid ${t.bdr}44`}}>
+                            <td style={{padding:4,color:t.tx,fontWeight:600}}>{row.lab}</td>
+                            <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.shapiro.W.toFixed(4)}</td>
+                            <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.shapiro.pValue.toFixed(4)}</td>
+                            <td style={{padding:4,textAlign:"right",color:row.shapiro.normal?t.ok:t.err,fontWeight:600}}>{row.shapiro.normal?"Yes":"No"}</td>
+                            <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.skew!==null?row.skew.toFixed(3):"—"}</td>
+                            <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.kurt!==null?row.kurt.toFixed(3):"—"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {tab==="errors"&&(
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:6}}>Per-Landmark Error Metrics</div>
+                  {perLandmark.length===0?<div style={{color:t.tx3,fontSize:11,textAlign:"center",padding:12}}>Need at least two sessions for per-landmark errors.</div>:(
+                    <div style={{overflowX:"auto",marginBottom:12}}>
+                      <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
+                        <thead>
+                          <tr style={{borderBottom:`1px solid ${t.bdr}`}}>
+                            <th style={{textAlign:"left",padding:4,color:t.tx2}}>Landmark</th>
+                            <th style={{textAlign:"right",padding:4,color:t.tx2}}>n</th>
+                            <th style={{textAlign:"right",padding:4,color:t.tx2}}>Mean Diff</th>
+                            <th style={{textAlign:"right",padding:4,color:t.tx2}}>SD Diff</th>
+                            <th style={{textAlign:"right",padding:4,color:t.tx2}}>Dahlberg</th>
+                            <th style={{textAlign:"right",padding:4,color:t.tx2}}>Abs Mean</th>
+                            <th style={{textAlign:"right",padding:4,color:t.tx2}}>CV%</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {perLandmark.map(row=>(
+                            <tr key={row.lab} style={{borderBottom:`1px solid ${t.bdr}44`}}>
+                              <td style={{padding:4,color:t.tx,fontWeight:600}}>{row.lab}</td>
+                              <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.n}</td>
+                              <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.meanDiff.toFixed(4)}</td>
+                              <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.sdDiff.toFixed(4)}</td>
+                              <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:600}}>{row.dahlberg.toFixed(4)}</td>
+                              <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.absMean.toFixed(4)}</td>
+                              <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.cv!==null?row.cv.toFixed(2):"—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:6}}>Systematic Bias Detection</div>
+                  {biases.length===0?<div style={{color:t.tx3,fontSize:11,textAlign:"center",padding:12}}>Insufficient data for bias detection.</div>:(
+                    <div style={{overflowX:"auto"}}>
+                      <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
+                        <thead>
+                          <tr style={{borderBottom:`1px solid ${t.bdr}`}}>
+                            <th style={{textAlign:"left",padding:4,color:t.tx2}}>Comparison</th>
+                            <th style={{textAlign:"right",padding:4,color:t.tx2}}>t</th>
+                            <th style={{textAlign:"right",padding:4,color:t.tx2}}>p-value</th>
+                            <th style={{textAlign:"right",padding:4,color:t.tx2}}>Significant?</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {biases.map((b,i)=>(
+                            <tr key={i} style={{borderBottom:`1px solid ${t.bdr}44`}}>
+                              <td style={{padding:4,color:t.tx,fontWeight:600}}>{b.pair}</td>
+                              <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{b.t.toFixed(4)}</td>
+                              <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:b.significant?t.err:t.ok}}>{b.pValue.toFixed(6)}</td>
+                              <td style={{padding:4,textAlign:"right",color:b.significant?t.err:t.ok,fontWeight:600}}>{b.significant?"Yes (bias)":"No"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {tab==="inferential"&&(
+                <div>
+                  <div style={{marginBottom:12}}>
+                    <div style={{fontSize:10,color:t.tx2,marginBottom:4}}>Pairwise comparison</div>
+                    {study.type==="intra"&&(
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                        <div>
+                          <div style={{fontSize:9,color:t.tx3,marginBottom:2}}>Trial A</div>
+                          <select value={pa} onChange={e=>setPairA(+e.target.value)} style={{width:"100%",padding:"6px 8px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
+                            {(study.operators[0]?.trials||[]).map((tr,i)=>(<option key={i} value={i}>Trial {i+1}</option>))}
+                          </select>
+                        </div>
+                        <div>
+                          <div style={{fontSize:9,color:t.tx3,marginBottom:2}}>Trial B</div>
+                          <select value={pb} onChange={e=>setPairB(+e.target.value)} style={{width:"100%",padding:"6px 8px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
+                            {(study.operators[0]?.trials||[]).map((tr,i)=>(<option key={i} value={i}>Trial {i+1}</option>))}
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                    {study.type==="inter"&&(
+                      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                        <div>
+                          <div style={{fontSize:9,color:t.tx3,marginBottom:2}}>Operator A</div>
+                          <select value={pa} onChange={e=>setPairA(+e.target.value)} style={{width:"100%",padding:"6px 8px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
+                            {study.operators.map((op,i)=>(<option key={op.id} value={i}>{op.name||`Operator ${i+1}`}</option>))}
+                          </select>
+                        </div>
+                        <div>
+                          <div style={{fontSize:9,color:t.tx3,marginBottom:2}}>Operator B</div>
+                          <select value={pb} onChange={e=>setPairB(+e.target.value)} style={{width:"100%",padding:"6px 8px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
+                            {study.operators.map((op,i)=>(<option key={op.id} value={i}>{op.name||`Operator ${i+1}`}</option>))}
+                          </select>
+                        </div>
+                      </div>
+                    )}
+                    <div style={{fontSize:9,color:t.tx3,marginTop:6}}>Paired rows: {vals1.length} landmarks with both values</div>
+                  </div>
+                  <div style={{border:`1px solid ${t.bdr}`,borderRadius:8,background:t.surf2,padding:12}}>
+                    <div style={{fontSize:11,fontWeight:700,color:t.acc,marginBottom:10}}>Inferential tests</div>
+                    <div style={{marginBottom:12}}>
+                      <div style={{fontSize:10,fontWeight:700,color:t.tx2,marginBottom:6}}>Intraclass correlation (ICC)</div>
+                      {icc?(
+                        <div style={{fontSize:11}}>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>ICC (absolute agreement)</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700}}>{icc.ICC_Absolute?.toFixed(4)??"—"}</span></div>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>ICC (consistency)</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700}}>{icc.ICC_Consistency?.toFixed(4)??"—"}</span></div>
+                          {sem!==null&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>SEM</span><span style={{fontFamily:"'DM Mono',monospace",color:t.tx}}>{sem.toFixed(4)} px</span></div>}
+                          {mdc!==null&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>MDC (95%)</span><span style={{fontFamily:"'DM Mono',monospace",color:t.tx}}>{mdc.toFixed(4)} px</span></div>}
+                          <div style={{padding:"6px 8px",borderRadius:4,background:t.accMuted,color:t.acc,fontWeight:600,textAlign:"center",fontSize:10}}>{icc.interpretation}</div>
+                        </div>
+                      ):<div style={{color:t.tx3,fontSize:11}}>Need at least two complete sessions and matching landmarks on every session for ICC.</div>}
+                    </div>
+                    <div style={{marginBottom:12}}>
+                      <div style={{fontSize:10,fontWeight:700,color:t.tx2,marginBottom:6}}>Dahlberg error</div>
+                      {dahl?<div style={{display:"flex",justifyContent:"space-between",fontSize:11}}><span>Random error (paired)</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700}}>{dahl.error.toFixed(4)} px</span></div>:<div style={{color:t.tx3,fontSize:11}}>Need two sessions with the same landmarks.</div>}
+                    </div>
+                    <div style={{marginBottom:12}}>
+                      <div style={{fontSize:10,fontWeight:700,color:t.tx2,marginBottom:6}}>Paired t-test</div>
+                      {tTest?(
+                        <div style={{fontSize:11}}>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>t</span><span style={{fontFamily:"'DM Mono',monospace",color:t.tx}}>{tTest.t.toFixed(4)}</span></div>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>df</span><span style={{fontFamily:"'DM Mono',monospace",color:t.tx}}>{tTest.df}</span></div>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>p-value</span><span style={{fontFamily:"'DM Mono',monospace",color:tTest.significant?t.err:t.ok,fontWeight:700}}>{tTest.pValue.toFixed(6)}</span></div>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>Spearman ρ</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc}}>{spearman!==null?spearman.toFixed(4):"—"}</span></div>
+                          <div style={{padding:"6px 8px",borderRadius:4,background:tTest.significant?t.err+"22":t.ok+"22",color:tTest.significant?t.err:t.ok,fontWeight:600,textAlign:"center"}}>{tTest.significant?"Significant (p < 0.05)":"Not significant"}</div>
+                        </div>
+                      ):<div style={{color:t.tx3,fontSize:11}}>Cannot compute (need paired observations).</div>}
+                    </div>
+                    <div style={{marginBottom:12}}>
+                      <div style={{fontSize:10,fontWeight:700,color:t.tx2,marginBottom:6}}>Normality (paired data)</div>
+                      {shapiro?(
+                        <div style={{fontSize:11}}>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>W (session A)</span><span style={{fontFamily:"'DM Mono',monospace"}}>{shapiro.W.toFixed(4)}</span></div>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>p-value</span><span style={{fontFamily:"'DM Mono',monospace",color:shapiro.normal?t.ok:t.err}}>{shapiro.pValue.toFixed(4)}</span></div>
+                          {shapiro2&&<><div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>W (session B)</span><span style={{fontFamily:"'DM Mono',monospace"}}>{shapiro2.W.toFixed(4)}</span></div>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>p-value</span><span style={{fontFamily:"'DM Mono',monospace",color:shapiro2.normal?t.ok:t.err}}>{shapiro2.pValue.toFixed(4)}</span></div></>}
+                          <div style={{padding:"6px 8px",borderRadius:4,background:(shapiro.normal&&(!shapiro2||shapiro2.normal))?t.ok+"22":t.err+"22",color:shapiro.normal&&(!shapiro2||shapiro2.normal)?t.ok:t.err,fontWeight:600,textAlign:"center"}}>{shapiro.normal&&(!shapiro2||shapiro2.normal)?"Approximately normal":"Non-normal distribution"}</div>
+                        </div>
+                      ):<div style={{color:t.tx3,fontSize:11}}>Need at least 3 paired observations.</div>}
+                    </div>
+                    <div>
+                      <div style={{fontSize:10,fontWeight:700,color:t.tx2,marginBottom:6}}>Bland–Altman</div>
+                      {bland?(
+                        <div style={{fontSize:11}}>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>Mean difference</span><span style={{fontFamily:"'DM Mono',monospace",color:t.tx}}>{bland.meanDiff.toFixed(4)}</span></div>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>SD of differences</span><span style={{fontFamily:"'DM Mono',monospace",color:t.tx}}>{bland.stdDiff.toFixed(4)}</span></div>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>Lower LoA</span><span style={{fontFamily:"'DM Mono',monospace",color:t.warn}}>{bland.lowerLOA.toFixed(4)}</span></div>
+                          <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>Upper LoA</span><span style={{fontFamily:"'DM Mono',monospace",color:t.warn}}>{bland.upperLOA.toFixed(4)}</span></div>
+                        </div>
+                      ):<div style={{color:t.tx3,fontSize:11}}>Cannot compute.</div>}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {tab==="norms"&&(
+                <div>
+                  <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:6}}>Clinical Norms Comparison</div>
+                  {(!study?.norms||study.norms.length===0)?(
+                    <div style={{color:t.tx3,fontSize:11,textAlign:"center",padding:20}}>No norms defined for this study. Add norms in the Markups panel first.</div>
+                  ):(
+                    <div style={{overflowX:"auto"}}>
+                      <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
+                        <thead>
+                          <tr style={{borderBottom:`1px solid ${t.bdr}`}}>
+                            <th style={{textAlign:"left",padding:4,color:t.tx2}}>Landmark</th>
+                            <th style={{textAlign:"right",padding:4,color:t.tx2}}>Mean (mm)</th>
+                            <th style={{textAlign:"right",padding:4,color:t.tx2}}>Norm (mm)</th>
+                            <th style={{textAlign:"right",padding:4,color:t.tx2}}>Deviation</th>
+                            <th style={{textAlign:"right",padding:4,color:t.tx2}}>Z-score</th>
+                            <th style={{textAlign:"right",padding:4,color:t.tx2}}>Within ±2SD?</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {normsComp.filter(r=>r.normMean!==null).map(row=>(
+                            <tr key={row.lab} style={{borderBottom:`1px solid ${t.bdr}44`}}>
+                              <td style={{padding:4,color:t.tx,fontWeight:600}}>{row.lab}</td>
+                              <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.statMm?.toFixed(2)??(row.mean?(row.mean.toFixed(2)):"—")}</td>
+                              <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:t.acc}}>{row.normMean?.toFixed(2)}</td>
+                              <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:row.deviation!==null&&(Math.abs(row.deviation)>row.normSD*2)?t.err:t.tx}}>{row.deviation!==null?row.deviation.toFixed(2):"—"}</td>
+                              <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:row.normZ!==null?(Math.abs(row.normZ)>2?t.err:Math.abs(row.normZ)>1?t.warn:t.ok):t.tx3}}>{row.normZ!==null?row.normZ.toFixed(2):"—"}</td>
+                              <td style={{padding:4,textAlign:"right",color:row.withinNorm?t.ok:t.err,fontWeight:600}}>{row.withinNorm!==null?(row.withinNorm?"Yes":"No"):"—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {tab==="export"&&(
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  <Btn t={t} onClick={()=>exportReproTablesCsv(study)}>⬇ Raw data tables (.csv)</Btn>
+                  <Btn t={t} onClick={()=>exportDescriptiveCsv(study,metric,descriptive)}>⬇ Descriptive statistics (.csv)</Btn>
+                  <Btn t={t} onClick={()=>exportErrorMetricsCsv(perLandmark)}>⬇ Per-landmark error metrics (.csv)</Btn>
+                  <Btn t={t} onClick={()=>exportFullStatsReport(study,metric,labels,descriptive,perLandmark,biases,icc,dahl,bland,tTest,anovaRes,sem,mdc)}>⬇ Full statistical report (.csv)</Btn>
+                </div>
+              )}
             </>
           )}
         </div>

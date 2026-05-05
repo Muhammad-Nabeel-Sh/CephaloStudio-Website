@@ -296,3 +296,313 @@ export function blandAltman(arr1, arr2) {
   const loa2 = m + 1.96 * s;
   return { meanDiff: m, stdDiff: s, lowerLOA: loa, upperLOA: loa2, means, minMean: Math.min(...means), maxMean: Math.max(...means) };
 }
+
+export const median = arr => {
+  const sorted = [...arr].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+};
+
+export const iqr = arr => {
+  const sorted = [...arr].sort((a, b) => a - b);
+  const q1 = sorted[Math.floor(sorted.length * 0.25)];
+  const q3 = sorted[Math.floor(sorted.length * 0.75)];
+  return { q1, q3, iqr: q3 - q1 };
+};
+
+export const skewness = arr => {
+  const n = arr.length, m = mean(arr), s = stdev(arr, m);
+  if (s === 0) return 0;
+  return (n / ((n - 1) * (n - 2))) * arr.reduce((sum, x) => sum + ((x - m) / s) ** 3, 0);
+};
+
+export const kurtosis = arr => {
+  const n = arr.length, m = mean(arr), s = stdev(arr, m);
+  if (s === 0) return 0;
+  const m4 = arr.reduce((sum, x) => sum + (x - m) ** 4, 0) / n;
+  return (m4 / s ** 4) - 3;
+};
+
+export const coefficientOfVariation = arr => {
+  const m = mean(arr);
+  if (m === 0) return null;
+  return (stdev(arr, m) / Math.abs(m)) * 100;
+};
+
+export const standardError = (arr, icc) => {
+  const s = stdev(arr, mean(arr));
+  if (icc == null || icc < 0 || icc > 1) return s / Math.sqrt(arr.length);
+  return s * Math.sqrt(1 - icc);
+};
+
+export const minimalDetectableChange = (sem, confidence = 1.96) => confidence * sem * Math.sqrt(2);
+
+export function shapiroWilk(arr) {
+  const n = arr.length;
+  if (n < 3 || n > 5000) return null;
+  const sorted = [...arr].sort((a, b) => a - b);
+  const m = mean(sorted);
+  const ss = sorted.reduce((s, x) => s + (x - m) ** 2, 0);
+  if (ss === 0) return { W: 1, pValue: 1, normal: true };
+  const coeffs = shapiroCoefficients(n);
+  if (!coeffs) return null;
+  let b = 0;
+  for (let i = 0; i < Math.floor(n / 2); i++) {
+    b += coeffs[i] * (sorted[n - 1 - i] - sorted[i]);
+  }
+  const W = (b ** 2) / ss;
+  const pValue = shapiroPValue(W, n);
+  return { W, pValue, normal: pValue > 0.05 };
+}
+
+function shapiroCoefficients(n) {
+  if (n < 3) return null;
+  const m = Array.from({ length: n }, (_, i) => normalQuantile((i + 1 - 0.375) / (n + 0.25)));
+  const ss = m.reduce((s, x) => s + x * x, 0);
+  const a = m.map(x => x / Math.sqrt(ss));
+  return a.slice(0, Math.floor(n / 2));
+}
+
+function normalQuantile(p) {
+  if (p <= 0) return -Infinity;
+  if (p >= 1) return Infinity;
+  if (p === 0.5) return 0;
+  const a = [-3.969683028665376e+01, 2.209460984245205e+02, -2.759285104469687e+02, 1.383577518672690e+02, -3.066479806614716e+01, 2.506628277459239e+00];
+  const b = [-5.447609879822406e+01, 1.615858368580409e+02, -1.556989798598866e+02, 6.680131188771972e+01, -1.328068155288572e+01];
+  const c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00, -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
+  const d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00, 3.754408661907416e+00];
+  const pLow = 0.02425;
+  const q = p < pLow ? p : 1 - p;
+  let x;
+  if (q < pLow) {
+    const r = Math.sqrt(-2 * Math.log(q));
+    x = (((((c[0]*r+c[1])*r+c[2])*r+c[3])*r+c[4])*r+c[5]) / ((((d[0]*r+d[1])*r+d[2])*r+d[3])*r+1);
+  } else {
+    const r = p - 0.5;
+    const r2 = r * r;
+    x = (((((a[0]*r2+a[1])*r2+a[2])*r2+a[3])*r2+a[4])*r2+a[5])*r / (((((b[0]*r2+b[1])*r2+b[2])*r2+b[3])*r2+b[4])*r2+1);
+  }
+  return p < 0.5 ? -x : x;
+}
+
+function shapiroPValue(W, n) {
+  if (W >= 1) return 1;
+  if (W <= 0) return 0;
+  if (n <= 3) return W > 0.5 ? 0.5 : 0.1;
+  const mu = -1.2725 + 1.0521 * Math.log(n);
+  const sigma = 1.0308 - 0.26758 / Math.sqrt(n);
+  const z = (Math.log(1 - W) - mu) / sigma;
+  return 1 - normalCDF(z);
+}
+
+function normalCDF(x) {
+  const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741, a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
+  const sign = x < 0 ? -1 : 1;
+  x = Math.abs(x) / Math.sqrt(2);
+  const t = 1 / (1 + p * x);
+  const y = 1 - (((((a5*t+a4)*t+a3)*t+a2)*t+a1)*t) * Math.exp(-x*x);
+  return 0.5 * (1 + sign * y);
+}
+
+export function oneWayAnova(...groups) {
+  if (groups.length < 2) return null;
+  const all = groups.flat();
+  const N = all.length, k = groups.length;
+  const grandMean = mean(all);
+  const ssBetween = groups.reduce((ss, g) => ss + g.length * (mean(g) - grandMean) ** 2, 0);
+  const ssWithin = groups.reduce((ss, g) => {
+    const m = mean(g);
+    return ss + g.reduce((s, x) => s + (x - m) ** 2, 0);
+  }, 0);
+  const dfBetween = k - 1, dfWithin = N - k;
+  if (dfWithin <= 0 || ssWithin === 0) return null;
+  const msBetween = ssBetween / dfBetween, msWithin = ssWithin / dfWithin;
+  const F = msBetween / msWithin;
+  const pValue = 1 - fCDF(F, dfBetween, dfWithin);
+  return { F, dfBetween, dfWithin, msBetween, msWithin, ssBetween, ssWithin, pValue, significant: pValue < 0.05 };
+}
+
+function fCDF(f, d1, d2) {
+  if (f <= 0) return 0;
+  const x = d2 / (d2 + d1 * f);
+  return 1 - betaIncomplete(d1 / 2, d2 / 2, x);
+}
+
+export function spearmanCorrelation(arr1, arr2) {
+  if (arr1.length !== arr2.length || arr1.length < 2) return null;
+  const rank1 = rankArray(arr1), rank2 = rankArray(arr2);
+  return pearsonCorrelation(rank1, rank2);
+}
+
+function rankArray(arr) {
+  const sorted = arr.map((v, i) => ({ v, i })).sort((a, b) => a.v - b.v);
+  const ranks = new Array(arr.length);
+  let i = 0;
+  while (i < sorted.length) {
+    let j = i;
+    while (j < sorted.length - 1 && sorted[j + 1].v === sorted[j].v) j++;
+    const avgRank = (i + j) / 2 + 1;
+    for (let k = i; k <= j; k++) ranks[sorted[k].i] = avgRank;
+    i = j + 1;
+  }
+  return ranks;
+}
+
+export function pearsonCorrelation(arr1, arr2) {
+  if (arr1.length !== arr2.length || arr1.length < 2) return null;
+  const n = arr1.length, m1 = mean(arr1), m2 = mean(arr2);
+  let num = 0, d1 = 0, d2 = 0;
+  for (let i = 0; i < n; i++) {
+    const a = arr1[i] - m1, b = arr2[i] - m2;
+    num += a * b; d1 += a * a; d2 += b * b;
+  }
+  const den = Math.sqrt(d1 * d2);
+  return den === 0 ? null : num / den;
+}
+
+export function correlationMatrix(datasets) {
+  const n = datasets.length;
+  const matrix = Array.from({ length: n }, () => Array(n).fill(null));
+  for (let i = 0; i < n; i++) {
+    matrix[i][i] = 1;
+    for (let j = i + 1; j < n; j++) {
+      const r = pearsonCorrelation(datasets[i], datasets[j]);
+      matrix[i][j] = r; matrix[j][i] = r;
+    }
+  }
+  return matrix;
+}
+
+export function aggregateDahlberg(pairedArrays) {
+  if (pairedArrays.length < 1) return null;
+  const errors = pairedArrays.map(({ vals1, vals2 }) => {
+    if (!vals1 || !vals2 || vals1.length < 2) return null;
+    const d = dahlbergError(vals1, vals2);
+    return d ? d.error : null;
+  }).filter(e => e !== null);
+  if (!errors.length) return null;
+  return { mean: mean(errors), max: Math.max(...errors), min: Math.min(...errors), count: errors.length };
+}
+
+export function computePerLandmarkError(study, metric, labels) {
+  if (!study || !labels?.length) return [];
+  const results = [];
+  if (study.type === "intra" && study.operators[0]?.trials?.length >= 2) {
+    const trials = study.operators[0].trials;
+    for (let i = 0; i < trials.length - 1; i++) {
+      for (let j = i + 1; j < trials.length; j++) {
+        labels.forEach(lab => {
+          const m1 = (trials[i].measurements || []).find(x => x.label === lab);
+          const m2 = (trials[j].measurements || []).find(x => x.label === lab);
+          if (m1 && m2) {
+            const v1 = metric === "x" ? m1.x : m1.y;
+            const v2 = metric === "x" ? m2.x : m2.y;
+            results.push({ lab, pair: `T${i + 1} vs T${j + 1}`, diff: v1 - v2, absDiff: Math.abs(v1 - v2) });
+          }
+        });
+      }
+    }
+  } else if (study.type === "inter" && study.operators.length >= 2) {
+    for (let i = 0; i < study.operators.length - 1; i++) {
+      for (let j = i + 1; j < study.operators.length; j++) {
+        labels.forEach(lab => {
+          const m1 = (study.operators[i].trials?.[0]?.measurements || []).find(x => x.label === lab);
+          const m2 = (study.operators[j].trials?.[0]?.measurements || []).find(x => x.label === lab);
+          if (m1 && m2) {
+            const v1 = metric === "x" ? m1.x : m1.y;
+            const v2 = metric === "x" ? m2.x : m2.y;
+            results.push({ lab, pair: `${study.operators[i].name || `Op${i+1}`} vs ${study.operators[j].name || `Op${j+1}`}`, diff: v1 - v2, absDiff: Math.abs(v1 - v2) });
+          }
+        });
+      }
+    }
+  }
+  const byLabel = {};
+  results.forEach(r => {
+    if (!byLabel[r.lab]) byLabel[r.lab] = { diffs: [] };
+    byLabel[r.lab].diffs.push(r.diff);
+  });
+  return Object.entries(byLabel).map(([lab, data]) => {
+    const diffs = data.diffs;
+    const sumSq = diffs.reduce((s, d) => s + d ** 2, 0);
+    const dahlberg = Math.sqrt(sumSq / (2 * diffs.length));
+    const m = mean(diffs);
+    const s = stdev(diffs, m);
+    const cv = coefficientOfVariation(diffs.map(Math.abs));
+    return { lab, n: diffs.length, meanDiff: m, sdDiff: s, dahlberg, cv, absMean: mean(diffs.map(Math.abs)) };
+  });
+}
+
+export function detectSystematicBias(study, metric, labels) {
+  if (!study || !labels?.length) return [];
+  const biases = [];
+  if (study.type === "intra" && study.operators[0]?.trials?.length >= 2) {
+    const trials = study.operators[0].trials;
+    for (let i = 0; i < trials.length - 1; i++) {
+      for (let j = i + 1; j < trials.length; j++) {
+        const vals1 = [], vals2 = [];
+        labels.forEach(lab => {
+          const m1 = (trials[i].measurements || []).find(x => x.label === lab);
+          const m2 = (trials[j].measurements || []).find(x => x.label === lab);
+          if (m1 && m2) { vals1.push(metric === "x" ? m1.x : m1.y); vals2.push(metric === "x" ? m2.x : m2.y); }
+        });
+        if (vals1.length >= 2) {
+          const t = tTestPaired(vals1, vals2);
+          if (t) biases.push({ pair: `Trial ${i + 1} vs ${j + 1}`, t: t.t, pValue: t.pValue, significant: t.significant, n: vals1.length });
+        }
+      }
+    }
+  } else if (study.type === "inter" && study.operators.length >= 2) {
+    for (let i = 0; i < study.operators.length - 1; i++) {
+      for (let j = i + 1; j < study.operators.length; j++) {
+        const vals1 = [], vals2 = [];
+        labels.forEach(lab => {
+          const m1 = (study.operators[i].trials?.[0]?.measurements || []).find(x => x.label === lab);
+          const m2 = (study.operators[j].trials?.[0]?.measurements || []).find(x => x.label === lab);
+          if (m1 && m2) { vals1.push(metric === "x" ? m1.x : m1.y); vals2.push(metric === "x" ? m2.x : m2.y); }
+        });
+        if (vals1.length >= 2) {
+          const t = tTestPaired(vals1, vals2);
+          if (t) biases.push({ pair: `${study.operators[i].name || `Op${i+1}`} vs ${study.operators[j].name || `Op${j+1}`}`, t: t.t, pValue: t.pValue, significant: t.significant, n: vals1.length });
+        }
+      }
+    }
+  }
+  return biases;
+}
+
+export function anovaAcrossSessions(study, metric, labels) {
+  if (!study || !labels?.length) return null;
+  const groups = [];
+  if (study.type === "intra") {
+    const trials = study.operators[0]?.trials || [];
+    if (trials.length < 3) return null;
+    trials.forEach(tr => {
+      const vals = (tr.measurements || []).filter(m => labels.includes(m.label)).map(m => metric === "x" ? m.x : m.y);
+      if (vals.length >= 2) groups.push(vals);
+    });
+  } else {
+    if (study.operators.length < 3) return null;
+    study.operators.forEach(op => {
+      const vals = (op.trials?.[0]?.measurements || []).filter(m => labels.includes(m.label)).map(m => metric === "x" ? m.x : m.y);
+      if (vals.length >= 2) groups.push(vals);
+    });
+  }
+  if (groups.length < 3) return null;
+  return oneWayAnova(...groups);
+}
+
+export function computeNormsComparison(descriptiveStats, norms, calibration) {
+  if (!norms?.length || !descriptiveStats?.length) return [];
+  const ppm = calibration?.pxPerMm || 1;
+  return descriptiveStats.filter(ds => ds.mean !== null).map(ds => {
+    const norm = norms.find(n => n.label === ds.lab);
+    if (!norm) return { ...ds, normZ: null, normMean: null, normSD: null, withinNorm: null, deviation: null };
+    const normMeanMm = norm.mean_mm || norm.mean;
+    const normSDMm = norm.sd_mm || norm.sd;
+    const statMm = ds.mean / ppm;
+    const statSDMm = (ds.sd || 0) / ppm;
+    const z = normSDMm > 0 ? (statMm - normMeanMm) / normSDMm : null;
+    return { ...ds, statMm, statSDMm, normMean: normMeanMm, normSD: normSDMm, normZ: z, withinNorm: z !== null && Math.abs(z) <= 2, deviation: z !== null ? statMm - normMeanMm : null };
+  });
+}
