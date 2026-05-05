@@ -2401,43 +2401,27 @@ function StudyDashboard({t,studies}){
 
           {tab==="overview"&&(
             <div>
-              <div style={{marginBottom:12,padding:10,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
-                <div style={{fontSize:10,fontWeight:700,color:t.tx,marginBottom:6}}>Overview</div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:6,fontSize:10}}>
-                  <span style={{color:t.tx2}}>Design</span><span>{study.type==="intra"?"Intra-operator":"Inter-operator"}</span>
-                  <span style={{color:t.tx2}}>Status</span><span style={{color:study.status==="completed"?t.ok:t.warn}}>{study.status||"—"}</span>
-                  <span style={{color:t.tx2}}>Landmarks</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc}}>{labels.length}</span>
-                  <span style={{color:t.tx2}}>Sessions</span><span style={{fontFamily:"'DM Mono',monospace"}}>{study.type==="intra"?(study.operators[0]?.trials||[]).length:study.operators.length}</span>
-                </div>
-                <div style={{display:"flex",gap:8,marginTop:10,flexWrap:"wrap"}}>
-                  <Btn t={t} small onClick={()=>exportReproTablesCsv(study)}>⬇ Download tables (.csv)</Btn>
-                  <Btn t={t} small onClick={()=>exportFullStatsReport(study,metric,labels,descriptive,perLandmark,biases,icc,dahl,bland,tTest,anovaRes,sem,mdc)}>⬇ Full report</Btn>
-                </div>
+              <table style={{width:"100%",fontSize:10,borderCollapse:"collapse"}}>
+                <tbody>
+                  <tr><td style={{padding:"5px 6px",color:t.tx2,width:160}}>Design</td><td style={{padding:"5px 6px"}}>{study.type==="intra"?"Intra-operator":"Inter-operator"}</td></tr>
+                  <tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2}}>Status</td><td style={{padding:"5px 6px",color:study.status==="completed"?t.ok:t.warn}}>{study.status||"—"}</td></tr>
+                  <tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2}}>Landmarks</td><td style={{padding:"5px 6px",fontFamily:"'DM Mono',monospace",color:t.acc}}>{labels.length}</td></tr>
+                  <tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2}}>Sessions</td><td style={{padding:"5px 6px",fontFamily:"'DM Mono',monospace"}}>{study.type==="intra"?(study.operators[0]?.trials||[]).length:study.operators.length}</td></tr>
+                  {icc&&(<tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2,fontWeight:600}}>ICC (absolute)</td><td style={{padding:"5px 6px",fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700}}>{icc.ICC_Absolute?.toFixed(4)}</td></tr>)}
+                  {icc&&(<tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2,fontWeight:600}}>ICC interpretation</td><td style={{padding:"5px 6px",fontWeight:600,color:icc.ICC_Absolute>=0.9?t.ok:icc.ICC_Absolute>=0.75?t.warn:t.err}}>{icc.interpretation}</td></tr>)}
+                  {icc&&sem!==null&&(<tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2,fontWeight:600}}>SEM</td><td style={{padding:"5px 6px",fontFamily:"'DM Mono',monospace"}}>{sem.toFixed(4)} px</td></tr>)}
+                  {icc&&mdc!==null&&(<tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2,fontWeight:600}}>MDC (95%)</td><td style={{padding:"5px 6px",fontFamily:"'DM Mono',monospace"}}>{mdc.toFixed(4)} px</td></tr>)}
+                  {anovaRes&&(<tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2,fontWeight:600}}>ANOVA F</td><td style={{padding:"5px 6px",fontFamily:"'DM Mono',monospace"}}>{anovaRes.F.toFixed(4)}</td></tr>)}
+                  {anovaRes&&(<tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2,fontWeight:600}}>ANOVA p-value</td><td style={{padding:"5px 6px",fontFamily:"'DM Mono',monospace",color:anovaRes.significant?t.err:t.ok,fontWeight:700}}>{anovaRes.pValue.toFixed(6)}</td></tr>)}
+                  {anovaRes&&(<tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2,fontWeight:600}}>ANOVA result</td><td style={{padding:"5px 6px",fontWeight:600,color:anovaRes.significant?t.err:t.ok}}>{anovaRes.significant?"Significant bias":"No significant bias"}</td></tr>)}
+                  {dahl&&(<tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2,fontWeight:600}}>Dahlberg error</td><td style={{padding:"5px 6px",fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700}}>{dahl.error.toFixed(4)} px</td></tr>)}
+                  {dahl&&(<tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2,fontWeight:600}}>Paired landmarks</td><td style={{padding:"5px 6px",fontFamily:"'DM Mono',monospace"}}>{vals1.length}</td></tr>)}
+                </tbody>
+              </table>
+              <div style={{display:"flex",gap:8,marginTop:14,paddingTop:10,borderTop:`1px solid ${t.bdr}`,flexWrap:"wrap"}}>
+                <Btn t={t} small onClick={()=>exportReproTablesCsv(study)}>⬇ Download tables (.csv)</Btn>
+                <Btn t={t} small onClick={()=>exportFullStatsReport(study,metric,labels,descriptive,perLandmark,biases,icc,dahl,bland,tTest,anovaRes,sem,mdc)}>⬇ Full report</Btn>
               </div>
-              {icc&&(<div style={{marginBottom:12,padding:10,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
-                <div style={{fontSize:10,fontWeight:700,color:t.tx,marginBottom:6}}>Reliability Summary</div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:6,fontSize:10}}>
-                  <span style={{color:t.tx2}}>ICC (absolute)</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700}}>{icc.ICC_Absolute?.toFixed(4)}</span>
-                  <span style={{color:t.tx2}}>Interpretation</span><span style={{color:icc.ICC_Absolute>=0.9?t.ok:icc.ICC_Absolute>=0.75?t.warn:t.err,fontWeight:600}}>{icc.interpretation}</span>
-                  {sem!==null&&<><span style={{color:t.tx2}}>SEM</span><span style={{fontFamily:"'DM Mono',monospace"}}>{sem.toFixed(4)} px</span></>}
-                  {mdc!==null&&<><span style={{color:t.tx2}}>MDC (95%)</span><span style={{fontFamily:"'DM Mono',monospace"}}>{mdc.toFixed(4)} px</span></>}
-                </div>
-              </div>)}
-              {anovaRes&&(<div style={{marginBottom:12,padding:10,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
-                <div style={{fontSize:10,fontWeight:700,color:t.tx,marginBottom:6}}>ANOVA (across sessions)</div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:6,fontSize:10}}>
-                  <span style={{color:t.tx2}}>F</span><span style={{fontFamily:"'DM Mono',monospace"}}>{anovaRes.F.toFixed(4)}</span>
-                  <span style={{color:t.tx2}}>p-value</span><span style={{fontFamily:"'DM Mono',monospace",color:anovaRes.significant?t.err:t.ok,fontWeight:700}}>{anovaRes.pValue.toFixed(6)}</span>
-                  <span style={{color:t.tx2}}>Result</span><span style={{color:anovaRes.significant?t.err:t.ok,fontWeight:600}}>{anovaRes.significant?"Significant bias":"No significant bias"}</span>
-                </div>
-              </div>)}
-              {dahl&&(<div style={{padding:10,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
-                <div style={{fontSize:10,fontWeight:700,color:t.tx,marginBottom:6}}>Aggregate Error</div>
-                <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:6,fontSize:10}}>
-                  <span style={{color:t.tx2}}>Dahlberg</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700}}>{dahl.error.toFixed(4)} px</span>
-                  <span style={{color:t.tx2}}>Paired landmarks</span><span style={{fontFamily:"'DM Mono',monospace"}}>{vals1.length}</span>
-                </div>
-              </div>)}
             </div>
           )}
 
@@ -2827,17 +2811,16 @@ function DatabaseDashboard({t,databaseImages}){
 
       {tab==="overview"&&(
         <div>
-          <div style={{marginBottom:12,padding:10,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
-            <div style={{fontSize:10,fontWeight:700,color:t.tx,marginBottom:6}}>Database Overview</div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:6,fontSize:10}}>
-              <span style={{color:t.tx2}}>Images</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc}}>{databaseImages.length}</span>
-              <span style={{color:t.tx2}}>Total variables</span><span style={{fontFamily:"'DM Mono',monospace"}}>{variables.length}</span>
-              <span style={{color:t.tx2}}>Landmark coords</span><span style={{fontFamily:"'DM Mono',monospace"}}>{landmarkVars.length} pts</span>
-              <span style={{color:t.tx2}}>Measurements</span><span style={{fontFamily:"'DM Mono',monospace"}}>{measVars.length}</span>
-            </div>
-          </div>
+          <table style={{width:"100%",fontSize:10,borderCollapse:"collapse"}}>
+            <tbody>
+              <tr><td style={{padding:"5px 6px",color:t.tx2,width:160}}>Images</td><td style={{padding:"5px 6px",fontFamily:"'DM Mono',monospace",color:t.acc}}>{databaseImages.length}</td></tr>
+              <tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2}}>Total variables</td><td style={{padding:"5px 6px",fontFamily:"'DM Mono',monospace"}}>{variables.length}</td></tr>
+              <tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2}}>Landmark coords</td><td style={{padding:"5px 6px",fontFamily:"'DM Mono',monospace"}}>{landmarkVars.length} pts</td></tr>
+              <tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2}}>Measurements</td><td style={{padding:"5px 6px",fontFamily:"'DM Mono',monospace"}}>{measVars.length}</td></tr>
+            </tbody>
+          </table>
           {descriptive.length>0&&(
-            <div style={{padding:10,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`,marginBottom:12}}>
+            <div style={{marginTop:14,paddingTop:10,borderTop:`1px solid ${t.bdr}`}}>
               <div style={{fontSize:10,fontWeight:700,color:t.tx,marginBottom:6}}>Quick Summary</div>
               <div style={{overflowX:"auto"}}>
                 <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
@@ -2848,7 +2831,7 @@ function DatabaseDashboard({t,databaseImages}){
             </div>
           )}
           {landmarkVars.length>0&&(
-            <div style={{padding:10,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
+            <div style={{marginTop:14,paddingTop:10,borderTop:`1px solid ${t.bdr}`}}>
               <div style={{fontSize:10,fontWeight:700,color:t.tx,marginBottom:6}}>Registered Landmark Coordinates</div>
               <div style={{overflowX:"auto"}}>
                 <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>

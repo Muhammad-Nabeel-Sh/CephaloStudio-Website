@@ -178,7 +178,7 @@ export const deviationColor = (sdUnits, t) => {
 
 export const mean = arr => arr.reduce((a, b) => a + b, 0) / arr.length;
 
-export const variance = (arr, m) => arr.reduce((s, x) => s + (x - m) ** 2, 0) / arr.length;
+export const variance = (arr, m) => arr.reduce((s, x) => s + (x - m) ** 2, 0) / (arr.length - 1);
 
 export const stdev = (arr, m) => Math.sqrt(variance(arr, m));
 
@@ -255,8 +255,8 @@ export function calculateICC(values) {
   const grandMean = mean(values.flat());
   const rowMeans = values.map(row => mean(row));
   const colMeans = Array(n).fill(0).map((_, j) => mean(values.map(row => row[j])));
-  const SSB = k * mean(rowMeans.map((rm) => (rm - grandMean) ** 2));
-  const SSC = n * mean(colMeans.map((cm) => (cm - grandMean) ** 2));
+  const SSB = n * rowMeans.reduce((sum, rm) => sum + (rm - grandMean) ** 2, 0);
+  const SSC = k * colMeans.reduce((sum, cm) => sum + (cm - grandMean) ** 2, 0);
   const SST = values.flat().reduce((s, x) => s + (x - grandMean) ** 2, 0);
   const SSW = SST - SSB - SSC;
   const MSB = SSB / (k - 1);
@@ -624,15 +624,70 @@ export function detectOutliers(arr, method = "iqr") {
   return { outliers, values: arr, q1, q3, iqr: iqrVal, bounds: [lo, hi] };
 }
 
+// Helper function to get exact t-values for small samples or Z-scores for larger ones
+function getTCriticalValue(confidence, df) {
+  // Standard Normal Distribution (Z-scores) for large sample sizes (df > 30)
+  const zScores = { 0.90: 1.645, 0.95: 1.960, 0.99: 2.576 };
+  
+  if (df > 30) {
+    return zScores[confidence] || 1.960;
+  }
+
+  // Lookup table for exact t-values for degrees of freedom 1 to 30
+  const tTable = {
+    1: { 0.90: 6.314, 0.95: 12.706, 0.99: 63.657 },
+    2: { 0.90: 2.920, 0.95: 4.303, 0.99: 9.925 },
+    3: { 0.90: 2.353, 0.95: 3.182, 0.99: 5.841 },
+    4: { 0.90: 2.132, 0.95: 2.776, 0.99: 4.604 },
+    5: { 0.90: 2.015, 0.95: 2.571, 0.99: 4.032 },
+    6: { 0.90: 1.943, 0.95: 2.447, 0.99: 3.707 },
+    7: { 0.90: 1.895, 0.95: 2.365, 0.99: 3.499 },
+    8: { 0.90: 1.860, 0.95: 2.306, 0.99: 3.355 },
+    9: { 0.90: 1.833, 0.95: 2.262, 0.99: 3.250 },
+    10: { 0.90: 1.812, 0.95: 2.228, 0.99: 3.169 },
+    11: { 0.90: 1.796, 0.95: 2.201, 0.99: 3.106 },
+    12: { 0.90: 1.782, 0.95: 2.179, 0.99: 3.055 },
+    13: { 0.90: 1.771, 0.95: 2.160, 0.99: 3.012 },
+    14: { 0.90: 1.761, 0.95: 2.145, 0.99: 2.977 },
+    15: { 0.90: 1.753, 0.95: 2.131, 0.99: 2.947 },
+    16: { 0.90: 1.746, 0.95: 2.120, 0.99: 2.921 },
+    17: { 0.90: 1.740, 0.95: 2.110, 0.99: 2.898 },
+    18: { 0.90: 1.734, 0.95: 2.101, 0.99: 2.878 },
+    19: { 0.90: 1.729, 0.95: 2.093, 0.99: 2.861 },
+    20: { 0.90: 1.725, 0.95: 2.086, 0.99: 2.845 },
+    21: { 0.90: 1.721, 0.95: 2.080, 0.99: 2.831 },
+    22: { 0.90: 1.717, 0.95: 2.074, 0.99: 2.819 },
+    23: { 0.90: 1.714, 0.95: 2.069, 0.99: 2.807 },
+    24: { 0.90: 1.711, 0.95: 2.064, 0.99: 2.797 },
+    25: { 0.90: 1.708, 0.95: 2.060, 0.99: 2.787 },
+    26: { 0.90: 1.706, 0.95: 2.056, 0.99: 2.779 },
+    27: { 0.90: 1.703, 0.95: 2.052, 0.99: 2.771 },
+    28: { 0.90: 1.701, 0.95: 2.048, 0.99: 2.763 },
+    29: { 0.90: 1.699, 0.95: 2.045, 0.99: 2.756 },
+    30: { 0.90: 1.697, 0.95: 2.042, 0.99: 2.750 }
+  };
+
+  // Fallback to 0.95 if an unsupported confidence level is passed
+  const safeConf = tTable[df][confidence] ? confidence : 0.95;
+  return tTable[df][safeConf];
+}
+
 export function confidenceInterval(arr, confidence = 0.95) {
   const n = arr.length;
   if (n < 2) return null;
-  const m = mean(arr), s = stdev(arr, m);
+  
+  const m = mean(arr);
+  const s = stdev(arr, m); 
+  
   if (s === 0) return { mean: m, sd: 0, lower: m, upper: m, margin: 0, n, confidence };
+  
   const se = s / Math.sqrt(n);
-  const tVals = { 0.90: 1.645, 0.95: 1.96, 0.99: 2.576 };
-  const z = tVals[confidence] || 1.96;
-  const margin = z * se;
+  const df = n - 1; // Degrees of freedom
+  
+  // Calculate margin using exact t-distribution critical values
+  const tCritical = getTCriticalValue(confidence, df);
+  const margin = tCritical * se;
+  
   return { mean: m, sd: s, se, lower: m - margin, upper: m + margin, margin, n, confidence };
 }
 
