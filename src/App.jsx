@@ -2588,6 +2588,7 @@ function DatabaseDashboard({t,databaseImages}){
       const entry={id:`img_${idx}`,measurements:{},group:"default",timepoint:`T${idx+1}`,operator:"default"};
       const angle3Count={current:0};const angle4Count={current:0};
       (img.markups||[]).forEach(m=>{
+        if(m.type==="ruler")return;
         const meas=computeMeasurements(m,img.calibration);
         let label;
         if(m.type==="angle3"){angle3Count.current++;label=`Angle_${angle3Count.current}`;}
@@ -2642,11 +2643,19 @@ function DatabaseDashboard({t,databaseImages}){
     return result;
   },[dataset,variables]);
 
-  const corrVars=useMemo(()=>variables.filter(v=>extractVar(v).length>=3).slice(0,12),[dataset,variables,extractVar]);
+  const corrVarsAll=useMemo(()=>variables.filter(v=>extractVar(v).length>=3),[dataset,variables,extractVar]);
+  const[corrSelected,setCorrSelected]=useState([]);
+  const corrVars=useMemo(()=>{
+    const selected=corrSelected.filter(v=>corrVarsAll.includes(v));
+    return selected.length>=2?selected:corrVarsAll.slice(0,8);
+  },[corrVarsAll,corrSelected]);
   const corrMatrix=useMemo(()=>{
     if(corrVars.length<2)return null;
     return correlationMatrix(corrVars.map(v=>extractVar(v)));
   },[corrVars,extractVar]);
+
+  const selectAll=()=>setCorrSelected([...corrVarsAll]);
+  const clearAll=()=>setCorrSelected([]);
 
   useEffect(()=>{
     if(!corrModalOpen||!corrCanvasRef.current||!corrMatrix)return;
@@ -2811,11 +2820,29 @@ function DatabaseDashboard({t,databaseImages}){
 
       {tab==="correlation"&&(
         <div>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
             <div style={{fontSize:11,fontWeight:700,color:t.tx}}>Correlation Matrix</div>
             {corrMatrix&&<button onClick={()=>setCorrModalOpen(true)} style={{padding:"4px 8px",borderRadius:6,border:`1px solid ${t.bdr}`,background:"transparent",color:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}} title="Enlarge">⛶ Enlarge</button>}
           </div>
-          {!corrMatrix?<div style={{color:t.tx3,fontSize:11,textAlign:"center",padding:12}}>Need at least 2 variables with 3+ values each.</div>:(
+          <div style={{marginBottom:10,padding:10,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+              <div style={{fontSize:10,fontWeight:600,color:t.tx2}}>Select Variables ({corrSelected.length}/{corrVarsAll.length})</div>
+              <div style={{display:"flex",gap:4}}>
+                <button onClick={selectAll} style={{padding:"2px 6px",borderRadius:4,border:`1px solid ${t.bdr}`,background:"transparent",color:t.tx2,cursor:"pointer",fontSize:9}}>All</button>
+                <button onClick={clearAll} style={{padding:"2px 6px",borderRadius:4,border:`1px solid ${t.bdr}`,background:"transparent",color:t.tx2,cursor:"pointer",fontSize:9}}>None</button>
+              </div>
+            </div>
+            <div style={{maxHeight:140,overflowY:"auto",display:"grid",gridTemplateColumns:"1fr 1fr",gap:"2px 10px"}}>
+              {corrVarsAll.map(v=>(
+                <label key={v} style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer",padding:"2px 4px",borderRadius:4,fontSize:9,color:corrSelected.includes(v)?t.tx:t.tx3,transition:"color .15s"}}>
+                  <input type="checkbox" checked={corrSelected.includes(v)} onChange={e=>setCorrSelected(prev=>e.target.checked?[...new Set([...prev,v])]:prev.filter(x=>x!==v))} style={{accentColor:t.acc,width:12,height:12}}/>
+                  <span style={{fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{v}</span>
+                </label>
+              ))}
+              {corrVarsAll.length===0&&<div style={{color:t.tx3,fontSize:9,padding:6}}>No variables with 3+ data points.</div>}
+            </div>
+          </div>
+          {!corrMatrix?<div style={{color:t.tx3,fontSize:11,textAlign:"center",padding:12}}>Need at least 2 selected variables with 3+ values each.</div>:(
             <div style={{overflowX:"auto"}}>
               <table style={{width:"100%",fontSize:8,borderCollapse:"collapse"}}>
                 <thead><tr><th style={{padding:3,color:t.tx2}}></th>{corrVars.map(v=><th key={v} style={{padding:3,color:t.acc,fontFamily:"'DM Mono',monospace",writingMode:"vertical-lr",textAlign:"left"}}>{v}</th>)}</tr></thead>
@@ -2830,12 +2857,13 @@ function DatabaseDashboard({t,databaseImages}){
           )}
           <div style={{marginTop:16}}>
             <div style={{fontSize:10,fontWeight:700,color:t.tx2,marginBottom:6}}>Quick Correlations</div>
-            {variables.slice(0,5).map(v=>{
-              const arr1=extractVar(variables[0]||"");const arr2=extractVar(v);
+            {corrVars.slice(0,6).map((v,i)=>{
+              if(i===0)return null;
+              const arr1=extractVar(corrVars[0]);const arr2=extractVar(v);
               const minLen=Math.min(arr1.length,arr2.length);
               const r=pearsonCorrelation(arr1.slice(0,minLen),arr2.slice(0,minLen));
               const sp=spearmanCorrelation(arr1.slice(0,minLen),arr2.slice(0,minLen));
-              return(<div key={v} style={{fontSize:10,color:t.tx2,display:"flex",justifyContent:"space-between"}}><span>{variables[0]||"—"} vs {v}</span><span>r={r?r.toFixed(2):"-"} | ρ={sp!=null?sp.toFixed(2):"-"}</span></div>);
+              return(<div key={v} style={{fontSize:10,color:t.tx2,display:"flex",justifyContent:"space-between"}}><span>{corrVars[0]||"—"} vs {v}</span><span>r={r?r.toFixed(2):"-"} | ρ={sp!=null?sp.toFixed(2):"-"}</span></div>);
             })}
           </div>
         </div>
