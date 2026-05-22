@@ -1055,7 +1055,7 @@ function PinGate({t,project,onVerified,onCancel}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // WORKSPACE
 // ═══════════════════════════════════════════════════════════════════════════════
-function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTheme}){
+function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTheme,onSave}){
   const canvasRef=useRef(null);const containerRef=useRef(null);
   const procCache=useRef(new Map());const imgRefs=useRef({});
 
@@ -1634,7 +1634,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         </>}
         <Btn t={t} small onClick={()=>openImgRef.current?.click()}>Open</Btn>
         {!isMobile&&<Btn t={t} small onClick={()=>stackImgRef.current?.click()}>+ Stack</Btn>}
-        <Btn t={t} small onClick={()=>exportCephx(project)}>Save</Btn>
+        <Btn t={t} small onClick={()=>onSave?.(project)}>Save</Btn>
         {!isMobile&&<div style={{display:"flex",alignItems:"center",gap:6}}>
           <Btn t={t} small onClick={()=>setShowDatabaseImport(true)}>DB</Btn>
           <button onClick={()=>{if(!databaseMode&&databaseImages.length===0)setShowDatabaseImport(true);else if(databaseMode){setDatabaseMode(false);setDatabaseImages([]);setCurrentImageIndex(0);}}} title={databaseImages.length===0?"Import images first":"Toggle Database Mode"} style={{background:"none",border:"none",cursor:databaseImages.length===0?"not-allowed":"pointer",padding:4,display:"flex",alignItems:"center",opacity:databaseImages.length===0?0.5:1}}>
@@ -1841,7 +1841,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       {showDatabaseImport&&<Modal t={t} title="Database Mode - Import Images" onClose={()=>setShowDatabaseImport(false)}><DatabaseImportModal t={t} onImport={loadDatabaseImages} onClose={()=>setShowDatabaseImport(false)}/></Modal>}
       {showTemplatePicker&&<Modal t={t} title="" onClose={()=>setShowTemplatePicker(false)}><TemplatePickerModal t={t} projection={project.projection} onPick={handleTemplatePick} onClose={()=>setShowTemplatePicker(false)}/></Modal>}
       {showCalib&&<Modal t={t} title="Calibration" onClose={()=>setShowCalib(false)}><CalibModal t={t} calibration={calibration} onFinish={finalizeCalib}/></Modal>}
-      {showExport&&<Modal t={t} title="Export" onClose={()=>setShowExport(false)}><div style={{display:"flex",flexDirection:"column",gap:10}}><Btn t={t} onClick={()=>{exportCSV();setShowExport(false);}}>Measurements CSV</Btn><Btn t={t} onClick={()=>{exportCephx(project);setShowExport(false);}}>Full Project .cephx</Btn><Btn t={t} onClick={()=>{const name=window.prompt("Template name:",project.name+" Template");if(name){exportTemplateAsCepht(project,name);setShowExport(false);}}}>Template .cepht</Btn></div></Modal>}
+      {showExport&&<Modal t={t} title="Export" onClose={()=>setShowExport(false)}><div style={{display:"flex",flexDirection:"column",gap:10}}><Btn t={t} onClick={()=>{exportCSV();setShowExport(false);}}>Measurements CSV</Btn><Btn t={t} onClick={()=>{onSave?.(project);setShowExport(false);}}>Full Project .cephx</Btn><Btn t={t} onClick={()=>{const name=window.prompt("Template name:",project.name+" Template");if(name){exportTemplateAsCepht(project,name);setShowExport(false);}}}>Template .cepht</Btn></div></Modal>}
       {pendingTextPos&&<Modal t={t} title="Text Annotation" onClose={()=>setPendingTextPos(null)}><TextModal t={t} defaultColor="#fbbf24" onConfirm={(txt,opts)=>{addMarkup({type:"text",points:[pendingTextPos],text:txt,...opts});setPendingTextPos(null);}} onCancel={()=>setPendingTextPos(null)}/></Modal>}
       {showAnon&&<Modal t={t} title="Anonymization & Access" onClose={()=>setShowAnon(false)}><AnonModal t={t} project={project} onUpdateProject={onUpdateProject} onClose={()=>setShowAnon(false)}/></Modal>}
       {showAlign&&<Modal t={t} title="Point-Based Alignment" onClose={()=>setShowAlign(false)}><AlignModal t={t} markups={markups} images={project.images} onUpdateImages={imgs=>onUpdateProject({images:imgs})} onClose={()=>setShowAlign(false)}/></Modal>}
@@ -3205,12 +3205,19 @@ function DatabaseDashboard({t,databaseImages}){
 export default function CephalometryStudio(){
   const[theme,setTheme]=useState("bluish");const t={...THEMES[theme],id:theme};
   const[projects,setProjects]=useState([]);const[activeId,setActiveId]=useState(null);const[pinVerified,setPinVerified]=useState({});
+  const dirtyRef=useRef(false);
+
+  useEffect(()=>{
+    const handler=e=>{if(dirtyRef.current){e.preventDefault();e.returnValue="";}};
+    window.addEventListener("beforeunload",handler);
+    return ()=>window.removeEventListener("beforeunload",handler);
+  },[]);
 
   const activeProject=projects.find(p=>p.id===activeId);
   const needsPin=activeProject&&activeProject.accessControl?.requirePin&&!pinVerified[activeId];
 
-  const updateProject=(id,patch)=>setProjects(prev=>prev.map(p=>p.id===id?{...p,...patch,modified:Date.now()}:p));
-  const updateVersion=(projectId,versionId,patch)=>setProjects(prev=>prev.map(p=>{if(p.id!==projectId)return p;return{...p,modified:Date.now(),versions:p.versions.map(v=>v.id===versionId?{...v,...patch}:v)};}));
+  const updateProject=(id,patch)=>{dirtyRef.current=true;setProjects(prev=>prev.map(p=>p.id===id?{...p,...patch,modified:Date.now()}:p));};
+  const updateVersion=(projectId,versionId,patch)=>{dirtyRef.current=true;setProjects(prev=>prev.map(p=>{if(p.id!==projectId)return p;return{...p,modified:Date.now(),versions:p.versions.map(v=>v.id===versionId?{...v,...patch}:v)};}));};
 
   const createProject=(projection,name,meta)=>{
     const p={...mkProject(projection),name,meta:{...mkProject(projection).meta,...meta}};
@@ -3234,7 +3241,8 @@ export default function CephalometryStudio(){
         <Workspace key={activeId} project={activeProject}
           onUpdateProject={patch=>updateProject(activeId,patch)}
           onUpdateVersion={(versionId,patch)=>updateVersion(activeId,versionId,patch)}
-          onHome={()=>setActiveId(null)} t={t} theme={theme} setTheme={setTheme}/>
+          onHome={()=>setActiveId(null)} t={t} theme={theme} setTheme={setTheme}
+          onSave={proj=>{exportCephx(proj);dirtyRef.current=false;}}/>
       )}
     </div>
   );
