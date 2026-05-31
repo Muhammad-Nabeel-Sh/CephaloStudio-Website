@@ -111,7 +111,7 @@ function HomePage({t,theme,setTheme,projects,onOpen,onCreate,onImport}){
       <header style={{padding:"18px 28px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"absolute",top:0,left:0,right:0,zIndex:10}} className="home-header">
         <style>{`@media (max-width: 767px) {.home-header {position:relative !important;padding:12px 16px !important; display:block !important;}}`}</style>
         <div style={{display:"flex",alignItems:"center",gap:12}}>
-          <div style={{width:50,height:50,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}><img src="\favicon.svg" alt="Website Icon" width="48" height="48"/> </div>
+          <div style={{width:50,height:50,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}><img src="/favicon.svg" alt="Website Icon" width="48" height="48"/> </div>
           <div><div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:20,letterSpacing:-0.5,color:t.tx}}>Cephalometry Studio</div><div style={{fontSize:10,color:t.tx2,letterSpacing:1,textTransform:"uppercase",fontWeight:600}}>Advanced Cephalometric Analysis</div></div>
         </div>
         <div style={{display:"flex",gap:6,alignItems:"center"}}>
@@ -226,7 +226,7 @@ function NewCaseForm({t,projection,onCreate,onCancel}){
   const upd=(k,v)=>setD(prev=>({...prev,[k]:v}));
   return(
     <div>
-      <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:18,color:t.tx,marginBottom:20}}>New {projection} Case</div>
+      <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:18,color:t.tx,marginBottom:20}}>New Case</div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
         {[["name","Case Name *",""],["patientId","Patient ID",""],["patientName","Patient Name",""],["dob","Date of Birth","date"],["age","Age","number"],["gender","","select-gender"],["ethnicity","Ethnicity",""],["clinician","Clinician",""],["facility","Facility",""],["referral","Referral",""],].map(([k,label,type])=>(
           <div key={k}>
@@ -578,39 +578,9 @@ function DatabaseImportModal({t,onImport,onClose}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // STATS DASHBOARD
 // ═══════════════════════════════════════════════════════════════════════════════
-function mean$1(arr){
-  if(!arr.length) return null;
-  return arr.reduce((a,b)=>a+b,0)/arr.length;
-}
-
-function std$1(arr){
-  if(arr.length < 2) return null;
-  const m = mean$1(arr);
-  return Math.sqrt(arr.reduce((s,x)=>s+(x-m)**2,0)/(arr.length-1));
-}
-
-function median$1(arr){
-  if(!arr.length) return null;
-  const sorted = [...arr].sort((a,b)=>a-b);
-  const mid = Math.floor(sorted.length/2);
-  return sorted.length % 2 ? sorted[mid] : (sorted[mid-1]+sorted[mid])/2;
-}
-
 function range$1(arr){
   if(!arr.length) return null;
   return { min: Math.min(...arr), max: Math.max(...arr) };
-}
-
-function correlation$1(x,y){
-  if(x.length !== y.length || x.length < 2) return null;
-  const mx = mean$1(x);
-  const my = mean$1(y);
-  const num = x.reduce((s,xi,i)=>s+(xi-mx)*(y[i]-my),0);
-  const den = Math.sqrt(
-    x.reduce((s,xi)=>s+(xi-mx)**2,0) *
-    y.reduce((s,yi)=>s+(yi-my)**2,0)
-  );
-  return den === 0 ? null : num/den;
 }
 
 function groupBy$1(dataset, key){
@@ -630,13 +600,13 @@ function extractVariable$1(dataset, variable){
 
 function descriptiveStats$1(values){
   if(!values.length) return {n:0,mean:null,sd:null,median:null,range:null,cv:null,skew:null};
-  const m = mean$1(values);
-  const s = std$1(values);
+  const m = mean(values);
+  const s = stdev(values);
   return {
     n: values.length,
     mean: m,
     sd: s,
-    median: median$1(values),
+    median: median(values),
     range: range$1(values),
     cv: m!==0?(s/Math.abs(m))*100:null,
     skew: values.length>=3?skewness(values):null
@@ -799,7 +769,7 @@ function StatsDashboard({ dataset, t }) {
         <strong style={{fontSize:11,color:t.tx}}>Quick Correlations</strong>
         {variables.slice(0,5).map(v=>{
           const arr = extractVariable$1(dataset, v);
-          const r = correlation$1(values, arr);
+          const r = pearsonCorrelation(values, arr);
           const rs = spearmanCorrelation(values.filter((_,i)=>arr[i]!=null).map((val,i)=>{const a=arr.filter(x=>x!=null);return a[i];}),arr.filter(x=>x!=null));
           return (
             <div key={v} style={{fontSize:10,color:t.tx2,display:"flex",justifyContent:"space-between"}}>
@@ -1076,6 +1046,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const[pendingTextPos,setPendingTextPos]=useState(null);
   const[showFormulaEditor,setShowFormulaEditor]=useState(false);const[editFormulaId,setEditFormulaId]=useState(null);
   const[placingMode,setPlacingMode]=useState(false);const[placingQueue,setPlacingQueue]=useState([]);const[placingIdx,setPlacingIdx]=useState(0);
+  const[loadingImages,setLoadingImages]=useState(false);
   const[showTemplatePicker,setShowTemplatePicker]=useState(true);
   const[isMobile,setIsMobile]=useState(()=>window.innerWidth<768);const[showMobilePanel,setShowMobilePanel]=useState(false);
   const[toolbarFloating,setToolbarFloating]=useState(false);const[toolbarPos,setToolbarPos]=useState({x:70,y:100});
@@ -1263,7 +1234,13 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   };
 
   // load images
-  useEffect(()=>{project.images.forEach(imgE=>{if(!imgRefs.current[imgE.id]&&imgE.dataUrl){const img=new Image();img.onload=()=>{imgRefs.current[imgE.id]=img;redraw();};img.src=imgE.dataUrl;}});},[project.images]);
+  useEffect(()=>{
+    const pending=project.images.filter(imgE=>!imgRefs.current[imgE.id]&&imgE.dataUrl);
+    if(!pending.length)return;
+    setLoadingImages(true);
+    let loaded=0;
+    pending.forEach(imgE=>{const img=new Image();img.onload=()=>{imgRefs.current[imgE.id]=img;loaded++;if(loaded===pending.length)setLoadingImages(false);redraw();};img.src=imgE.dataUrl;});
+  },[project.images]);
 
   const getProcessed=useCallback(imgEntry=>{
     const key=`${imgEntry.id}-${JSON.stringify(processing)}-${lutMode}-${lutInvert}`;
@@ -1343,6 +1320,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
 
   const loadImage=(file,addToStack=false)=>{
     if(!file||!file.type.startsWith("image/"))return;
+    setLoadingImages(true);
     const reader=new FileReader();
     reader.onload=e=>{
       const dataUrl=e.target.result;const img=new Image();
@@ -1351,12 +1329,14 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         const entry={id,name:file.name,dataUrl,dx:0,dy:0,opacity:1,blendMode:"normal",visible:true,color:"none",transform:{tx:0,ty:0,rot:0,scale:1}};
         const newImages=addToStack?[...project.images,entry]:[entry];
         onUpdateProject({images:newImages});
+        setLoadingImages(false);
         if(!addToStack){const cw=canvasSize.current.w-80,ch=canvasSize.current.h-80;const sc=Math.min(cw/(img.naturalWidth||600),ch/(img.naturalHeight||500),1);setZoom(sc);setPan({x:40,y:40});}
       };img.src=dataUrl;
     };reader.readAsDataURL(file);
   };
 
   const loadDatabaseImages=async (files)=>{
+    setLoadingImages(true);
     const loaded=await Promise.all(files.map(file=>{
       return new Promise((resolve)=>{
         if(!file.type.startsWith("image/")){resolve(null);return;}
@@ -1377,7 +1357,9 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       const firstImg=validImages[0];
       imgRefs.current[firstImg.id]=await new Promise(r=>{const i=new Image();i.onload=()=>r(i);i.src=firstImg.dataUrl;});
       const cw=canvasSize.current.w-80,ch=canvasSize.current.h-80;
-      const img=new Image();img.onload=()=>{const sc=Math.min(cw/(img.naturalWidth||600),ch/(img.naturalHeight||500),1);setZoom(sc);setPan({x:40,y:40});};img.src=firstImg.dataUrl;
+      const img=new Image();img.onload=()=>{const sc=Math.min(cw/(img.naturalWidth||600),ch/(img.naturalHeight||500),1);setZoom(sc);setPan({x:40,y:40});setLoadingImages(false);};img.src=firstImg.dataUrl;
+    }else{
+      setLoadingImages(false);
     }
   };
 
@@ -1736,6 +1718,9 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
             onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
             onDoubleClick={handleDblClick}
             onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}/>
+          {loadingImages&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:t.bg+"cc",zIndex:10}}>
+            <div style={{textAlign:"center"}}><div style={{width:28,height:28,border:`3px solid ${t.bdr}`,borderTopColor:t.acc,borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto 10px"}}/><div style={{fontSize:13,color:t.tx2}}>Loading images…</div></div>
+          </div>}
           {!isMobile&&<div style={{position:"absolute",bottom:isMobile?60:8,left:8,display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
             {mousePos&&<div style={{background:t.surf+"ee",border:`1px solid ${t.bdr}`,borderRadius:6,padding:"3px 10px",fontSize:11,color:t.tx2,fontFamily:"'DM Mono',monospace"}}>
               {(()=>{const ip=toImage(mousePos.x,mousePos.y);return`${ip.x.toFixed(1)}, ${ip.y.toFixed(1)} px${calibration.done?` · (${(ip.x/calibration.pxPerMm).toFixed(1)}, ${(ip.y/calibration.pxPerMm).toFixed(1)} mm)`:""}`})()}

@@ -8,7 +8,6 @@ import { useState, useEffect, useRef } from "react";
 export function useKatex() {
   const [loaded, setLoaded] = useState(!!window.katex);
   useEffect(() => {
-    if (window.katex) { setLoaded(true); return; }
     if (!document.getElementById("katex-css")) {
       const l = document.createElement("link");
       l.id = "katex-css"; l.rel = "stylesheet";
@@ -31,12 +30,10 @@ export function KatexSpan({ latex, block = false, large = false, fontSize }) {
   const ref = useRef(null);
   useEffect(() => {
     if (!loaded || !ref.current || !window.katex) return;
-    try {
-      window.katex.render(latex, ref.current, {
-        throwOnError: false, displayMode: block,
-        output: "html",
-      });
-    } catch {}
+    window.katex.render(latex, ref.current, {
+      throwOnError: false, displayMode: block,
+      output: "html",
+    });
   }, [latex, block, loaded]);
   const size = fontSize ? `${fontSize}pt` : (large ? "2.4rem" : "inherit");
   return (

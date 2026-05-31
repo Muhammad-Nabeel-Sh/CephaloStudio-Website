@@ -4,6 +4,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { clamp } from "./utils.js";
+import { Sld } from "./ui.jsx";
 
 export function getLUTColor(v, mode, invert = false) {
   v = clamp(Math.round(v), 0, 255);
@@ -99,28 +100,6 @@ export function computeHistogram(img) {
 }
 
 import { useState, useEffect, useRef } from "react";
-
-function Sld({ label, value, min, max, step = 1, onChange, t, unit = "" }) {
-  return (
-    <div style={{ marginBottom: 8 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: t.tx2, marginBottom: 3 }}>
-        <span>{label}</span>
-        <span style={{ fontFamily: "'DM Mono', monospace", color: t.acc }}>
-          {typeof value === "number" ? value.toFixed(step < 1 ? 1 : 0) : value}{unit}
-        </span>
-      </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={e => onChange(+e.target.value)}
-        style={{ width: "100%", accentColor: t.acc }}
-      />
-    </div>
-  );
-}
 
 export function FloatingHistogram({ hist, t, lutMode, lutInvert, processing, onProcessingChange, onClose }) {
   const [pos, setPos] = useState({ x: 60, y: 60 });

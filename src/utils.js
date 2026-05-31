@@ -2,7 +2,16 @@
 // UTILS - Geometry, Measurements, Snap, Alignment, Statistics
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import * as math from "mathjs";
+import { create, all } from "mathjs";
+
+const math = create(all, { number: "number", precision: 14 });
+math.import({
+  import: () => { throw new Error("Not allowed"); },
+  createUnit: () => { throw new Error("Not allowed"); },
+  evaluate: () => { throw new Error("Not allowed"); },
+  parse: () => { throw new Error("Not allowed"); },
+  simplify: () => { throw new Error("Not allowed"); }
+}, { override: true });
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -161,7 +170,11 @@ export function buildScope(markups, calibration) {
 }
 
 export function evalFormula(expr, scope) {
-  try { const r = math.evaluate(expr, { ...scope }); return typeof r === "number" ? r : null; } catch { return null; }
+  try {
+    const compiled = math.compile(expr);
+    const result = compiled.evaluate(scope);
+    return typeof result === "number" && isFinite(result) ? result : null;
+  } catch { return null; }
 }
 
 export function normDeviation(value, norm) {
