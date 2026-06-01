@@ -1010,7 +1010,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     dispatch({type:"SET",payload:{loadingImages:true}});
     let loaded=0;
     pending.forEach(imgE=>{const img=new Image();img.onload=()=>{imgRefs.current[imgE.id]=img;loaded++;if(loaded===pending.length)dispatch({type:"SET",payload:{loadingImages:false}});scheduleRedraw();};img.src=imgE.dataUrl;});
-  },[project.images, scheduleRedraw]);
+  },[project.images]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const getProcessed=useCallback(imgEntry=>{
     const key=`${imgEntry.id}-${JSON.stringify(processing)}-${lutMode}-${lutInvert}`;
@@ -1025,7 +1025,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   useEffect(()=>{
     const obs=new ResizeObserver(()=>{const el=containerRef.current;if(!el)return;const c=canvasRef.current;if(!c)return;c.width=el.clientWidth;c.height=el.clientHeight;canvasSize.current={w:el.clientWidth,h:el.clientHeight};scheduleRedraw();});
     if(containerRef.current)obs.observe(containerRef.current);return()=>obs.disconnect();
-  },[scheduleRedraw]);
+  },[]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const redraw=useCallback(()=>{
     const canvas=canvasRef.current;if(!canvas)return;
@@ -1158,7 +1158,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     }else{
       scheduleRedraw();
     }
-  },[currentImageIndex,databaseMode,databaseImages,scheduleRedraw]);
+  },[currentImageIndex,databaseMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDrop=e=>{e.preventDefault();loadImage(e.dataTransfer.files[0]);};
 
