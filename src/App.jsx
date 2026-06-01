@@ -1387,7 +1387,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         <Btn t={t} small onClick={()=>onSave?.(project)}>Save</Btn>
         {!isMobile&&<div style={{display:"flex",alignItems:"center",gap:6}}>
           <Btn t={t} small onClick={()=>dispatch({type:"SET",payload:{showDatabaseImport:true}})}>DB</Btn>
-          <button onClick={()=>{if(!databaseMode&&databaseImages.length===0)dispatch({type:"SET",payload:{showDatabaseImport:true}});else if(databaseMode){dispatch({type:"SET",payload:{databaseMode:false}});dispatch({type:"SET",payload:{databaseImages:[]}});dispatch({type:"SET",payload:{currentImageIndex:0}});}}} title={databaseImages.length===0?"Import images first":"Toggle Database Mode"} style={{background:"none",border:"none",cursor:databaseImages.length===0?"not-allowed":"pointer",padding:4,display:"flex",alignItems:"center",opacity:databaseImages.length===0?0.5:1}}>
+          <button onClick={()=>{if(!databaseMode&&databaseImages.length===0)dispatch({type:"SET",payload:{showDatabaseImport:true}});else if(databaseMode){if(!window.confirm("Turn off Database Mode? This will clear all imported database images."))return;dispatch({type:"SET",payload:{databaseMode:false}});dispatch({type:"SET",payload:{databaseImages:[]}});dispatch({type:"SET",payload:{currentImageIndex:0}});}}} title={databaseImages.length===0?"Import images first":"Toggle Database Mode"} style={{background:"none",border:"none",cursor:databaseImages.length===0?"not-allowed":"pointer",padding:4,display:"flex",alignItems:"center",opacity:databaseImages.length===0?0.5:1}}>
             <div style={{width:36,height:20,borderRadius:10,background:databaseMode?t.acc:t.surf3,border:`1px solid ${databaseMode?t.acc:t.bdr}`,position:"relative",transition:"all 0.2s"}}>
               <div style={{width:16,height:16,borderRadius:8,background:databaseMode?(t.id==="light"?"#fff":t.bg):t.tx,position:"absolute",top:1,left:databaseMode?18:2,transition:"all 0.2s",boxShadow:"0 1px 3px rgba(0,0,0,3)"}}/>
             </div>
@@ -1569,7 +1569,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
                   {rightPanel==="layers"&&<LayersPanel t={t} images={project.images} onUpdateImages={imgs=>onUpdateProject({images:imgs})} onAddImage={e=>{if(e.target.files[0])loadImage(e.target.files[0],true);}} showDisplacement={showDisplacement} setShowDisplacement={setShowDisplacement} compareVersionId={compareVersionId} setCompareVersionId={setCompareVersionId} versions={project.versions} onShowAlign={()=>dispatch({type:"SET",payload:{showAlign:true}})} onShowTransform={()=>dispatch({type:"SET",payload:{showTransform:true}})}/>}
                   {rightPanel==="versions"&&<VersionsPanel project={project} t={t} onUpdateProject={onUpdateProject} onUpdateVersion={onUpdateVersion} onExportTemplate={v=>exportCepht({name:`${project.name}`,projection:project.projection,markups:v.markups||[],formulas:v.formulas||[],norms:v.norms||[]})}/>}
                   {rightPanel==="reproducibility"&&<ReproducibilityPanel t={t} markups={markups} studies={reproStudies} onUpdateStudies={setReproStudies} activeStudyId={activeStudyId} setActiveStudyId={setActiveStudyId} reproCollecting={reproCollecting} setReproCollecting={setReproCollecting}/>}
-                  {rightPanel==="statistics"&&<StatisticsPanel t={t} studies={reproStudies} databaseMode={databaseMode} databaseImages={databaseImages} currentImageIndex={currentImageIndex} formatAngle={formatAngle}/>}
+                  {rightPanel==="statistics"&&<StatisticsPanel t={t} studies={reproStudies} databaseMode={databaseMode} databaseImages={databaseImages} formatAngle={formatAngle}/>}
                   {rightPanel==="templates"&&<TemplatesPanel t={t} projection={project.projection} onLoadTemplate={loadTemplate} onImportCepht={data=>{
           if(data.markups){
             const newMarkups=data.markups.map(m=>({...m,id:uid(),points:[{x:-99999,y:-99999}],placed:false}));
@@ -1906,90 +1906,76 @@ function reproPairedVectors(study,metric,sessionA,sessionB){
   return{vals1,vals2};
 }
 
-function exportReproTablesCsv(study){
-  const rows=[["study","design","operator","session_index","landmark","x_px","y_px","timestamp"]];
-  study.operators.forEach((op,oi)=>{
-    (op.trials||[]).forEach((tr,ti)=>{
-      (tr.measurements||[]).forEach(m=>{
-        rows.push([study.name,study.type,op.name||`Operator_${oi+1}`,ti+1,m.label,m.x,m.y,m.timestamp||""]);
+function exportCsv(type, opts){
+  const {study,metric,descriptive,perLandmark,biases,icc,dahl,bland,tTest,anovaRes,sem,mdc} = opts||{};
+  let rows=[], filename="export.csv";
+  if(type==="reproTables"){
+    rows=[["study","design","operator","session_index","landmark","x_px","y_px","timestamp"]];
+    study.operators.forEach((op,oi)=>{
+      (op.trials||[]).forEach((tr,ti)=>{
+        (tr.measurements||[]).forEach(m=>{
+          rows.push([study.name,study.type,op.name||`Operator_${oi+1}`,ti+1,m.label,m.x,m.y,m.timestamp||""]);
+        });
       });
     });
-  });
-  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
-  a.download=`${String(study.name).replace(/\s+/g,"_")}_reproducibility.csv`;
-  a.click();
-}
-
-function exportDescriptiveCsv(study,metric,descriptive){
-  const rows=[["Landmark","n","Mean","SD","Median","CV%","Min","Max","Skewness","Kurtosis","Shapiro_W","Shapiro_p","Normal"]];
-  descriptive.forEach(r=>{
-    rows.push([r.lab,r.n,r.mean!==null?r.mean.toFixed(4):"",r.sd!==null?r.sd.toFixed(4):"",r.median!==null?r.median.toFixed(4):"",r.cv!==null?r.cv.toFixed(4):"",r.min!==null?r.min.toFixed(4):"",r.max!==null?r.max.toFixed(4):"",r.skew!==null?r.skew.toFixed(4):"",r.kurt!==null?r.kurt.toFixed(4):"",r.shapiro?r.shapiro.W.toFixed(4):"",r.shapiro?r.shapiro.pValue.toFixed(4):"",r.shapiro?String(r.shapiro.normal):""]);
-  });
-  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
-  a.download=`${String(study.name).replace(/\s+/g,"_")}_descriptive.csv`;a.click();
-}
-
-function exportErrorMetricsCsv(perLandmark){
-  const rows=[["Landmark","n","Mean_Diff","SD_Diff","Dahlberg","Abs_Mean","CV%"]];
-  perLandmark.forEach(r=>{rows.push([r.lab,r.n,r.meanDiff.toFixed(4),r.sdDiff.toFixed(4),r.dahlberg.toFixed(4),r.absMean.toFixed(4),r.cv!==null?r.cv.toFixed(4):""]);});
-  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
-  a.download="error_metrics.csv";a.click();
-}
-
-function exportFullStatsReport(study,metric,labels,descriptive,perLandmark,biases,icc,dahl,bland,tTest,anovaRes,sem,mdc){
-  const rows=[];
-  rows.push(["CephaloStudio Statistical Report"]);
-  rows.push(["Study",study.name]);
-  rows.push(["Design",study.type==="intra"?"Intra-operator":"Inter-operator"]);
-  rows.push(["Metric",metric.toUpperCase()]);
-  rows.push(["Date",new Date().toISOString()]);
-  rows.push([]);
-  rows.push(["=== DESCRIPTIVE STATISTICS ==="]);
-  rows.push(["Landmark","n","Mean","SD","Median","CV%","Min","Max"]);
-  descriptive.forEach(r=>{rows.push([r.lab,r.n,r.mean?.toFixed(4),r.sd?.toFixed(4),r.median?.toFixed(4),r.cv?.toFixed(4),r.min?.toFixed(4),r.max?.toFixed(4)]);});
-  rows.push([]);
-  rows.push(["=== RELIABILITY ==="]);
-  rows.push(["ICC (Absolute)",icc?.ICC_Absolute?.toFixed(4)]);
-  rows.push(["ICC (Consistency)",icc?.ICC_Consistency?.toFixed(4)]);
-  rows.push(["Interpretation",icc?.interpretation]);
-  rows.push(["SEM",sem?.toFixed(4)]);
-  rows.push(["MDC (95%)",mdc?.toFixed(4)]);
-  rows.push([]);
-  rows.push(["=== ERROR METRICS ==="]);
-  rows.push(["Dahlberg Error",dahl?.error?.toFixed(4)]);
-  rows.push(["Bland-Altman Mean Diff",bland?.meanDiff?.toFixed(4)]);
-  rows.push(["Bland-Altman SD",bland?.stdDiff?.toFixed(4)]);
-  rows.push(["Bland-Altman Lower LoA",bland?.lowerLOA?.toFixed(4)]);
-  rows.push(["Bland-Altman Upper LoA",bland?.upperLOA?.toFixed(4)]);
-  rows.push([]);
-  rows.push(["=== PAIRED T-TEST ==="]);
-  rows.push(["t",tTest?.t?.toFixed(4)]);
-  rows.push(["df",tTest?.df]);
-  rows.push(["p-value",tTest?.pValue?.toFixed(6)]);
-  rows.push(["Significant",tTest?.significant?"Yes":"No"]);
-  rows.push([]);
-  rows.push(["=== ANOVA ==="]);
-  rows.push(["F",anovaRes?.F?.toFixed(4)]);
-  rows.push(["p-value",anovaRes?.pValue?.toFixed(6)]);
-  rows.push(["Significant",anovaRes?.significant?"Yes":"No"]);
-  rows.push([]);
-  rows.push(["=== PER-LANDMARK ERRORS ==="]);
-  rows.push(["Landmark","n","Mean Diff","SD Diff","Dahlberg","Abs Mean","CV%"]);
-  perLandmark.forEach(r=>{rows.push([r.lab,r.n,r.meanDiff.toFixed(4),r.sdDiff.toFixed(4),r.dahlberg.toFixed(4),r.absMean.toFixed(4),r.cv?.toFixed(4)]);});
-  rows.push([]);
-  rows.push(["=== SYSTEMATIC BIAS ==="]);
-  rows.push(["Comparison","t","p-value","Significant"]);
-  biases.forEach(b=>{rows.push([b.pair,b.t.toFixed(4),b.pValue.toFixed(6),b.significant?"Yes":"No"]);});
+    filename=`${String(study.name).replace(/\s+/g,"_")}_reproducibility.csv`;
+  }else if(type==="descriptive"){
+    rows=[["Landmark","n","Mean","SD","Median","CV%","Min","Max","Skewness","Kurtosis","Shapiro_W","Shapiro_p","Normal"]];
+    descriptive.forEach(r=>{rows.push([r.lab,r.n,r.mean!==null?r.mean.toFixed(4):"",r.sd!==null?r.sd.toFixed(4):"",r.median!==null?r.median.toFixed(4):"",r.cv!==null?r.cv.toFixed(4):"",r.min!==null?r.min.toFixed(4):"",r.max!==null?r.max.toFixed(4):"",r.skew!==null?r.skew.toFixed(4):"",r.kurt!==null?r.kurt.toFixed(4):"",r.shapiro?r.shapiro.W.toFixed(4):"",r.shapiro?r.shapiro.pValue.toFixed(4):"",r.shapiro?String(r.shapiro.normal):""]);});
+    filename=`${String(study.name).replace(/\s+/g,"_")}_descriptive.csv`;
+  }else if(type==="errorMetrics"){
+    rows=[["Landmark","n","Mean_Diff","SD_Diff","Dahlberg","Abs_Mean","CV%"]];
+    perLandmark.forEach(r=>{rows.push([r.lab,r.n,r.meanDiff.toFixed(4),r.sdDiff.toFixed(4),r.dahlberg.toFixed(4),r.absMean.toFixed(4),r.cv!==null?r.cv.toFixed(4):""]);});
+    filename="error_metrics.csv";
+  }else if(type==="fullReport"){
+    rows.push(["CephaloStudio Statistical Report"]);
+    rows.push(["Study",study.name]);
+    rows.push(["Design",study.type==="intra"?"Intra-operator":"Inter-operator"]);
+    rows.push(["Metric",metric.toUpperCase()]);
+    rows.push(["Date",new Date().toISOString()]);
+    rows.push([]);
+    rows.push(["=== DESCRIPTIVE STATISTICS ==="]);
+    rows.push(["Landmark","n","Mean","SD","Median","CV%","Min","Max"]);
+    descriptive.forEach(r=>{rows.push([r.lab,r.n,r.mean?.toFixed(4),r.sd?.toFixed(4),r.median?.toFixed(4),r.cv?.toFixed(4),r.min?.toFixed(4),r.max?.toFixed(4)]);});
+    rows.push([]);
+    rows.push(["=== RELIABILITY ==="]);
+    rows.push(["ICC (Absolute)",icc?.ICC_Absolute?.toFixed(4)]);
+    rows.push(["ICC (Consistency)",icc?.ICC_Consistency?.toFixed(4)]);
+    rows.push(["Interpretation",icc?.interpretation]);
+    rows.push(["SEM",sem?.toFixed(4)]);
+    rows.push(["MDC (95%)",mdc?.toFixed(4)]);
+    rows.push([]);
+    rows.push(["=== ERROR METRICS ==="]);
+    rows.push(["Dahlberg Error",dahl?.error?.toFixed(4)]);
+    rows.push(["Bland-Altman Mean Diff",bland?.meanDiff?.toFixed(4)]);
+    rows.push(["Bland-Altman SD",bland?.stdDiff?.toFixed(4)]);
+    rows.push(["Bland-Altman Lower LoA",bland?.lowerLOA?.toFixed(4)]);
+    rows.push(["Bland-Altman Upper LoA",bland?.upperLOA?.toFixed(4)]);
+    rows.push([]);
+    rows.push(["=== PAIRED T-TEST ==="]);
+    rows.push(["t",tTest?.t?.toFixed(4)]);
+    rows.push(["df",tTest?.df]);
+    rows.push(["p-value",tTest?.pValue?.toFixed(6)]);
+    rows.push(["Significant",tTest?.significant?"Yes":"No"]);
+    rows.push([]);
+    rows.push(["=== ANOVA ==="]);
+    rows.push(["F",anovaRes?.F?.toFixed(4)]);
+    rows.push(["p-value",anovaRes?.pValue?.toFixed(6)]);
+    rows.push(["Significant",anovaRes?.significant?"Yes":"No"]);
+    rows.push([]);
+    rows.push(["=== PER-LANDMARK ERRORS ==="]);
+    rows.push(["Landmark","n","Mean Diff","SD Diff","Dahlberg","Abs Mean","CV%"]);
+    perLandmark.forEach(r=>{rows.push([r.lab,r.n,r.meanDiff.toFixed(4),r.sdDiff.toFixed(4),r.dahlberg.toFixed(4),r.absMean.toFixed(4),r.cv?.toFixed(4)]);});
+    rows.push([]);
+    rows.push(["=== SYSTEMATIC BIAS ==="]);
+    rows.push(["Comparison","t","p-value","Significant"]);
+    biases.forEach(b=>{rows.push([b.pair,b.t.toFixed(4),b.pValue.toFixed(6),b.significant?"Yes":"No"]);});
+    filename=`${String(study.name).replace(/\s+/g,"_")}_full_report.csv`;
+  }
   const csv=rows.map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(",")).join("\n");
   const a=document.createElement("a");
   a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
-  a.download=`${String(study.name).replace(/\s+/g,"_")}_full_report.csv`;a.click();
+  a.download=filename;a.click();
 }
 
 function StatisticsPanel({t,studies,databaseImages,formatAngle}){
@@ -2074,7 +2060,7 @@ function StudyMarkupTables({t,studies}){
             </table>
           </div>
           <div style={{marginTop:10}}>
-            <Btn t={t} small onClick={()=>exportReproTablesCsv(study)}>⬇ Download raw data (.csv)</Btn>
+            <Btn t={t} small onClick={()=>exportCsv("reproTables",{study})}>⬇ Download raw data (.csv)</Btn>
           </div>
         </div>
       )}
@@ -2170,8 +2156,8 @@ function StudyDashboard({t,studies}){
                 </tbody>
               </table>
               <div style={{display:"flex",gap:8,marginTop:14,paddingTop:10,borderTop:`1px solid ${t.bdr}`,flexWrap:"wrap"}}>
-                <Btn t={t} small onClick={()=>exportReproTablesCsv(study)}>⬇ Download tables (.csv)</Btn>
-                <Btn t={t} small onClick={()=>exportFullStatsReport(study,metric,labels,descriptive,perLandmark,biases,icc,dahl,bland,tTest,anovaRes,sem,mdc)}>⬇ Full report</Btn>
+                <Btn t={t} small onClick={()=>exportCsv("reproTables",{study})}>⬇ Download tables (.csv)</Btn>
+                <Btn t={t} small onClick={()=>exportCsv("fullReport",{study,metric,labels,descriptive,perLandmark,biases,icc,dahl,bland,tTest,anovaRes,sem,mdc})}>⬇ Full report</Btn>
               </div>
             </div>
           )}
@@ -2300,10 +2286,10 @@ function StudyDashboard({t,studies}){
 
           {tab==="export"&&(
             <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              <Btn t={t} onClick={()=>exportReproTablesCsv(study)}>⬇ Raw data tables (.csv)</Btn>
-              <Btn t={t} onClick={()=>exportDescriptiveCsv(study,metric,descriptive)}>⬇ Descriptive statistics (.csv)</Btn>
-              <Btn t={t} onClick={()=>exportErrorMetricsCsv(perLandmark)}>⬇ Per-landmark error metrics (.csv)</Btn>
-              <Btn t={t} onClick={()=>exportFullStatsReport(study,metric,labels,descriptive,perLandmark,biases,icc,dahl,bland,tTest,anovaRes,sem,mdc)}>⬇ Full statistical report (.csv)</Btn>
+              <Btn t={t} onClick={()=>exportCsv("reproTables",{study})}>⬇ Raw data tables (.csv)</Btn>
+              <Btn t={t} onClick={()=>exportCsv("descriptive",{study,metric,descriptive})}>⬇ Descriptive statistics (.csv)</Btn>
+              <Btn t={t} onClick={()=>exportCsv("errorMetrics",{perLandmark})}>⬇ Per-landmark error metrics (.csv)</Btn>
+              <Btn t={t} onClick={()=>exportCsv("fullReport",{study,metric,labels,descriptive,perLandmark,biases,icc,dahl,bland,tTest,anovaRes,sem,mdc})}>⬇ Full statistical report (.csv)</Btn>
             </div>
           )}
         </>
