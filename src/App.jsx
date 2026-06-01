@@ -2,10 +2,12 @@
 /* eslint-disable no-unused-vars */
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { SMV_CSV, OPG_CSV, csvToAnalysis, THEMES, TOOLS, PREDEFINED, LUT_PRESETS } from "./constants.js";
-import { uid, clamp, dist, angle3pt, angle4pt, perpDist, polyArea, polyLen, vpts, sampleSpline, splineArea, splineLen, getInfiniteLinePoints, computeMeasurements, catmullRom, perpPoint, snapPoint, snapToLine, alignOnePoint, alignTwoPoints, buildScope, evalFormula, normDeviation, deviationColor, mean, variance, stdev, gammaLn, betaIncomplete, betaCF, tDistributeCDF, tTestPaired, calculateICC, getICCInterpretation, dahlbergError, blandAltman, median, iqr, skewness, kurtosis, coefficientOfVariation, standardError, minimalDetectableChange, shapiroWilk, oneWayAnova, spearmanCorrelation, pearsonCorrelation, correlationMatrix, aggregateDahlberg, computePerLandmarkError, detectSystematicBias, anovaAcrossSessions, computeNormsComparison, detectOutliers, confidenceInterval, linearRegression } from "./utils.js";
+import { uid, clamp, dist, angle3pt, angle4pt, perpDist, polyArea, polyLen, vpts, sampleSpline, splineArea, splineLen, getInfiniteLinePoints, computeMeasurements, catmullRom, perpPoint, snapPoint, snapToLine, alignOnePoint, alignTwoPoints, buildScope, evalFormula, normDeviation, deviationColor, mean, variance, stdev, gammaLn, betaIncomplete, betaCF, tDistributeCDF, tTestPaired, calculateICC, getICCInterpretation, dahlbergError, blandAltman, median, iqr, skewness, kurtosis, coefficientOfVariation, standardError, minimalDetectableChange, shapiroWilk, oneWayAnova, spearmanCorrelation, pearsonCorrelation, correlationMatrix, aggregateDahlberg, computePerLandmarkError, detectSystematicBias, anovaAcrossSessions, computeNormsComparison, detectOutliers, confidenceInterval, linearRegression, hashPin } from "./utils.js";
 import { getLUTColor, applyEdgeKernel, processImageToCanvas, computeHistogram, FloatingHistogram } from "./imageUtils.jsx";
 import { useKatex, KatexSpan, LatexFloatingPanel } from "./hooks.jsx";
 import { Btn, Tag, Sld, PropRow, Inp, Divider, PanelHeader } from "./ui.jsx";
+import ToolBtn from "./ToolBtn.jsx";
+import PinGate from "./PinGate.jsx";
 import { drawMarkup, drawInProgress, drawScaleBar, drawLUTLegend, drawSnapIndicator, drawDisplacementVectors, hitTest } from "./markups.jsx";
 import { MarkupsPanel, MeasurementsPanel, FormulasPanel, ImagePanel, LayersPanel, MarkupProps, TemplatesPanel, ThemesPanel } from "./panels.jsx";
 
@@ -23,11 +25,6 @@ function mkProject(projection){
     meta:{patientId:"",name:"",dob:"",age:"",gender:"",ethnicity:"",clinician:"",facility:"",referral:"",notes:"",anonymized:false},
     accessControl:{requirePin:false,pinHash:""},
     activeVersionId:v.id,versions:[v],images:[]};
-}
-
-async function hashPin(pin){
-  const buf=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(pin));
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
 }
 
 function exportCephx(project){
@@ -58,35 +55,6 @@ function exportTemplateAsCepht(project,templateName){
   const payload={format:"cepht",version:"1.0",exported:Date.now(),...template};
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}));
   a.download=`${templateName.replace(/\s+/g,"_")}.cepht`;a.click();
-}
-
-// TOOL BUTTON WITH HOVER EFFECT
-// ═══════════════════════════════════════════════════════════════════════════════
-function ToolBtn({tool,active,onClick,theme,t,style}){
-  const[hov,setHov]=useState(false);
-  return(
-    <button title={`${tool.label} (${tool.key})`} onClick={onClick}
-      onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
-      style={{width:42,height:42,borderRadius:8,border:"none",
-        background:active?t.acc:hov?t.accMuted:"transparent",
-        color:active?(theme==="light"?"#fff":t.bg):hov?t.acc:t.tx,
-        cursor:"pointer",fontSize:tool.id==="text"?14:20,
-        display:"flex",alignItems:"center",justifyContent:"center",
-        transition:"all 0.15s",fontWeight:tool.id==="text"?700:400,flexShrink:0,
-        boxShadow:active?`0 0 0 2px ${t.acc}`:hov?`0 2px 8px ${t.shadow}`:"none",
-        transform:hov&&!active?"translateX(1px)":"none",...style}}>
-      {tool.icon}
-    </button>
-  );
-}
-
-// CANVAS DRAWING
-// ═══════════════════════════════════════════════════════════════════════════════
-/** Reproducibility trial points: only visible while that trial/operator session is actively collecting. */
-function isReproPointVisible(m,reproCollecting){
-  if(m.type!=="point"||!m.repro)return true;
-  if(!reproCollecting)return false;
-  return m.repro.studyId===reproCollecting.studyId&&m.repro.opId===reproCollecting.opId&&m.repro.trialIdx===reproCollecting.trialIdx;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -576,214 +544,6 @@ function DatabaseImportModal({t,onImport,onClose}){
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// STATS DASHBOARD
-// ═══════════════════════════════════════════════════════════════════════════════
-function range(arr){
-  if(!arr.length) return null;
-  return { min: Math.min(...arr), max: Math.max(...arr) };
-}
-
-function groupBy(dataset, key){
-  return dataset.reduce((acc, item)=>{
-    const k = item[key] || "undefined";
-    if(!acc[k]) acc[k] = [];
-    acc[k].push(item);
-    return acc;
-  }, {});
-}
-
-function extractVariable(dataset, variable){
-  return dataset
-    .map(c => c.measurements?.[variable] ?? c.formulas?.[variable])
-    .filter(v => typeof v === "number");
-}
-
-function descriptiveStats(values){
-  if(!values.length) return {n:0,mean:null,sd:null,median:null,range:null,cv:null,skew:null};
-  const m = mean(values);
-  const s = stdev(values);
-  return {
-    n: values.length,
-    mean: m,
-    sd: s,
-    median: median(values),
-    range: range(values),
-    cv: m!==0?(s/Math.abs(m))*100:null,
-    skew: values.length>=3?skewness(values):null
-  };
-}
-
-function StatsDashboard({ dataset, t }) {
-  const [selectedVar, setSelectedVar] = useState("SNA");
-  const [groupKey, setGroupKey] = useState("group");
-  const [showCorr, setShowCorr] = useState(false);
-
-  const variables = useMemo(()=>{
-    if(!dataset.length) return [];
-    return Object.keys({
-      ...(dataset[0]?.measurements||{}),
-      ...(dataset[0]?.formulas||{})
-    });
-  },[dataset]);
-
-  const values = useMemo(()=> extractVariable(dataset, selectedVar), [dataset, selectedVar]);
-  const stats = useMemo(()=> descriptiveStats(values), [values]);
-  const grouped = useMemo(()=> groupBy(dataset, groupKey), [dataset, groupKey]);
-
-  const corrMatrix = useMemo(()=>{
-    if(!showCorr||variables.length<2) return null;
-    const varDatasets = variables.slice(0,12).map(v=>extractVariable(dataset,v).filter(x=>x!=null));
-    const validPairs = varDatasets.filter(v=>v.length>=3);
-    if(validPairs.length<2) return null;
-    return correlationMatrix(validPairs);
-  },[dataset,variables,showCorr]);
-
-  const corrVars = useMemo(()=>{
-    if(!showCorr) return [];
-    return variables.slice(0,12).filter(v=>{
-      const vals = extractVariable(dataset,v).filter(x=>x!=null);
-      return vals.length>=3;
-    });
-  },[dataset,variables,showCorr]);
-
-  const boxPlotData = useMemo(()=>{
-    return variables.slice(0,8).map(v=>{
-      const vals = extractVariable(dataset,v).filter(x=>x!=null);
-      if(vals.length<3) return null;
-      const sorted = [...vals].sort((a,b)=>a-b);
-      const q1 = sorted[Math.floor(sorted.length*0.25)];
-      const q3 = sorted[Math.floor(sorted.length*0.75)];
-      const med = sorted.length%2?sorted[Math.floor(sorted.length/2)]:(sorted[sorted.length/2-1]+sorted[sorted.length/2])/2;
-      const iqrVal = q3-q1;
-      return {var:v,n:vals.length,min:sorted[0],q1,median:med,q3,max:sorted[sorted.length-1],iqr:iqrVal,outliers:vals.filter(x=>x<q1-1.5*iqrVal||x>q3+1.5*iqrVal)};
-    }).filter(Boolean);
-  },[dataset,variables]);
-
-  return (
-    <div style={{padding:16}}>
-      <h3 style={{fontSize:14,fontWeight:700,color:"inherit",marginBottom:12}}>Statistical Dashboard</h3>
-      <div style={{marginBottom:10}}>
-        <label style={{fontSize:11,color:t.tx2,marginRight:8}}>Variable: </label>
-        <select value={selectedVar} onChange={e=>setSelectedVar(e.target.value)} style={{padding:"4px 8px",border:`1px solid ${t.bdr}`,borderRadius:4,background:t.surf3,color:t.tx,fontSize:11}}>
-          {variables.map(v => <option key={v} value={v}>{v}</option>)}
-        </select>
-      </div>
-      <div style={{marginBottom:20, padding:10, border:"1px solid "+t.bdr,borderRadius:8}}>
-        <strong style={{fontSize:11,color:t.tx}}>Descriptive Statistics</strong>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,fontSize:11,marginTop:6}}>
-          <span style={{color:t.tx2}}>N</span><span>{stats.n}</span>
-          <span style={{color:t.tx2}}>Mean</span><span>{stats.mean?.toFixed(2)}</span>
-          <span style={{color:t.tx2}}>SD</span><span>{stats.sd?.toFixed(2)}</span>
-          <span style={{color:t.tx2}}>Median</span><span>{stats.median?.toFixed(2)}</span>
-          <span style={{color:t.tx2}}>Range</span><span>{stats.range ? `${stats.range.min} – ${stats.range.max}` : "-"}</span>
-          {stats.cv!=null&&<><span style={{color:t.tx2}}>CV%</span><span>{stats.cv.toFixed(2)}%</span></>}
-          {stats.skew!=null&&<><span style={{color:t.tx2}}>Skewness</span><span>{stats.skew.toFixed(3)}</span></>}
-        </div>
-      </div>
-      <div style={{marginBottom:20}}>
-        <label style={{fontSize:11,color:t.tx2,marginRight:8}}>Group by: </label>
-        <select value={groupKey} onChange={e=>setGroupKey(e.target.value)} style={{padding:"4px 8px",border:`1px solid ${t.bdr}`,borderRadius:4,background:t.surf3,color:t.tx,fontSize:11}}>
-          <option value="group">Group</option>
-          <option value="timepoint">Timepoint</option>
-          <option value="operator">Operator</option>
-        </select>
-        {Object.entries(grouped).map(([g, cases])=>{
-          const vals = extractVariable(cases, selectedVar);
-          const s = descriptiveStats(vals);
-          return (
-            <div key={g} style={{marginTop:8, padding:8, border:"1px solid "+t.bdr,borderRadius:6}}>
-              <strong style={{fontSize:11,color:t.tx}}>{g}</strong>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4,fontSize:10,marginTop:4}}>
-                <span style={{color:t.tx2}}>Mean</span><span>{s.mean?.toFixed(2)}</span>
-                <span style={{color:t.tx2}}>SD</span><span>{s.sd?.toFixed(2)}</span>
-                <span style={{color:t.tx2}}>N</span><span>{s.n}</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      {boxPlotData.length>1&&(
-        <div style={{marginBottom:20,padding:10,border:"1px solid "+t.bdr,borderRadius:8}}>
-          <strong style={{fontSize:11,color:t.tx}}>Distribution Summary (Box Plot Data)</strong>
-          <div style={{overflowX:"auto",marginTop:8}}>
-            <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
-              <thead>
-                <tr style={{borderBottom:`1px solid ${t.bdr}`}}>
-                  <th style={{textAlign:"left",padding:4,color:t.tx2}}>Variable</th>
-                  <th style={{textAlign:"right",padding:4,color:t.tx2}}>N</th>
-                  <th style={{textAlign:"right",padding:4,color:t.tx2}}>Min</th>
-                  <th style={{textAlign:"right",padding:4,color:t.tx2}}>Q1</th>
-                  <th style={{textAlign:"right",padding:4,color:t.tx2}}>Median</th>
-                  <th style={{textAlign:"right",padding:4,color:t.tx2}}>Q3</th>
-                  <th style={{textAlign:"right",padding:4,color:t.tx2}}>Max</th>
-                  <th style={{textAlign:"right",padding:4,color:t.tx2}}>IQR</th>
-                  <th style={{textAlign:"right",padding:4,color:t.tx2}}>Outliers</th>
-                </tr>
-              </thead>
-              <tbody>
-                {boxPlotData.map(bp=>(
-                  <tr key={bp.var} style={{borderBottom:`1px solid ${t.bdr}44`}}>
-                    <td style={{padding:4,color:t.tx,fontWeight:600}}>{bp.var}</td>
-                    <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{bp.n}</td>
-                    <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{bp.min.toFixed(2)}</td>
-                    <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{bp.q1.toFixed(2)}</td>
-                    <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:t.acc}}>{bp.median.toFixed(2)}</td>
-                    <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{bp.q3.toFixed(2)}</td>
-                    <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{bp.max.toFixed(2)}</td>
-                    <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{bp.iqr.toFixed(2)}</td>
-                    <td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:bp.outliers.length>0?t.warn:t.ok}}>{bp.outliers.length}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-      <div style={{marginBottom:20}}>
-        <button onClick={()=>setShowCorr(!showCorr)} style={{width:"100%",padding:"8px",borderRadius:6,border:`1px solid ${t.bdr}`,background:showCorr?t.acc+"18":t.surf2,color:t.tx,cursor:"pointer",fontSize:12,textAlign:"center"}}>{showCorr?"Hide":"Show"} Correlation Matrix</button>
-        {showCorr&&corrMatrix&&corrVars.length>=2&&(
-          <div style={{marginTop:10,overflowX:"auto"}}>
-            <table style={{width:"100%",fontSize:8,borderCollapse:"collapse"}}>
-              <thead>
-                <tr><th style={{padding:3,color:t.tx2}}></th>{corrVars.map(v=><th key={v} style={{padding:3,color:t.acc,fontFamily:"'DM Mono',monospace",writingMode:"vertical-lr",textAlign:"left"}}>{v}</th>)}</tr>
-              </thead>
-              <tbody>
-                {corrMatrix.map((row,i)=>(
-                  <tr key={i}><td style={{padding:3,color:t.tx,fontWeight:600}}>{corrVars[i]}</td>{row.map((v,j)=>{
-                    const abs=v!=null?Math.abs(v):0;
-                    let bg="transparent";
-                    let clr=t.tx3;
-                    if(v!=null){
-                      if(v>0){clr=t.acc;bg=`rgba(59,130,246,${(abs*0.3).toFixed(2)})`;}
-                      else{clr=t.err;bg=`rgba(239,68,68,${(abs*0.3).toFixed(2)})`;}
-                    }
-                    return <td key={j} style={{padding:3,textAlign:"center",fontFamily:"'DM Mono',monospace",background:bg,color:clr}}>{v!=null?v.toFixed(2):"-"}</td>;
-                  })}</tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-      <div style={{marginBottom:20}}>
-        <strong style={{fontSize:11,color:t.tx}}>Quick Correlations</strong>
-        {variables.slice(0,5).map(v=>{
-          const arr = extractVariable(dataset, v);
-          const r = pearsonCorrelation(values, arr);
-          const rs = spearmanCorrelation(values.filter((_,i)=>arr[i]!=null).map((val,i)=>{const a=arr.filter(x=>x!=null);return a[i];}),arr.filter(x=>x!=null));
-          return (
-            <div key={v} style={{fontSize:10,color:t.tx2,display:"flex",justifyContent:"space-between"}}>
-              <span>{selectedVar} vs {v}</span>
-              <span>r={r?r.toFixed(2):"-"} | ρ={rs!=null?rs.toFixed(2):"-"}</span>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
 // MARKUP TABLES PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
 function MarkupTablesPanel({databaseImages,currentImageIndex,t,formatAngle}){
@@ -1004,24 +764,6 @@ function MarkupTablesPanel({databaseImages,currentImageIndex,t,formatAngle}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // DATABASE STATS PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
-function PinGate({t,project,onVerified,onCancel}){
-  const[pin,setPin]=useState("");const[err,setErr]=useState(false);
-  const verify=async()=>{const h=await hashPin(pin);if(h===project.accessControl.pinHash)onVerified();else{setErr(true);setPin("");}};
-  return(
-    <div style={{minHeight:"100vh",display:"flex",alignItems:"center",justifyContent:"center",background:t.bg}}>
-      <div style={{background:t.surf,border:`1px solid ${t.bdr}`,borderRadius:12,padding:32,width:300,boxShadow:`0 16px 48px ${t.shadow}`,textAlign:"center"}}>
-        <div style={{fontSize:32,marginBottom:12}}>🔒</div>
-        <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:18,color:t.tx,marginBottom:4}}>{project.name}</div>
-        <div style={{fontSize:12,color:t.tx2,marginBottom:20}}>PIN required to open this case.</div>
-        <input type="password" value={pin} onChange={e=>setPin(e.target.value)} onKeyDown={e=>e.key==="Enter"&&verify()} placeholder="Enter PIN" autoFocus
-          style={{width:"100%",background:t.surf3,border:`1px solid ${err?t.err:t.bdr}`,borderRadius:8,padding:"10px 12px",color:t.tx,fontSize:16,fontFamily:"'DM Mono',monospace",textAlign:"center",marginBottom:12,boxSizing:"border-box"}}/>
-        {err&&<div style={{fontSize:12,color:t.err,marginBottom:12}}>Incorrect PIN.</div>}
-        <div style={{display:"flex",gap:8}}><Btn t={t} onClick={verify} style={{flex:1}}>Unlock</Btn><Btn t={t} onClick={onCancel} style={{flex:1}}>Back</Btn></div>
-      </div>
-    </div>
-  );
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // WORKSPACE
 // ═══════════════════════════════════════════════════════════════════════════════
