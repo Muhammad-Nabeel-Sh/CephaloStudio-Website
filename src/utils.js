@@ -9,7 +9,6 @@ math.import({
   import: () => { throw new Error("Not allowed"); },
   createUnit: () => { throw new Error("Not allowed"); },
   evaluate: () => { throw new Error("Not allowed"); },
-  parse: () => { throw new Error("Not allowed"); },
   simplify: () => { throw new Error("Not allowed"); }
 }, { override: true });
 
@@ -85,6 +84,7 @@ export const getInfiniteLinePoints = (p1, p2, w, h) => {
 
 export function computeMeasurements(m, cal) {
   const ppm = cal?.pxPerMm || 1, meas = {}, vp = vpts(m);
+  if (vp.length > 0) { meas.x = vp[0].x; meas.y = vp[0].y; }
   if ((m.type === "line" || m.type === "parallel") && vp.length >= 2 && m.mode !== "infinite") meas.length = dist(vp[0], vp[1]) / ppm;
   if (m.type === "angle3" && vp.length >= 3) meas.angle = angle3pt(vp[0], vp[1], vp[2]);
   if (m.type === "angle4" && vp.length >= 4) meas.angle = angle4pt(vp[0], vp[1], vp[2], vp[3]);
@@ -169,12 +169,41 @@ export function buildScope(markups, calibration) {
   return scope;
 }
 
+const _builtins = new Set(["sin","cos","tan","asin","acos","atan","atan2","abs","sqrt","exp","log","log2","log10","ceil","floor","round","min","max","pow","pi","e","i","true","false","Infinity","NaN"]);
+
 export function evalFormula(expr, scope) {
   try {
-    const compiled = math.compile(expr);
-    const result = compiled.evaluate(scope);
-    return typeof result === "number" && isFinite(result) ? result : null;
+    let s = expr; const keys = Object.keys(scope).sort((a,b)=>b.length-a.length);
+    const used = new Set();
+    for (const k of keys) {
+      const v = scope[k];
+      if (typeof v === "number" && isFinite(v)) {
+        const re = new RegExp(`\\b${k.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")}\\b`, "g");
+        if (re.test(s)) { re.lastIndex = 0; s = s.replace(re, `(${v})`); used.add(k); }
+      }
+    }
+    const tokens = (expr.match(/\b[a-zA-Z_]\w*\b/g)||[]).filter(w=>!/^\d+$/.test(w)&&!_builtins.has(w));
+    const missing = tokens.filter(w=>!used.has(w));
+    if (missing.length > 0) return null;
+    const c = math.compile(s), r = c.evaluate({});
+    return typeof r === "number" && isFinite(r) ? r : null;
   } catch { return null; }
+}
+
+export function getMissingVars(expr, scope) {
+  if (!expr) return [];
+  const keys = Object.keys(scope).sort((a,b)=>b.length-a.length);
+  const used = new Set();
+  let s = expr;
+  for (const k of keys) {
+    const v = scope[k];
+    if (typeof v === "number" && isFinite(v)) {
+      const re = new RegExp(`\\b${k.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")}\\b`, "g");
+      if (re.test(s)) { re.lastIndex = 0; s = s.replace(re, ""); used.add(k); }
+    }
+  }
+  const tokens = (expr.match(/\b[a-zA-Z_]\w*\b/g)||[]).filter(w=>!/^\d+$/.test(w)&&!_builtins.has(w));
+  return [...new Set(tokens.filter(w=>!used.has(w)))];
 }
 
 export function normDeviation(value, norm) {

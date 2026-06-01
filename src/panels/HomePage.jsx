@@ -57,7 +57,15 @@ export default function HomePage({t,theme,setTheme,projects,onOpen,onCreate,onIm
           <div><div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:20,letterSpacing:-0.5,color:t.tx}}>Cephalometry Studio</div><div style={{fontSize:10,color:t.tx2,letterSpacing:1,textTransform:"uppercase",fontWeight:600}}>Advanced Cephalometric Analysis</div></div>
         </div>
         <div style={{display:"flex",gap:6,alignItems:"center"}}>
-          {Object.values(THEMES).filter(th=>th.inHeader).map(th=>(<button key={th.id} onClick={()=>setTheme(th.id)} title={th.name} style={{width:28,height:28,borderRadius:6,border:theme===th.id?`2px solid ${t.acc}`:`1px solid ${t.bdr}`,background:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}><div style={{width:12,height:12,borderRadius:3,background:th.bg,border:`1px solid ${th.acc}`,boxShadow:theme===th.id?`0 0 0 2px ${t.acc}`:"none"}}/></button>))}
+          {Object.values(THEMES).map(th=>(
+            <button key={th.id} onClick={()=>setTheme(th.id)} title={th.name}
+              style={{width:30,height:30,borderRadius:8,border:0,background:"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:0,position:"relative"}}>
+              <div style={{width:28,height:28,borderRadius:7,background:th.bg,border:theme===th.id?`2px solid ${t.acc}`:`1px solid ${t.bdr}`,display:"flex",alignItems:"center",justifyContent:"center",position:"relative",transition:"all 0.15s",boxShadow:theme===th.id?`0 0 0 2px ${t.acc}33, 0 2px 8px ${t.shadow}`:`0 1px 3px ${t.shadow}`}}>
+                <div style={{width:12,height:12,borderRadius:4,background:th.acc,opacity:0.9,boxShadow:`0 0 6px ${th.acc}66`}}/>
+                {theme===th.id&&<div style={{position:"absolute",inset:-3,borderRadius:9,border:`2px solid ${t.acc}`,opacity:0.5}}/>}
+              </div>
+            </button>
+          ))}
           <div style={{width:1,height:20,background:t.bdr,margin:"0 4px"}}/>
           <input ref={fileRef} type="file" accept=".cephx" style={{display:"none"}} onChange={e=>{if(e.target.files[0])onImport(e.target.files[0]);e.target.value="";}}/>
           <Btn t={t} small onClick={()=>fileRef.current?.click()}>↑ Import .cephx</Btn>

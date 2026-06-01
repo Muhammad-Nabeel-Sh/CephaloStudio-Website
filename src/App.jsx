@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo, useReducer } from "react";
 import { THEMES, TOOLS, PREDEFINED, LUT_PRESETS } from "./constants.js";
-import { uid, clamp, dist, vpts, computeMeasurements, snapPoint, alignOnePoint, alignTwoPoints, buildScope, evalFormula, mean, stdev, tTestPaired, calculateICC, dahlbergError, blandAltman, median, iqr, skewness, kurtosis, coefficientOfVariation, standardError, minimalDetectableChange, shapiroWilk, spearmanCorrelation, pearsonCorrelation, correlationMatrix, computePerLandmarkError, detectSystematicBias, anovaAcrossSessions, computeNormsComparison, detectOutliers, confidenceInterval, linearRegression } from "./utils.js";
+import { uid, clamp, dist, vpts, computeMeasurements, snapPoint, alignOnePoint, alignTwoPoints, buildScope, evalFormula, getMissingVars, mean, stdev, tTestPaired, calculateICC, dahlbergError, blandAltman, median, iqr, skewness, kurtosis, coefficientOfVariation, standardError, minimalDetectableChange, shapiroWilk, spearmanCorrelation, pearsonCorrelation, correlationMatrix, computePerLandmarkError, detectSystematicBias, anovaAcrossSessions, computeNormsComparison, detectOutliers, confidenceInterval, linearRegression } from "./utils.js";
 import { processImageToCanvas, computeHistogram, FloatingHistogram } from "./imageUtils.jsx";
 import { KatexSpan, LatexFloatingPanel } from "./hooks.jsx";
 import { Btn, Tag, Sld, PropRow, Inp } from "./ui.jsx";
@@ -167,8 +167,29 @@ function TransformModal({t,images,onUpdateImages,onClose}){
 function FormulaEditor({t,formula,scope,onSave,onClose}){
   const[name,setName]=useState(formula?.name||"");const[latex,setLatex]=useState(formula?.latex||"");
   const[expr,setExpr]=useState(formula?.expression||"");const[unit,setUnit]=useState(formula?.unit||"");const[desc,setDesc]=useState(formula?.description||"");
-  const[bigLatex,setBigLatex]=useState(null);
+  const[bigLatex,setBigLatex]=useState(null);const[showFx,setShowFx]=useState(false);const inputRef=useRef(null);
   const preview=useMemo(()=>evalFormula(expr,scope),[expr,scope]);
+  const missing=useMemo(()=>getMissingVars(expr,scope),[expr,scope]);
+
+  const groups=useMemo(()=>{
+    const cats={Angles:[],Lengths:[],Points:[],Polygons:[],Other:[]};
+    Object.keys(scope).forEach(k=>{
+      if(k.endsWith("_angle"))cats.Angles.push(k);
+      else if(k.endsWith("_length"))cats.Lengths.push(k);
+      else if(k.endsWith("_x")||k.endsWith("_y"))cats.Points.push(k);
+      else if(k.endsWith("_area")||k.endsWith("_perimeter"))cats.Polygons.push(k);
+      else cats.Other.push(k);
+    });
+    return Object.entries(cats).filter(([,vs])=>vs.length>0);
+  },[scope]);
+
+  const insertVar=varName=>{
+    const el=inputRef.current;if(!el){setExpr(prev=>prev+varName);return;}
+    const start=el.selectionStart??expr.length;const end=el.selectionEnd??expr.length;
+    setExpr(prev=>prev.slice(0,start)+varName+prev.slice(end));
+    setTimeout(()=>{el.focus();const p=start+varName.length;el.setSelectionRange(p,p);},0);
+  };
+
   return(
     <div>
       <PropRow label="Name" t={t}><Inp value={name} onChange={setName} t={t} placeholder="e.g. ANB Angle"/></PropRow>
@@ -181,13 +202,39 @@ function FormulaEditor({t,formula,scope,onSave,onClose}){
         </div>}
       </div>
       <div style={{marginBottom:8}}>
-        <div style={{fontSize:11,color:t.tx2,marginBottom:3}}>Expression (mathjs)</div>
-        <Inp value={expr} onChange={setExpr} t={t} placeholder="SNA_angle - SNB_angle"/>
-        <div style={{fontSize:10,color:t.tx3,marginTop:4}}>Vars: {Object.keys(scope).slice(0,6).join(", ")}{Object.keys(scope).length>6?"…":""}</div>
+        <div style={{fontSize:11,color:t.tx2,marginBottom:3,display:"flex",alignItems:"center",gap:6}}>Expression (mathjs)
+          <span onClick={()=>setShowFx(!showFx)} style={{fontSize:9,fontWeight:700,color:t.acc,cursor:"pointer",background:t.accMuted,borderRadius:3,padding:"1px 6px",fontFamily:"'DM Mono',monospace"}}>fx</span>
+        </div>
+        {showFx&&<div style={{background:t.surf2,border:`1px solid ${t.bdr}`,borderRadius:6,padding:"8px 10px",marginBottom:6,fontSize:10,lineHeight:1.7,color:t.tx2}}>
+          <b style={{color:t.tx}}>Operators:</b> + - * / ^ %<br/>
+          <b style={{color:t.tx}}>Functions:</b> sin(), cos(), tan(), asin(), acos(), atan(), atan2(y,x)<br/>
+          <span style={{marginLeft:50}}/>abs(), sqrt(), exp(), log(), log2(), log10()<br/>
+          <span style={{marginLeft:50}}/>ceil(), floor(), round(), min(a,b), max(a,b), pow(x,y)<br/>
+          <b style={{color:t.tx}}>Constants:</b> pi, e
+        </div>}
+        <Inp ref={inputRef} value={expr} onChange={setExpr} t={t} placeholder="SNA_angle - SNB_angle"/>
+        {groups.length>0&&<div style={{marginTop:6}}>
+          <div style={{fontSize:10,color:t.tx3,marginBottom:4}}>Click a variable to insert:</div>
+          {groups.map(([cat,vars])=>(
+            <div key={cat} style={{marginBottom:4}}>
+              <div style={{fontSize:9,color:t.tx2,fontWeight:700,marginBottom:2,textTransform:"uppercase",letterSpacing:0.5}}>{cat}</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                {vars.map(v=><button key={v} type="button" onClick={()=>insertVar(v)} title={`${scope[v]?.toFixed(2)??"?"}`}
+                  style={{fontSize:11,padding:"2px 8px",borderRadius:4,border:`1px solid ${t.bdr}`,background:t.surf3,color:t.tx,cursor:"pointer",fontFamily:"'DM Mono',monospace"}}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor=t.acc;e.currentTarget.style.background=t.accMuted;}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor=t.bdr;e.currentTarget.style.background=t.surf3;}}>
+                  {v}
+                </button>)}
+              </div>
+            </div>
+          ))}
+        </div>}
       </div>
       <div style={{display:"flex",justifyContent:"space-between",padding:"6px 8px",background:preview!==null?t.ok+"11":expr?t.err+"11":t.surf2,borderRadius:6,marginBottom:8}}>
         <span style={{fontSize:12,color:t.tx2}}>Preview</span>
-        <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:700,color:preview!==null?t.ok:expr?t.err:t.tx3}}>{preview!==null?`${preview.toFixed(2)} ${unit}`:expr?"Error":"—"}</span>
+        <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:700,color:preview!==null?t.ok:expr?t.err:t.tx3}}>
+          {preview!==null?`${preview.toFixed(2)} ${unit}`:expr?(missing.length>0?`Unknown: ${missing.join(", ")}`:"Error"):"—"}
+        </span>
       </div>
       <PropRow label="Unit" t={t}><Inp value={unit} onChange={setUnit} t={t} placeholder="°, mm, ratio"/></PropRow>
       <PropRow label="Notes" t={t}><Inp value={desc} onChange={setDesc} t={t} placeholder="Reference"/></PropRow>
