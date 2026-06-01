@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { uid, computeMeasurements, normDeviation, deviationColor, evalFormula } from "./utils.js";
-import { LUT_PRESETS, PREDEFINED, THEMES } from "./constants.js";
+import { LUT_PRESETS, PREDEFINED } from "./constants.js";
 import { KatexSpan, LatexFloatingPanel } from "./hooks.jsx";
 import { Btn, Tag, Sld, PropRow, Inp, Divider, PanelHeader } from "./ui.jsx";
 
@@ -372,7 +372,13 @@ export function MarkupProps({ m, t, theme, onUpdate, onDelete, calibration, onPa
 // TEMPLATES PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
 export function TemplatesPanel({ t, projection, onLoadTemplate, onImportCepht }) {
-  const allTemplates = PREDEFINED[projection] || [];
+  let allTemplates = PREDEFINED[projection] || [];
+  if (projection === "other") {
+    const subKeys = ["smv", "opg"];
+    subKeys.forEach(key => {
+      if (PREDEFINED[key]) allTemplates = allTemplates.concat(PREDEFINED[key]);
+    });
+  }
   const uniqueTemplates = allTemplates.filter((tmpl, idx, self) => idx === self.findIndex(t => t.name === tmpl.name));
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const cephtInputRef = useRef(null);
@@ -459,30 +465,3 @@ export function TemplatesPanel({ t, projection, onLoadTemplate, onImportCepht })
   );
 }
 
-// ══════════════════════════════════════════════════════════════���════════════════
-// THEMES PANEL
-// ═══════════════════════════════════════════════════════════════════════════════
-export function ThemesPanel({ t, theme, setTheme }) {
-  return (
-    <div style={{ padding: 12 }}>
-      <div style={{ fontSize: 11, color: t.tx2, marginBottom: 12, lineHeight: 1.45 }}>
-        Choose a color theme for the interface.
-      </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {Object.values(THEMES).map(th => (
-          <div key={th.id} onClick={() => setTheme(th.id)} style={{ padding: 12, borderRadius: 8, background: theme === th.id ? t.accMuted : t.surf2, border: `1px solid ${theme === th.id ? t.acc : t.bdr}`, cursor: "pointer", display: "flex", alignItems: "center", gap: 12, transition: "all 0.15s" }}>
-            <div style={{ width: 48, height: 32, borderRadius: 6, background: th.bg, border: `1px solid ${th.bdr}`, display: "flex", flexDirection: "column", gap: 2, padding: 4, flexShrink: 0 }}>
-              <div style={{ flex: 1, display: "flex", gap: 2 }}><div style={{ flex: 1, background: th.surf, borderRadius: 2 }} /><div style={{ flex: 1, background: th.surf2, borderRadius: 2 }} /></div>
-              <div style={{ height: 6, background: `linear-gradient(90deg, ${th.acc} 0%, ${th.err} 50%, ${th.ok} 100%)`, borderRadius: 2 }} />
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: t.tx, marginBottom: 2 }}>{th.name}</div>
-              <div style={{ fontSize: 10, color: t.tx2 }}>Click to apply</div>
-            </div>
-            {theme === th.id && <div style={{ color: t.acc, fontSize: 16 }}>✓</div>}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}

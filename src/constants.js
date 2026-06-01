@@ -1,116 +1,17 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// CONSTANTS - CSV Data, Themes, Tools, Predefined Analyses
+// CONSTANTS - Themes, Tools, Predefined Analyses
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export const SMV_CSV = `Analysis,View,Markup type,Landmark,Definition
-General SMV Analysis,SMV,Point,Ang-L - Angulare (Left),The point of intersection between the posterior border of the ramus and the inferior border of the mandibular body on the left side.
-General SMV Analysis,SMV,Point,Ang-R - Angulare (Right),The point of intersection between the posterior border of the ramus and the inferior border of the mandibular body on the right side.
-General SMV Analysis,SMV,Point,ANS - Anterior nasal spine,The tip of the anterior nasal spine in the midline.
-General SMV Analysis,SMV,Point,Ba - Basion,The median point of the anterior margin of the foramen magnum.
-General SMV Analysis,SMV,Point,CdA-L - Condylion Anterioris (Left),The most anterior point on the contour of the left mandibular condylar head.
-General SMV Analysis,SMV,Point,CdA-R - Condylion Anterioris (Right),The most anterior point on the contour of the right mandibular condylar head.
-General SMV Analysis,SMV,Point,CdL-L - Condylion Lateral (Left),The most lateral point on the left mandibular condyle.
-General SMV Analysis,SMV,Point,CdL-R - Condylion Lateral (Right),The most lateral point on the right mandibular condyle.
-General SMV Analysis,SMV,Point,CdM-L - Condylion Medial (Left),The most medial point on the left mandibular condyle.
-General SMV Analysis,SMV,Point,CdM-R - Condylion Medial (Right),The most medial point on the right mandibular condyle.
-General SMV Analysis,SMV,Point,CdP-L - Condylion Posterioris (Left),The most posterior point on the contour of the left mandibular condylar head.
-General SMV Analysis,SMV,Point,CdP-R - Condylion Posterioris (Right),The most posterior point on the contour of the right mandibular condylar head.
-General SMV Analysis,SMV,Point,Cg - Crista galli,The most anterior point of the crista galli.
-General SMV Analysis,SMV,Point,Cor-L - Coronoid (Left),The most anterior projection of the left coronoid process.
-General SMV Analysis,SMV,Point,Cor-R - Coronoid (Right),The most anterior projection of the right coronoid process.
-General SMV Analysis,SMV,Point,Go-L - Gonion (Left),The most lateral point at the angle of the left mandible.
-General SMV Analysis,SMV,Point,Go-R - Gonion (Right),The most lateral point at the angle of the right mandible.
-General SMV Analysis,SMV,Point,Jug-L - Jugale (Left),The intersection of the maxillary tuberosity and zygomatic buttress on the left side.
-General SMV Analysis,SMV,Point,Jug-R - Jugale (Right),The intersection of the maxillary tuberosity and zygomatic buttress on the right side.
-General SMV Analysis,SMV,Point,L1M - Lower dental midline,The dental midline point of the mandibular central incisors.
-General SMV Analysis,SMV,Point,L6-L - Lower first molar (Left),The most prominent lateral point on the buccal surface of the left mandibular first molar.
-General SMV Analysis,SMV,Point,L6-R - Lower first molar (Right),The most prominent lateral point on the buccal surface of the right mandibular first molar.
-General SMV Analysis,SMV,Point,Ma-L - Mastoid (Left),The most inferior and lateral point of the left mastoid process.
-General SMV Analysis,SMV,Point,Ma-R - Mastoid (Right),The most inferior and lateral point of the right mastoid process.
-General SMV Analysis,SMV,Point,MCF-L - Middle Cranial Fossa (Left),The most lateral or inferior prominent point on the outline of the left middle cranial fossa.
-General SMV Analysis,SMV,Point,MCF-R - Middle Cranial Fossa (Right),The most lateral or inferior prominent point on the outline of the right middle cranial fossa.
-General SMV Analysis,SMV,Point,MdABM - Mandibular Apical Base Midline,The geometric midline point of the mandibular apical base in the transverse plane.
-General SMV Analysis,SMV,Point,Me - Menton,The most anterior point on the symphysis of the mandible in the SMV projection.
-General SMV Analysis,SMV,Point,MxABM - Maxillary Apical Base Midline,The geometric midline point of the maxillary apical base in the transverse plane.
-General SMV Analysis,SMV,Point,Od - Odontoid,The most superior point on the tip of the odontoid process (dens) of the second cervical vertebra (axis).
-General SMV Analysis,SMV,Point,Op - Opisthion,The median point of the posterior margin of the foramen magnum.
-General SMV Analysis,SMV,Point,PCV-L - Posterior Cranial Vault (Left),The most posterior point on the bony outline of the left posterior cranial vault.
-General SMV Analysis,SMV,Point,PCV-R - Posterior Cranial Vault (Right),The most posterior point on the bony outline of the right posterior cranial vault.
-General SMV Analysis,SMV,Point,Ptm-L - Pterygomaxillary Fissure (Left),The most inferior point of the teardrop-shaped radiolucency representing the pterygomaxillary fissure on the left side.
-General SMV Analysis,SMV,Point,Ptm-R - Pterygomaxillary Fissure (Right),The most inferior point of the teardrop-shaped radiolucency representing the pterygomaxillary fissure on the right side.
-General SMV Analysis,SMV,Point,Sp-L - Foramen Spinosum (Left),The center of the left foramen spinosum, often used as a reliable bilateral cranial base reference structure.
-General SMV Analysis,SMV,Point,Sp-R - Foramen Spinosum (Right),The center of the right foramen spinosum, often used as a reliable bilateral cranial base reference structure.
-General SMV Analysis,SMV,Point,U1M - Upper dental midline,The dental midline point of the maxillary central incisors.
-General SMV Analysis,SMV,Point,U6-L - Upper first molar (Left),The most prominent lateral point on the buccal surface of the left maxillary first molar.
-General SMV Analysis,SMV,Point,U6-R - Upper first molar (Right),The most prominent lateral point on the buccal surface of the right maxillary first molar.
-General SMV Analysis,SMV,Point,V - Vomer,The most posterior point on the bony nasal septum (vomer).
-General SMV Analysis,SMV,Point,ZA-L - Zygomatic Arch (Left),The most lateral point on the left zygomatic arch.
-General SMV Analysis,SMV,Point,ZA-R - Zygomatic Arch (Right),The most lateral point on the right zygomatic arch.`;
+import smvCsv from "../Data/SMV.csv?raw";
+import opgCsv from "../Data/OPG.csv?raw";
+import { parseAnalysisCsv } from "./csvParser.js";
 
-export const OPG_CSV = `Analysis,View,Markup type,Landmark,Definition
-General OPG Analysis,OPG,Point,Ag-L - Antegonion (Left),The deepest point of the antegonial notch on the lower border of the left mandible.
-General OPG Analysis,OPG,Point,Ag-R - Antegonion (Right),The deepest point of the antegonial notch on the lower border of the right mandible.
-General OPG Analysis,OPG,Point,Ar-L - Articulare (Left),The point of intersection of the posterior border of the left condylar neck and the inferior border of the cranial base.
-General OPG Analysis,OPG,Point,Ar-R - Articulare (Right),The point of intersection of the posterior border of the right condylar neck and the inferior border of the cranial base.
-General OPG Analysis,OPG,Point,Co-L - Condylion (Left),The most superior point on the contour of the left mandibular condylar head.
-General OPG Analysis,OPG,Point,Co-R - Condylion (Right),The most superior point on the contour of the right mandibular condylar head.
-General OPG Analysis,OPG,Point,Cor-L - Coronoid (Left),The most superior point of the left coronoid process.
-General OPG Analysis,OPG,Point,Cor-R - Coronoid (Right),The most superior point of the right coronoid process.
-General OPG Analysis,OPG,Point,Go-L - Gonion (Left),The most inferior and posterior point at the angle of the left mandible.
-General OPG Analysis,OPG,Point,Go-R - Gonion (Right),The most inferior and posterior point at the angle of the right mandible.
-General OPG Analysis,OPG,Point,MdF-L - Mandibular Foramen (Left),The geometric center of the left mandibular foramen.
-General OPG Analysis,OPG,Point,MdF-R - Mandibular Foramen (Right),The geometric center of the right mandibular foramen.
-General OPG Analysis,OPG,Point,Me - Menton,The most inferior point on the outline of the mandibular symphysis.
-General OPG Analysis,OPG,Point,Mf-L - Mental Foramen (Left),The geometric center of the left mental foramen.
-General OPG Analysis,OPG,Point,Mf-R - Mental Foramen (Right),The geometric center of the right mental foramen.
-General OPG Analysis,OPG,Point,Or-L - Orbitale (Left),The lowest point on the left infraorbital margin.
-General OPG Analysis,OPG,Point,Or-R - Orbitale (Right),The lowest point on the right infraorbital margin.
-General OPG Analysis,OPG,Point,Ptm-L - Pterygomaxillary Fissure (Left),The lowest point of the teardrop-shaped radiolucency of the pterygomaxillary fissure on the left side.
-General OPG Analysis,OPG,Point,Ptm-R - Pterygomaxillary Fissure (Right),The lowest point of the teardrop-shaped radiolucency of the pterygomaxillary fissure on the right side.
-General OPG Analysis,OPG,Point,Sig-L - Sigmoid Notch (Left),The deepest point of the mandibular (sigmoid) notch between the coronoid process and the condyle on the left side.
-General OPG Analysis,OPG,Point,Sig-R - Sigmoid Notch (Right),The deepest point of the mandibular (sigmoid) notch between the coronoid process and the condyle on the right side.
-General Analysis,Multi-view,Point,Inc-L - Incisura Mandibulae (Left),The deepest point of the mandibular (sigmoid) notch between the coronoid process and the condyle on the left side.
-General Analysis,Multi-view,Point,Inc-R - Incisura Mandibulae (Right),The deepest point of the mandibular (sigmoid) notch between the coronoid process and the condyle on the right side.`;
-
-export function parseCSV(csv) {
-  const lines = csv.trim().split("\n");
-  const headers = lines[0].split(",").map(h => h.trim());
-  const result = [];
-  for (let i = 1; i < lines.length; i++) {
-    let line = lines[i], row = [], inQuote = false, current = "";
-    for (let j = 0; j < line.length; j++) {
-      const ch = line[j];
-      if (ch === '"') { inQuote = !inQuote; continue; }
-      if (ch === "," && !inQuote) { row.push(current.trim()); current = ""; continue; }
-      current += ch;
-    }
-    row.push(current.trim());
-    if (row.length > 0) {
-      const obj = {};
-      headers.forEach((h, idx) => obj[h] = row[idx] || "");
-      result.push(obj);
-    }
-  }
-  return result;
-}
-
-export function csvToAnalysis(csv, name, color) {
-  const data = parseCSV(csv);
-  const analyses = {};
-  data.forEach(row => {
-    const aname = row.Analysis || "General";
-    if (!analyses[aname]) analyses[aname] = [];
-    const label = row.Landmark.split(" - ")[0].trim();
-    analyses[aname].push({ l: label, def: row.Definition || "", color: color });
-  });
-  return Object.entries(analyses).map(([aname, pts]) => ({ name: aname, pts }));
-}
+const _smvAnalyses = parseAnalysisCsv(smvCsv);
+const _opgAnalyses = parseAnalysisCsv(opgCsv);
 
 export const THEMES = {
   bluish: { name: "Plasticity", id: "bluish", bg: "#0f0f12", surf: "#1a1a22", surf2: "#252530", surf3: "#323242", bdr: "#404058", tx: "#e4e4ef", tx2: "#9999ad", tx3: "#6a6a80", acc: "#a855f7", acc2: "#9333ea", accMuted: "rgba(168,85,247,0.15)", err: "#f87171", ok: "#4ade80", warn: "#fbbf24", shadow: "rgba(0,0,0,0.6)", inHeader: true },
   dark: { name: "GitHub Dark", id: "dark", bg: "#0d1117", surf: "#161b22", surf2: "#21262d", surf3: "#30363d", bdr: "#30363d", tx: "#c9d1d9", tx2: "#8b949e", tx3: "#6e7681", acc: "#58a6ff", acc2: "#388bfd", accMuted: "rgba(88,166,255,0.1)", err: "#f85149", ok: "#3fb950", warn: "#d29922", shadow: "rgba(0,0,0,0.4)", inHeader: true },
-  mocha: { name: "Mocha", id: "mocha", bg: "#2d2b33", surf: "#37353e", surf2: "#44444e", surf3: "#555560", bdr: "#555560", tx: "#d3dad9", tx2: "#a0a5a8", tx3: "#8a8f94", acc: "#79763b", acc2: "#7b7729", accMuted: "rgba(113, 90, 90, 0.15)", err: "#e57373", ok: "#81c784", warn: "#ffb74d", shadow: "rgba(0, 0, 0, 0.5)", inHeader: false },
-  sage: { name: "Sage", id: "sage", bg: "#d6dac8", surf: "#e8eadd", surf2: "#fbf3d5", surf3: "#edf0e4", bdr: "#b8c0ad", tx: "#3a3a35", tx2: "#5c5c58", tx3: "#70756b", acc: "#6b827c", acc2: "#7a9188", accMuted: "rgba(156,175,170,0.15)", err: "#d4847c", ok: "#7a9e7a", warn: "#c9a855", shadow: "rgba(0,0,0,0.1)", inHeader: false },
   paper: { name: "Paper", id: "paper", bg: "#f5f5f5", surf: "#ffffff", surf2: "#e3e3e3", surf3: "#e8e8e8", bdr: "#d0d0d0", tx: "#1a1a1a", tx2: "#4a4a4a", tx3: "#787878", acc: "#2563eb", acc2: "#1d4ed8", accMuted: "rgba(37,99,235,0.12)", err: "#dc2626", ok: "#16a34a", warn: "#ca8a04", shadow: "rgba(0, 0, 0, 0.6)", inHeader: false },
   light: { name: "GitHub Light", id: "light", bg: "#e8eaed", surf: "#f6f8fa", surf2: "#ffffff", surf3: "#eaecf0", bdr: "#d0d7de", tx: "#24292f", tx2: "#57606a", tx3: "#8c959f", acc: "#06a23d", acc2: "#078050", accMuted: "rgba(9,105,218,0.1)", err: "#cf222e", ok: "#1a7f37", warn: "#9a6700", shadow: "rgba(0,0,0,0.08)", inHeader: true },
 };
@@ -373,6 +274,8 @@ export const PREDEFINED = {
       { l: "Zf-L", def: "The junction of the zygomatic and frontal bones at the lateral orbital rim on the left side.", color: "#fb923c" },
     ]},
   ],
+  smv: _smvAnalyses,
+  opg: _opgAnalyses,
   other: [
     { group: "Standard Orthodontic & Orthognathic", projections: [
       { name: "Submentovertex (SMV)", def: "Evaluating cranial base symmetry, condylar angulation, and transverse discrepancies from a bottom-up angle.", color: "#f59e0b" },

@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef, useCallback, useMemo, useReducer } from "react";
-import { SMV_CSV, OPG_CSV, csvToAnalysis, THEMES, TOOLS, PREDEFINED, LUT_PRESETS } from "./constants.js";
-import { uid, clamp, dist, vpts, computeMeasurements, snapPoint, alignOnePoint, alignTwoPoints, buildScope, evalFormula, mean, stdev, tTestPaired, calculateICC, dahlbergError, blandAltman, median, iqr, skewness, kurtosis, coefficientOfVariation, standardError, minimalDetectableChange, shapiroWilk, spearmanCorrelation, pearsonCorrelation, correlationMatrix, computePerLandmarkError, detectSystematicBias, anovaAcrossSessions, computeNormsComparison, detectOutliers, confidenceInterval, linearRegression, hashPin } from "./utils.js";
+import { THEMES, TOOLS, PREDEFINED, LUT_PRESETS } from "./constants.js";
+import { uid, clamp, dist, vpts, computeMeasurements, snapPoint, alignOnePoint, alignTwoPoints, buildScope, evalFormula, mean, stdev, tTestPaired, calculateICC, dahlbergError, blandAltman, median, iqr, skewness, kurtosis, coefficientOfVariation, standardError, minimalDetectableChange, shapiroWilk, spearmanCorrelation, pearsonCorrelation, correlationMatrix, computePerLandmarkError, detectSystematicBias, anovaAcrossSessions, computeNormsComparison, detectOutliers, confidenceInterval, linearRegression } from "./utils.js";
 import { processImageToCanvas, computeHistogram, FloatingHistogram } from "./imageUtils.jsx";
 import { KatexSpan, LatexFloatingPanel } from "./hooks.jsx";
 import { Btn, Tag, Sld, PropRow, Inp, Divider, PanelHeader } from "./ui.jsx";
 import ToolBtn from "./ToolBtn.jsx";
-import PinGate from "./PinGate.jsx";
 import { drawMarkup, drawInProgress, drawScaleBar, drawLUTLegend, drawSnapIndicator, drawDisplacementVectors, hitTest } from "./markups.jsx";
-import { MarkupsPanel, MeasurementsPanel, FormulasPanel, ImagePanel, LayersPanel, MarkupProps, TemplatesPanel, ThemesPanel } from "./panels.jsx";
+import { MarkupsPanel, MeasurementsPanel, FormulasPanel, ImagePanel, LayersPanel, MarkupProps, TemplatesPanel } from "./panels.jsx";
 
 // PROJECT MODEL
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -21,7 +20,6 @@ function mkProject(projection){
   const v=mkVersion();
   return{id:uid(),name:"New Case",projection,created:Date.now(),modified:Date.now(),
     meta:{patientId:"",name:"",dob:"",age:"",gender:"",ethnicity:"",clinician:"",facility:"",referral:"",notes:"",anonymized:false},
-    accessControl:{requirePin:false,pinHash:""},
     activeVersionId:v.id,versions:[v],images:[]};
 }
 
@@ -231,15 +229,7 @@ function TemplatePickerModal({t,projection,onPick,onClose}){
   if(projection==="other"){
     const otherData=PREDEFINED.other||[];
     const handleProjectionClick=(p)=>{
-      if(p.name.includes("SMV")||p.name.includes("Submentovertex")){
-        const analyses=csvToAnalysis(SMV_CSV,"General SMV Analysis",p.color);
-        onPick("analysis",analyses[0]);
-      }else if(p.name.includes("OPG")||p.name.includes("Panoramic")){
-        const analyses=csvToAnalysis(OPG_CSV,"General OPG Analysis",p.color);
-        onPick("analysis",analyses[0]);
-      }else{
-        onPick("projection",{name:p.name,def:p.def,color:p.color});
-      }
+      onPick("projection",{name:p.name,def:p.def,color:p.color});
     };
     return(
       <div>
@@ -395,9 +385,7 @@ function TextModal({t,onConfirm,onCancel,defaultColor}){
 }
 
 function AnonModal({t,project,onUpdateProject}){
-  const[pin,setPin]=useState("");const[requirePin,setRequirePin]=useState(project.accessControl?.requirePin||false);
   const anonymize=async()=>{if(!window.confirm("Remove all patient identifiers permanently?"))return;onUpdateProject({meta:{...project.meta,patientId:"ANON-"+uid().toUpperCase(),patientName:"",dob:"",age:"",clinician:"",facility:"",referral:"",notes:"[Anonymized]",anonymized:true}});};
-  const savePin=async()=>{if(pin.length<4){alert("PIN must be ≥4 characters");return;}const hash=await hashPin(pin);onUpdateProject({accessControl:{requirePin,pinHash:hash}});setPin("");alert("PIN saved.");};
   return(
     <div>
       <div style={{marginBottom:16,padding:12,background:t.surf2,borderRadius:8,border:`1px solid ${t.bdr}`}}>
@@ -406,11 +394,7 @@ function AnonModal({t,project,onUpdateProject}){
           <PropRow key={k} label={label} t={t}><input type="text" value={project.meta[k]||""} onChange={e=>onUpdateProject({meta:{...project.meta,[k]:e.target.value}})} style={{background:t.surf3,border:`1px solid ${t.bdr}`,borderRadius:4,padding:"4px 8px",color:t.tx,fontSize:12,width:240,fontFamily:"inherit"}}/></PropRow>
         ))}
       </div>
-      {project.meta.anonymized?<div style={{padding:10,background:t.ok+"11",border:`1px solid ${t.ok}33`,borderRadius:6,fontSize:12,color:t.ok,marginBottom:16}}>✓ Case is anonymized.</div>:<Btn t={t} danger onClick={anonymize} style={{width:"100%",marginBottom:16}}>🔏 Anonymize (irreversible)</Btn>}
-      <Divider t={t}/>
-      <div style={{fontSize:12,fontWeight:700,color:t.tx,marginBottom:8}}>Access Control</div>
-      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}><input type="checkbox" id="rp" checked={requirePin} onChange={e=>setRequirePin(e.target.checked)} style={{accentColor:t.acc}}/><label htmlFor="rp" style={{fontSize:12,color:t.tx}}>Require PIN to open</label></div>
-      {requirePin&&<><PropRow label="New PIN" t={t}><input type="password" value={pin} onChange={e=>setPin(e.target.value)} placeholder="Min 4 chars" style={{background:t.surf3,border:`1px solid ${t.bdr}`,borderRadius:4,padding:"4px 8px",color:t.tx,fontSize:12,width:"100%",fontFamily:"inherit"}}/></PropRow><Btn t={t} onClick={savePin} style={{width:"100%"}}>Save PIN</Btn></>}
+      {project.meta.anonymized?<div style={{padding:10,background:t.ok+"11",border:`1px solid ${t.ok}33`,borderRadius:6,fontSize:12,color:t.ok,marginBottom:16}}>✓ Case is anonymized.</div>:<Btn t={t} danger onClick={anonymize} style={{width:"100%"}}>🔏 Anonymize (irreversible)</Btn>}
     </div>
   );
 }
@@ -1321,11 +1305,23 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     setPlacingQueue(newMarkups.map(m=>m.id));dispatch({type:"SET",payload:{placingIdx:0}});dispatch({type:"SET",payload:{placingMode:true}});dispatch({type:"SET",payload:{rightPanel:"markups"}});
   };
 
+  const projectionKeyMap={
+    "Submentovertex (SMV)":"smv",
+    "Panoramic Radiograph (OPG)":"opg",
+  };
   const handleTemplatePick=(type,analysis,file)=>{
     dispatch({type:"SET",payload:{showTemplatePicker:false}});
     if(type==="blank")return;
     if(type==="analysis"&&analysis){loadTemplate(analysis);return;}
     if(type==="complete"&&analysis){loadTemplate(analysis);return;}
+    if(type==="projection"&&analysis){
+      const key=projectionKeyMap[analysis.name];
+      if(key&&PREDEFINED[key]&&PREDEFINED[key].length>0){
+        const template=PREDEFINED[key][0];
+        const projData={...analysis,pts:template?.pts||[]};
+        if(projData.pts.length>0){loadTemplate(projData);return;}
+      }
+    }
     if(type==="upload"&&file){
       importCepht(file,d=>{
         if(d.markups){
@@ -1348,8 +1344,8 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const cursorStyle={select:"default",pan:"grab",point:"crosshair",line:"crosshair",angle3:"crosshair",angle4:"crosshair",polygon:"crosshair",curve:"crosshair",perp:"crosshair",parallel:"crosshair",midpoint:"crosshair",perppoint:"crosshair",arrow:"crosshair",text:"text",ruler:"crosshair"}[activeTool]||"default";
   const _availAnalyses=PREDEFINED[project.projection]||[];
 
-  const panelIcons={markups:"◉",measurements:"📏",formulas:"∑",image:"▦",layers:"🗐",versions:"⏲",reproducibility:"↻",statistics:"𝛀",templates:"▤",themes:"◐"};
-  const panelTabs=[["markups","Markups"],["measurements","Measure"],["formulas","Formulas"],["image","Image"],["layers","Layers"],["versions","Versions"],["reproducibility","Reproducibility"],["statistics","Statistics"],["templates","Templates"],["themes","Themes"]];
+  const panelIcons={markups:"◉",measurements:"📏",formulas:"∑",image:"▦",layers:"🗐",versions:"⏲",reproducibility:"↻",statistics:"𝛀",templates:"▤"};
+  const panelTabs=[["markups","Markups"],["measurements","Measure"],["formulas","Formulas"],["image","Image"],["layers","Layers"],["versions","Versions"],["reproducibility","Reproducibility"],["statistics","Statistics"],["templates","Templates"]];
 
   return(
     <div style={{height:"100vh",display:"flex",flexDirection:"column",background:t.bg,color:t.tx,fontFamily:"'DM Sans',sans-serif",overflow:"hidden"}}>
@@ -1580,8 +1576,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
             updVer({markups:[...markups,...newMarkups],formulas:[...formulas,...(data.formulas||[])],norms:[...(project.versions[0]?.norms||[]),...(data.norms||[])],analysisTemplate:data.name||"Imported"});
             setPlacingQueue(newMarkups.map(m=>m.id));dispatch({type:"SET",payload:{placingIdx:0}});dispatch({type:"SET",payload:{placingMode:true}});dispatch({type:"SET",payload:{rightPanel:"markups"}});
           }
-        }}/>}
-                  {rightPanel==="themes"&&<ThemesPanel t={t} theme={theme} setTheme={setTheme}/>}
+        }        }/>}
                 </div>
               </div>
               {selectedMarkup&&<div style={{borderTop:`1px solid ${t.bdr}`,padding:12,flexShrink:0,maxHeight:isMobile?180:260,overflowY:"auto",scrollbarWidth:"none"}}>
@@ -1600,7 +1595,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       {showCalib&&<Modal t={t} title="Calibration" onClose={()=>dispatch({type:"SET",payload:{showCalib:false}})}><CalibModal t={t} calibration={calibration} onFinish={finalizeCalib}/></Modal>}
       {showExport&&<Modal t={t} title="Export" onClose={()=>dispatch({type:"SET",payload:{showExport:false}})}><div style={{display:"flex",flexDirection:"column",gap:10}}><Btn t={t} onClick={()=>{exportCSV();dispatch({type:"SET",payload:{showExport:false}});}}>Measurements CSV</Btn><Btn t={t} onClick={()=>{onSave?.(project);dispatch({type:"SET",payload:{showExport:false}});}}>Full Project .cephx</Btn><Btn t={t} onClick={()=>{const name=window.prompt("Template name:",project.name+" Template");if(name){exportTemplateAsCepht(project,name);dispatch({type:"SET",payload:{showExport:false}});}}}>Template .cepht</Btn></div></Modal>}
       {pendingTextPos&&<Modal t={t} title="Text Annotation" onClose={()=>dispatch({type:"SET",payload:{pendingTextPos:null}})}><TextModal t={t} defaultColor="#fbbf24" onConfirm={(txt,opts)=>{addMarkup({type:"text",points:[pendingTextPos],text:txt,...opts});dispatch({type:"SET",payload:{pendingTextPos:null}});}} onCancel={()=>dispatch({type:"SET",payload:{pendingTextPos:null}})}/></Modal>}
-      {showAnon&&<Modal t={t} title="Anonymization & Access" onClose={()=>dispatch({type:"SET",payload:{showAnon:false}})}><AnonModal t={t} project={project} onUpdateProject={onUpdateProject} onClose={()=>dispatch({type:"SET",payload:{showAnon:false}})}/></Modal>}
+      {showAnon&&<Modal t={t} title="Anonymization" onClose={()=>dispatch({type:"SET",payload:{showAnon:false}})}><AnonModal t={t} project={project} onUpdateProject={onUpdateProject} onClose={()=>dispatch({type:"SET",payload:{showAnon:false}})}/></Modal>}
       {showAlign&&<Modal t={t} title="Point-Based Alignment" onClose={()=>dispatch({type:"SET",payload:{showAlign:false}})}><AlignModal t={t} markups={markups} images={project.images} onUpdateImages={imgs=>onUpdateProject({images:imgs})} onClose={()=>dispatch({type:"SET",payload:{showAlign:false}})}/></Modal>}
       {showTransform&&<Modal t={t} title="Image Transform" onClose={()=>dispatch({type:"SET",payload:{showTransform:false}})}><TransformModal t={t} images={project.images} onUpdateImages={imgs=>onUpdateProject({images:imgs})} onClose={()=>dispatch({type:"SET",payload:{showTransform:false}})}/></Modal>}
       {showFormulaEditor&&<Modal t={t} title={editFormulaId?"Edit Formula":"New Formula"} onClose={()=>dispatch({type:"SET",payload:{showFormulaEditor:false}})}><FormulaEditor t={t} formula={editFormulaId?formulas.find(f=>f.id===editFormulaId):null} scope={measScope} onSave={f=>{const newFs=editFormulaId?formulas.map(x=>x.id===editFormulaId?f:x):[...formulas,f];updVer({formulas:newFs});dispatch({type:"SET",payload:{showFormulaEditor:false}});}} onClose={()=>dispatch({type:"SET",payload:{showFormulaEditor:false}})}/></Modal>}
@@ -2958,7 +2953,7 @@ function DatabaseDashboard({t,databaseImages}){
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function CephalometryStudio(){
   const[theme,setTheme]=useState("bluish");const t=useMemo(()=>({...THEMES[theme],id:theme}),[theme]);
-  const[projects,setProjects]=useState([]);const[activeId,setActiveId]=useState(null);const[pinVerified,setPinVerified]=useState({});
+  const[projects,setProjects]=useState([]);const[activeId,setActiveId]=useState(null);
   const dirtyRef=useRef(false);
 
   useEffect(()=>{
@@ -2968,7 +2963,6 @@ export default function CephalometryStudio(){
   },[]);
 
   const activeProject=projects.find(p=>p.id===activeId);
-  const needsPin=activeProject&&activeProject.accessControl?.requirePin&&!pinVerified[activeId];
 
   const updateProject=(id,patch)=>{dirtyRef.current=true;setProjects(prev=>prev.map(p=>p.id===id?{...p,...patch,modified:Date.now()}:p));};
   const updateVersion=(projectId,versionId,patch)=>{dirtyRef.current=true;setProjects(prev=>prev.map(p=>{if(p.id!==projectId)return p;return{...p,modified:Date.now(),versions:p.versions.map(v=>v.id===versionId?{...v,...patch}:v)};}));};
@@ -2990,8 +2984,7 @@ export default function CephalometryStudio(){
     <div style={{background:t.bg,minHeight:"100vh"}}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet"/>
       {!activeId&&<HomePage t={t} theme={theme} setTheme={setTheme} projects={projects} onOpen={id=>setActiveId(id)} onCreate={createProject} onImport={importCephxFile}/>}
-      {activeId&&needsPin&&<PinGate t={t} project={activeProject} onVerified={()=>setPinVerified(prev=>({...prev,[activeId]:true}))} onCancel={()=>setActiveId(null)}/>}
-      {activeId&&!needsPin&&activeProject&&(
+      {activeId&&activeProject&&(
         <Workspace key={activeId} project={activeProject}
           onUpdateProject={patch=>updateProject(activeId,patch)}
           onUpdateVersion={(versionId,patch)=>updateVersion(activeId,versionId,patch)}
