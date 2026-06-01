@@ -37,7 +37,7 @@ function exportCephx(project){
 }
 function importCephx(file,onLoad){
   const reader=new FileReader();
-  reader.onload=e=>{try{const d=JSON.parse(e.target.result);if(d.format==="cephx"&&d.project)onLoad(d.project);else alert("Invalid .cephx file");}catch{alert("Cannot parse file");}};
+  reader.onload=e=>{try{const d=JSON.parse(e.target.result);if(d.format==="cephx"&&d.project)onLoad(d.project);else alert("Invalid .cephx file");}catch(err){console.error("Cephx import error:",err);alert("Cannot parse file");}};
   reader.readAsText(file);
 }
 function exportCepht(template){
@@ -47,7 +47,7 @@ function exportCepht(template){
 }
 function importCepht(file,onLoad){
   const reader=new FileReader();
-  reader.onload=e=>{try{const d=JSON.parse(e.target.result);if(d.format==="cepht")onLoad(d);else alert("Invalid .cepht file");}catch{alert("Cannot parse template");}};
+  reader.onload=e=>{try{const d=JSON.parse(e.target.result);if(d.format==="cepht")onLoad(d);else alert("Invalid .cepht file");}catch(err){console.error("Cepht import error:",err);alert("Cannot parse template");}};
   reader.readAsText(file);
 }
 function exportTemplateAsCepht(project,templateName){
@@ -578,12 +578,12 @@ function DatabaseImportModal({t,onImport,onClose}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // STATS DASHBOARD
 // ═══════════════════════════════════════════════════════════════════════════════
-function range$1(arr){
+function range(arr){
   if(!arr.length) return null;
   return { min: Math.min(...arr), max: Math.max(...arr) };
 }
 
-function groupBy$1(dataset, key){
+function groupBy(dataset, key){
   return dataset.reduce((acc, item)=>{
     const k = item[key] || "undefined";
     if(!acc[k]) acc[k] = [];
@@ -592,13 +592,13 @@ function groupBy$1(dataset, key){
   }, {});
 }
 
-function extractVariable$1(dataset, variable){
+function extractVariable(dataset, variable){
   return dataset
     .map(c => c.measurements?.[variable] ?? c.formulas?.[variable])
     .filter(v => typeof v === "number");
 }
 
-function descriptiveStats$1(values){
+function descriptiveStats(values){
   if(!values.length) return {n:0,mean:null,sd:null,median:null,range:null,cv:null,skew:null};
   const m = mean(values);
   const s = stdev(values);
@@ -607,7 +607,7 @@ function descriptiveStats$1(values){
     mean: m,
     sd: s,
     median: median(values),
-    range: range$1(values),
+    range: range(values),
     cv: m!==0?(s/Math.abs(m))*100:null,
     skew: values.length>=3?skewness(values):null
   };
@@ -626,13 +626,13 @@ function StatsDashboard({ dataset, t }) {
     });
   },[dataset]);
 
-  const values = useMemo(()=> extractVariable$1(dataset, selectedVar), [dataset, selectedVar]);
-  const stats = useMemo(()=> descriptiveStats$1(values), [values]);
-  const grouped = useMemo(()=> groupBy$1(dataset, groupKey), [dataset, groupKey]);
+  const values = useMemo(()=> extractVariable(dataset, selectedVar), [dataset, selectedVar]);
+  const stats = useMemo(()=> descriptiveStats(values), [values]);
+  const grouped = useMemo(()=> groupBy(dataset, groupKey), [dataset, groupKey]);
 
   const corrMatrix = useMemo(()=>{
     if(!showCorr||variables.length<2) return null;
-    const varDatasets = variables.slice(0,12).map(v=>extractVariable$1(dataset,v).filter(x=>x!=null));
+    const varDatasets = variables.slice(0,12).map(v=>extractVariable(dataset,v).filter(x=>x!=null));
     const validPairs = varDatasets.filter(v=>v.length>=3);
     if(validPairs.length<2) return null;
     return correlationMatrix(validPairs);
@@ -641,14 +641,14 @@ function StatsDashboard({ dataset, t }) {
   const corrVars = useMemo(()=>{
     if(!showCorr) return [];
     return variables.slice(0,12).filter(v=>{
-      const vals = extractVariable$1(dataset,v).filter(x=>x!=null);
+      const vals = extractVariable(dataset,v).filter(x=>x!=null);
       return vals.length>=3;
     });
   },[dataset,variables,showCorr]);
 
   const boxPlotData = useMemo(()=>{
     return variables.slice(0,8).map(v=>{
-      const vals = extractVariable$1(dataset,v).filter(x=>x!=null);
+      const vals = extractVariable(dataset,v).filter(x=>x!=null);
       if(vals.length<3) return null;
       const sorted = [...vals].sort((a,b)=>a-b);
       const q1 = sorted[Math.floor(sorted.length*0.25)];
@@ -688,8 +688,8 @@ function StatsDashboard({ dataset, t }) {
           <option value="operator">Operator</option>
         </select>
         {Object.entries(grouped).map(([g, cases])=>{
-          const vals = extractVariable$1(cases, selectedVar);
-          const s = descriptiveStats$1(vals);
+          const vals = extractVariable(cases, selectedVar);
+          const s = descriptiveStats(vals);
           return (
             <div key={g} style={{marginTop:8, padding:8, border:"1px solid "+t.bdr,borderRadius:6}}>
               <strong style={{fontSize:11,color:t.tx}}>{g}</strong>
@@ -768,7 +768,7 @@ function StatsDashboard({ dataset, t }) {
       <div style={{marginBottom:20}}>
         <strong style={{fontSize:11,color:t.tx}}>Quick Correlations</strong>
         {variables.slice(0,5).map(v=>{
-          const arr = extractVariable$1(dataset, v);
+          const arr = extractVariable(dataset, v);
           const r = pearsonCorrelation(values, arr);
           const rs = spearmanCorrelation(values.filter((_,i)=>arr[i]!=null).map((val,i)=>{const a=arr.filter(x=>x!=null);return a[i];}),arr.filter(x=>x!=null));
           return (
@@ -2078,16 +2078,7 @@ function CreateStudyModal({t,onCreate,onClose}){
   );
 }
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// STATISTICS PANEL
-// ═══════════════════════════════════════════════════════════════════════════════
-function reproAllLabels(study){
-  const labels=new Set();
-  study.operators.forEach(op=>{
-    (op.trials||[]).forEach(tr=>{(tr.measurements||[]).forEach(m=>{if(m.label)labels.add(m.label);});});
-  });
-  return[...labels].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
-}
+
 
 function reproIccMatrix(study,metric){
   if(study.type==="intra"){
