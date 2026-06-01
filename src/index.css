@@ -13,5 +13,3 @@ body {
   to { transform: rotate(360deg); }
 }
 
-*::-webkit-scrollbar { display: none; }
-* { scrollbar-width: none; -ms-overflow-style: none; }

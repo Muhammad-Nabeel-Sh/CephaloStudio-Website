@@ -5,29 +5,7 @@ function isReproPointVisible(m, reproCollecting){
   return m.repro.studyId === reproCollecting.studyId && m.repro.opId === reproCollecting.opId && m.repro.trialIdx === reproCollecting.trialIdx;
 }
 
-export function drawMeasLabel(ctx, text, x, y, showAnnotations = true, annotationSize = 1, m = null){
-  if(!showAnnotations || (m && m.noLabel)) return;
-  
-  const fontSize = 10 * annotationSize;
-  const prevFont = ctx.font;
-  ctx.font = `${fontSize}px "DM Mono",monospace`;
-  
-  const metrics = ctx.measureText(text);
-  const padding = 3 * annotationSize;
-  const bgHeight = 14 * annotationSize;
-  
-  ctx.fillStyle = "rgba(46, 46, 46, 0.85)";
-  ctx.roundRect(x - padding, y - bgHeight + 2, metrics.width + padding * 2, bgHeight + 4 , 5);
-  ctx.fill();
-  
-  const prevFill = ctx.fillStyle;
-  ctx.fillStyle = "#fff";
-  ctx.fillText(text, x, y);
-  ctx.fillStyle = prevFill;
-  ctx.font = prevFont;
-}
-
-export function drawMeasLabelX(ctx, text, x, y, showAnnotations = true, annotationSize = 1, m = null){
+export function drawMeasLabel(ctx, text, x, y, showAnnotations = true, annotationSize = 1, m = null, color = "#fff", bgColor = "rgba(46, 46, 46, 0.85)"){
   if(!showAnnotations || (m && m.noLabel)) return;
   
   const fontSize = 10 * annotationSize;
@@ -35,7 +13,15 @@ export function drawMeasLabelX(ctx, text, x, y, showAnnotations = true, annotati
   ctx.font = `${fontSize}px "DM Mono",monospace`;
   
   const prevFill = ctx.fillStyle;
-  ctx.fillStyle = "#00c3ff";
+  if(bgColor){
+    const metrics = ctx.measureText(text);
+    const padding = 3 * annotationSize;
+    const bgHeight = 14 * annotationSize;
+    ctx.fillStyle = bgColor;
+    ctx.roundRect(x - padding, y - bgHeight + 2, metrics.width + padding * 2, bgHeight + 4 , 5);
+    ctx.fill();
+  }
+  ctx.fillStyle = color;
   ctx.fillText(text, x, y);
   ctx.fillStyle = prevFill;
   ctx.font = prevFont;
@@ -338,7 +324,7 @@ function drawPolygon(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotatio
     const area = (m.curveStyle === "bspline" ? splineArea(ip) : polyArea(ip)) / cal.pxPerMm ** 2;
     ctx.font = `${clamp(10 * Math.sqrt(zoom), 8, 14)}px "DM Mono",monospace`;
     ctx.fillStyle = m.strokeColor || t.acc;
-    drawMeasLabelX(ctx, area.toFixed(1) + " mm²", cx - 20, cy, showAnnotations, annotationSize, m);
+    drawMeasLabel(ctx, area.toFixed(1) + " mm²", cx - 20, cy, showAnnotations, annotationSize, m, "#00c3ff", null);
   }
 }
 
@@ -376,7 +362,7 @@ function drawCurve(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationS
     const len = (m.curveStyle === "bspline" && ip.length >= 3 ? splineLen(ip, false) : polyLen(ip, false)) / cal.pxPerMm;
     ctx.font = `${clamp(10 * Math.sqrt(zoom), 8, 14)}px "DM Mono",monospace`;
     ctx.fillStyle = m.color || "#fb923c";
-    drawMeasLabelX(ctx, len.toFixed(1) + " mm", lp.x + 5, lp.y - 8, showAnnotations, annotationSize, m);
+    drawMeasLabel(ctx, len.toFixed(1) + " mm", lp.x + 5, lp.y - 8, showAnnotations, annotationSize, m, "#00c3ff", null);
   }
 }
 

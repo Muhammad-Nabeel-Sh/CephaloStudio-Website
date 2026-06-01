@@ -1,10 +1,8 @@
-/* eslint-disable react-hooks/exhaustive-deps */
-/* eslint-disable no-unused-vars */
 import { useState, useEffect, useRef, useCallback, useMemo, useReducer } from "react";
 import { SMV_CSV, OPG_CSV, csvToAnalysis, THEMES, TOOLS, PREDEFINED, LUT_PRESETS } from "./constants.js";
-import { uid, clamp, dist, angle3pt, angle4pt, perpDist, polyArea, polyLen, vpts, sampleSpline, splineArea, splineLen, getInfiniteLinePoints, computeMeasurements, catmullRom, perpPoint, snapPoint, snapToLine, alignOnePoint, alignTwoPoints, buildScope, evalFormula, normDeviation, deviationColor, mean, variance, stdev, gammaLn, betaIncomplete, betaCF, tDistributeCDF, tTestPaired, calculateICC, getICCInterpretation, dahlbergError, blandAltman, median, iqr, skewness, kurtosis, coefficientOfVariation, standardError, minimalDetectableChange, shapiroWilk, oneWayAnova, spearmanCorrelation, pearsonCorrelation, correlationMatrix, aggregateDahlberg, computePerLandmarkError, detectSystematicBias, anovaAcrossSessions, computeNormsComparison, detectOutliers, confidenceInterval, linearRegression, hashPin } from "./utils.js";
-import { getLUTColor, applyEdgeKernel, processImageToCanvas, computeHistogram, FloatingHistogram } from "./imageUtils.jsx";
-import { useKatex, KatexSpan, LatexFloatingPanel } from "./hooks.jsx";
+import { uid, clamp, dist, vpts, computeMeasurements, snapPoint, alignOnePoint, alignTwoPoints, buildScope, evalFormula, mean, stdev, tTestPaired, calculateICC, dahlbergError, blandAltman, median, iqr, skewness, kurtosis, coefficientOfVariation, standardError, minimalDetectableChange, shapiroWilk, spearmanCorrelation, pearsonCorrelation, correlationMatrix, computePerLandmarkError, detectSystematicBias, anovaAcrossSessions, computeNormsComparison, detectOutliers, confidenceInterval, linearRegression, hashPin } from "./utils.js";
+import { processImageToCanvas, computeHistogram, FloatingHistogram } from "./imageUtils.jsx";
+import { KatexSpan, LatexFloatingPanel } from "./hooks.jsx";
 import { Btn, Tag, Sld, PropRow, Inp, Divider, PanelHeader } from "./ui.jsx";
 import ToolBtn from "./ToolBtn.jsx";
 import PinGate from "./PinGate.jsx";
@@ -92,7 +90,7 @@ function HomePage({t,theme,setTheme,projects,onOpen,onCreate,onImport}){
 
       {/* HERO */}
       <div style={{textAlign:"center",padding:"64px 32px 48px"}}>
-        <div style={{display:"inline-block",background:t.accMuted,border:`1px solid ${t.acc}44`,borderRadius:20,padding:"5px 16px",fontSize:12,color:t.acc,fontWeight:600,letterSpacing:0.5,marginBottom:24}}>RESEARCH-GRADE IN SILICO CEPHALOMETRY</div>
+        <div style={{display:"inline-block",background:t.accMuted,border:`1px solid ${t.acc}44`,borderRadius:20,padding:"5px 16px",fontSize:12,color:t.acc,fontWeight:600,letterSpacing:0.5,marginBottom:24}}>IN SILICO CEPHALOMETRY</div>
         <h1 style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:"clamp(36px,5vw,64px)",margin:"0 0 16px",lineHeight:1.1,letterSpacing:-2,color:t.tx}}>
           Precision Landmark<br/><span style={{color:t.acc}}>Analysis Platform</span>
         </h1>
@@ -189,7 +187,7 @@ function HomePage({t,theme,setTheme,projects,onOpen,onCreate,onImport}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // NEW CASE FORM
 // ═══════════════════════════════════════════════════════════════════════════════
-function NewCaseForm({t,projection,onCreate,onCancel}){
+function NewCaseForm({t,onCreate,onCancel}){
   const[d,setD]=useState({name:"Case 001",patientId:"",patientName:"",dob:"",age:"",gender:"",ethnicity:"",clinician:"",facility:"",referral:"",notes:""});
   const upd=(k,v)=>setD(prev=>({...prev,[k]:v}));
   return(
@@ -326,7 +324,7 @@ function TemplatePickerModal({t,projection,onPick,onClose}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // VERSIONS PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
-function VersionsPanel({project,t,onUpdateProject,onUpdateVersion,onExportTemplate}){
+function VersionsPanel({project,t,onUpdateProject,onExportTemplate}){
   const[lbl,setLbl]=useState("T1");const[nm,setNm]=useState("Follow-up");
   const create=()=>{const v=mkVersion(lbl,nm);const src=project.versions.find(x=>x.id===project.activeVersionId);const nv={...v,calibration:src?.calibration,processing:src?.processing,lutMode:src?.lutMode,lutInvert:src?.lutInvert,analysisTemplate:src?.analysisTemplate,markups:src?.markups||[],formulas:src?.formulas||[],norms:src?.norms||[]};onUpdateProject({activeVersionId:nv.id,versions:[...project.versions,nv]});};
   return(
@@ -396,7 +394,7 @@ function TextModal({t,onConfirm,onCancel,defaultColor}){
   );
 }
 
-function AnonModal({t,project,onUpdateProject,onClose}){
+function AnonModal({t,project,onUpdateProject}){
   const[pin,setPin]=useState("");const[requirePin,setRequirePin]=useState(project.accessControl?.requirePin||false);
   const anonymize=async()=>{if(!window.confirm("Remove all patient identifiers permanently?"))return;onUpdateProject({meta:{...project.meta,patientId:"ANON-"+uid().toUpperCase(),patientName:"",dob:"",age:"",clinician:"",facility:"",referral:"",notes:"[Anonymized]",anonymized:true}});};
   const savePin=async()=>{if(pin.length<4){alert("PIN must be ≥4 characters");return;}const hash=await hashPin(pin);onUpdateProject({accessControl:{requirePin,pinHash:hash}});setPin("");alert("PIN saved.");};
@@ -417,11 +415,14 @@ function AnonModal({t,project,onUpdateProject,onClose}){
   );
 }
 
+function PtSel({val,onChange,t,pts}){
+  return <select value={val} onChange={e=>onChange(e.target.value)} style={{width:"100%",background:t.surf3,border:`1px solid ${t.bdr}`,borderRadius:4,padding:"4px 8px",color:t.tx,fontSize:12,fontFamily:"inherit"}}><option value="">—</option>{pts.map(m=><option key={m.id} value={m.id}>{m.label}</option>)}</select>;
+}
+
 function AlignModal({t,markups,images,onUpdateImages,onClose}){
   const pts=markups.filter(m=>m.type==="point"&&vpts(m)[0]?.x>-9000);
   const[src1,setSrc1]=useState("");const[dst1,setDst1]=useState("");const[src2,setSrc2]=useState("");const[dst2,setDst2]=useState("");
   const[tgtId,setTgtId]=useState(images[1]?.id||"");
-  const PtSel=({val,onChange})=>(<select value={val} onChange={e=>onChange(e.target.value)} style={{width:"100%",background:t.surf3,border:`1px solid ${t.bdr}`,borderRadius:4,padding:"4px 8px",color:t.tx,fontSize:12,fontFamily:"inherit"}}><option value="">—</option>{pts.map(m=><option key={m.id} value={m.id}>{m.label}</option>)}</select>);
   const align=()=>{
     const sp1=vpts(markups.find(m=>m.id===src1)||{})[0],dp1=vpts(markups.find(m=>m.id===dst1)||{})[0];if(!sp1||!dp1)return;
     let tf;if(src2&&dst2){const sp2=vpts(markups.find(m=>m.id===src2)||{})[0],dp2=vpts(markups.find(m=>m.id===dst2)||{})[0];tf=sp2&&dp2?alignTwoPoints(sp1,sp2,dp1,dp2):alignOnePoint(sp1,dp1);}else tf=alignOnePoint(sp1,dp1);
@@ -432,10 +433,10 @@ function AlignModal({t,markups,images,onUpdateImages,onClose}){
       <div style={{fontSize:12,color:t.tx2,marginBottom:14,lineHeight:1.6}}>1 pair = translation only · 2 pairs = translation + rotation</div>
       <PropRow label="Target" t={t}><select value={tgtId} onChange={e=>setTgtId(e.target.value)} style={{width:"100%",background:t.surf3,border:`1px solid ${t.bdr}`,borderRadius:4,padding:"4px 8px",color:t.tx,fontSize:12,fontFamily:"inherit"}}>{images.map(i=><option key={i.id} value={i.id}>{i.name}</option>)}</select></PropRow>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
-        <div><div style={{fontSize:10,color:t.tx2,marginBottom:2}}>Src pt 1</div><PtSel val={src1} onChange={setSrc1}/></div>
-        <div><div style={{fontSize:10,color:t.tx2,marginBottom:2}}>Dst pt 1</div><PtSel val={dst1} onChange={setDst1}/></div>
-        <div><div style={{fontSize:10,color:t.tx2,marginBottom:2}}>Src pt 2</div><PtSel val={src2} onChange={setSrc2}/></div>
-        <div><div style={{fontSize:10,color:t.tx2,marginBottom:2}}>Dst pt 2</div><PtSel val={dst2} onChange={setDst2}/></div>
+        <div><div style={{fontSize:10,color:t.tx2,marginBottom:2}}>Src pt 1</div><PtSel val={src1} onChange={setSrc1} t={t} pts={pts}/></div>
+        <div><div style={{fontSize:10,color:t.tx2,marginBottom:2}}>Dst pt 1</div><PtSel val={dst1} onChange={setDst1} t={t} pts={pts}/></div>
+        <div><div style={{fontSize:10,color:t.tx2,marginBottom:2}}>Src pt 2</div><PtSel val={src2} onChange={setSrc2} t={t} pts={pts}/></div>
+        <div><div style={{fontSize:10,color:t.tx2,marginBottom:2}}>Dst pt 2</div><PtSel val={dst2} onChange={setDst2} t={t} pts={pts}/></div>
       </div>
       <div style={{display:"flex",gap:8}}><Btn t={t} onClick={align} style={{flex:1}} disabled={!src1||!dst1}>Apply</Btn><Btn t={t} onClick={onClose} style={{flex:1}}>Cancel</Btn></div>
     </div>
@@ -546,7 +547,7 @@ function DatabaseImportModal({t,onImport,onClose}){
 // ═══════════════════════════════════════════════════════════════════════════════
 // MARKUP TABLES PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
-function MarkupTablesPanel({databaseImages,currentImageIndex,t,formatAngle}){
+function MarkupTablesPanel({databaseImages,t}){
   const[activeTable,setActiveTable]=useState("points");
 
   const exportTableCSV=(type)=>{
@@ -558,7 +559,7 @@ function MarkupTablesPanel({databaseImages,currentImageIndex,t,formatAngle}){
         rows.push([`P${ptIdx+1}_X`]);
         rows.push([`P${ptIdx+1}_Y`]);
       }
-      databaseImages.forEach((img,imgIdx)=>{
+      databaseImages.forEach(img=>{
         const points=(img.markups||[]).filter(m=>m.type==="point");
         points.forEach((pt,ptIdx)=>{
           const vp=vpts(pt);
@@ -574,7 +575,7 @@ function MarkupTablesPanel({databaseImages,currentImageIndex,t,formatAngle}){
     }else if(type==="lines"){
       const maxLines=Math.max(...databaseImages.map(img=>(img.markups||[]).filter(m=>m.type==="line"||m.type==="parallel").length));
       for(let i=0;i<maxLines;i++)rows.push([`Line${i+1}_length`]);
-      databaseImages.forEach((img,imgIdx)=>{
+      databaseImages.forEach(img=>{
         const lines=(img.markups||[]).filter(m=>m.type==="line"||m.type==="parallel");
         lines.forEach((ln,lnIdx)=>{
           const meas=computeMeasurements(ln,img.calibration);
@@ -587,7 +588,7 @@ function MarkupTablesPanel({databaseImages,currentImageIndex,t,formatAngle}){
         rows.push([`Angle${i+1}_deg`]);
         rows.push([`Angle${i+1}_rad`]);
       }
-      databaseImages.forEach((img,imgIdx)=>{
+      databaseImages.forEach(img=>{
         const angles=[...(img.markups||[]).filter(m=>m.type==="angle3"),...(img.markups||[]).filter(m=>m.type==="angle4")];
         angles.forEach((ang,angIdx)=>{
           const meas=computeMeasurements(ang,img.calibration);
@@ -598,7 +599,7 @@ function MarkupTablesPanel({databaseImages,currentImageIndex,t,formatAngle}){
     }else if(type==="curves"){
       const maxCurves=Math.max(...databaseImages.map(img=>(img.markups||[]).filter(m=>m.type==="curve").length));
       for(let i=0;i<maxCurves;i++)rows.push([`Curve${i+1}_length`]);
-      databaseImages.forEach((img,imgIdx)=>{
+      databaseImages.forEach(img=>{
         const curves=(img.markups||[]).filter(m=>m.type==="curve");
         curves.forEach((cv,cvIdx)=>{
           const meas=computeMeasurements(cv,img.calibration);
@@ -611,7 +612,7 @@ function MarkupTablesPanel({databaseImages,currentImageIndex,t,formatAngle}){
         rows.push([`Polygon${i+1}_area`]);
         rows.push([`Polygon${i+1}_perimeter`]);
       }
-      databaseImages.forEach((img,imgIdx)=>{
+      databaseImages.forEach(img=>{
         const polys=(img.markups||[]).filter(m=>m.type==="polygon");
         polys.forEach((poly,polyIdx)=>{
           const meas=computeMeasurements(poly,img.calibration);
@@ -717,7 +718,7 @@ function MarkupTablesPanel({databaseImages,currentImageIndex,t,formatAngle}){
   };
 
   const tableData=getTableData();
-  const numImages=databaseImages.length;
+  const _numImages=databaseImages.length;
 
   return(
     <div>
@@ -797,7 +798,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const procCache=useRef(new Map());const imgRefs=useRef({});const rafRef=useRef(null);
 
   // file input refs
-  const openImgRef=useRef(null);const stackImgRef=useRef(null);const importRef=useRef(null);const cephtRef=useRef(null);
+  const openImgRef=useRef(null);const stackImgRef=useRef(null);const importRef=useRef(null);
 
   const[ws,dispatch]=useReducer(wsReducer,INITIAL_WORKSPACE);
   const{zoom,pan,mousePos,snapPos,selectedId,replacingId,currentDraw,
@@ -812,6 +813,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     databaseMode,databaseImages,currentImageIndex,showDatabaseImport}=ws;
   const rightPanelWidthRef=useRef(rightPanelWidth);rightPanelWidthRef.current=rightPanelWidth;
   const toolbarPosRef=useRef(toolbarPos);toolbarPosRef.current=toolbarPos;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const setSelectedId=v=>dispatch({type:"SET",payload:{selectedId:typeof v==="function"?v(selectedId):v}});
   const setShowLUT=v=>dispatch({type:"SET",payload:{showLUT:typeof v==="function"?v(showLUT):v}});
   const setShowScaleBar=v=>dispatch({type:"SET",payload:{showScaleBar:typeof v==="function"?v(showScaleBar):v}});
@@ -855,10 +857,10 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const redoStackRef=useRef([]);
 
   const activeVersion=project.versions.find(v=>v.id===project.activeVersionId)||project.versions[0];
-  const markups=activeVersion?.markups||[];
+  const markups=useMemo(()=>activeVersion?.markups||[],[activeVersion?.markups]);
 
-  const calibration=activeVersion?.calibration||{done:false,pxPerMm:1};
-  const processing=activeVersion?.processing||{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0};
+  const calibration=useMemo(()=>activeVersion?.calibration||{done:false,pxPerMm:1},[activeVersion?.calibration]);
+  const processing=useMemo(()=>activeVersion?.processing||{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},[activeVersion?.processing]);
   const lutMode=activeVersion?.lutMode||"gray";const lutInvert=activeVersion?.lutInvert||false;
   const formulas=activeVersion?.formulas||[];const norms=activeVersion?.norms||[];
   const selectedMarkup=markups.find(m=>m.id===selectedId);
@@ -872,7 +874,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     let val=v;
     if(sign==="abs")val=Math.abs(v);
     else if(sign==="simple")val=Math.abs(v);
-    else if(sign==="reflex")val=Math.abs(v)>180?360-Math.abs(v):360-Math.abs(v);
+    else if(sign==="reflex")val=Math.abs(v)>180?Math.abs(v):360-Math.abs(v);
     if(unit==="rad")return(val*Math.PI/180).toFixed(4)+" rad";
     return val.toFixed(1)+"°";
   };
@@ -881,12 +883,13 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     if(undoStackRef.current.length>50)undoStackRef.current.shift();
     redoStackRef.current=[];
   };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const undo=()=>{
     if(undoStackRef.current.length===0)return;
-    redoStackRef.current.push(JSON.stringify(markups));
     const prev=undoStackRef.current.pop();
     if(prev)updVer({markups:JSON.parse(prev)});
   };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const redo=()=>{
     if(redoStackRef.current.length===0)return;
     undoStackRef.current.push(JSON.stringify(markups));
@@ -908,6 +911,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       })};
     })}});
   };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const updMarkup=(id,patch)=>{
     const useDb=databaseMode&&databaseImages.length>0&&!reproCollecting;
     if(useDb){
@@ -931,6 +935,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       if(pt&&pt.x>-9000)syncReproStudyCoords(merged.repro,pt.x,pt.y);
     }
   };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const delMarkup=id=>{
     const useDb=databaseMode&&databaseImages.length>0&&!reproCollecting;
     if(useDb){
@@ -956,6 +961,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       })}});
     }
   };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const addMarkup=partial=>{
     const useDb=databaseMode&&databaseImages.length>0&&!reproCollecting;
     const currentDbImg=useDb?databaseImages[currentImageIndex]:null;
@@ -975,6 +981,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     }
     updMarkups(ms=>[...ms,m]);dispatch({type:"SET",payload:{selectedId:m.id}});return m;
   };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const finalizeMarkup=draw=>{
     const useDb=databaseMode&&databaseImages.length>0&&!reproCollecting;
     const currentDbImg=useDb?databaseImages[currentImageIndex]:null;
@@ -1003,7 +1010,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     dispatch({type:"SET",payload:{loadingImages:true}});
     let loaded=0;
     pending.forEach(imgE=>{const img=new Image();img.onload=()=>{imgRefs.current[imgE.id]=img;loaded++;if(loaded===pending.length)dispatch({type:"SET",payload:{loadingImages:false}});scheduleRedraw();};img.src=imgE.dataUrl;});
-  },[project.images]);
+  },[project.images, scheduleRedraw]);
 
   const getProcessed=useCallback(imgEntry=>{
     const key=`${imgEntry.id}-${JSON.stringify(processing)}-${lutMode}-${lutInvert}`;
@@ -1012,12 +1019,13 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   },[processing,lutMode,lutInvert]);
 
   const toImage=useCallback((sx,sy)=>({x:(sx-pan.x)/zoom,y:(sy-pan.y)/zoom}),[pan,zoom]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const getCanvasPos=e=>{const r=canvasRef.current.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};};
 
   useEffect(()=>{
     const obs=new ResizeObserver(()=>{const el=containerRef.current;if(!el)return;const c=canvasRef.current;if(!c)return;c.width=el.clientWidth;c.height=el.clientHeight;canvasSize.current={w:el.clientWidth,h:el.clientHeight};scheduleRedraw();});
     if(containerRef.current)obs.observe(containerRef.current);return()=>obs.disconnect();
-  },[]);
+  },[scheduleRedraw]);
 
   const redraw=useCallback(()=>{
     const canvas=canvasRef.current;if(!canvas)return;
@@ -1077,7 +1085,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       const m=drawMarkups.find(x=>x.id===placingQueue[placingIdx]);
       if(m){ctx.save();ctx.fillStyle="rgba(0,0,0,0.8)";ctx.fillRect(0,0,canvas.width,36);ctx.fillStyle=t.acc;ctx.font=`bold 13px "DM Sans",sans-serif`;ctx.fillText(`📍 Placing: ${m.label}${m.definition?" — "+m.definition:""} · Click image · Esc to skip`,12,23);ctx.restore();}
     }
-  },[markups,selectedId,zoom,pan,project.images,calibration,t,currentDraw,mousePos,snapEnabled,snapPos,showScaleBar,showLUT,showAnnotations,annotationSize,lutMode,lutInvert,placingMode,placingQueue,placingIdx,showDisplacement,compareVersion,getProcessed,reproCollecting,angleMode,databaseMode,databaseImages,currentImageIndex]);
+  },[markups,selectedId,zoom,pan,project.images,calibration,t,currentDraw,mousePos,snapEnabled,snapPos,showScaleBar,showLUT,showAnnotations,annotationSize,placingMode,placingQueue,placingIdx,showDisplacement,compareVersion,getProcessed,reproCollecting,angleMode,databaseMode,databaseImages,currentImageIndex]);
 
   useEffect(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});});
   const scheduleRedraw=useCallback(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});},[redraw]);
@@ -1150,7 +1158,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     }else{
       scheduleRedraw();
     }
-  },[currentImageIndex,databaseMode]);
+  },[currentImageIndex,databaseMode,databaseImages,scheduleRedraw]);
 
   const handleDrop=e=>{e.preventDefault();loadImage(e.dataTransfer.files[0]);};
 
@@ -1168,7 +1176,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       if(e.key==="0"){dispatch({type:"SET",payload:{zoom:1}});dispatch({type:"SET",payload:{pan:{x:40,y:40}}});}
     };
     window.addEventListener("keydown",fn);return()=>window.removeEventListener("keydown",fn);
-  },[selectedId,placingMode,placingIdx,placingQueue,markups]);
+  },[selectedId,placingMode,placingIdx,placingQueue,markups,delMarkup,redo,undo]);
 
   const handleMouseDown=useCallback(e=>{
     if(e.button!==0)return;
@@ -1249,7 +1257,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     if(["line","angle3","angle4","polygon","curve","perp"].includes(activeTool)){
       if(!currentDraw)dispatch({type:"SET",payload:{currentDraw:{type:activeTool,points:[ip],curveStyle:"linear",replacingId}}});
       else{const nps=[...currentDraw.points,ip];const need={line:2,angle3:3,angle4:4,perp:3}[activeTool];if(need&&nps.length>=need){finalizeMarkup({...currentDraw,points:nps});dispatch({type:"SET",payload:{currentDraw:null}});}else dispatch({type:"SET",payload:{currentDraw:{...currentDraw,points:nps}}});}return;}
-  },[activeTool,markups,zoom,pan,snapEnabled,currentDraw,selectedMarkup,placingMode,placingQueue,placingIdx,reproCollecting,reproStudies,databaseMode,databaseImages,currentImageIndex,replacingId]);
+  },[activeTool,markups,zoom,pan,snapEnabled,currentDraw,selectedMarkup,placingMode,placingQueue,placingIdx,reproCollecting,reproStudies,databaseMode,databaseImages,currentImageIndex,replacingId,setSelectedId,updMarkup,addMarkup,finalizeMarkup,toImage,getCanvasPos,t]);
 
   const handleMouseMove=useCallback(e=>{
     const currentDbImg=databaseMode&&!reproCollecting&&databaseImages.length>0?databaseImages[currentImageIndex]:null;
@@ -1259,7 +1267,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     if(snapEnabled&&activeTool!=="select"&&activeTool!=="pan"){const ip=toImage(sp.x,sp.y);const sn=snapPoint(ip,activeMarkupsList,12/zoom,snapEnabled);dispatch({type:"SET",payload:{snapPos:(Math.abs(sn.x-ip.x)>0.1||Math.abs(sn.y-ip.y)>0.1)?sn:null}});}else dispatch({type:"SET",payload:{snapPos:null}});
     if(isPanning.current&&panStart.current)dispatch({type:"SET",payload:{pan:{x:panStart.current.px+(e.clientX-panStart.current.mx),y:panStart.current.py+(e.clientY-panStart.current.my)}}});
     if(isDragging.current&&dragMid.current){const ip=toImage(sp.x,sp.y);const dx=ip.x-dragStart.current.x,dy=ip.y-dragStart.current.y;updMarkup(dragMid.current,{points:(activeMarkupsList.find(m=>m.id===dragMid.current)?.points||[]).map((p,i)=>i===dragPtIdx.current?{x:p.x+dx,y:p.y+dy}:p)});dragStart.current=ip;}
-  },[activeTool,markups,zoom,snapEnabled,databaseMode,databaseImages,currentImageIndex,reproCollecting]);
+  },[activeTool,markups,zoom,snapEnabled,databaseMode,databaseImages,currentImageIndex,reproCollecting,updMarkup,toImage,getCanvasPos]);
 
   const handleMouseUp=()=>{
     const currentDbImg=databaseMode&&!reproCollecting&&databaseImages.length>0?databaseImages[currentImageIndex]:null;
@@ -1356,7 +1364,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
           <span style={{fontSize:18}}>←</span>
         </button>
         <button onClick={onHome} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:5,padding:"4px 8px",borderRadius:6,flexShrink:0}}>
-          <span><img src="\favicon.svg" alt="Website Icon" width="48" height="48" borderTop="25px"/> </span>
+          <span><img src="/favicon.svg" alt="Website Icon" width="48" height="48"/> </span>
           {!isMobile&&<span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,color:t.tx,fontSize:17}}>Cephalometry Studio</span>}
         </button>
         <div style={{width:1,height:20,background:t.bdr,flexShrink:0}}/>
@@ -2359,7 +2367,7 @@ function DatabaseDashboard({t,databaseImages}){
       const cv=coefficientOfVariation(vals),sk=vals.length>=3?skewness(vals):null,kt=vals.length>=4?kurtosis(vals):null,sw=vals.length>=3?shapiroWilk(vals):null;
       return{var:v,n:vals.length,mean:m0,sd:s,min:Math.min(...vals),max:Math.max(...vals),median:md,iqrVal:iq.iqr,skew:sk,kurt:kt,cv,shapiro:sw};
     });
-  },[dataset,variables,extractVar]);
+  },[variables,extractVar]);
 
   const grouped=useMemo(()=>{
     const g={};
@@ -2949,7 +2957,7 @@ function DatabaseDashboard({t,databaseImages}){
 // ROOT
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function CephalometryStudio(){
-  const[theme,setTheme]=useState("bluish");const t={...THEMES[theme],id:theme};
+  const[theme,setTheme]=useState("bluish");const t=useMemo(()=>({...THEMES[theme],id:theme}),[theme]);
   const[projects,setProjects]=useState([]);const[activeId,setActiveId]=useState(null);const[pinVerified,setPinVerified]=useState({});
   const dirtyRef=useRef(false);
 
