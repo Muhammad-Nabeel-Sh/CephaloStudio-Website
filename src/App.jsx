@@ -762,9 +762,6 @@ function MarkupTablesPanel({databaseImages,currentImageIndex,t,formatAngle}){
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// DATABASE STATS PANEL
-// ═══════════════════════════════════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════════════════════════════════
 // WORKSPACE
 // ═══════════════════════════════════════════════════════════════════════════════
 function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTheme,onSave}){
@@ -1821,6 +1818,12 @@ function CreateStudyModal({t,onCreate,onClose}){
 }
 
 
+
+function reproAllLabels(study){
+  const labels=new Set();
+  study.operators.forEach(op=>{(op.trials||[]).forEach(tr=>{(tr.measurements||[]).forEach(m=>{if(m.label)labels.add(m.label);});});});
+  return[...labels].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+}
 
 function reproIccMatrix(study,metric){
   if(study.type==="intra"){
