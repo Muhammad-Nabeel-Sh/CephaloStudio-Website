@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo, useReducer } from "react";
 import { THEMES, TOOLS, PREDEFINED, LUT_PRESETS } from "./constants.js";
-import { uid, clamp, dist, vpts, computeMeasurements, snapPoint, alignOnePoint, alignTwoPoints, buildScope, evalFormula, getMissingVars, mean, stdev, tTestPaired, calculateICC, dahlbergError, blandAltman, median, iqr, skewness, kurtosis, coefficientOfVariation, standardError, minimalDetectableChange, shapiroWilk, spearmanCorrelation, pearsonCorrelation, correlationMatrix, computePerLandmarkError, detectSystematicBias, anovaAcrossSessions, computeNormsComparison, detectOutliers, confidenceInterval, linearRegression } from "./utils.js";
+import { uid, clamp, dist, vpts, computeMeasurements, snapPoint, alignOnePoint, alignTwoPoints, buildScope, evalFormula, getMissingVars, mean, stdev, tTestPaired, calculateICC, calculateICC_CI, dahlbergError, blandAltman, median, iqr, coefficientOfVariation, standardError, minimalDetectableChange, spearmanCorrelation, pearsonCorrelation, correlationMatrix, computePerLandmarkError, detectSystematicBias, anovaAcrossSessions, computeNormsComparison, detectOutliers, confidenceInterval, linearRegression } from "./utils.js";
 import { processImageToCanvas, computeHistogram, FloatingHistogram } from "./imageUtils.jsx";
 import { KatexSpan, LatexFloatingPanel } from "./hooks.jsx";
 import { Btn, Tag, Sld, PropRow, Inp } from "./ui.jsx";
@@ -1438,7 +1438,7 @@ function reproPairedVectors(study,metric,sessionA,sessionB){
 }
 
 function exportCsv(type, opts){
-  const {study,metric,descriptive,perLandmark,biases,icc,dahl,bland,tTest,anovaRes,sem,mdc} = opts||{};
+  const {study,metric,descriptive,perLandmark,biases,icc,iccCI,dahl,bland,tTest,anovaRes,sem,mdc} = opts||{};
   let rows=[], filename="export.csv";
   if(type==="reproTables"){
     rows=[["study","design","operator","session_index","landmark","x_px","y_px","timestamp"]];
@@ -1451,8 +1451,8 @@ function exportCsv(type, opts){
     });
     filename=`${String(study.name).replace(/\s+/g,"_")}_reproducibility.csv`;
   }else if(type==="descriptive"){
-    rows=[["Landmark","n","Mean","SD","Median","CV%","Min","Max","Skewness","Kurtosis","Shapiro_W","Shapiro_p","Normal"]];
-    descriptive.forEach(r=>{rows.push([r.lab,r.n,r.mean!==null?r.mean.toFixed(4):"",r.sd!==null?r.sd.toFixed(4):"",r.median!==null?r.median.toFixed(4):"",r.cv!==null?r.cv.toFixed(4):"",r.min!==null?r.min.toFixed(4):"",r.max!==null?r.max.toFixed(4):"",r.skew!==null?r.skew.toFixed(4):"",r.kurt!==null?r.kurt.toFixed(4):"",r.shapiro?r.shapiro.W.toFixed(4):"",r.shapiro?r.shapiro.pValue.toFixed(4):"",r.shapiro?String(r.shapiro.normal):""]);});
+    rows=[["Landmark","n","Mean","SD","Median","CV%","Min","Max"]];
+    descriptive.forEach(r=>{rows.push([r.lab,r.n,r.mean!==null?r.mean.toFixed(4):"",r.sd!==null?r.sd.toFixed(4):"",r.median!==null?r.median.toFixed(4):"",r.cv!==null?r.cv.toFixed(4):"",r.min!==null?r.min.toFixed(2):"",r.max!==null?r.max.toFixed(2):""]);});
     filename=`${String(study.name).replace(/\s+/g,"_")}_descriptive.csv`;
   }else if(type==="errorMetrics"){
     rows=[["Landmark","n","Mean_Diff","SD_Diff","Dahlberg","Abs_Mean","CV%"]];
@@ -1472,6 +1472,8 @@ function exportCsv(type, opts){
     rows.push(["=== RELIABILITY ==="]);
     rows.push(["ICC (Absolute)",icc?.ICC_Absolute?.toFixed(4)]);
     rows.push(["ICC (Consistency)",icc?.ICC_Consistency?.toFixed(4)]);
+    rows.push(["ICC 95% CI lower",iccCI?.lower?.toFixed(4)]);
+    rows.push(["ICC 95% CI upper",iccCI?.upper?.toFixed(4)]);
     rows.push(["Interpretation",icc?.interpretation]);
     rows.push(["SEM",sem?.toFixed(4)]);
     rows.push(["MDC (95%)",mdc?.toFixed(4)]);
@@ -1605,6 +1607,12 @@ function StudyDashboard({t,studies}){
   const[pairA,setPairA]=useState(0);
   const[pairB,setPairB]=useState(1);
   const[tab,setTab]=useState("overview");
+  const[usePx,setUsePx]=useState(true);
+  const[ppm,setPpm]=useState(1);
+  const blandCanvasRef=useRef(null);
+  const errorChartRef=useRef(null);
+
+  const unit=usePx?"px":"mm";
 
   const study=studies.find(s=>s.id===selectedId);
   const labels=reproAllLabels(study||{operators:[]});
@@ -1619,8 +1627,6 @@ function StudyDashboard({t,studies}){
   const dahl=vals1.length>=2&&vals1.length===vals2.length?dahlbergError(vals1,vals2):null;
   const bland=vals1.length>=2&&vals1.length===vals2.length?blandAltman(vals1,vals2):null;
   const tTest=vals1.length>=2&&vals1.length===vals2.length?tTestPaired(vals1,vals2):null;
-  const shapiro=vals1.length>=3?shapiroWilk(vals1):null;
-  const shapiro2=vals2.length>=3?shapiroWilk(vals2):null;
   const spearman=spearmanCorrelation(vals1,vals2);
 
   const descriptive=!study||!labels.length?[]:labels.map(lab=>{
@@ -1630,10 +1636,10 @@ function StudyDashboard({t,studies}){
     }else{
       study.operators.forEach(op=>{const m=(op.trials?.[0]?.measurements||[]).find(x=>x.label===lab);if(m)vals.push(metric==="x"?m.x:m.y);});
     }
-    if(!vals.length)return{lab,n:0,mean:null,sd:null,min:null,max:null,median:null,iqrVal:null,skew:null,kurt:null,cv:null};
+    if(!vals.length)return{lab,n:0,mean:null,sd:null,min:null,max:null,median:null,iqrVal:null,cv:null};
     const m0=mean(vals),s=stdev(vals,m0),md=median(vals),iq=iqr(vals);
-    const cv=coefficientOfVariation(vals),sk=vals.length>=3?skewness(vals):null,kt=vals.length>=4?kurtosis(vals):null,sw=vals.length>=3?shapiroWilk(vals):null;
-    return{lab,n:vals.length,mean:m0,sd:s,min:Math.min(...vals),max:Math.max(...vals),median:md,iqrVal:iq.iqr,skew:sk,kurt:kt,cv,shapiro:sw};
+    const cv=coefficientOfVariation(vals);
+    return{lab,n:vals.length,mean:m0,sd:s,min:Math.min(...vals),max:Math.max(...vals),median:md,iqrVal:iq.iqr,cv};
   });
 
   const perLandmark=study?computePerLandmarkError(study,metric,labels):[];
@@ -1641,9 +1647,83 @@ function StudyDashboard({t,studies}){
   const anovaRes=study?anovaAcrossSessions(study,metric,labels):null;
   const sem=icc?standardError(vals1,icc.ICC_Absolute):null;
   const mdc=sem?minimalDetectableChange(sem):null;
+  const iccCI=icc?calculateICC_CI(icc.ICC_Absolute,iccMat[0]?.length||0,iccMat.length):null;
   const normsComp=computeNormsComparison(descriptive,study?.norms||[],{pxPerMm:1});
 
   const tabs=[["overview","Overview"],["descriptive","Descriptive"],["errors","Per-Landmark"],["inferential","Inferential"],["norms","Norms"],["export","Export"]];
+
+  useEffect(()=>{
+    if(!bland||!blandCanvasRef.current)return;
+    const canvas=blandCanvasRef.current;
+    const W=400,H=280,padL=50,padR=30,padT=30,padB=50;
+    const cw=W-padL-padR,ch=H-padT-padB;
+    const dpr=window.devicePixelRatio||1;
+    canvas.width=W*dpr;canvas.height=H*dpr;
+    canvas.style.width=W+"px";canvas.style.height=H+"px";
+    const ctx=canvas.getContext("2d");
+    ctx.scale(dpr,dpr);
+    ctx.fillStyle=t.bg;ctx.fillRect(0,0,W,H);
+    const pts=bland.means.map((m,i)=>({x:m,y:bland.meanDiff+(vals1[i]-vals2[i]-bland.meanDiff)}));
+    const minM=bland.minMean,maxM=bland.maxMean,padM=(maxM-minM)*0.1||1;
+    const mnM=minM-padM,mxM=maxM+padM;
+    const dMax=Math.max(Math.abs(bland.upperLOA),Math.abs(bland.lowerLOA),Math.max(...pts.map(p=>Math.abs(p.y))))*1.15;
+    const xScale=cw/(mxM-mnM||1),yScale=ch/(2*dMax||1);
+    const tx=x=>padL+(x-mnM)*xScale,ty=y=>padT+ch/2-y*yScale;
+    ctx.strokeStyle=t.bdr;ctx.lineWidth=0.5;
+    for(let i=0;i<=4;i++){const y=padT+(i/4)*ch;ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(padL+cw,y);ctx.stroke();}
+    for(let i=0;i<=4;i++){const x=padL+(i/4)*cw;ctx.beginPath();ctx.moveTo(x,padT);ctx.lineTo(x,padT+ch);ctx.stroke();}
+    ctx.fillStyle=t.tx2;ctx.font="9px 'DM Mono',monospace";ctx.textAlign="center";
+    ctx.fillText("Mean of paired values",padL+cw/2,H-4);
+    ctx.save();ctx.translate(12,padT+ch/2);ctx.rotate(-Math.PI/2);ctx.textAlign="center";ctx.fillText("Difference",0,0);ctx.restore();
+    pts.forEach(p=>{ctx.fillStyle=p.y>bland.upperLOA||p.y<bland.lowerLOA?t.err:t.acc;ctx.beginPath();ctx.arc(tx(p.x),ty(p.y),3,0,Math.PI*2);ctx.fill();});
+    ctx.strokeStyle=t.tx;ctx.lineWidth=1.5;ctx.setLineDash([]);
+    ctx.beginPath();ctx.moveTo(padL,ty(bland.meanDiff));ctx.lineTo(padL+cw,ty(bland.meanDiff));ctx.stroke();
+    ctx.fillStyle=t.tx;ctx.font="bold 9px 'DM Sans',sans-serif";ctx.textAlign="left";
+    ctx.fillText(`Bias: ${bland.meanDiff.toFixed(2)}`,padL+4,padT+12);
+    ctx.strokeStyle=t.warn;ctx.lineWidth=1;ctx.setLineDash([4,4]);
+    ctx.beginPath();ctx.moveTo(padL,ty(bland.upperLOA));ctx.lineTo(padL+cw,ty(bland.upperLOA));ctx.stroke();
+    ctx.beginPath();ctx.moveTo(padL,ty(bland.lowerLOA));ctx.lineTo(padL+cw,ty(bland.lowerLOA));ctx.stroke();
+    ctx.fillStyle=t.warn;ctx.font="8px 'DM Mono',monospace";ctx.textAlign="left";
+    ctx.fillText(`+1.96 SD: ${bland.upperLOA.toFixed(2)}`,padL+4,ty(bland.upperLOA)-4);
+    ctx.fillText(`-1.96 SD: ${bland.lowerLOA.toFixed(2)}`,padL+4,ty(bland.lowerLOA)+12);
+  },[bland,t,vals1,vals2]);
+
+  useEffect(()=>{
+    if(!perLandmark.length||!errorChartRef.current)return;
+    const canvas=errorChartRef.current;
+    const W=500,H=220,padL=50,padR=20,padT=25,padB=60;
+    const cw=W-padL-padR,ch=H-padT-padB;
+    const dpr=window.devicePixelRatio||1;
+    canvas.width=W*dpr;canvas.height=H*dpr;
+    canvas.style.width=W+"px";canvas.style.height=H+"px";
+    const ctx=canvas.getContext("2d");
+    ctx.scale(dpr,dpr);
+    ctx.fillStyle=t.bg;ctx.fillRect(0,0,W,H);
+    const labs=perLandmark.map(r=>r.lab);
+    const allDiffs=perLandmark.flatMap(r=>[r.meanDiff+r.sdDiff,r.meanDiff-r.sdDiff,0]);
+    const yMax=Math.max(...allDiffs.map(Math.abs))*1.2||1;
+    const yScale=ch/(2*yMax);
+    const gap=cw/labs.length;
+    const ty2=y=>padT+ch/2-y*yScale;
+    ctx.strokeStyle=t.bdr;ctx.lineWidth=0.5;
+    for(let i=0;i<=4;i++){const y=padT+(i/4)*ch;ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(padL+cw,y);ctx.stroke();ctx.fillStyle=t.tx2;ctx.font="8px 'DM Mono',monospace";ctx.textAlign="right";ctx.textBaseline="middle";ctx.fillText((yMax*(1-i/2)).toFixed(1),padL-4,y);}
+    ctx.strokeStyle=t.tx;ctx.lineWidth=1;ctx.setLineDash([]);
+    ctx.beginPath();ctx.moveTo(padL,ty2(0));ctx.lineTo(padL+cw,ty2(0));ctx.stroke();
+    ctx.fillStyle=t.tx2;ctx.font="9px 'DM Sans',sans-serif";ctx.textAlign="center";ctx.textBaseline="top";
+    labs.forEach((lab,i)=>{
+      const r=perLandmark[i],cx=padL+i*gap+gap/2;
+      ctx.fillStyle=t.tx;ctx.font="8px 'DM Mono',monospace";ctx.textAlign="center";ctx.textBaseline="top";
+      ctx.save();ctx.translate(cx,padT+ch+4);ctx.rotate(Math.PI/4);ctx.fillText(lab,0,0);ctx.restore();
+      ctx.strokeStyle=t.acc;ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(cx,ty2(r.meanDiff-r.sdDiff));ctx.lineTo(cx,ty2(r.meanDiff+r.sdDiff));ctx.stroke();
+      ctx.fillStyle=t.acc;ctx.beginPath();ctx.arc(cx,ty2(r.meanDiff),4,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle=t.acc;ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(cx-4,ty2(r.meanDiff-r.sdDiff));ctx.lineTo(cx+4,ty2(r.meanDiff-r.sdDiff));ctx.stroke();
+      ctx.beginPath();ctx.moveTo(cx-4,ty2(r.meanDiff+r.sdDiff));ctx.lineTo(cx+4,ty2(r.meanDiff+r.sdDiff));ctx.stroke();
+    });
+    ctx.fillStyle=t.tx;ctx.font="bold 9px 'DM Sans',sans-serif";ctx.textAlign="center";ctx.textBaseline="bottom";
+    ctx.fillText(`Mean difference ± SD by landmark`,padL+cw/2,padT-4);
+  },[perLandmark,t]);
 
   if(!studies.length)return(<div style={{color:t.tx3,fontSize:12,textAlign:"center",padding:20}}>No studies yet. Create and complete a study in Reproducibility first.</div>);
 
@@ -1659,9 +1739,12 @@ function StudyDashboard({t,studies}){
       {!study&&<div style={{color:t.tx3,fontSize:12,textAlign:"center",padding:20}}>Select a study to view statistics.</div>}
       {study&&(
         <>
-          <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap"}}>
-            <button type="button" onClick={()=>setMetric("x")} style={{padding:"4px 10px",border:`1px solid ${metric==="x"?t.acc:t.bdr}`,borderRadius:6,background:metric==="x"?t.accMuted:t.surf3,color:metric==="x"?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}}>X (px)</button>
-            <button type="button" onClick={()=>setMetric("y")} style={{padding:"4px 10px",border:`1px solid ${metric==="y"?t.acc:t.bdr}`,borderRadius:6,background:metric==="y"?t.accMuted:t.surf3,color:metric==="y"?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}}>Y (px)</button>
+          <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
+            <button type="button" onClick={()=>setMetric("x")} style={{padding:"4px 10px",border:`1px solid ${metric==="x"?t.acc:t.bdr}`,borderRadius:6,background:metric==="x"?t.accMuted:t.surf3,color:metric==="x"?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}}>X ({unit})</button>
+            <button type="button" onClick={()=>setMetric("y")} style={{padding:"4px 10px",border:`1px solid ${metric==="y"?t.acc:t.bdr}`,borderRadius:6,background:metric==="y"?t.accMuted:t.surf3,color:metric==="y"?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}}>Y ({unit})</button>
+            <span style={{width:1,height:20,background:t.bdr,margin:"0 4px"}}/>
+            <button type="button" onClick={()=>setUsePx(p=>!p)} style={{padding:"4px 10px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:usePx?t.tx2:t.acc,cursor:"pointer",fontSize:10,fontWeight:600}}>mm</button>
+            {!usePx&&<input value={ppm} onChange={e=>{const v=parseFloat(e.target.value);if(v>0)setPpm(v);}} type="number" step="0.01" min="0.01" placeholder="px/mm" style={{width:60,padding:"4px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:10}}/>}
           </div>
           <div style={{display:"flex",gap:4,marginBottom:12,flexWrap:"wrap"}}>
             {tabs.map(([id,label])=>(<button key={id} onClick={()=>setTab(id)} style={{padding:"5px 10px",borderRadius:6,border:`1px solid ${tab===id?t.acc:t.bdr}`,background:tab===id?t.acc+"18":"transparent",color:tab===id?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{label}</button>))}
@@ -1669,44 +1752,65 @@ function StudyDashboard({t,studies}){
 
           {tab==="overview"&&(
             <div>
-              <table style={{width:"100%",fontSize:10,borderCollapse:"collapse"}}>
-                <tbody>
-                  <tr><td style={{padding:"5px 6px",color:t.tx2,width:160}}>Design</td><td style={{padding:"5px 6px"}}>{study.type==="intra"?"Intra-operator":"Inter-operator"}</td></tr>
-                  <tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2}}>Status</td><td style={{padding:"5px 6px",color:study.status==="completed"?t.ok:t.warn}}>{study.status||"—"}</td></tr>
-                  <tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2}}>Landmarks</td><td style={{padding:"5px 6px",fontFamily:"'DM Mono',monospace",color:t.acc}}>{labels.length}</td></tr>
-                  <tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2}}>Sessions</td><td style={{padding:"5px 6px",fontFamily:"'DM Mono',monospace"}}>{study.type==="intra"?(study.operators[0]?.trials||[]).length:study.operators.length}</td></tr>
-                  {icc&&(<tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2,fontWeight:600}}>ICC (absolute)</td><td style={{padding:"5px 6px",fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700}}>{icc.ICC_Absolute?.toFixed(4)}</td></tr>)}
-                  {icc&&(<tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2,fontWeight:600}}>ICC interpretation</td><td style={{padding:"5px 6px",fontWeight:600,color:icc.ICC_Absolute>=0.9?t.ok:icc.ICC_Absolute>=0.75?t.warn:t.err}}>{icc.interpretation}</td></tr>)}
-                  {icc&&sem!==null&&(<tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2,fontWeight:600}}>SEM</td><td style={{padding:"5px 6px",fontFamily:"'DM Mono',monospace"}}>{sem.toFixed(4)} px</td></tr>)}
-                  {icc&&mdc!==null&&(<tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2,fontWeight:600}}>MDC (95%)</td><td style={{padding:"5px 6px",fontFamily:"'DM Mono',monospace"}}>{mdc.toFixed(4)} px</td></tr>)}
-                  {anovaRes&&(<tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2,fontWeight:600}}>ANOVA F</td><td style={{padding:"5px 6px",fontFamily:"'DM Mono',monospace"}}>{anovaRes.F.toFixed(4)}</td></tr>)}
-                  {anovaRes&&(<tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2,fontWeight:600}}>ANOVA p-value</td><td style={{padding:"5px 6px",fontFamily:"'DM Mono',monospace",color:anovaRes.significant?t.err:t.ok,fontWeight:700}}>{anovaRes.pValue.toFixed(6)}</td></tr>)}
-                  {anovaRes&&(<tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2,fontWeight:600}}>ANOVA result</td><td style={{padding:"5px 6px",fontWeight:600,color:anovaRes.significant?t.err:t.ok}}>{anovaRes.significant?"Significant bias":"No significant bias"}</td></tr>)}
-                  {dahl&&(<tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2,fontWeight:600}}>Dahlberg error</td><td style={{padding:"5px 6px",fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700}}>{dahl.error.toFixed(4)} px</td></tr>)}
-                  {dahl&&(<tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2,fontWeight:600}}>Paired landmarks</td><td style={{padding:"5px 6px",fontFamily:"'DM Mono',monospace"}}>{vals1.length}</td></tr>)}
-                </tbody>
-              </table>
-              <div style={{display:"flex",gap:8,marginTop:14,paddingTop:10,borderTop:`1px solid ${t.bdr}`,flexWrap:"wrap"}}>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:10,marginBottom:16}}>
+                <div style={{padding:12,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
+                  <div style={{fontSize:9,color:t.tx2,marginBottom:2}}>Design</div>
+                  <div style={{fontSize:13,fontWeight:700,color:t.tx}}>{study.type==="intra"?"Intra-operator":"Inter-operator"}</div>
+                </div>
+                <div style={{padding:12,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
+                  <div style={{fontSize:9,color:t.tx2,marginBottom:2}}>Status</div>
+                  <div style={{fontSize:13,fontWeight:700,color:study.status==="completed"?t.ok:t.warn}}>{study.status||"—"}</div>
+                </div>
+                <div style={{padding:12,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
+                  <div style={{fontSize:9,color:t.tx2,marginBottom:2}}>Landmarks</div>
+                  <div style={{fontSize:18,fontWeight:700,color:t.acc}}>{labels.length}</div>
+                </div>
+                <div style={{padding:12,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
+                  <div style={{fontSize:9,color:t.tx2,marginBottom:2}}>Sessions</div>
+                  <div style={{fontSize:18,fontWeight:700,color:t.tx}}>{study.type==="intra"?(study.operators[0]?.trials||[]).length:study.operators.length}</div>
+                </div>
+                {icc&&<div style={{padding:12,borderRadius:8,background:t.accMuted,border:`1px solid ${t.acc}44`}}>
+                  <div style={{fontSize:9,color:t.tx2,marginBottom:2}}>ICC (absolute)</div>
+                  <div style={{fontSize:18,fontWeight:700,color:t.acc}}>{icc.ICC_Absolute?.toFixed(4)}</div>
+                  <div style={{fontSize:9,fontWeight:600,color:icc.ICC_Absolute>=0.9?t.ok:icc.ICC_Absolute>=0.75?t.warn:t.err}}>{icc.interpretation}</div>
+                  {iccCI&&<div style={{fontSize:8,color:t.tx3,marginTop:2}}>95% CI: [{iccCI.lower.toFixed(4)}, {iccCI.upper.toFixed(4)}]</div>}
+                </div>}
+                {sem!==null&&<div style={{padding:12,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
+                  <div style={{fontSize:9,color:t.tx2,marginBottom:2}}>SEM</div>
+                  <div style={{fontSize:15,fontWeight:700,color:t.tx}}>{(usePx?sem:sem/ppm).toFixed(4)} {unit}</div>
+                </div>}
+                {mdc!==null&&<div style={{padding:12,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
+                  <div style={{fontSize:9,color:t.tx2,marginBottom:2}}>MDC (95%)</div>
+                  <div style={{fontSize:15,fontWeight:700,color:t.warn}}>{(usePx?mdc:mdc/ppm).toFixed(4)} {unit}</div>
+                </div>}
+                {dahl&&<div style={{padding:12,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
+                  <div style={{fontSize:9,color:t.tx2,marginBottom:2}}>Dahlberg error</div>
+                  <div style={{fontSize:15,fontWeight:700,color:t.acc}}>{(usePx?dahl.error:dahl.error/ppm).toFixed(4)} {unit}</div>
+                </div>}
+                {vals1.length>0&&<div style={{padding:12,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
+                  <div style={{fontSize:9,color:t.tx2,marginBottom:2}}>Paired pairs</div>
+                  <div style={{fontSize:15,fontWeight:700,color:t.tx}}>{vals1.length}</div>
+                </div>}
+                {anovaRes&&<div style={{padding:12,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
+                  <div style={{fontSize:9,color:t.tx2,marginBottom:2}}>ANOVA</div>
+                  <div style={{fontSize:13,fontWeight:700,color:t.tx}}>F={anovaRes.F.toFixed(2)}</div>
+                  <div style={{fontSize:9,color:anovaRes.significant?t.err:t.ok}}>p={anovaRes.pValue.toFixed(4)} {anovaRes.significant?"(bias)":"(ok)"}</div>
+                </div>}
+              </div>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                 <Btn t={t} small onClick={()=>exportCsv("reproTables",{study})}>⬇ Download tables (.csv)</Btn>
-                <Btn t={t} small onClick={()=>exportCsv("fullReport",{study,metric,labels,descriptive,perLandmark,biases,icc,dahl,bland,tTest,anovaRes,sem,mdc})}>⬇ Full report</Btn>
+                <Btn t={t} small onClick={()=>exportCsv("fullReport",{study,metric,labels,descriptive,perLandmark,biases,icc,iccCI,dahl,bland,tTest,anovaRes,sem,mdc})}>⬇ Full report</Btn>
               </div>
             </div>
           )}
 
           {tab==="descriptive"&&(
             <div>
-              <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:6}}>Descriptive Statistics ({metric.toUpperCase()}, px)</div>
+              <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:6}}>Descriptive Statistics ({metric.toUpperCase()}, {unit})</div>
               <div style={{overflowX:"auto",marginBottom:12}}>
                 <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
                   <thead><tr style={{borderBottom:`1px solid ${t.bdr}`}}><th style={{textAlign:"left",padding:4,color:t.tx2}}>Landmark</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>n</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Mean</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>SD</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Median</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>CV%</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Min</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Max</th></tr></thead>
                   <tbody>{descriptive.map(row=>(<tr key={row.lab} style={{borderBottom:`1px solid ${t.bdr}44`}}><td style={{padding:4,color:t.tx,fontWeight:600}}>{row.lab}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.n}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:t.acc}}>{row.mean!==null?row.mean.toFixed(3):"—"}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.sd!==null?row.sd.toFixed(3):"—"}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.median!==null?row.median.toFixed(3):"—"}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.cv!==null?row.cv.toFixed(2):"—"}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.min!==null?row.min.toFixed(2):"—"}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.max!==null?row.max.toFixed(2):"—"}</td></tr>))}</tbody>
-                </table>
-              </div>
-              <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:6}}>Normality (Shapiro–Wilk)</div>
-              <div style={{overflowX:"auto"}}>
-                <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
-                  <thead><tr style={{borderBottom:`1px solid ${t.bdr}`}}><th style={{textAlign:"left",padding:4,color:t.tx2}}>Landmark</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>W</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>p-value</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Normal?</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Skew</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Kurtosis</th></tr></thead>
-                  <tbody>{descriptive.filter(r=>r.shapiro).map(row=>(<tr key={row.lab} style={{borderBottom:`1px solid ${t.bdr}44`}}><td style={{padding:4,color:t.tx,fontWeight:600}}>{row.lab}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.shapiro.W.toFixed(4)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.shapiro.pValue.toFixed(4)}</td><td style={{padding:4,textAlign:"right",color:row.shapiro.normal?t.ok:t.err,fontWeight:600}}>{row.shapiro.normal?"Yes":"No"}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.skew!==null?row.skew.toFixed(3):"—"}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.kurt!==null?row.kurt.toFixed(3):"—"}</td></tr>))}</tbody>
                 </table>
               </div>
             </div>
@@ -1716,11 +1820,16 @@ function StudyDashboard({t,studies}){
             <div>
               <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:6}}>Per-Landmark Error Metrics</div>
               {perLandmark.length===0?<div style={{color:t.tx3,fontSize:11,textAlign:"center",padding:12}}>Need at least two sessions for per-landmark errors.</div>:(
-                <div style={{overflowX:"auto",marginBottom:12}}>
-                  <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
-                    <thead><tr style={{borderBottom:`1px solid ${t.bdr}`}}><th style={{textAlign:"left",padding:4,color:t.tx2}}>Landmark</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>n</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Mean Diff</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>SD Diff</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Dahlberg</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Abs Mean</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>CV%</th></tr></thead>
-                    <tbody>{perLandmark.map(row=>(<tr key={row.lab} style={{borderBottom:`1px solid ${t.bdr}44`}}><td style={{padding:4,color:t.tx,fontWeight:600}}>{row.lab}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.n}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.meanDiff.toFixed(4)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.sdDiff.toFixed(4)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:600}}>{row.dahlberg.toFixed(4)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.absMean.toFixed(4)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.cv!==null?row.cv.toFixed(2):"—"}</td></tr>))}</tbody>
-                  </table>
+                <div>
+                  <div style={{display:"flex",justifyContent:"center",marginBottom:12}}>
+                    <canvas ref={errorChartRef} style={{borderRadius:6,border:`1px solid ${t.bdr}`,maxWidth:"100%"}}/>
+                  </div>
+                  <div style={{overflowX:"auto",marginBottom:12}}>
+                    <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
+                      <thead><tr style={{borderBottom:`1px solid ${t.bdr}`}}><th style={{textAlign:"left",padding:4,color:t.tx2}}>Landmark</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>n</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Mean Diff</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>SD Diff</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Dahlberg</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Abs Mean</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>CV%</th></tr></thead>
+                      <tbody>{perLandmark.map(row=>(<tr key={row.lab} style={{borderBottom:`1px solid ${t.bdr}44`}}><td style={{padding:4,color:t.tx,fontWeight:600}}>{row.lab}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.n}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.meanDiff.toFixed(4)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.sdDiff.toFixed(4)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:600}}>{row.dahlberg.toFixed(4)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.absMean.toFixed(4)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.cv!==null?row.cv.toFixed(2):"—"}</td></tr>))}</tbody>
+                    </table>
+                  </div>
                 </div>
               )}
               <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:6}}>Systematic Bias Detection</div>
@@ -1760,14 +1869,15 @@ function StudyDashboard({t,studies}){
                   {icc?(<div style={{fontSize:11}}>
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>ICC (absolute agreement)</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700}}>{icc.ICC_Absolute?.toFixed(4)??"—"}</span></div>
                     <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>ICC (consistency)</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700}}>{icc.ICC_Consistency?.toFixed(4)??"—"}</span></div>
-                    {sem!==null&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>SEM</span><span style={{fontFamily:"'DM Mono',monospace",color:t.tx}}>{sem.toFixed(4)} px</span></div>}
-                    {mdc!==null&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>MDC (95%)</span><span style={{fontFamily:"'DM Mono',monospace",color:t.tx}}>{mdc.toFixed(4)} px</span></div>}
+                    {iccCI&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>95% CI (absolute)</span><span style={{fontFamily:"'DM Mono',monospace",color:t.tx2,fontSize:10}}>[{iccCI.lower.toFixed(4)}, {iccCI.upper.toFixed(4)}]</span></div>}
+                    {sem!==null&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>SEM</span><span style={{fontFamily:"'DM Mono',monospace",color:t.tx}}>{(usePx?sem:sem/ppm).toFixed(4)} {unit}</span></div>}
+                    {mdc!==null&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>MDC (95%)</span><span style={{fontFamily:"'DM Mono',monospace",color:t.tx}}>{(usePx?mdc:mdc/ppm).toFixed(4)} {unit}</span></div>}
                     <div style={{padding:"6px 8px",borderRadius:4,background:t.accMuted,color:t.acc,fontWeight:600,textAlign:"center",fontSize:10}}>{icc.interpretation}</div>
                   </div>):<div style={{color:t.tx3,fontSize:11}}>Need at least two complete sessions and matching landmarks on every session for ICC.</div>}
                 </div>
                 <div style={{marginBottom:12}}>
                   <div style={{fontSize:10,fontWeight:700,color:t.tx2,marginBottom:6}}>Dahlberg error</div>
-                  {dahl?<div style={{display:"flex",justifyContent:"space-between",fontSize:11}}><span>Random error (paired)</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700}}>{dahl.error.toFixed(4)} px</span></div>:<div style={{color:t.tx3,fontSize:11}}>Need two sessions with the same landmarks.</div>}
+                  {dahl?<div style={{display:"flex",justifyContent:"space-between",fontSize:11}}><span>Random error (paired)</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700}}>{(usePx?dahl.error:dahl.error/ppm).toFixed(4)} {unit}</span></div>:<div style={{color:t.tx3,fontSize:11}}>Need two sessions with the same landmarks.</div>}
                 </div>
                 <div style={{marginBottom:12}}>
                   <div style={{fontSize:10,fontWeight:700,color:t.tx2,marginBottom:6}}>Paired t-test</div>
@@ -1779,22 +1889,16 @@ function StudyDashboard({t,studies}){
                     <div style={{padding:"6px 8px",borderRadius:4,background:tTest.significant?t.err+"22":t.ok+"22",color:tTest.significant?t.err:t.ok,fontWeight:600,textAlign:"center"}}>{tTest.significant?"Significant (p < 0.05)":"Not significant"}</div>
                   </div>):<div style={{color:t.tx3,fontSize:11}}>Cannot compute (need paired observations).</div>}
                 </div>
-                <div style={{marginBottom:12}}>
-                  <div style={{fontSize:10,fontWeight:700,color:t.tx2,marginBottom:6}}>Normality (paired data)</div>
-                  {shapiro?(<div style={{fontSize:11}}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>W (session A)</span><span style={{fontFamily:"'DM Mono',monospace"}}>{shapiro.W.toFixed(4)}</span></div>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>p-value</span><span style={{fontFamily:"'DM Mono',monospace",color:shapiro.normal?t.ok:t.err}}>{shapiro.pValue.toFixed(4)}</span></div>
-                    {shapiro2&&<><div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>W (session B)</span><span style={{fontFamily:"'DM Mono',monospace"}}>{shapiro2.W.toFixed(4)}</span></div><div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>p-value</span><span style={{fontFamily:"'DM Mono',monospace",color:shapiro2.normal?t.ok:t.err}}>{shapiro2.pValue.toFixed(4)}</span></div></>}
-                    <div style={{padding:"6px 8px",borderRadius:4,background:(shapiro.normal&&(!shapiro2||shapiro2.normal))?t.ok+"22":t.err+"22",color:shapiro.normal&&(!shapiro2||shapiro2.normal)?t.ok:t.err,fontWeight:600,textAlign:"center"}}>{shapiro.normal&&(!shapiro2||shapiro2.normal)?"Approximately normal":"Non-normal distribution"}</div>
-                  </div>):<div style={{color:t.tx3,fontSize:11}}>Need at least 3 paired observations.</div>}
-                </div>
                 <div>
                   <div style={{fontSize:10,fontWeight:700,color:t.tx2,marginBottom:6}}>Bland–Altman</div>
                   {bland?(<div style={{fontSize:11}}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>Mean difference</span><span style={{fontFamily:"'DM Mono',monospace",color:t.tx}}>{bland.meanDiff.toFixed(4)}</span></div>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>SD of differences</span><span style={{fontFamily:"'DM Mono',monospace",color:t.tx}}>{bland.stdDiff.toFixed(4)}</span></div>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>Lower LoA</span><span style={{fontFamily:"'DM Mono',monospace",color:t.warn}}>{bland.lowerLOA.toFixed(4)}</span></div>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>Upper LoA</span><span style={{fontFamily:"'DM Mono',monospace",color:t.warn}}>{bland.upperLOA.toFixed(4)}</span></div>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>Mean difference</span><span style={{fontFamily:"'DM Mono',monospace",color:t.tx}}>{(usePx?bland.meanDiff:bland.meanDiff/ppm).toFixed(4)} {unit}</span></div>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>SD of differences</span><span style={{fontFamily:"'DM Mono',monospace",color:t.tx}}>{(usePx?bland.stdDiff:bland.stdDiff/ppm).toFixed(4)} {unit}</span></div>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>Lower LoA</span><span style={{fontFamily:"'DM Mono',monospace",color:t.warn}}>{(usePx?bland.lowerLOA:bland.lowerLOA/ppm).toFixed(4)} {unit}</span></div>
+                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>Upper LoA</span><span style={{fontFamily:"'DM Mono',monospace",color:t.warn}}>{(usePx?bland.upperLOA:bland.upperLOA/ppm).toFixed(4)} {unit}</span></div>
+                    <div style={{display:"flex",justifyContent:"center",marginTop:8}}>
+                      <canvas ref={blandCanvasRef} style={{borderRadius:6,border:`1px solid ${t.bdr}`,maxWidth:"100%"}}/>
+                    </div>
                   </div>):<div style={{color:t.tx3,fontSize:11}}>Cannot compute.</div>}
                 </div>
               </div>
@@ -1820,7 +1924,7 @@ function StudyDashboard({t,studies}){
               <Btn t={t} onClick={()=>exportCsv("reproTables",{study})}>⬇ Raw data tables (.csv)</Btn>
               <Btn t={t} onClick={()=>exportCsv("descriptive",{study,metric,descriptive})}>⬇ Descriptive statistics (.csv)</Btn>
               <Btn t={t} onClick={()=>exportCsv("errorMetrics",{perLandmark})}>⬇ Per-landmark error metrics (.csv)</Btn>
-              <Btn t={t} onClick={()=>exportCsv("fullReport",{study,metric,labels,descriptive,perLandmark,biases,icc,dahl,bland,tTest,anovaRes,sem,mdc})}>⬇ Full statistical report (.csv)</Btn>
+              <Btn t={t} onClick={()=>exportCsv("fullReport",{study,metric,labels,descriptive,perLandmark,biases,icc,iccCI,dahl,bland,tTest,anovaRes,sem,mdc})}>⬇ Full statistical report (.csv)</Btn>
             </div>
           )}
         </>
@@ -1876,8 +1980,8 @@ function DatabaseDashboard({t,databaseImages}){
       const vals=extractVar(v);
       if(!vals.length)return{var:v,n:0,mean:null,sd:null,min:null,max:null,median:null,iqrVal:null,skew:null,kurt:null,cv:null};
       const m0=mean(vals),s=stdev(vals,m0),md=median(vals),iq=iqr(vals);
-      const cv=coefficientOfVariation(vals),sk=vals.length>=3?skewness(vals):null,kt=vals.length>=4?kurtosis(vals):null,sw=vals.length>=3?shapiroWilk(vals):null;
-      return{var:v,n:vals.length,mean:m0,sd:s,min:Math.min(...vals),max:Math.max(...vals),median:md,iqrVal:iq.iqr,skew:sk,kurt:kt,cv,shapiro:sw};
+      const cv=coefficientOfVariation(vals);
+      return{var:v,n:vals.length,mean:m0,sd:s,min:Math.min(...vals),max:Math.max(...vals),median:md,iqrVal:iq.iqr,cv};
     });
   },[variables,extractVar]);
 
@@ -2138,13 +2242,7 @@ function DatabaseDashboard({t,databaseImages}){
                   <tbody>{descriptive.filter(d=>d.n>0&&!/_x$|_y$/.test(d.var)).map(row=>(<tr key={row.var} style={{borderBottom:`1px solid ${t.bdr}44`}}><td style={{padding:4,color:t.tx,fontWeight:600}}>{row.var}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.n}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:t.acc}}>{row.mean?.toFixed(3)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.sd?.toFixed(3)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.median?.toFixed(3)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.cv?.toFixed(2)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.min?.toFixed(2)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.max?.toFixed(2)}</td></tr>))}</tbody>
                 </table>
               </div>
-              <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:6}}>Normality (Shapiro–Wilk)</div>
-              <div style={{overflowX:"auto"}}>
-                <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
-                  <thead><tr style={{borderBottom:`1px solid ${t.bdr}`}}><th style={{textAlign:"left",padding:4,color:t.tx2}}>Variable</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>W</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>p-value</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Normal?</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Skew</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Kurtosis</th></tr></thead>
-                  <tbody>{descriptive.filter(r=>r.shapiro&&r.n>=3&&!/_x$|_y$/.test(r.var)).map(row=>(<tr key={row.var} style={{borderBottom:`1px solid ${t.bdr}44`}}><td style={{padding:4,color:t.tx,fontWeight:600}}>{row.var}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.shapiro.W.toFixed(4)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.shapiro.pValue.toFixed(4)}</td><td style={{padding:4,textAlign:"right",color:row.shapiro.normal?t.ok:t.err,fontWeight:600}}>{row.shapiro.normal?"Yes":"No"}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.skew?.toFixed(3)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.kurt?.toFixed(3)}</td></tr>))}</tbody>
-                </table>
-              </div>
+
             </>
           )}
         </div>

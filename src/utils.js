@@ -320,6 +320,19 @@ export const getICCInterpretation = icc => {
   return "Excellent";
 };
 
+export function calculateICC_CI(icc, n, k, confidence = 0.95) {
+  if (icc == null || n < 2 || k < 2) return null;
+  const r = Math.max(-0.999, Math.min(0.999, icc));
+  const z = 0.5 * Math.log((1 + r) / (1 - r));
+  const se = 1 / Math.sqrt(k * (n - 1) - 1);
+  const zCrit = confidence === 0.99 ? 2.576 : confidence === 0.90 ? 1.645 : 1.96;
+  const lo = z - zCrit * se;
+  const hi = z + zCrit * se;
+  const lower = (Math.exp(2 * lo) - 1) / (Math.exp(2 * lo) + 1);
+  const upper = (Math.exp(2 * hi) - 1) / (Math.exp(2 * hi) + 1);
+  return { lower, upper, confidence };
+}
+
 export function dahlbergError(arr1, arr2) {
   if (arr1.length !== arr2.length) return null;
   const n = arr1.length;
