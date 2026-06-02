@@ -1,4 +1,5 @@
 import { clamp, dist, angle3pt, angle4pt, perpDist, polyArea, polyLen, vpts, catmullRom, splineArea, splineLen, getInfiniteLinePoints } from "./utils.js";
+import { SILHOUETTES } from "./silhouettes.js";
 
 function isReproPointVisible(m, reproCollecting){
   if(!reproCollecting || !m.repro) return true;
@@ -42,45 +43,48 @@ export function drawMarkup(ctx, m, zoom, pan, cal, sel, t, reproCollecting, canv
   };
   
   const sp = vpts(m).map(sc);
-  if(!sp.length) return;
+  if(!sp.length && m.type !== "silhouette") return;
   
   const isSel = sel === m.id;
   ctx.save();
-  
-  switch(m.type){
-    case "point":
-      drawPoint(ctx, m, sp, isSel, t, zoom, pan, showAnnotations, annotationSize);
-      break;
-    case "arrow":
-      drawArrow(ctx, m, sp, t, zoom);
-      break;
-    case "line":
-    case "parallel":
-      drawLine(ctx, m, sp, isSel, t, cal, zoom, canvasSize, showAnnotations, annotationSize);
-      break;
-    case "angle3":
-      drawAngle3(ctx, m, sp, isSel, t, cal, zoom, fmtAngle, showAnnotations, annotationSize);
-      break;
-    case "angle4":
-      drawAngle4(ctx, m, sp, t, fmtAngle, zoom, showAnnotations, annotationSize);
-      break;
-    case "polygon":
-      drawPolygon(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize);
-      break;
-    case "curve":
-      drawCurve(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize);
-      break;
-    case "perp":
-      drawPerp(ctx, m, sp, t, cal, zoom, pan, showAnnotations, annotationSize);
-      break;
-    case "text":
-      drawText(ctx, m, sp, isSel, t, zoom, showAnnotations, annotationSize);
-      break;
-    case "ruler":
-      drawRuler(ctx, m, sp, t, zoom, showAnnotations, annotationSize);
-      break;
-  }
-  
+  try {
+    switch(m.type){
+      case "point":
+        drawPoint(ctx, m, sp, isSel, t, zoom, pan, showAnnotations, annotationSize);
+        break;
+      case "arrow":
+        drawArrow(ctx, m, sp, t, zoom);
+        break;
+      case "line":
+      case "parallel":
+        drawLine(ctx, m, sp, isSel, t, cal, zoom, canvasSize, showAnnotations, annotationSize);
+        break;
+      case "angle3":
+        drawAngle3(ctx, m, sp, isSel, t, cal, zoom, fmtAngle, showAnnotations, annotationSize);
+        break;
+      case "angle4":
+        drawAngle4(ctx, m, sp, t, fmtAngle, zoom, showAnnotations, annotationSize);
+        break;
+      case "polygon":
+        drawPolygon(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize);
+        break;
+      case "curve":
+        drawCurve(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize);
+        break;
+      case "perp":
+        drawPerp(ctx, m, sp, t, cal, zoom, pan, showAnnotations, annotationSize);
+        break;
+      case "text":
+        drawText(ctx, m, sp, isSel, t, zoom, showAnnotations, annotationSize);
+        break;
+      case "ruler":
+        drawRuler(ctx, m, sp, t, zoom, showAnnotations, annotationSize);
+        break;
+      case "silhouette":
+        drawSilhouette(ctx, m, isSel, t, zoom, pan, showAnnotations, annotationSize);
+        break;
+    }
+  } catch { /*silent*/ }
   ctx.restore();
 }
 
@@ -470,6 +474,126 @@ function drawRuler(ctx, m, sp, t, zoom, showAnnotations, annotationSize = 1){
   }
 }
 
+function drawSilhouette(ctx, m, isSel, t, zoom, pan) {
+  try {
+  const def = SILHOUETTES[m.silhouetteType];
+  if (!def) return;
+
+  const rot = m.rotation || 0;
+  const sc = m.scale || 1;
+  const pos = m.position || { x: 0, y: 0 };
+  const baseSize = 100;
+  const cosR = Math.cos(rot);
+  const sinR = Math.sin(rot);
+
+  function transform(p) {
+    const sx = p.x * sc * baseSize;
+    const sy = p.y * sc * baseSize;
+    const rx = sx * cosR - sy * sinR;
+    const ry = sx * sinR + sy * cosR;
+    return {
+      x: (rx + pos.x) * zoom + pan.x,
+      y: (ry + pos.y) * zoom + pan.y,
+    };
+  }
+
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+
+  def.paths.forEach(path => {
+    if (path.points.length < 2) return;
+    const sp = path.points.map(transform);
+
+    sp.forEach(p => {
+      if (p.x < minX) minX = p.x;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.y > maxY) maxY = p.y;
+    });
+
+    const fillColor = m.fillColor || (m.color || def.color) + "22";
+    const strokeColor = m.color || def.color;
+    const lineWidth = (m.width || 1.5) * Math.sqrt(zoom);
+
+    if (path.closed) {
+      ctx.beginPath();
+      if (sp.length >= 3) catmullRom(ctx, sp, true);
+      else {
+        ctx.moveTo(sp[0].x, sp[0].y);
+        sp.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+        ctx.closePath();
+      }
+      ctx.fillStyle = fillColor;
+      ctx.fill();
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = lineWidth;
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      if (sp.length >= 3) catmullRom(ctx, sp, false);
+      else {
+        ctx.moveTo(sp[0].x, sp[0].y);
+        sp.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+      }
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = lineWidth;
+      ctx.stroke();
+    }
+  });
+
+  if (isSel && minX < Infinity) {
+    const pad = 6 * Math.sqrt(zoom);
+    const hSize = 6 * Math.sqrt(zoom);
+    const bminX = minX - pad, bmaxX = maxX + pad;
+    const bminY = minY - pad, bmaxY = maxY + pad;
+
+    ctx.strokeStyle = t.acc + "66";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4 * Math.sqrt(zoom), 3 * Math.sqrt(zoom)]);
+    ctx.strokeRect(bminX, bminY, bmaxX - bminX, bmaxY - bminY);
+    ctx.setLineDash([]);
+
+    const handleColor = "#fff";
+    const borderColor = t.acc;
+    const corners = [
+      { x: bminX, y: bminY },
+      { x: bmaxX, y: bminY },
+      { x: bminX, y: bmaxY },
+      { x: bmaxX, y: bmaxY },
+    ];
+
+    corners.forEach(p => {
+      ctx.fillStyle = handleColor;
+      ctx.strokeStyle = borderColor;
+      ctx.lineWidth = 1.5;
+      ctx.fillRect(p.x - hSize / 2, p.y - hSize / 2, hSize, hSize);
+      ctx.strokeRect(p.x - hSize / 2, p.y - hSize / 2, hSize, hSize);
+    });
+
+    const rotCX = (bminX + bmaxX) / 2;
+    const rotCY = bminY - pad - 18 * Math.sqrt(zoom);
+    ctx.beginPath();
+    ctx.arc(rotCX, rotCY, hSize, 0, Math.PI * 2);
+    ctx.fillStyle = handleColor;
+    ctx.fill();
+    ctx.strokeStyle = borderColor;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.strokeStyle = borderColor + "66";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3 * Math.sqrt(zoom), 3 * Math.sqrt(zoom)]);
+    ctx.beginPath();
+    ctx.moveTo(rotCX, rotCY + hSize);
+    ctx.lineTo(rotCX, corners[0].y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = borderColor;
+    ctx.font = `${10 * Math.sqrt(zoom)}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.fillText("↻", rotCX, rotCY + hSize + 12 * Math.sqrt(zoom));
+  }
+  } catch { /*silent*/ }
+}
+
 export function drawInProgress(ctx, draw, mp, zoom, pan, t){
   if(!draw) return;
   
@@ -706,6 +830,76 @@ export function drawDisplacementVectors(ctx, m1arr, m2arr, zoom, pan){
   ctx.restore();
 }
 
+function silhouetteHitTest(m, ip, zoom) {
+  try {
+  const def = SILHOUETTES[m.silhouetteType];
+  if (!def) return false;
+  const rot = m.rotation || 0;
+  const sc = m.scale || 1;
+  const pos = m.position || { x: 0, y: 0 };
+  const baseSize = 100;
+  const cosR = Math.cos(rot);
+  const sinR = Math.sin(rot);
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  def.paths.forEach(path => {
+    path.points.forEach(p => {
+      const sx = p.x * sc * baseSize;
+      const sy = p.y * sc * baseSize;
+      const rx = sx * cosR - sy * sinR;
+      const ry = sx * sinR + sy * cosR;
+      const tx = rx + pos.x;
+      const ty = ry + pos.y;
+      if (tx < minX) minX = tx;
+      if (tx > maxX) maxX = tx;
+      if (ty < minY) minY = ty;
+      if (ty > maxY) maxY = ty;
+    });
+  });
+  const pad = 8 / zoom;
+  return ip.x >= minX - pad && ip.x <= maxX + pad && ip.y >= minY - pad && ip.y <= maxY + pad;
+  } catch { return false; }
+}
+
+export function getSilhouetteHandlesImage(m, zoom = 1) {
+  try {
+  const def = SILHOUETTES[m.silhouetteType];
+  if (!def) return { corners: [], rotCenter: null };
+  const rot = m.rotation || 0;
+  const sc = m.scale || 1;
+  const pos = m.position || { x: 0, y: 0 };
+  const baseSize = 100;
+  const cosR = Math.cos(rot);
+  const sinR = Math.sin(rot);
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  def.paths.forEach(path => {
+    path.points.forEach(p => {
+      const sx = p.x * sc * baseSize;
+      const sy = p.y * sc * baseSize;
+      const rx = sx * cosR - sy * sinR;
+      const ry = sx * sinR + sy * cosR;
+      const tx = rx + pos.x;
+      const ty = ry + pos.y;
+      if (tx < minX) minX = tx;
+      if (tx > maxX) maxX = tx;
+      if (ty < minY) minY = ty;
+      if (ty > maxY) maxY = ty;
+    });
+  });
+  const pad = 6 / Math.sqrt(zoom);
+  const hSize = 6;
+  if (!isFinite(minX) || !isFinite(maxX)) return { corners: [], rotCenter: null };
+  const corners = [
+    { x: minX - pad, y: minY - pad },
+    { x: maxX + pad, y: minY - pad },
+    { x: minX - pad, y: maxY + pad },
+    { x: maxX + pad, y: maxY + pad },
+  ];
+  const centerX = (minX + maxX) / 2;
+  const rotCenter = { x: centerX, y: minY - pad - 18 / Math.sqrt(zoom) };
+  return { corners, rotCenter, hSize, bbox: { minX, maxX, minY, maxY } };
+  } catch { return { corners: [], rotCenter: null }; }
+}
+
 export function hitTest(markups, ip, zoom, reproCollecting){
   const thr = 8 / zoom;
   
@@ -736,6 +930,7 @@ export function hitTest(markups, ip, zoom, reproCollecting){
     if(m.type === "perp" && vp.length >= 2 && perpDist(ip, vp[0], vp[1]) < thr) return m.id;
     if(m.type === "perp" && vp.length >= 3 && dist(vp[2], ip) < thr * 2) return m.id;
     if(m.type === "text" && vp.length && dist(vp[0], ip) < thr * 4) return m.id;
+    if(m.type === "silhouette" && silhouetteHitTest(m, ip, zoom)) return m.id;
   }
   
   return null;

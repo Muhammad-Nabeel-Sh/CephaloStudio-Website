@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, useCallback, useMemo, useReducer } from "react";
 import { THEMES, TOOLS, PREDEFINED, LUT_PRESETS } from "./constants.js";
+import { SILHOUETTES } from "./silhouettes.js";
 import { uid, clamp, dist, vpts, computeMeasurements, snapPoint, alignOnePoint, alignTwoPoints, buildScope, evalFormula, getMissingVars, mean, stdev, tTestPaired, calculateICC, calculateICC_CI, dahlbergError, blandAltman, median, iqr, coefficientOfVariation, standardError, minimalDetectableChange, spearmanCorrelation, pearsonCorrelation, correlationMatrix, computePerLandmarkError, detectSystematicBias, anovaAcrossSessions, computeNormsComparison, detectOutliers, confidenceInterval, linearRegression } from "./utils.js";
 import { processImageToCanvas, computeHistogram, FloatingHistogram } from "./imageUtils.jsx";
 import { KatexSpan, LatexFloatingPanel } from "./hooks.jsx";
 import { Btn, Tag, Sld, PropRow, Inp } from "./ui.jsx";
 import ToolBtn from "./ToolBtn.jsx";
-import { drawMarkup, drawInProgress, drawScaleBar, drawLUTLegend, drawSnapIndicator, drawDisplacementVectors, hitTest } from "./markups.jsx";
-import { MarkupsPanel, MeasurementsPanel, FormulasPanel, ImagePanel, LayersPanel, MarkupProps, TemplatesPanel } from "./panels.jsx";
+import { drawMarkup, drawInProgress, drawScaleBar, drawLUTLegend, drawSnapIndicator, drawDisplacementVectors, hitTest, getSilhouetteHandlesImage } from "./markups.jsx";
+import { MarkupsPanel, MeasurementsPanel, FormulasPanel, ImagePanel, LayersPanel, MarkupProps, TemplatesPanel, SilhouettesPanel } from "./panels.jsx";
 import { Modal } from "./panels/Modal.jsx";
 import HomePage from "./panels/HomePage.jsx";
 import TemplatePickerModal from "./panels/TemplatePickerModal.jsx";
@@ -606,6 +607,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const isPanning=useRef(false);const panStart=useRef(null);
   const isDragging=useRef(false);const dragStart=useRef(null);const dragStartState=useRef(null);
   const dragMid=useRef(null);const dragPtIdx=useRef(null);
+  const silhouetteAction=useRef(null);
   const canvasSize=useRef({w:800,h:600});const lastTouchDist=useRef(null);
   const undoStackRef=useRef([]);
   const redoStackRef=useRef([]);
@@ -952,6 +954,39 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       if(hit){
         const m=activeMarkupsList.find(x=>x.id===hit);
         if(m?.locked){isDragging.current=false;return;}
+        if(m?.type==="silhouette"){
+          try {
+            const handles = getSilhouetteHandlesImage(m, zoom);
+            const thr = Math.max(10, 20 * Math.sqrt(zoom)) / zoom;
+            if (handles.rotCenter && isFinite(handles.rotCenter.x) && dist(ip, handles.rotCenter) < thr) {
+              silhouetteAction.current = {
+                type: "rotate", markupId: hit, startIp: ip,
+                initialRotation: m.rotation || 0,
+                center: { x: (handles.bbox.minX + handles.bbox.maxX) / 2, y: (handles.bbox.minY + handles.bbox.maxY) / 2 },
+              };
+              dragStartState.current=JSON.stringify(activeMarkupsList);
+              return;
+            }
+            for (let hi = 0; hi < handles.corners.length; hi++) {
+              const c = handles.corners[hi];
+              if (isFinite(c.x) && dist(ip, c) < thr) {
+                const cx = (handles.bbox.minX + handles.bbox.maxX) / 2;
+                const cy = (handles.bbox.minY + handles.bbox.maxY) / 2;
+                silhouetteAction.current = {
+                  type: "resize", markupId: hit, startIp: ip,
+                  initialScale: m.scale || 1,
+                  center: { x: cx, y: cy },
+                  initialDist: dist(ip, { x: cx, y: cy }),
+                };
+                dragStartState.current=JSON.stringify(activeMarkupsList);
+                return;
+              }
+            }
+          } catch(e) { console.error("Silhouette handle error", e); }
+          isDragging.current=true;dragMid.current=hit;dragStartState.current=JSON.stringify(activeMarkupsList);
+          dragPtIdx.current=-1;dragStart.current=ip;
+          return;
+        }
         if(e.ctrlKey&&(m.type==="curve"||m.type==="polygon")){
           const vp=vpts(m);
           let bestIdx=-1,bestDist=Infinity;
@@ -1020,13 +1055,30 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     const sp=getCanvasPos(e);dispatch({type:"SET",payload:{mousePos:sp}});
     if(snapEnabled&&activeTool!=="select"&&activeTool!=="pan"){const ip=toImage(sp.x,sp.y);const sn=snapPoint(ip,activeMarkupsList,12/zoom,snapEnabled);dispatch({type:"SET",payload:{snapPos:(Math.abs(sn.x-ip.x)>0.1||Math.abs(sn.y-ip.y)>0.1)?sn:null}});}else dispatch({type:"SET",payload:{snapPos:null}});
     if(isPanning.current&&panStart.current)dispatch({type:"SET",payload:{pan:{x:panStart.current.px+(e.clientX-panStart.current.mx),y:panStart.current.py+(e.clientY-panStart.current.my)}}});
-    if(isDragging.current&&dragMid.current){const ip=toImage(sp.x,sp.y);const dx=ip.x-dragStart.current.x,dy=ip.y-dragStart.current.y;updMarkup(dragMid.current,{points:(activeMarkupsList.find(m=>m.id===dragMid.current)?.points||[]).map((p,i)=>i===dragPtIdx.current?{x:p.x+dx,y:p.y+dy}:p)});dragStart.current=ip;}
+    if(isDragging.current&&dragMid.current){const ip=toImage(sp.x,sp.y);const dx=ip.x-dragStart.current.x,dy=ip.y-dragStart.current.y;const m=activeMarkupsList.find(x=>x.id===dragMid.current);if(!m)return;if(m.type==="silhouette"){updMarkup(dragMid.current,{position:{x:(m.position?.x||0)+dx,y:(m.position?.y||0)+dy}});}else{updMarkup(dragMid.current,{points:(m.points||[]).map((p,i)=>i===dragPtIdx.current?{x:p.x+dx,y:p.y+dy}:p)});}dragStart.current=ip;}
+    if(silhouetteAction.current){
+      try {
+        const ip=toImage(sp.x,sp.y);const sa=silhouetteAction.current;
+        const m=activeMarkupsList.find(x=>x.id===sa.markupId);
+        if(!m||!isFinite(sa.center.x)||!isFinite(sa.center.y)){silhouetteAction.current=null;return;}
+        if(sa.type==="resize"&&isFinite(sa.initialDist)&&sa.initialDist>0){
+          const d=dist(ip,sa.center);
+          if(!isFinite(d)) return;
+          const f=d/sa.initialDist;
+          updMarkup(sa.markupId,{scale:Math.max(0.05,Math.min(20,sa.initialScale*f))});
+        }else if(sa.type==="rotate"&&isFinite(sa.startIp.x)){
+          const a=Math.atan2(ip.y-sa.center.y,ip.x-sa.center.x);
+          const s=Math.atan2(sa.startIp.y-sa.center.y,sa.startIp.x-sa.center.x);
+          updMarkup(sa.markupId,{rotation:sa.initialRotation+(a-s)});
+        }
+      } catch { silhouetteAction.current=null; /*silent*/ }
+    }
   },[activeTool,markups,zoom,snapEnabled,databaseMode,databaseImages,currentImageIndex,reproCollecting,updMarkup,toImage,getCanvasPos]);
 
   const handleMouseUp=()=>{
     const currentDbImg=databaseMode&&!reproCollecting&&databaseImages.length>0?databaseImages[currentImageIndex]:null;
     const activeMarkupsList=databaseMode&&!reproCollecting?(currentDbImg?.markups||[]):markups;
-    if(isDragging.current&&dragStartState.current){
+    if((isDragging.current||silhouetteAction.current)&&dragStartState.current){
       const currentState=JSON.stringify(activeMarkupsList);
       if(dragStartState.current!==currentState){
         undoStackRef.current.push(dragStartState.current);
@@ -1035,7 +1087,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       }
       dragStartState.current=null;
     }
-    isPanning.current=false;isDragging.current=false;
+    isPanning.current=false;isDragging.current=false;silhouetteAction.current=null;
   };
   const handleDblClick=()=>{if((activeTool==="polygon"||activeTool==="curve")&&currentDraw?.points.length>=2){finalizeMarkup(currentDraw);dispatch({type:"SET",payload:{currentDraw:null}});}};
   useEffect(()=>{const c=canvasRef.current;if(!c)return;const onWheel=e=>{if(Math.abs(e.deltaY)>0.1||Math.abs(e.deltaX)>0.1){e.preventDefault();e.stopPropagation();const sp=getCanvasPos(e),f=e.deltaY>0?0.9:1.1,nz=clamp(zoom*f,0.05,15);dispatch({type:"SET",payload:{pan:prev=>({x:sp.x-(sp.x-prev.x)*(nz/zoom),y:sp.y-(sp.y-prev.y)*(nz/zoom)})}});dispatch({type:"SET",payload:{zoom:nz}});}};c.addEventListener("wheel",onWheel,{passive:false});return()=>c.removeEventListener("wheel",onWheel);},[zoom]);
@@ -1114,8 +1166,8 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const cursorStyle={select:"default",pan:"grab",point:"crosshair",line:"crosshair",angle3:"crosshair",angle4:"crosshair",polygon:"crosshair",curve:"crosshair",perp:"crosshair",parallel:"crosshair",midpoint:"crosshair",perppoint:"crosshair",arrow:"crosshair",text:"text",ruler:"crosshair"}[activeTool]||"default";
   const _availAnalyses=PREDEFINED[project.projection]||[];
 
-  const panelIcons={markups:"◉",measurements:"📏",formulas:"∑",image:"▦",layers:"🗐",versions:"⏲",reproducibility:"↻",statistics:"𝛀",templates:"▤"};
-  const panelTabs=[["markups","Markups"],["measurements","Measure"],["formulas","Formulas"],["image","Image"],["layers","Layers"],["versions","Versions"],["reproducibility","Reproducibility"],["statistics","Statistics"],["templates","Templates"]];
+  const panelIcons={markups:"◉",measurements:"📏",formulas:"∑",image:"▦",layers:"🗐",versions:"⏲",reproducibility:"↻",statistics:"𝛀",templates:"▤",silhouettes:"⊡"};
+  const panelTabs=[["markups","Markups"],["measurements","Measure"],["formulas","Formulas"],["image","Image"],["layers","Layers"],["versions","Versions"],["reproducibility","Reproducibility"],["statistics","Statistics"],["templates","Templates"],["silhouettes","Silhouettes"]];
 
   return(
     <div style={{height:"100vh",display:"flex",flexDirection:"column",background:t.bg,color:t.tx,fontFamily:"'DM Sans',sans-serif",overflow:"hidden"}}>
@@ -1275,7 +1327,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
             {/* Vertical tabs on left side */}
             <div style={{display:"flex",flexDirection:"column",alignItems:"center",paddingTop:8,flexShrink:0,background:t.surf2}}>
               {panelTabs.map(([id,label])=>{
-                const icons={markups:"◉",measurements:"📏",formulas:"∑",image:"▦",layers:"🗐",versions:"⏲",reproducibility:"↻",statistics:"𝛀",templates:"▤",themes:"◐"};
+                const icons={markups:"◉",measurements:"📏",formulas:"∑",image:"▦",layers:"🗐",versions:"⏲",reproducibility:"↻",statistics:"𝛀",templates:"▤",silhouettes:"⊡",themes:"◐"};
                 return(
                   <button key={id} onClick={()=>setRightPanel(id)} title={label}
                     onMouseEnter={e=>{if(rightPanel!==id)e.currentTarget.style.background=t.accMuted;e.currentTarget.style.color=t.acc;}}
@@ -1340,9 +1392,28 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
                   {rightPanel==="versions"&&<VersionsPanel project={project} t={t} onUpdateProject={onUpdateProject} onUpdateVersion={onUpdateVersion} onExportTemplate={v=>exportCepht({name:`${project.name}`,projection:project.projection,markups:v.markups||[],formulas:v.formulas||[],norms:v.norms||[]})}/>}
                   {rightPanel==="reproducibility"&&<ReproducibilityPanel t={t} markups={markups} studies={reproStudies} onUpdateStudies={setReproStudies} activeStudyId={activeStudyId} setActiveStudyId={setActiveStudyId} reproCollecting={reproCollecting} setReproCollecting={setReproCollecting}/>}
                   {rightPanel==="statistics"&&<StatisticsPanel t={t} studies={reproStudies} databaseMode={databaseMode} databaseImages={databaseImages} formatAngle={formatAngle}/>}
+                  {rightPanel==="silhouettes"&&<SilhouettesPanel t={t} onInsert={(silhouetteType) => {
+                    try {
+                      const def = SILHOUETTES[silhouetteType];
+                      if (!def) return;
+                      const cw = canvasSize.current?.w || 800, ch = canvasSize.current?.h || 600;
+                      const center = toImage(cw / 2, ch / 2);
+                      addMarkup({
+                        type: "silhouette",
+                        silhouetteType,
+                        position: center,
+                        scale: 1,
+                        rotation: 0,
+                        color: def.color,
+                        fillColor: def.color + "22",
+                        width: 1.5,
+                        label: def.name,
+                      });
+                    } catch(e) { console.error("Silhouette insert error:", e); }
+                  }}/>}
                   {rightPanel==="templates"&&<TemplatesPanel t={t} projection={project.projection} onLoadTemplate={loadTemplate} onImportCepht={data=>{
           if(data.markups){
-            const newMarkups=data.markups.map(m=>({...m,id:uid(),points:[{x:-99999,y:-99999}],placed:false}));
+            const newMarkups=data.markups.map(m=>({...m,id:uid(),placed:false,points:m.type==="silhouette"?m.points:[{x:-99999,y:-99999}]}));
             updVer({markups:[...markups,...newMarkups],formulas:[...formulas,...(data.formulas||[])],norms:[...(project.versions[0]?.norms||[]),...(data.norms||[])],analysisTemplate:data.name||"Imported"});
             setPlacingQueue(newMarkups.map(m=>m.id));dispatch({type:"SET",payload:{placingIdx:0}});dispatch({type:"SET",payload:{placingMode:true}});dispatch({type:"SET",payload:{rightPanel:"markups"}});
           }

@@ -129,7 +129,11 @@ export const snapPoint = (ip, markups, r, enabled) => {
   let best = ip, bestD = r;
   for (const m of markups) {
     if (m.visible === false) continue;
-    for (const p of m.points) { if (p.x < -9000) continue; const d = dist(p, ip); if (d < bestD) { bestD = d; best = p; } }
+    for (const p of (m.points || [])) {
+      if (p.x < -9000) continue;
+      const d = dist(p, ip);
+      if (d < bestD) { bestD = d; best = p; }
+    }
   }
   return { ...best };
 };
