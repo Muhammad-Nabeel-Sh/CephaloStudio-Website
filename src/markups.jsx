@@ -476,8 +476,8 @@ function drawRuler(ctx, m, sp, t, zoom, showAnnotations, annotationSize = 1){
 
 function drawSilhouette(ctx, m, isSel, t, zoom, pan) {
   try {
-  const def = SILHOUETTES[m.silhouetteType];
-  if (!def) return;
+  const paths = m.paths || SILHOUETTES[m.silhouetteType]?.paths;
+  if (!paths) return;
 
   const rot = m.rotation || 0;
   const sc = m.scale || 1;
@@ -499,7 +499,7 @@ function drawSilhouette(ctx, m, isSel, t, zoom, pan) {
 
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
 
-  def.paths.forEach(path => {
+  paths.forEach(path => {
     if (path.points.length < 2) return;
     const sp = path.points.map(transform);
 
@@ -510,8 +510,9 @@ function drawSilhouette(ctx, m, isSel, t, zoom, pan) {
       if (p.y > maxY) maxY = p.y;
     });
 
-    const fillColor = m.fillColor || (m.color || def.color) + "22";
-    const strokeColor = m.color || def.color;
+    const defColor = SILHOUETTES[m.silhouetteType]?.color;
+    const fillColor = m.fillColor || (m.color || defColor) + "22";
+    const strokeColor = m.color || defColor;
     const lineWidth = (m.width || 1.5) * Math.sqrt(zoom);
 
     if (path.closed) {
@@ -546,6 +547,23 @@ function drawSilhouette(ctx, m, isSel, t, zoom, pan) {
     const bminX = minX - pad, bmaxX = maxX + pad;
     const bminY = minY - pad, bmaxY = maxY + pad;
 
+    // Draw draggable point handles on editable silhouettes
+    if (m.paths) {
+      paths.forEach(path => {
+        path.points.forEach(p => {
+          const sp = transform(p);
+          ctx.beginPath();
+          ctx.arc(sp.x, sp.y, 4 * Math.sqrt(zoom), 0, Math.PI * 2);
+          ctx.fillStyle = "#fff";
+          ctx.fill();
+          ctx.strokeStyle = t.acc;
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        });
+      });
+    }
+
+    if (m.showFrame !== false) {
     ctx.strokeStyle = t.acc + "66";
     ctx.lineWidth = 1;
     ctx.setLineDash([4 * Math.sqrt(zoom), 3 * Math.sqrt(zoom)]);
@@ -590,6 +608,7 @@ function drawSilhouette(ctx, m, isSel, t, zoom, pan) {
     ctx.font = `${10 * Math.sqrt(zoom)}px sans-serif`;
     ctx.textAlign = "center";
     ctx.fillText("↻", rotCX, rotCY + hSize + 12 * Math.sqrt(zoom));
+    }
   }
   } catch { /*silent*/ }
 }
@@ -832,8 +851,8 @@ export function drawDisplacementVectors(ctx, m1arr, m2arr, zoom, pan){
 
 function silhouetteHitTest(m, ip, zoom) {
   try {
-  const def = SILHOUETTES[m.silhouetteType];
-  if (!def) return false;
+  const paths = m.paths || SILHOUETTES[m.silhouetteType]?.paths;
+  if (!paths) return false;
   const rot = m.rotation || 0;
   const sc = m.scale || 1;
   const pos = m.position || { x: 0, y: 0 };
@@ -841,7 +860,7 @@ function silhouetteHitTest(m, ip, zoom) {
   const cosR = Math.cos(rot);
   const sinR = Math.sin(rot);
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  def.paths.forEach(path => {
+  paths.forEach(path => {
     path.points.forEach(p => {
       const sx = p.x * sc * baseSize;
       const sy = p.y * sc * baseSize;
@@ -862,8 +881,8 @@ function silhouetteHitTest(m, ip, zoom) {
 
 export function getSilhouetteHandlesImage(m, zoom = 1) {
   try {
-  const def = SILHOUETTES[m.silhouetteType];
-  if (!def) return { corners: [], rotCenter: null };
+  const paths = m.paths || SILHOUETTES[m.silhouetteType]?.paths;
+  if (!paths) return { corners: [], rotCenter: null };
   const rot = m.rotation || 0;
   const sc = m.scale || 1;
   const pos = m.position || { x: 0, y: 0 };
@@ -871,7 +890,7 @@ export function getSilhouetteHandlesImage(m, zoom = 1) {
   const cosR = Math.cos(rot);
   const sinR = Math.sin(rot);
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  def.paths.forEach(path => {
+  paths.forEach(path => {
     path.points.forEach(p => {
       const sx = p.x * sc * baseSize;
       const sy = p.y * sc * baseSize;

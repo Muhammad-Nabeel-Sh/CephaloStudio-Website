@@ -982,6 +982,91 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
                 return;
               }
             }
+            if (e.ctrlKey && m.paths) {
+              const rot = m.rotation || 0;
+              const sc = m.scale || 1;
+              const pos = m.position || { x: 0, y: 0 };
+              const baseSize = 100;
+              const cosR = Math.cos(rot);
+              const sinR = Math.sin(rot);
+              let bestPathIdx = -1, bestPtIdx = -1, bestDist = Infinity;
+              m.paths.forEach((path, pi) => {
+                path.points.forEach((p, ptI) => {
+                  const sx = p.x * sc * baseSize;
+                  const sy = p.y * sc * baseSize;
+                  const rx = sx * cosR - sy * sinR;
+                  const ry = sx * sinR + sy * cosR;
+                  const d = dist(ip, { x: rx + pos.x, y: ry + pos.y });
+                  if (d < bestDist) { bestDist = d; bestPathIdx = pi; bestPtIdx = ptI; }
+                });
+              });
+              const dnx = ((ip.x - pos.x) * cosR + (ip.y - pos.y) * sinR) / (sc * baseSize);
+              const dny = (-(ip.x - pos.x) * sinR + (ip.y - pos.y) * cosR) / (sc * baseSize);
+              const newPaths = m.paths.map((path, pi) => {
+                if (pi !== bestPathIdx) return path;
+                const newPoints = [...path.points];
+                newPoints.splice(bestPtIdx + 1, 0, { x: dnx, y: dny });
+                return { ...path, points: newPoints };
+              });
+              updMarkup(hit, { paths: newPaths });
+              return;
+            }
+            if (e.shiftKey && m.paths) {
+              const rot = m.rotation || 0;
+              const sc = m.scale || 1;
+              const pos = m.position || { x: 0, y: 0 };
+              const baseSize = 100;
+              const cosR = Math.cos(rot);
+              const sinR = Math.sin(rot);
+              let bestPathIdx = -1, bestPtIdx = -1, bestDist = Infinity;
+              m.paths.forEach((path, pi) => {
+                path.points.forEach((p, ptI) => {
+                  const sx = p.x * sc * baseSize;
+                  const sy = p.y * sc * baseSize;
+                  const rx = sx * cosR - sy * sinR;
+                  const ry = sx * sinR + sy * cosR;
+                  const d = dist(ip, { x: rx + pos.x, y: ry + pos.y });
+                  if (d < bestDist) { bestDist = d; bestPathIdx = pi; bestPtIdx = ptI; }
+                });
+              });
+              if (m.paths[bestPathIdx].points.length > 2) {
+                const newPaths = m.paths.map((path, pi) => {
+                  if (pi !== bestPathIdx) return path;
+                  return { ...path, points: path.points.filter((_, i) => i !== bestPtIdx) };
+                });
+                updMarkup(hit, { paths: newPaths });
+              }
+              return;
+            }
+            // Point-level drag on editable silhouettes
+            if (m.paths) {
+              const ptThr = 8 / zoom;
+              const rot = m.rotation || 0;
+              const sc = m.scale || 1;
+              const pos = m.position || { x: 0, y: 0 };
+              const baseSize = 100;
+              const cosR = Math.cos(rot);
+              const sinR = Math.sin(rot);
+              let bestPathIdx = -1, bestPtIdx = -1, bestDist = Infinity;
+              m.paths.forEach((path, pi) => {
+                path.points.forEach((p, ptI) => {
+                  const sx = p.x * sc * baseSize;
+                  const sy = p.y * sc * baseSize;
+                  const rx = sx * cosR - sy * sinR;
+                  const ry = sx * sinR + sy * cosR;
+                  const d = dist(ip, { x: rx + pos.x, y: ry + pos.y });
+                  if (d < bestDist) { bestDist = d; bestPathIdx = pi; bestPtIdx = ptI; }
+                });
+              });
+              if (bestDist < ptThr) {
+                isDragging.current = true;
+                dragMid.current = hit;
+                dragStartState.current = JSON.stringify(activeMarkupsList);
+                dragPtIdx.current = { pathIdx: bestPathIdx, ptIdx: bestPtIdx };
+                dragStart.current = ip;
+                return;
+              }
+            }
           } catch(e) { console.error("Silhouette handle error", e); }
           isDragging.current=true;dragMid.current=hit;dragStartState.current=JSON.stringify(activeMarkupsList);
           dragPtIdx.current=-1;dragStart.current=ip;
@@ -1055,7 +1140,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     const sp=getCanvasPos(e);dispatch({type:"SET",payload:{mousePos:sp}});
     if(snapEnabled&&activeTool!=="select"&&activeTool!=="pan"){const ip=toImage(sp.x,sp.y);const sn=snapPoint(ip,activeMarkupsList,12/zoom,snapEnabled);dispatch({type:"SET",payload:{snapPos:(Math.abs(sn.x-ip.x)>0.1||Math.abs(sn.y-ip.y)>0.1)?sn:null}});}else dispatch({type:"SET",payload:{snapPos:null}});
     if(isPanning.current&&panStart.current)dispatch({type:"SET",payload:{pan:{x:panStart.current.px+(e.clientX-panStart.current.mx),y:panStart.current.py+(e.clientY-panStart.current.my)}}});
-    if(isDragging.current&&dragMid.current){const ip=toImage(sp.x,sp.y);const dx=ip.x-dragStart.current.x,dy=ip.y-dragStart.current.y;const m=activeMarkupsList.find(x=>x.id===dragMid.current);if(!m)return;if(m.type==="silhouette"){updMarkup(dragMid.current,{position:{x:(m.position?.x||0)+dx,y:(m.position?.y||0)+dy}});}else{updMarkup(dragMid.current,{points:(m.points||[]).map((p,i)=>i===dragPtIdx.current?{x:p.x+dx,y:p.y+dy}:p)});}dragStart.current=ip;}
+    if(isDragging.current&&dragMid.current){const ip=toImage(sp.x,sp.y);const dx=ip.x-dragStart.current.x,dy=ip.y-dragStart.current.y;const m=activeMarkupsList.find(x=>x.id===dragMid.current);if(!m)return;if(m.type==="silhouette"){if(typeof dragPtIdx.current==="object"&&dragPtIdx.current!==null){const sc=m.scale||1;const rot=m.rotation||0;const cosR=Math.cos(rot);const sinR=Math.sin(rot);const baseSize=100;const dnx=(cosR*dx+sinR*dy)/(sc*baseSize);const dny=(-sinR*dx+cosR*dy)/(sc*baseSize);const{pathIdx,ptIdx}=dragPtIdx.current;updMarkup(dragMid.current,{paths:(m.paths||[]).map((path,pi)=>({...path,points:path.points.map((p,ptI)=>pi===pathIdx&&ptI===ptIdx?{x:p.x+dnx,y:p.y+dny}:p)}))});}else{updMarkup(dragMid.current,{position:{x:(m.position?.x||0)+dx,y:(m.position?.y||0)+dy}});}}else{updMarkup(dragMid.current,{points:(m.points||[]).map((p,i)=>i===dragPtIdx.current?{x:p.x+dx,y:p.y+dy}:p)});}dragStart.current=ip;}
     if(silhouetteAction.current){
       try {
         const ip=toImage(sp.x,sp.y);const sa=silhouetteAction.current;
@@ -1408,6 +1493,10 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
                         fillColor: def.color + "22",
                         width: 1.5,
                         label: def.name,
+                        paths: def.paths.map(p => ({
+                          ...p,
+                          points: p.points.map(pt => ({ ...pt })),
+                        })),
                       });
                     } catch(e) { console.error("Silhouette insert error:", e); }
                   }}/>}
