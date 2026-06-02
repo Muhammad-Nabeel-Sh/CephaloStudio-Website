@@ -300,6 +300,87 @@ export const PREDEFINED = {
   ],
 };
 
+export const PREDEFINED_NORMS = {
+  Steiner: {
+    source: "Steiner, 1953 / Am J Orthod",
+    norms: [
+      { label: "SNA", mean: 82, sd: 2, type: "angle" },
+      { label: "SNB", mean: 80, sd: 2, type: "angle" },
+      { label: "ANB", mean: 2, sd: 2, type: "angle" },
+      { label: "SN-MP", mean: 32, sd: 2, type: "angle" },
+      { label: "GoGn-SN", mean: 32, sd: 2, type: "angle" },
+      { label: "SN-Occ", mean: 14, sd: 2, type: "angle" },
+      { label: "U1-NA", mean: 22, sd: 2, type: "angle" },
+      { label: "U1-NA-mm", mean: 4, sd: 2, type: "length" },
+      { label: "L1-NB", mean: 25, sd: 2, type: "angle" },
+      { label: "L1-NB-mm", mean: 4, sd: 2, type: "length" },
+      { label: "Interincisal", mean: 131, sd: 5, type: "angle" },
+      { label: "U1-L1", mean: 131, sd: 5, type: "angle" },
+    ],
+  },
+  Ricketts: {
+    source: "Ricketts, 1960 / Am J Orthod",
+    norms: [
+      { label: "Facial axis", mean: 90, sd: 3, type: "angle" },
+      { label: "Facial depth", mean: 87, sd: 3, type: "angle" },
+      { label: "Mandibular plane", mean: 26, sd: 4, type: "angle" },
+      { label: "Lower facial height", mean: 47, sd: 4, type: "angle" },
+      { label: "Mandibular arc", mean: 26, sd: 4, type: "angle" },
+      { label: "Convexity", mean: 2, sd: 2, type: "length" },
+      { label: "Interincisal", mean: 130, sd: 6, type: "angle" },
+      { label: "U1-APog", mean: 28, sd: 4, type: "angle" },
+      { label: "U1-APog-mm", mean: 3.5, sd: 2.5, type: "length" },
+      { label: "L1-APog", mean: 22, sd: 4, type: "angle" },
+      { label: "L1-APog-mm", mean: 1.5, sd: 2, type: "length" },
+    ],
+  },
+  Downs: {
+    source: "Downs, 1948 / Am J Orthod",
+    norms: [
+      { label: "Facial angle", mean: 87.8, sd: 3.6, type: "angle" },
+      { label: "Convexity", mean: 0, sd: 5.9, type: "angle" },
+      { label: "AB plane", mean: -4.6, sd: 3.7, type: "angle" },
+      { label: "Mandibular plane", mean: 21.9, sd: 3.7, type: "angle" },
+      { label: "Y-axis", mean: 59.4, sd: 3.8, type: "angle" },
+      { label: "Occlusal plane", mean: 9.3, sd: 3.8, type: "angle" },
+      { label: "Interincisal", mean: 135.4, sd: 5.8, type: "angle" },
+      { label: "U1-L1", mean: 135.4, sd: 5.8, type: "angle" },
+    ],
+  },
+  "McNamara": {
+    source: "McNamara, 1984 / Am J Orthod",
+    norms: [
+      { label: "N-A", mean: 1, sd: 2, type: "length" },
+      { label: "N-B", mean: 4, sd: 3, type: "length" },
+      { label: "A-N", mean: 1, sd: 2, type: "length" },
+      { label: "Facial axis", mean: 90, sd: 3, type: "angle" },
+      { label: "Lower facial height", mean: 47, sd: 4, type: "angle" },
+    ],
+  },
+  "Bjork-Jarabak": {
+    source: "Jarabak, 1972",
+    norms: [
+      { label: "Sum of angles", mean: 396, sd: 6, type: "angle" },
+      { label: "N-S-Ar", mean: 123, sd: 5, type: "angle" },
+      { label: "S-Ar-Go", mean: 143, sd: 6, type: "angle" },
+      { label: "Ar-Go-Me", mean: 130, sd: 7, type: "angle" },
+      { label: "ML-NSL", mean: 32, sd: 2, type: "angle" },
+      { label: "NL-NSL", mean: 8.5, sd: 3, type: "angle" },
+    ],
+  },
+  "Tweed": {
+    source: "Tweed, 1954",
+    norms: [
+      { label: "FMA", mean: 25, sd: 3, type: "angle" },
+      { label: "FMIA", mean: 65, sd: 3, type: "angle" },
+      { label: "IMPA", mean: 90, sd: 3, type: "angle" },
+      { label: "SNA", mean: 82, sd: 2, type: "angle" },
+      { label: "SNB", mean: 80, sd: 2, type: "angle" },
+      { label: "ANB", mean: 2, sd: 2, type: "angle" },
+    ],
+  },
+};
+
 export const LUT_PRESETS = [
   { id: "gray", name: "Grayscale", stops: ["#000", "#fff"] },
   { id: "hot", name: "Hot", stops: ["#000", "#f00", "#ff0", "#fff"] },

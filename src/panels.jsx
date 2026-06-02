@@ -1,6 +1,6 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { uid, computeMeasurements, normDeviation, deviationColor, evalFormula } from "./utils.js";
-import { LUT_PRESETS, PREDEFINED } from "./constants.js";
+import { LUT_PRESETS, PREDEFINED, PREDEFINED_NORMS } from "./constants.js";
 import { KatexSpan, LatexFloatingPanel } from "./hooks.jsx";
 import { Btn, Tag, Sld, PropRow, Inp, Divider, PanelHeader } from "./ui.jsx";
 
@@ -148,12 +148,32 @@ function NormBadges({ norms, meas, t }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 export function MeasurementsPanel({ allMeas, t, calibration, norms, onUpdateNorms, onExportCSV, onOpenCalib, formatAngle }) {
   const [editingNorm, setEditingNorm] = useState(null);
+  const [showGallery, setShowGallery] = useState(false);
   return (
     <div style={{ padding: 12 }}>
       {!calibration.done && <div style={{ background: t.warn + "22", border: `1px solid ${t.warn}44`, borderRadius: 8, padding: 12, marginBottom: 12, fontSize: 12, color: t.warn }}>⚠ Calibrate for mm values.<button onClick={onOpenCalib} style={{ display: "block", marginTop: 6, background: t.warn, color: "#000", border: "none", borderRadius: 4, padding: "3px 8px", cursor: "pointer", fontSize: 11, fontWeight: 700 }}>Open Calibration</button></div>}
       {calibration.done && <div style={{ background: t.ok + "11", border: `1px solid ${t.ok}33`, borderRadius: 6, padding: 8, marginBottom: 10, fontSize: 11, color: t.ok, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span>⟺ {calibration.pxPerMm.toFixed(3)} px/mm</span><button onClick={onOpenCalib} style={{ background: "none", border: `1px solid ${t.ok}55`, color: t.ok, borderRadius: 4, padding: "2px 8px", cursor: "pointer", fontSize: 10 }}>Edit</button>
       </div>}
+
+      <div style={{ marginBottom: 12, display: "flex", gap: 6 }}>
+        <Btn t={t} small onClick={() => setShowGallery(true)} style={{ flex: 1 }}>Norms Reference</Btn>
+        <Btn t={t} small onClick={() => {
+          const existing = norms ? [...norms] : [];
+          Object.values(PREDEFINED_NORMS).forEach(preset => {
+            preset.norms.forEach(n => {
+              if (!existing.some(e => e.markupLabel === n.label && e.measureType === n.type))
+                existing.push({ id: uid(), markupLabel: n.label, measureType: n.type, mean: n.mean, sd: n.sd, source: preset.source });
+            });
+          });
+          onUpdateNorms(existing);
+        }} style={{ flexShrink: 0 }}>+ All Presets</Btn>
+      </div>
+      {showGallery && <NormsReferenceModal t={t} onAdd={(label, mean, sd, type, source) => {
+        const existing = norms ? [...norms] : [];
+        if (existing.some(e => e.markupLabel === label && e.measureType === type)) return;
+        onUpdateNorms([...existing, { id: uid(), markupLabel: label, measureType: type, mean, sd, source }]);
+      }} onClose={() => setShowGallery(false)} />}
 
       {allMeas.length === 0 ? <div style={{ color: t.tx3, fontSize: 12, textAlign: "center", paddingTop: 20 }}>Place lines, angles, or polygons.</div>
         : allMeas.map(({ m, meas }) => {
@@ -460,6 +480,82 @@ export function TemplatesPanel({ t, projection, onLoadTemplate, onImportCepht })
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NORMS REFERENCE GALLERY MODAL
+// ═══════════════════════════════════════════════════════════════════════════════
+export function NormsReferenceModal({ t, onAdd, onClose }) {
+  const [search, setSearch] = useState("");
+  const query = search.toLowerCase();
+  const entries = useMemo(() => {
+    const result = [];
+    Object.entries(PREDEFINED_NORMS).forEach(([key, preset]) => {
+      preset.norms.forEach(n => {
+        if (!query || n.label.toLowerCase().includes(query) || preset.source.toLowerCase().includes(query) || key.toLowerCase().includes(query))
+          result.push({ ...n, presetKey: key, source: preset.source });
+      });
+    });
+    return result;
+  }, [query]);
+  const grouped = useMemo(() => {
+    const g = {};
+    entries.forEach(e => { if (!g[e.presetKey]) g[e.presetKey] = { source: e.source, norms: [] }; g[e.presetKey].norms.push(e); });
+    return g;
+  }, [entries]);
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, backdropFilter: "blur(4px)" }} onClick={onClose}>
+      <div style={{ background: t.bg, border: `1px solid ${t.bdr}`, borderRadius: 12, width: "min(90vw, 640px)", maxHeight: "min(90vh, 700px)", display: "flex", flexDirection: "column", boxShadow: `0 24px 64px ${t.shadow}50` }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", borderBottom: `1px solid ${t.bdr}`, flexShrink: 0 }}>
+          <span style={{ fontSize: 16 }}>📖</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: t.tx, flex: 1 }}>Norms Reference Gallery</span>
+          <span style={{ fontSize: 10, color: t.tx3, fontFamily: "'DM Mono',monospace" }}>{Object.values(PREDEFINED_NORMS).reduce((s, p) => s + p.norms.length, 0)} norms</span>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: t.tx3, cursor: "pointer", fontSize: 18, lineHeight: 1, padding: "0 4px" }}>×</button>
+        </div>
+        <div style={{ padding: "8px 16px", borderBottom: `1px solid ${t.bdr}44`, flexShrink: 0 }}>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search norms by name, preset, or source..." style={{ width: "80%", padding: "8px 10px", border: `1px solid ${t.bdr}`, borderRadius: 8, background: t.surf3, color: t.tx, fontSize: 12, outline: "none" }} />
+        </div>
+        <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
+          {Object.keys(grouped).length === 0 ? (
+            <div style={{ textAlign: "center", padding: 40, color: t.tx3, fontSize: 12 }}>No norms match your search.</div>
+          ) : Object.entries(grouped).map(([key, group]) => (
+            <div key={key} style={{ marginBottom: 14, border: `1px solid ${t.bdr}`, borderRadius: 8, overflow: "hidden" }}>
+              <div style={{ padding: "8px 12px", background: t.surf2, borderBottom: `1px solid ${t.bdr}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div><span style={{ fontSize: 11, fontWeight: 700, color: t.acc }}>{key}</span><span style={{ fontSize: 10, color: t.tx3, marginLeft: 8 }}>{group.source}</span></div>
+                <button onClick={() => { group.norms.forEach(n => onAdd(n.label, n.mean, n.sd, n.type, group.source)); }} style={{ padding: "3px 8px", borderRadius: 4, border: "none", background: t.acc + "22", color: t.acc, cursor: "pointer", fontSize: 9, fontWeight: 700 }}>Add All ({group.norms.length})</button>
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", fontSize: 10, borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ borderBottom: `1px solid ${t.bdr}44`, background: t.surf3 }}>
+                      <th style={{ textAlign: "left", padding: "5px 10px", color: t.tx2, fontWeight: 600 }}>Label</th>
+                      <th style={{ textAlign: "right", padding: "5px 10px", color: t.tx2, fontWeight: 600 }}>Mean</th>
+                      <th style={{ textAlign: "right", padding: "5px 10px", color: t.tx2, fontWeight: 600 }}>SD</th>
+                      <th style={{ textAlign: "center", padding: "5px 10px", color: t.tx2, fontWeight: 600 }}>Type</th>
+                      <th style={{ textAlign: "right", padding: "5px 10px" }}></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {group.norms.map((n, i) => (
+                      <tr key={i} style={{ borderBottom: `1px solid ${t.bdr}33` }}>
+                        <td style={{ padding: "5px 10px", color: t.tx, fontWeight: 600, whiteSpace: "nowrap" }}>{n.label}</td>
+                        <td style={{ padding: "5px 10px", textAlign: "right", fontFamily: "'DM Mono',monospace", color: t.tx }}>{n.mean.toFixed(1)}</td>
+                        <td style={{ padding: "5px 10px", textAlign: "right", fontFamily: "'DM Mono',monospace", color: t.tx3 }}>± {n.sd.toFixed(1)}</td>
+                        <td style={{ padding: "5px 10px", textAlign: "center" }}><span style={{ background: (n.type === "angle" ? t.warn : t.ok) + "22", color: n.type === "angle" ? t.warn : t.ok, borderRadius: 3, padding: "1px 5px", fontSize: 8, fontWeight: 700 }}>{n.type}</span></td>
+                        <td style={{ padding: "5px 10px", textAlign: "right" }}>
+                          <button onClick={() => onAdd(n.label, n.mean, n.sd, n.type, group.source)} style={{ padding: "2px 7px", borderRadius: 4, border: `1px solid ${t.acc}55`, background: "transparent", color: t.acc, cursor: "pointer", fontSize: 9, fontWeight: 600, whiteSpace: "nowrap" }}>+ Add</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
