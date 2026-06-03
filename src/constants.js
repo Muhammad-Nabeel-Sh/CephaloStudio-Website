@@ -4,10 +4,166 @@
 
 import smvCsv from "../Data/SMV.csv?raw";
 import opgCsv from "../Data/OPG.csv?raw";
+import lateralCsv from "../Data/LateralCeph.csv?raw";
+import paCsv from "../Data/PA_Ceph.csv?raw";
+import analysisMeasurementsCsv from "../Data/AnalysisMeasurements.csv?raw";
 import { parseAnalysisCsv } from "./csvParser.js";
 
 const _smvAnalyses = parseAnalysisCsv(smvCsv);
 const _opgAnalyses = parseAnalysisCsv(opgCsv);
+const _lateralAnalyses = parseAnalysisCsv(lateralCsv);
+const _paAnalyses = parseAnalysisCsv(paCsv);
+const _measurementDefs = parseAnalysisCsv(analysisMeasurementsCsv);
+
+// Build a measurement lookup by analysis name
+const _measurementLookup = {};
+for (const a of _measurementDefs) {
+  _measurementLookup[a.name] = a.measurements;
+}
+
+const _lateralHardcoded = [
+  { name: "General Ceph Analysis", pts: [
+    { l: "N", def: "Nasion - the most anterior point of the frontonasal suture in the middle.", color: "#f59e0b" },
+    { l: "S", def: "Sella - the geometric center of the pituitary fossa (sella turcica).", color: "#f59e0b" },
+    { l: "Ba", def: "Basion - most inferior posterior point of the occipital bone.", color: "#f59e0b" },
+    { l: "Or", def: "Orbitale - the lowest point on the inferior margin of the orbit.", color: "#60a5fa" },
+    { l: "Po", def: "Porion - the superior point of the external auditory meatus.", color: "#60a5fa" },
+    { l: "Ar", def: "Articulare - the point of intersection of the posterior border of the condylar process and the inferior border of the basilar part of the occipital bone.", color: "#60a5fa" },
+    { l: "A", def: "Point A - the deepest point on the curve of the maxilla.", color: "#34d399" },
+    { l: "B", def: "Point B - the deepest midline point on the mandible.", color: "#34d399" },
+    { l: "ANS", def: "Anterior nasal spine - tip of the bony anterior nasal spine.", color: "#34d399" },
+    { l: "PNS", def: "Posterior nasal spine - intersection of palatum posterior and fossa pterygopalatina.", color: "#34d399" },
+    { l: "Pog", def: "Pogonion - the most anterior point on the chin.", color: "#a78bfa" },
+    { l: "Gn", def: "Gnathion - a point on the chin determined by bisecting the facial and mandibular planes.", color: "#a78bfa" },
+    { l: "Me", def: "Menton - the most inferior midline point on the mandibular symphysis.", color: "#a78bfa" },
+    { l: "Go", def: "Gonion - the point of intersection of the ramus plane and the mandibular plane.", color: "#a78bfa" },
+    { l: "Co", def: "Condylion - the most superior point of the mandibular condyle.", color: "#34d399" },
+    { l: "Is", def: "Incision superius - the incisal point of the most prominent maxillary central incisor.", color: "#fb923c" },
+    { l: "Ii", def: "Incision inferius - the incisal point of the most prominent mandibular central incisor.", color: "#f472b6" },
+    { l: "Prn", def: "Pronasale - the most protruded point of the apex nasi.", color: "#f472b6" },
+    { l: "Sn", def: "Subnasale - midpoint of the columella base at the apex of the nasolabial angle.", color: "#f472b6" },
+    { l: "Ss", def: "Superior sulcus - the deepest midline point between subnasion and the vermilion border.", color: "#f472b6" },
+    { l: "Stms", def: "Stomion superius - the lowermost point on the vermilion of the upper lip.", color: "#f472b6" },
+    { l: "Stmi", def: "Stomion inferius - the uppermost point on the vermilion of the lower lip.", color: "#f472b6" },
+    { l: "Si", def: "Sulpion - the point of greatest concavity in the midline between the lower lip and chin.", color: "#f472b6" },
+    { l: "TMJ", def: "Temporomandibular joint point - on the contour of the glenoid fossa.", color: "#60a5fa" },
+    { l: "Ids", def: "Infradentale superius - the highest point on the alveolar crest between the mandibular central incisors.", color: "#f472b6" },
+    { l: "Pr", def: "Prosthion - the most anterior point on the maxillary alveolar process.", color: "#34d399" },
+  ],
+  lines: [
+    { l: "Sella-Nasion line", def: "Line connecting Sella to Nasion.", color: "#f59e0b" },
+    { l: "Frankfort Horizontal", def: "Plane connecting Porion to Orbitale.", color: "#60a5fa" },
+    { l: "NBa plane", def: "Plane connecting Nasion to Basion.", color: "#f59e0b" },
+    { l: "Mandibular plane", def: "Plane connecting Gonion to Menton.", color: "#a78bfa" },
+  ]},
+  { name: "Steiner Analysis", pts: [
+    { l: "N", def: "Nasion is the most anterior point of the frontonasal suture in the middle.", color: "#f59e0b" },
+    { l: "S", def: "The center of sella turcica (the midpoint of the horizontal diameter).", color: "#f59e0b" },
+    { l: "A", def: "The deepest midline point on the premaxilla between the anterior nasal spine and prosthion.", color: "#60a5fa" },
+    { l: "B", def: "The deepest midline point on the mandible between infradentale and pogonion.", color: "#60a5fa" },
+    { l: "ANS", def: "Anterior nasal spine is the tip of bony anterior nasal spine in the midline or median plane.", color: "#34d399" },
+    { l: "PNS", def: "Posterior nasal spine is the intersection of a continuation of the anterior wall of the pterygopalatine fossa and the floor of the nose.", color: "#34d399" },
+    { l: "Pog", def: "The most anterior point on the chin.", color: "#a78bfa" },
+    { l: "Gn", def: "A point on the chin determined by bisecting the angle formed by the facial and mandibular planes.", color: "#a78bfa" },
+    { l: "Me", def: "The most inferior midline point on the mandibular symphysis.", color: "#a78bfa" },
+    { l: "Go", def: "The point of intersection of the ramus plane and the mandibular plane.", color: "#a78bfa" },
+    { l: "Is", def: "The incisal point of the most prominent medial maxillary incisor.", color: "#fb923c" },
+    { l: "Ii", def: "The incisal point of the most prominent medial mandibular incisor.", color: "#f472b6" },
+  ]},
+  { name: "Ricketts Analysis", pts: [
+    { l: "N", def: "Nasion is the most anterior point of the frontonasal suture in the middle.", color: "#f59e0b" },
+    { l: "S", def: "The point representing the geometric center of the pituitary fossa (sella turcica).", color: "#f59e0b" },
+    { l: "Ba", def: "Most inferior posterior point of the occipital bone.", color: "#f59e0b" },
+    { l: "Or", def: "The lowest point on the inferior margin of the orbit.", color: "#60a5fa" },
+    { l: "Po", def: "The superior point of the external auditory meatus (superior margin of temporomandibular fossa).", color: "#60a5fa" },
+    { l: "Ar", def: "The point of intersection of the images of the posterior border of the condylar process of the mandible and the inferior border of the basilar part of the occipital bone.", color: "#60a5fa" },
+    { l: "A", def: "The deepest point on the curve of the maxilla between the anterior nasal spine and the dental alveolus.", color: "#34d399" },
+    { l: "B", def: "The deepest midline point on the mandible between infradentale and pogonion.", color: "#34d399" },
+    { l: "ANS", def: "Tip of the anterior nasal spine.", color: "#34d399" },
+    { l: "PNS", def: "The intersection of palatum posterior durum, palatum molle and fossa pterygopalatina.", color: "#34d399" },
+    { l: "Pog", def: "Most anterior point on the midsagittal symphysis tangent to the facial plane.", color: "#a78bfa" },
+    { l: "Gn", def: "The most inferior point on the contour of the chin.", color: "#a78bfa" },
+    { l: "Me", def: "The most inferior midline point on the mandibular symphysis.", color: "#a78bfa" },
+    { l: "Go", def: "The point of intersection of the ramus plane and the mandibular plane.", color: "#a78bfa" },
+  ]},
+  { name: "McNamara Analysis", pts: [
+    { l: "N", def: "Nasion is the most anterior point of the frontonasal suture in the middle.", color: "#f59e0b" },
+    { l: "A", def: "The deepest point on the curve of the maxilla between the anterior nasal spine and the dental alveolus.", color: "#60a5fa" },
+    { l: "B", def: "The deepest midline point on the mandible between infradentale and pogonion.", color: "#60a5fa" },
+    { l: "Pog", def: "The most anterior point on the mandible in the midline.", color: "#a78bfa" },
+    { l: "Me", def: "The most inferior midline point on the mandibular symphysis.", color: "#a78bfa" },
+    { l: "Co", def: "The most superior point of the mandibular condyle.", color: "#34d399" },
+    { l: "ANS", def: "Tip of the anterior nasal spine.", color: "#34d399" },
+    { l: "PNS", def: "The intersection of palatum posterior durum, palatum molle and fossa pterygopalatina.", color: "#34d399" },
+  ]},
+  { name: "Downs Analysis", pts: [
+    { l: "N", def: "Nasion is the most anterior point of the frontonasal suture in the middle.", color: "#f59e0b" },
+    { l: "S", def: "Located by inspection of the profile image of the fossa.", color: "#f59e0b" },
+    { l: "Or", def: "The lowest point on the left infraorbital margin.", color: "#60a5fa" },
+    { l: "Po", def: "The highest point on the superior surface of the soft tissue of the external auditory meati.", color: "#60a5fa" },
+    { l: "A", def: "The deepest midline point on the premaxilla between the anterior nasal spine and prosthion.", color: "#34d399" },
+    { l: "B", def: "The deepest midline point on the mandible between infradentale and pogonion.", color: "#34d399" },
+    { l: "Pog", def: "The most anterior point on the mandible in the midline.", color: "#a78bfa" },
+    { l: "Gn", def: "A point on the chin determined by bisecting the angle formed by the facial and mandibular planes.", color: "#a78bfa" },
+    { l: "Me", def: "The most inferior midline point on the mandibular symphysis.", color: "#a78bfa" },
+    { l: "Go", def: "The point of intersection of the ramus plane and the mandibular plane.", color: "#a78bfa" },
+  ]},
+  { name: "Bjork Analysis", pts: [
+    { l: "Ar", def: "The point of intersection of the dorsal contours of processus articularis mandibulae and os temporale. The midpoint is used where double projection gives rise to two articulare points.", color: "#60a5fa" },
+    { l: "N", def: "Nasion is the most anterior point of the frontonasal suture in the middle.", color: "#f59e0b" },
+    { l: "S", def: "The center of sella turcica (the midpoint of the horizontal diameter).", color: "#f59e0b" },
+    { l: "Or", def: "The deepest point on the infraorbital margin. The midpoint is used where double projection gives rise to two points.", color: "#60a5fa" },
+    { l: "Po", def: "Porion is the most superior point of the external auditory meatus (the superior margin of the TMJ fossa, which lies at the same level may be substitute in the construction of the FH).", color: "#60a5fa" },
+    { l: "A", def: "The deepest point on the contour of the alveolar projection, between the spinal point and prosthion.", color: "#34d399" },
+    { l: "B", def: "The deepest point on the contour of the alveolar projection, between infradentale and pogonion.", color: "#34d399" },
+    { l: "ANS", def: "The apex of spina nasalis anterior.", color: "#34d399" },
+    { l: "PNS", def: "Posterior spine of palatum durum.", color: "#34d399" },
+    { l: "Pog", def: "The most anterior point on the chin.", color: "#a78bfa" },
+    { l: "Gn", def: "A point on the chin determined by bisecting the angle formed by the facial and mandibular planes.", color: "#a78bfa" },
+    { l: "Me", def: "The most inferior midline point on the mandibular symphysis.", color: "#a78bfa" },
+    { l: "Go", def: "The point of intersection of the ramus plane and the mandibular plane.", color: "#a78bfa" },
+  ]},
+  { name: "Tweed Analysis", pts: [
+    { l: "N", def: "Nasion is the most anterior point of the frontonasal suture in the middle.", color: "#f59e0b" },
+    { l: "Or", def: "The lowest point on the left infraorbital margin.", color: "#60a5fa" },
+    { l: "Po", def: "The highest point on the superior surface of the soft tissue of the external auditory meati.", color: "#60a5fa" },
+    { l: "Me", def: "The most inferior midline point on the mandibular symphysis.", color: "#a78bfa" },
+    { l: "Go", def: "The point of intersection of the ramus plane and the mandibular plane.", color: "#a78bfa" },
+    { l: "Xi", def: "The midpoint of the Xi path (a small round radiopacity representing the intersection of the ramus plane with the posterior border of the mandibular canal).", color: "#34d399" },
+    { l: "Pog", def: "The most anterior point on the chin.", color: "#a78bfa" },
+  ]},
+  { name: "Jarv-Bjork", pts: [
+    { l: "N", def: "Nasion is the most anterior point of the frontonasal suture in the middle.", color: "#f59e0b" },
+    { l: "S", def: "The center of sella turcica (the midpoint of the horizontal diameter).", color: "#f59e0b" },
+    { l: "Ba", def: "Most inferior posterior point of the occipital bone.", color: "#f59e0b" },
+    { l: "Ar", def: "The point of intersection of the dorsal contours of processus articularis mandibulae and os temporale.", color: "#60a5fa" },
+    { l: "Or", def: "The deepest point on the infraorbital margin.", color: "#60a5fa" },
+    { l: "Po", def: "Porion is the most superior point of the external auditory meatus.", color: "#60a5fa" },
+    { l: "PNS", def: "Posterior spine of palatum durum.", color: "#34d399" },
+    { l: "ANS", def: "The apex of spina nasalis anterior.", color: "#34d399" },
+    { l: "A", def: "The deepest point on the contour of the alveolar projection.", color: "#34d399" },
+    { l: "B", def: "The deepest point on the contour of the alveolar projection.", color: "#34d399" },
+    { l: "Pog", def: "The most anterior point on the chin.", color: "#a78bfa" },
+    { l: "Gn", def: "A point on the chin determined by bisecting the angle formed by the facial and mandibular planes.", color: "#a78bfa" },
+    { l: "Me", def: "The most inferior midline point on the mandibular symphysis.", color: "#a78bfa" },
+    { l: "Go", def: "The point of intersection of the ramus plane and the mandibular plane.", color: "#a78bfa" },
+  ]},
+  { name: "Wits Analysis", pts: [
+    { l: "A", def: "The deepest point on the contour of the alveolar projection.", color: "#34d399" },
+    { l: "B", def: "The deepest point on the contour of the mandibular symphysis.", color: "#34d399" },
+    { l: "Po", def: "The highest point on the superior surface of the soft tissue of the external auditory meati.", color: "#60a5fa" },
+    { l: "Or", def: "The lowest point on the left infraorbital margin.", color: "#60a5fa" },
+    { l: "Ba", def: "Most inferior posterior point of the occipital bone.", color: "#f59e0b" },
+    { l: "N", def: "Nasion is the most anterior point of the frontonasal suture in the middle.", color: "#f59e0b" },
+  ]},
+];
+
+const _existingLateralNames = new Set(_lateralHardcoded.map(a => a.name));
+const _additionalLateral = _lateralAnalyses
+  .filter(a => {
+    if (a.pts.length === 0) return false;
+    return !_existingLateralNames.has(a.name);
+  });
 
 export const THEMES = {
   bluish: { name: "Plasticity", id: "bluish", bg: "#0f0f12", surf: "#1a1a22", surf2: "#252530", surf3: "#323242", bdr: "#404058", tx: "#e4e4ef", tx2: "#9999ad", tx3: "#6a6a80", acc: "#a855f7", acc2: "#9333ea", accMuted: "rgba(168,85,247,0.15)", err: "#f87171", ok: "#4ade80", warn: "#fbbf24", shadow: "rgba(0,0,0,0.6)", inHeader: true },
@@ -37,142 +193,7 @@ export const TOOLS = [
 ];
 
 export const PREDEFINED = {
-  lateral: [
-    { name: "General Ceph Analysis", pts: [
-      { l: "N", def: "Nasion - the most anterior point of the frontonasal suture in the middle.", color: "#f59e0b" },
-      { l: "S", def: "Sella - the geometric center of the pituitary fossa (sella turcica).", color: "#f59e0b" },
-      { l: "Ba", def: "Basion - most inferior posterior point of the occipital bone.", color: "#f59e0b" },
-      { l: "Or", def: "Orbitale - the lowest point on the inferior margin of the orbit.", color: "#60a5fa" },
-      { l: "Po", def: "Porion - the superior point of the external auditory meatus.", color: "#60a5fa" },
-      { l: "Ar", def: "Articulare - the point of intersection of the posterior border of the condylar process and the inferior border of the basilar part of the occipital bone.", color: "#60a5fa" },
-      { l: "A", def: "Point A - the deepest point on the curve of the maxilla.", color: "#34d399" },
-      { l: "B", def: "Point B - the deepest midline point on the mandible.", color: "#34d399" },
-      { l: "ANS", def: "Anterior nasal spine - tip of the bony anterior nasal spine.", color: "#34d399" },
-      { l: "PNS", def: "Posterior nasal spine - intersection of palatum posterior and fossa pterygopalatina.", color: "#34d399" },
-      { l: "Pog", def: "Pogonion - the most anterior point on the chin.", color: "#a78bfa" },
-      { l: "Gn", def: "Gnathion - a point on the chin determined by bisecting the facial and mandibular planes.", color: "#a78bfa" },
-      { l: "Me", def: "Menton - the most inferior midline point on the mandibular symphysis.", color: "#a78bfa" },
-      { l: "Go", def: "Gonion - the point of intersection of the ramus plane and the mandibular plane.", color: "#a78bfa" },
-      { l: "Co", def: "Condylion - the most superior point of the mandibular condyle.", color: "#34d399" },
-      { l: "Is", def: "Incision superius - the incisal point of the most prominent maxillary central incisor.", color: "#fb923c" },
-      { l: "Ii", def: "Incision inferius - the incisal point of the most prominent mandibular central incisor.", color: "#f472b6" },
-      { l: "Prn", def: "Pronasale - the most protruded point of the apex nasi.", color: "#f472b6" },
-      { l: "Sn", def: "Subnasale - midpoint of the columella base at the apex of the nasolabial angle.", color: "#f472b6" },
-      { l: "Ss", def: "Superior sulcus - the deepest midline point between subnasion and the vermilion border.", color: "#f472b6" },
-      { l: "Stms", def: "Stomion superius - the lowermost point on the vermilion of the upper lip.", color: "#f472b6" },
-      { l: "Stmi", def: "Stomion inferius - the uppermost point on the vermilion of the lower lip.", color: "#f472b6" },
-      { l: "Si", def: "Sulpion - the point of greatest concavity in the midline between the lower lip and chin.", color: "#f472b6" },
-      { l: "TMJ", def: "Temporomandibular joint point - on the contour of the glenoid fossa.", color: "#60a5fa" },
-      { l: "Ids", def: "Infradentale superius - the highest point on the alveolar crest between the mandibular central incisors.", color: "#f472b6" },
-      { l: "Pr", def: "Prosthion - the most anterior point on the maxillary alveolar process.", color: "#34d399" },
-    ],
-    lines: [
-      { l: "Sella-Nasion line", def: "Line connecting Sella to Nasion.", color: "#f59e0b" },
-      { l: "Frankfort Horizontal", def: "Plane connecting Porion to Orbitale.", color: "#60a5fa" },
-      { l: "NBa plane", def: "Plane connecting Nasion to Basion.", color: "#f59e0b" },
-      { l: "Mandibular plane", def: "Plane connecting Gonion to Menton.", color: "#a78bfa" },
-    ]},
-    { name: "Steiner Analysis", pts: [
-      { l: "N", def: "Nasion is the most anterior point of the frontonasal suture in the middle.", color: "#f59e0b" },
-      { l: "S", def: "The center of sella turcica (the midpoint of the horizontal diameter).", color: "#f59e0b" },
-      { l: "A", def: "The deepest midline point on the premaxilla between the anterior nasal spine and prosthion.", color: "#60a5fa" },
-      { l: "B", def: "The deepest midline point on the mandible between infradentale and pogonion.", color: "#60a5fa" },
-      { l: "ANS", def: "Anterior nasal spine is the tip of bony anterior nasal spine in the midline or median plane.", color: "#34d399" },
-      { l: "PNS", def: "Posterior nasal spine is the intersection of a continuation of the anterior wall of the pterygopalatine fossa and the floor of the nose.", color: "#34d399" },
-      { l: "Pog", def: "The most anterior point on the chin.", color: "#a78bfa" },
-      { l: "Gn", def: "A point on the chin determined by bisecting the angle formed by the facial and mandibular planes.", color: "#a78bfa" },
-      { l: "Me", def: "The most inferior midline point on the mandibular symphysis.", color: "#a78bfa" },
-      { l: "Go", def: "The point of intersection of the ramus plane and the mandibular plane.", color: "#a78bfa" },
-      { l: "Is", def: "The incisal point of the most prominent medial maxillary incisor.", color: "#fb923c" },
-      { l: "Ii", def: "The incisal point of the most prominent medial mandibular incisor.", color: "#f472b6" },
-    ]},
-    { name: "Ricketts Analysis", pts: [
-      { l: "N", def: "Nasion is the most anterior point of the frontonasal suture in the middle.", color: "#f59e0b" },
-      { l: "S", def: "The point representing the geometric center of the pituitary fossa (sella turcica).", color: "#f59e0b" },
-      { l: "Ba", def: "Most inferior posterior point of the occipital bone.", color: "#f59e0b" },
-      { l: "Or", def: "The lowest point on the inferior margin of the orbit.", color: "#60a5fa" },
-      { l: "Po", def: "The superior point of the external auditory meatus (superior margin of temporomandibular fossa).", color: "#60a5fa" },
-      { l: "Ar", def: "The point of intersection of the images of the posterior border of the condylar process of the mandible and the inferior border of the basilar part of the occipital bone.", color: "#60a5fa" },
-      { l: "A", def: "The deepest point on the curve of the maxilla between the anterior nasal spine and the dental alveolus.", color: "#34d399" },
-      { l: "B", def: "The deepest midline point on the mandible between infradentale and pogonion.", color: "#34d399" },
-      { l: "ANS", def: "Tip of the anterior nasal spine.", color: "#34d399" },
-      { l: "PNS", def: "The intersection of palatum posterior durum, palatum molle and fossa pterygopalatina.", color: "#34d399" },
-      { l: "Pog", def: "Most anterior point on the midsagittal symphysis tangent to the facial plane.", color: "#a78bfa" },
-      { l: "Gn", def: "The most inferior point on the contour of the chin.", color: "#a78bfa" },
-      { l: "Me", def: "The most inferior midline point on the mandibular symphysis.", color: "#a78bfa" },
-      { l: "Go", def: "The point of intersection of the ramus plane and the mandibular plane.", color: "#a78bfa" },
-    ]},
-    { name: "McNamara Analysis", pts: [
-      { l: "N", def: "Nasion is the most anterior point of the frontonasal suture in the middle.", color: "#f59e0b" },
-      { l: "A", def: "The deepest point on the curve of the maxilla between the anterior nasal spine and the dental alveolus.", color: "#60a5fa" },
-      { l: "B", def: "The deepest midline point on the mandible between infradentale and pogonion.", color: "#60a5fa" },
-      { l: "Pog", def: "The most anterior point on the mandible in the midline.", color: "#a78bfa" },
-      { l: "Me", def: "The most inferior midline point on the mandibular symphysis.", color: "#a78bfa" },
-      { l: "Co", def: "The most superior point of the mandibular condyle.", color: "#34d399" },
-      { l: "ANS", def: "Tip of the anterior nasal spine.", color: "#34d399" },
-      { l: "PNS", def: "The intersection of palatum posterior durum, palatum molle and fossa pterygopalatina.", color: "#34d399" },
-    ]},
-    { name: "Downs Analysis", pts: [
-      { l: "N", def: "Nasion is the most anterior point of the frontonasal suture in the middle.", color: "#f59e0b" },
-      { l: "S", def: "Located by inspection of the profile image of the fossa.", color: "#f59e0b" },
-      { l: "Or", def: "The lowest point on the left infraorbital margin.", color: "#60a5fa" },
-      { l: "Po", def: "The highest point on the superior surface of the soft tissue of the external auditory meati.", color: "#60a5fa" },
-      { l: "A", def: "The deepest midline point on the premaxilla between the anterior nasal spine and prosthion.", color: "#34d399" },
-      { l: "B", def: "The deepest midline point on the mandible between infradentale and pogonion.", color: "#34d399" },
-      { l: "Pog", def: "The most anterior point on the mandible in the midline.", color: "#a78bfa" },
-      { l: "Gn", def: "A point on the chin determined by bisecting the angle formed by the facial and mandibular planes.", color: "#a78bfa" },
-      { l: "Me", def: "The most inferior midline point on the mandibular symphysis.", color: "#a78bfa" },
-      { l: "Go", def: "The point of intersection of the ramus plane and the mandibular plane.", color: "#a78bfa" },
-    ]},
-    { name: "Bjork Analysis", pts: [
-      { l: "Ar", def: "The point of intersection of the dorsal contours of processus articularis mandibulae and os temporale. The midpoint is used where double projection gives rise to two articulare points.", color: "#60a5fa" },
-      { l: "N", def: "Nasion is the most anterior point of the frontonasal suture in the middle.", color: "#f59e0b" },
-      { l: "S", def: "The center of sella turcica (the midpoint of the horizontal diameter).", color: "#f59e0b" },
-      { l: "Or", def: "The deepest point on the infraorbital margin. The midpoint is used where double projection gives rise to two points.", color: "#60a5fa" },
-      { l: "Po", def: "Porion is the most superior point of the external auditory meatus (the superior margin of the TMJ fossa, which lies at the same level may be substitute in the construction of the FH).", color: "#60a5fa" },
-      { l: "A", def: "The deepest point on the contour of the alveolar projection, between the spinal point and prosthion.", color: "#34d399" },
-      { l: "B", def: "The deepest point on the contour of the alveolar projection, between infradentale and pogonion.", color: "#34d399" },
-      { l: "ANS", def: "The apex of spina nasalis anterior.", color: "#34d399" },
-      { l: "PNS", def: "Posterior spine of palatum durum.", color: "#34d399" },
-      { l: "Pog", def: "The most anterior point on the chin.", color: "#a78bfa" },
-      { l: "Gn", def: "A point on the chin determined by bisecting the angle formed by the facial and mandibular planes.", color: "#a78bfa" },
-      { l: "Me", def: "The most inferior midline point on the mandibular symphysis.", color: "#a78bfa" },
-      { l: "Go", def: "The point of intersection of the ramus plane and the mandibular plane.", color: "#a78bfa" },
-    ]},
-    { name: "Tweed Analysis", pts: [
-      { l: "N", def: "Nasion is the most anterior point of the frontonasal suture in the middle.", color: "#f59e0b" },
-      { l: "Or", def: "The lowest point on the left infraorbital margin.", color: "#60a5fa" },
-      { l: "Po", def: "The highest point on the superior surface of the soft tissue of the external auditory meati.", color: "#60a5fa" },
-      { l: "Me", def: "The most inferior midline point on the mandibular symphysis.", color: "#a78bfa" },
-      { l: "Go", def: "The point of intersection of the ramus plane and the mandibular plane.", color: "#a78bfa" },
-      { l: "Xi", def: "The midpoint of the Xi path (a small round radiopacity representing the intersection of the ramus plane with the posterior border of the mandibular canal).", color: "#34d399" },
-      { l: "Pog", def: "The most anterior point on the chin.", color: "#a78bfa" },
-    ]},
-    { name: "Jarv-Bjork", pts: [
-      { l: "N", def: "Nasion is the most anterior point of the frontonasal suture in the middle.", color: "#f59e0b" },
-      { l: "S", def: "The center of sella turcica (the midpoint of the horizontal diameter).", color: "#f59e0b" },
-      { l: "Ba", def: "Most inferior posterior point of the occipital bone.", color: "#f59e0b" },
-      { l: "Ar", def: "The point of intersection of the dorsal contours of processus articularis mandibulae and os temporale.", color: "#60a5fa" },
-      { l: "Or", def: "The deepest point on the infraorbital margin.", color: "#60a5fa" },
-      { l: "Po", def: "Porion is the most superior point of the external auditory meatus.", color: "#60a5fa" },
-      { l: "PNS", def: "Posterior spine of palatum durum.", color: "#34d399" },
-      { l: "ANS", def: "The apex of spina nasalis anterior.", color: "#34d399" },
-      { l: "A", def: "The deepest point on the contour of the alveolar projection.", color: "#34d399" },
-      { l: "B", def: "The deepest point on the contour of the alveolar projection.", color: "#34d399" },
-      { l: "Pog", def: "The most anterior point on the chin.", color: "#a78bfa" },
-      { l: "Gn", def: "A point on the chin determined by bisecting the angle formed by the facial and mandibular planes.", color: "#a78bfa" },
-      { l: "Me", def: "The most inferior midline point on the mandibular symphysis.", color: "#a78bfa" },
-      { l: "Go", def: "The point of intersection of the ramus plane and the mandibular plane.", color: "#a78bfa" },
-    ]},
-    { name: "Wits Analysis", pts: [
-      { l: "A", def: "The deepest point on the contour of the alveolar projection.", color: "#34d399" },
-      { l: "B", def: "The deepest point on the contour of the mandibular symphysis.", color: "#34d399" },
-      { l: "Po", def: "The highest point on the superior surface of the soft tissue of the external auditory meati.", color: "#60a5fa" },
-      { l: "Or", def: "The lowest point on the left infraorbital margin.", color: "#60a5fa" },
-      { l: "Ba", def: "Most inferior posterior point of the occipital bone.", color: "#f59e0b" },
-      { l: "N", def: "Nasion is the most anterior point of the frontonasal suture in the middle.", color: "#f59e0b" },
-    ]},
-  ],
+  lateral: [..._lateralHardcoded, ..._additionalLateral],
   ap: [
     { name: "Ricketts", pts: [
       { l: "Crg", def: "Crista galli - the most superior point of the Crista galli.", color: "#f59e0b" },
@@ -299,6 +320,28 @@ export const PREDEFINED = {
     ]},
   ],
 };
+
+// Merge CSV measurements into PREDEFINED analyses
+for (const a of PREDEFINED.lateral) {
+  if (_measurementLookup[a.name]) {
+    a.measurements = _measurementLookup[a.name];
+  }
+}
+for (const a of PREDEFINED.ap) {
+  if (_measurementLookup[a.name]) {
+    a.measurements = _measurementLookup[a.name];
+  }
+}
+for (const a of PREDEFINED.smv) {
+  if (_measurementLookup[a.name]) {
+    a.measurements = _measurementLookup[a.name];
+  }
+}
+for (const a of PREDEFINED.opg) {
+  if (_measurementLookup[a.name]) {
+    a.measurements = _measurementLookup[a.name];
+  }
+}
 
 export const PREDEFINED_NORMS = {
   Steiner: {

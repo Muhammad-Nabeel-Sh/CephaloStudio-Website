@@ -1,0 +1,103 @@
+Analysis,Markup type,Landmark,Definition,Refs,Norm mean,Norm SD
+General Ceph Analysis,Angle,SNA,"Angle between Sella, Nasion, and Point A","S,N,A",82,2
+General Ceph Analysis,Angle,SNB,"Angle between Sella, Nasion, and Point B","S,N,B",80,2
+General Ceph Analysis,Angle,ANB,"Angle between Point A, Nasion, and Point B","A,N,B",2,2
+General Ceph Analysis,Angle,SN-GoMe,"Angle between SN line and mandibular plane (Go-Me)","S,N,Go,Me",32,4
+General Ceph Analysis,Angle,SN-FH,"Angle between SN line and Frankfort Horizontal (Po-Or)","S,N,Po,Or",7,3
+General Ceph Analysis,Distance,Anterior facial height (N-Me),Distance from Nasion to Menton.,"N,Me",110,5
+General Ceph Analysis,Distance,Posterior facial height (S-Go),Distance from Sella to Gonion.,"S,Go",75,5
+Steiner Analysis,Angle,SNA,"Angle between Sella, Nasion, and Point A","S,N,A",82,2
+Steiner Analysis,Angle,SNB,"Angle between Sella, Nasion, and Point B","S,N,B",80,2
+Steiner Analysis,Angle,ANB,"Angle between Point A, Nasion, and Point B","A,N,B",2,2
+Steiner Analysis,Angle,SN-GoMe,"Angle between SN line and mandibular plane (Go-Me)","S,N,Go,Me",32,4
+Ricketts Analysis,Angle,Facial depth,"Angle between FH (Po-Or) and facial plane (N-Pog)","Po,Or,N,Pog",87,3
+Ricketts Analysis,Perp,Convexity,Distance from Point A to the facial plane (N-Pog).,"N,Pog,A",2,2
+Ricketts Analysis,Angle,SN-FH,"Angle between SN line and Frankfort Horizontal","S,N,Po,Or",7,3
+McNamara Analysis,Distance,N-A,Length from Nasion to Point A.,"N,A",1,2
+McNamara Analysis,Distance,N-B,Length from Nasion to Point B.,"N,B",4,3
+McNamara Analysis,Distance,Co-A,Maxillary length from Condylion to Point A.,"Co,A",90,3
+McNamara Analysis,Distance,Co-Pog,Mandibular length from Condylion to Pogonion.,"Co,Pog",130,5
+McNamara Analysis,Distance,ANS-Me,Lower facial height from ANS to Menton.,"ANS,Me",65,4
+Downs Analysis,Angle,Facial depth,"Angle between FH (Po-Or) and facial plane (N-Pog)","Po,Or,N,Pog",87,3
+Downs Analysis,Perp,Convexity,Distance from Point A to the facial plane (N-Pog).,"N,Pog,A",0,5
+Downs Analysis,Angle,Mandibular plane angle,"Angle between FH (Po-Or) and mandibular plane (Go-Me)","Po,Or,Go,Me",22,4
+Downs Analysis,Angle,Y-axis,"Angle between FH (Po-Or) and Y-axis (S-Gn)","Po,Or,S,Gn",59,3
+Bjork Analysis,Angle,S-N-A,"Angle between Sella, Nasion, and Point A","S,N,A",82,2
+Bjork Analysis,Angle,S-N-B,"Angle between Sella, Nasion, and Point B","S,N,B",80,2
+Bjork Analysis,Angle,A-N-B,"Angle between Point A, Nasion, and Point B","A,N,B",2,2
+Bjork Analysis,Angle,ML-NSL,"Angle between mandibular plane (Go-Me) and nasion-sella line (N-S)","N,S,Go,Me",32,2
+Bjork Analysis,Angle,NL-NSL,"Angle between nasal line (ANS-PNS) and nasion-sella line (N-S)","N,S,ANS,PNS",8,3
+Tweed Analysis,Angle,FMA,"Frankfort Mandibular Angle","Po,Or,Go,Me",25,3
+Jarv-Bjork,Angle,N-S-Ar,"Saddle angle","N,S,Ar",123,5
+Jarv-Bjork,Angle,S-Ar-Go,"Articular angle","S,Ar,Go",143,6
+Jarv-Bjork,Angle,Ar-Go-Me,"Gonial angle","Ar,Go,Me",130,7
+Jarv-Bjork,Angle,ML-NSL,"Angle between mandibular plane (Me-Go) and nasion-sella line (N-S)","N,S,Me,Go",32,2
+Jarv-Bjork,Angle,NL-NSL,"Angle between nasal line (ANS-PNS) and nasion-sella line (N-S)","N,S,ANS,PNS",8,3
+Jarv-Bjork,Sum,Björk sum,"Sum of saddle + articular + gonial angles","N-S-Ar,S-Ar-Go,Ar-Go-Me",396,6
+Wits Analysis,Distance,A-B distance,Distance between Point A and Point B.,"A,B",0,2
+General Ceph Analysis,Line,Sella-Nasion line,Reference line connecting Sella to Nasion.,"S,N",,
+General Ceph Analysis,Line,Frankfort Horizontal,Reference plane connecting Porion to Orbitale.,"Po,Or",,
+General Ceph Analysis,Line,NBa plane,Reference plane connecting Nasion to Basion.,"N,Ba",,
+General Ceph Analysis,Line,Mandibular plane,Reference plane connecting Gonion to Menton.,"Go,Me",,
+Steiner Analysis,Line,Sella-Nasion line,Reference line connecting Sella to Nasion.,"S,N",,
+Ricketts Analysis,Line,Sella-Nasion line,Reference line connecting Sella to Nasion.,"S,N",,
+Ricketts Analysis,Line,Frankfort Horizontal,Reference plane connecting Porion to Orbitale.,"Po,Or",,
+Ricketts Analysis,Line,Facial plane,Reference plane connecting Nasion to Pogonion.,"N,Pog",,
+McNamara Analysis,Line,Sella-Nasion line,Reference line connecting Sella to Nasion.,"S,N",,
+Downs Analysis,Line,Frankfort Horizontal,Reference plane connecting Porion to Orbitale.,"Po,Or",,
+Downs Analysis,Line,Y-axis of growth,Reference line connecting Sella to Gnathion.,"S,Gn",,
+Bjork Analysis,Line,Sella-Nasion line,Reference line connecting Sella to Nasion.,"S,N",,
+Bjork Analysis,Line,Mandibular plane,Reference plane connecting Gonion to Menton.,"Go,Me",,
+Jarv-Bjork,Line,Sella-Nasion line,Reference line connecting Sella to Nasion.,"S,N",,
+Jarv-Bjork,Line,Mandibular plane,Reference plane connecting Gonion to Menton.,"Go,Me",,
+Tweed Analysis,Line,Frankfort Horizontal,Reference plane connecting Porion to Orbitale.,"Po,Or",,
+Tweed Analysis,Line,Mandibular plane,Reference plane connecting Gonion to Menton.,"Go,Me",,
+Ricketts,Distance,Zygomatic width,Width between the frontozygomatic sutures.,"Z-R,Z-L",95,4
+Ricketts,Distance,Zygomatic arch width,Width between the zygomatic arches.,"ZA-R,ZA-L",125,5
+Ricketts,Distance,Jugular width,Maxillary width at jugal points.,"J-R,J-L",65,3
+Ricketts,Distance,Antegonial width,Mandibular width at antegonial notches.,"AG-R,AG-L",90,4
+Ricketts,Distance,Nasal cavity width,Width of the nasal cavity.,"NC-R,NC-L",28,2
+General PA Analysis,Distance,Antegonial width,Width between antegonial notches.,"ag-R,ag-L",90,4
+General PA Analysis,Distance,Condylar width,Width between condylar heads.,"cd/Con-R,cd/Con-L",115,5
+General PA Analysis,Distance,Coronoid width,Width between coronoid processes.,"cor-R,cor-L",95,4
+General PA Analysis,Distance,Gonial width,Width between gonial angles.,"Go-R,Go-L",95,4
+General PA Analysis,Distance,Jugular width,Maxillary width at jugal points.,"Jug-R,Jug-L",65,3
+General PA Analysis,Distance,Mastoid width,Width between mastoid processes.,"ma/Mst-R,ma/Mst-L",105,5
+General PA Analysis,Distance,Zygomatic arch width,Width between zygomatic arches.,"za-R,za-L",125,5
+General PA Analysis,Distance,Orbital width,Width between lateral orbital margins.,"lo-R,lo-L",70,3
+Grummons Frontal Asymmetry,Distance,Condylar width,Width between condylar heads.,"Co-R,Co-L",115,5
+Grummons Frontal Asymmetry,Distance,Zygomatic width,Width between zygomaticofrontal sutures.,"Z-R,Z-L",95,4
+Grummons Frontal Asymmetry,Distance,Jugular width,Maxillary width at jugal points.,"J-R,J-L",65,3
+Grummons Frontal Asymmetry,Distance,Antegonial width,Mandibular width at antegonial notches.,"Ag-R,Ag-L",90,4
+Hewitt,Distance,Condylar width,Width between condylar heads.,"Cd-R,Cd-L",115,5
+Hewitt,Distance,Gonial width,Width between gonial angles.,"Go-R,Go-L",95,4
+Svanholt-Solow,Distance,Maxillary width,Width of the maxilla at lateral contours.,"Mx-R,Mx-L",60,3
+Svanholt-Solow,Distance,Orbital width,Width between lateral orbital contours.,"Lo-R,Lo-L",70,3
+Grayson Multiplane,Distance,Zygomaticofrontal width,Width between zygomaticofrontal sutures.,"Zf-R,Zf-L",95,4
+General SMV Analysis,Distance,Condylar width (anterior),Anterior condylar width.,"CdA-L,CdA-R",115,5
+General SMV Analysis,Distance,Condylar width (lateral),Lateral condylar width.,"CdL-L,CdL-R",120,5
+General SMV Analysis,Distance,Condylar width (medial),Medial condylar width.,"CdM-L,CdM-R",105,5
+General SMV Analysis,Distance,Condylar width (posterior),Posterior condylar width.,"CdP-L,CdP-R",110,5
+General SMV Analysis,Distance,Gonial width,Width at gonial angles.,"Go-L,Go-R",95,4
+General SMV Analysis,Distance,Zygomatic arch width,Width between zygomatic arches.,"ZA-L,ZA-R",125,5
+General SMV Analysis,Distance,Mastoid width,Width between mastoid processes.,"Ma-L,Ma-R",105,5
+General OPG Analysis,Distance,Condylar width,Width between condylar heads.,"Co-L,Co-R",115,5
+General OPG Analysis,Distance,Coronoid width,Width between coronoid processes.,"Cor-L,Cor-R",95,4
+General OPG Analysis,Distance,Gonial width,Width between gonial angles.,"Go-L,Go-R",95,4
+General OPG Analysis,Distance,Antegonial width,Width between antegonial notches.,"Ag-L,Ag-R",90,4
+Harvold,Distance,Mandibular length,Distance from TMJ to Prognathion.,"TMJ,PGN",120,5
+Harvold,Distance,Lower face height,Height from ANS to Gnathion.,"ANS,GN",65,4
+Harvold,Angle,Angle of convexity,Angle between PG-ANS and ANS-N.,"PG,ANS,N",0,5
+Legan and Burstone Soft Tissue,Angle,Facial convexity,Angle between Glabella-Subnasale-Soft tissue pogonion.,"G,Sn,Pg'",12,4
+Legan and Burstone Soft Tissue,Angle,Nasolabial angle,Angle between columella and upper lip.,"Cm,Sn,Ls",100,8
+Legan and Burstone Soft Tissue,Distance,Lower face height,Sn-Me' distance.,"Sn,Me'",50,4
+Legan and Burstone Soft Tissue,Angle,Vertical facial ratio,Sn-Stms to Stmi-Me'.,"Sn,Stms,Stmi,Me'",0.5,0.05
+Kim Analysis,Angle,ODI,"Angle between AB plane and Frankfort Horizontal (Po-Or)","A,B,Po,Or",75,6
+Kim Analysis,Angle,APDI,"Angle between facial plane (N-Pog) and AB plane","N,Pog,A,B",81,5
+Kim Analysis,Sum,CF,"Combination Factor = ODI + APDI","ODI,APDI",156,10
+Eastman Analysis,Angle,BaN-A,"Angle between Basion, Nasion, and Point A","Ba,N,A",60,3
+Eastman Analysis,Angle,BaN-B,"Angle between Basion, Nasion, and Point B","Ba,N,B",55,3
+Eastman Analysis,Angle,BaN-Pog,"Angle between Basion, Nasion, and Pogonion","Ba,N,Pog",58,3
+Delaire Analysis,Angle,Craniofacial angle,Angle between Basion-Nasion-Pogonion.,"Ba,N,Pog",170,5
+Delaire Analysis,Angle,Facial angle,Angle between FH (Po-Or) and facial plane (N-Pog).,"Po,Or,N,Pog",87,3
+Delaire Analysis,Angle,Maxillary position,Angle between FH (Po-Or) and NA line (N-A).,"Po,Or,N,A",90,3

@@ -98,6 +98,8 @@ export function computeMeasurements(m, cal) {
     meas.length = (useSpline ? splineLen(vp, false) : polyLen(vp, false)) / ppm;
   }
   if (m.type === "perp" && vp.length >= 3) { meas.distance = perpDist(vp[2], vp[0], vp[1]) / ppm; meas.lineLength = dist(vp[0], vp[1]) / ppm; }
+  if (m.type === "ratio" && m.computedValue !== undefined) { meas.value = m.computedValue; }
+  if (m.type === "sum" && m.computedValue !== undefined) { meas.value = m.computedValue; }
   return meas;
 }
 

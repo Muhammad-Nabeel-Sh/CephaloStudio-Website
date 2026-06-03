@@ -1,289 +1,326 @@
-Analysis,Markup type,Landmark,Definition
-Bjork,Point,Ar-articulare,The point of intersection of the dorsal contours of processus articularis mandibulae and os temporale. The midpoint is used where double projection gives rise to two articulare points.
-Bjork,Point,dd,The most prominent point of the chin in the direction of measurement.
-Bjork,Point,gn-gnathion,The deepest point on the chin.
-Bjork,Point,id-infradentale,The point of transition from the crown of the most prominent mandibular medial incisor to the alveolar projection.
-Bjork,Point,ii-incision inferius,The incisal point of the most prominent medial mandibular incisor.
-Bjork,Point,is-incision superius,The incisal point of the most prominent medial maxillary incisor.
-Bjork,Point,kk,The point of intersection between the base and ramus tangents to the mandible. The midpoint is used where double projection gives rise to two points.
-Bjork,Point,mi,The mesial contact point of the lower molar projected normal to the plane of occlusion.
-Bjork,Point,ms,The mesial contact point of the upper molar projected normal to the plane of occlusion.
-Bjork,Point,N-nasion,Nasion is the most anterior point of the frontonasal suture in the middle.
-Bjork,Point,or-orbitale,The deepest point on the infraorbital margin. The midpoint is used where double projection gives rise to two points.
-Bjork,Point,pg-pogonion,The most prominent point on the chin.
-Bjork,Point,Po-porion,"Porion is the most superior point of the external auditory meatus (the superior margin of the TMJ fossa, which lies at the same level may be substitute in the construction of the FH)."
-Bjork,Point,pr-prosthion,The transition point between the crown of the most prominent medial maxillary incisor and the alveolar projection.
-Bjork,Point,s,The center of sella turcica (the midpoint of the horizontal diameter).
-Bjork,Point,sm-supramentale,"The deepest point on the contour of the alveolar projection, between infradentale and pogonion."
-Bjork,Point,sp-the spinal point,The apex of spina nasalis anterior.
-Bjork,Point,snp-spina nasalis posterior,"The point of intersection of palatum posterior durum, palatum molle and fossa pterygopalatina."
-Bjork,Point,ss-subspinale,"The deepest point on the contour of the alveolar projection, between the spinal point and prosthion."
-Bjork,Point,io,"The incisal point of the most prominent medial mandibular incisor, projected normal to the plane of occlusion."
-Coben Craniofacial and Dentition,Point,A-point A (subspinale),The point at the deepest midline concavity on the maxilla between the anterior nasal spine and prosthion.
-Coben Craniofacial and Dentition,Point,Ans-anterior nasal spine,The most anterior point of the anterior nasal spine.
-Coben Craniofacial and Dentition,Point,Ar-articulare,The point of intersection of the images of the posterior border of the condylar process of the mandible and the inferior border of the basilar part of the occipital bone.
-Coben Craniofacial and Dentition,Point,B-point B (supramentale),The point at the deepest midline concavity on the mandibular symphysis between infradentale and pogonion.
-Coben Craniofacial and Dentition,Point,F - point F (constructed),"The point approximating foramen cecum representing the anatomic anterior limit of the cranial base, constructed as the point of intersection of a perpendicular to the S-N plane from the point of crossing of the images of the orbital roofs and the internal plate of the frontal bone."
-Coben Craniofacial and Dentition,Point,Go-gonion (constructed),The point of intersection of the ramus plane and the mandibular plane.
-Coben Craniofacial and Dentition,Point,M-menton,The most inferior midline point on the mandibular symphysis.
-Coben Craniofacial and Dentition,Point,N-nasion,Nasion is the most anterior point of the frontonasal suture in the middle.
-Coben Craniofacial and Dentition,Point,Or-orbitale,"The lowest point on the inferior margin of the orbit, midpoint between right and left images."
-Coben Craniofacial and Dentition,Point,Po-porion (anatomic),"The superior point of the externa-Lauditory meatus (superior margin of temporomandibular fossa, which lies at the same level, may be substituted in the construction of Frankfort horizontal)."
-Coben Craniofacial and Dentition,Point,Pog-pogonion,The most anterior midline point of the mandibular symphysis.
-Coben Craniofacial and Dentition,Point,Po'-pogonion' (constructed),The point of tangency of a perpendicular from the mandibular plane to the most prominent convexity of the mandibular symphysis.
-Coben Craniofacial and Dentition,Point,Ptm-pterygomaxillary fissure,The point of intersection of the images of the anterior surface of the pterygoid process of the sphenoid bone and the posterior margin of the maxilla.
-Coben Craniofacial and Dentition,Point,S-sella,The point representing the geometric center of the pituitary fossa (sella turcica).
-Coben Craniofacial and Dentition,Point,Ul-maxillary central incisor (horizontal),The most labial point on the crown of the maxillary central incisor.
-Coben Craniofacial and Dentition,Point,Ul-maxillary central incisor (vertical),The incisal edge of the maxillary central incisor.
-Coben Craniofacial and Dentition,Point,L1-mandibular central incisor (horizontal),The most labial point on the crown of the mandibular central incisor.
-Coben Craniofacial and Dentition,Point,L1-mandibular central incisor (vertical),The incisal edge of the mandibular central incisor.
-Coben Craniofacial and Dentition,Point,U6-maxillary first molar (horizontal),The most distal point on the crown of the maxillary first permanent molar.
-Coben Craniofacial and Dentition,Point,U6-maxillary first molar (vertical),The tip of the mesiobuccal cusp of the maxillary first permanent molar.
-Coben Craniofacial and Dentition,Point,L6-mandibular first molar (horizontal),The most distal point on the crown of the mandibular first permanent molar.
-Coben Craniofacial and Dentition,Point,L6-mandibular first molar (vertical),The tip of the mesiobuccal cusp of the mandibular first permanent molar.
-Downs,Point,N-nasion,Nasion is the most anterior point of the frontonasal suture in the middle.
-Downs,Point,Bolton point,The highest point on the concavity behind the occipital condyles.
-Downs,Point,The centre of sella turcica,Located by inspection of the profile image of the fossa.
-Downs,Point,Orbitale,The lowest point on the left infraorbital margin.
-Downs,Point,Porion (cephalometric),The highest point on the superior surface of the soft tissue of the external auditory meati.
-Downs,Point,Pogonion,The most anterior point on the mandible in the midline.
-Downs,Point,Point A-subspinale,The deepest midline point on the premaxilla between the anterior nasal spine and prosthion.
-Downs,Point,Point B-supramentale,The deepest midline point on the mandible between infradentale and pogonion.
-Downs,Point,Gnathion,A point on the chin determined by bisecting the angle formed by the facial and mandibular planes.
-Farkas and Coworkers Soft Tissue,Point,Trichion (tr),Point on the hairline in the midline of the forehead.
-Farkas and Coworkers Soft Tissue,Point,Glabella (g),The most prominent midline point between the eyebrows.
-Farkas and Coworkers Soft Tissue,Point,Subnasion (n'),Deepest point of the nasofrontal angle.
-Farkas and Coworkers Soft Tissue,Point,Pronasale (prn),The most protruded point of the apex nasi.
-Farkas and Coworkers Soft Tissue,Point,Subnasale (sn),Midpoint of the columella base at the apex of the nasolabial angle.
-Farkas and Coworkers Soft Tissue,Point,Labiale superius (ls),Midpoint of the upper vermilion line.
-Farkas and Coworkers Soft Tissue,Point,Labiale inferius (li),Midpoint of the lower vermilion line.
-Farkas and Coworkers Soft Tissue,Point,Sublabiale (si),Midpoint of the horizontal labiomental skin ridge.
-Farkas and Coworkers Soft Tissue,Point,Pogonion (pg),The most anterior midpoint of the chin.
-Harvold,Point,Temporomandibular joint (TMJ),"A point on the contour of the glenoid fossa, where the line indicating the maximum length of the mandible intercepts the contour of the temporomandibular fossa. The midpoint between the right and left side is marked."
-Harvold,Point,Anterior nasal spine (ANS),"A point on the lower contour of the anterior nasal spine where the vertical thickness is 3 mm, used for horizontal measurements; a point on the upper contour of the anterior nasal spine, where the vertical thickness is 3 mm, employed for vertical measurements."
-Harvold,Point,Prognathion (PGN),A point on the contour of the chin indicating maximum mandibular length measured from the temporomandibular joint.
-Harvold,Point,Gnathion (GN),The most inferior point on the contour of the chin.
-Harvold,Point,Pogonion (PG),The most anterior point on the chin.
-Harvold,Point,Nasion (N),"The point at which the nasofrontal suture reaches the contour line of the bones. The forward position of the maxilla, measured from TM to ANS."
-Harvold,Distance,Mandibular length,Measured from TM to PGN.
-Harvold,Distance,Lower face height,Measured from ANS to GN.
-Harvold,Angle,The angle of convexity,The angle between the lines PG-ANS and ANS-N.
-Holdaway,Line,The H line or harmony line,Drawn tangent to the soft tissue chin and the upper lip.
-Holdaway,Line,Soft tissue facial line,A soft tissue facial line from soft-tissue nasion to the point on the soft tissue chin overlying Rickett's suprapogonion.
-Holdaway,Plane,The usual hard tissue facial plane,The usual hard tissue facial plane.
-Holdaway,Line,The sella-nasion line,The sella-nasion line.
-Holdaway,Plane,Frankfort horizontal plane (FH),Frankfort horizontal plane (FH).
-Holdaway,Line,Right angle to Frankfort plane,A line running at a right angle to the Frankfort plane down tangent to the vermilion border of the upper lip.
-Legan and Burstone Soft Tissue,Point,Glabella (G),The most prominent point in the midsagittal plane of the forehead.
-Legan and Burstone Soft Tissue,Point,Columella point (Cm),The most anterior point on the columella of the nose.
-Legan and Burstone Soft Tissue,Point,Subnasale (Sn),The point at which the nasal septum merges with the upper cutaneous lip in the midsagittal plane.
-Legan and Burstone Soft Tissue,Point,Labrale superius (Ls),A point indicating the mucocutaneous border of the upper lip.
-Legan and Burstone Soft Tissue,Point,Stomion superius (Stms),The lowermost point on the vermilion of the upper lip.
-Legan and Burstone Soft Tissue,Point,Stomion inferius (Stmi),The uppermost point on the vermilion of the lower lip.
-Legan and Burstone Soft Tissue,Point,Labrale inferius (Li),A point indicating the mucocutaneous border of the lower lip.
-Legan and Burstone Soft Tissue,Point,Mentolabial sulcus (Si),The point of greatest concavity in the midline between the lower lip (Li) and chin (Pg').
-Legan and Burstone Soft Tissue,Point,Soft tissue pogonion (Pg'),The most anterior point on soft tissue chin.
-Legan and Burstone Soft Tissue,Point,Soft tissue gnathion (Gn'),The constructed midpoint between soft tissue pogonion and soft tissue menton; can be located at the intersection of the subnasale to soft tissue pogonion line and the line from C to Me.
-Legan and Burstone Soft Tissue,Point,Soft tissue menton (Me'),The lowest point on the contour of the soft tissue chin; found by dropping a perpendicular from horizontal plane through menton.
-Legan and Burstone Soft Tissue,Point,Cervical point (C),The innermost point between the submental area and the neck located at the intersection of lines drawn tangent to the neck and submental areas.
-Rickett's,Point,A,The deepest point on the curve of the maxilla between the anterior nasal spine and the dental alveolus.
-Rickett's,Point,ANS,Tip of the anterior nasal spine.
-Rickett's,Point,BA,Most inferior posterior point of the occipital bone.
-Rickett's,Point,CC,Point where the basion-nasion plane and the facial axis intersect.
-Rickett's,Point,DC,"A point selected in the center of the neck of the condyle, where the basion-nasion plane crosses it."
-Rickett's,Point,NA,A point at the anterior limit of the nasofrontal suture.
-Rickett's,Point,PM,Point selected at the anterior border of the symphysis between point B and pogonion where the curvature changes from concave to convex.
-Rickett's,Point,PO,Most anterior point on the midsagittal symphysis tangent to the facial plane.
-Rickett's,Point,XI,The geometric center of the ramus of the mandible.
-Sassouni,Angle,Palatocranial angle,Angle formed by the palatal plane and the anterior cranial base plane.
-Sassouni,Angle,Palatomandibular angle,Angle formed by the palatal plane and the mandibular base plane.
-Sassouni,Angle,Occlusopalatal angle,Angle formed by the occlusal plane and the palatal plane.
-Sassouni,Angle,Occlusomandibular angle,Angle formed by the occlusal plane and the mandibular base plane.
-Sassouni,Angle,Angle M,Angle formed by the 6 axis and the occlusal plane.
-Sassouni,Angle,Angle M',Angle formed by the 6 axis and che palatal plane.
-Sassouni,Angle,Angle M''ù,Angle formed by the 6 axis and the anterior cranial base plane.
-Sassouni,Angle,Angle I,Angle formed by 1 and the occlusal plane.
-Sassouni,Angle,Angle I',Angle formed by i and the palatal plane.
-Sassouni,Angle,Angle I''ù,Angle formed by I and che ancerior cranial base plane.
-Sassouni,Angle,Angle R,Angle formed by the occlusal plane and the ramal plane.
-Sassouni,Angle,Angle i,Angle formed by the occlusal plane and the axis of 1.
-Sassouni,Angle,Angle rfl',Angle formed by the occlusal plane and the axis of 6.
-Di Paolo's Quadrilateral,Point,A,The deepest point on the curve of the maxilla between the anterior nasal spine and the dental alveolus.
-Di Paolo's Quadrilateral,Point,ANS,Tip of the anterior nasal spine.
-Di Paolo's Quadrilateral,Point,Nasion (N),The point at which the nasofrontal suture reaches the contour line of the bones.
-Di Paolo's Quadrilateral,Point,Pogonion (PG),The most anterior point on the chin.
-Di Paolo's Quadrilateral,Point,Point B-supramentale,The deepest midline point on the mandible between infradentale and pogonion.
-Di Paolo's Quadrilateral,Point,Ptm-pterygomaxillary fissure,The point of intersection of the images of the anterior surface of the pterygoid process of the sphenoid bone and the posterior margin of the maxilla.
-Di Paolo's Quadrilateral,Point,Go-gonion (constructed),The point of intersection of the ramus plane and the mandibular plane.
-Di Paolo's Quadrilateral,Point,Ar-articulare,The point of intersection of the dorsal contours of processus articularis mandibulae and os temporale. The midpoint is used where double projection gives rise to two articulare points.
-Di Paolo's Quadrilateral,Point,snp-spina nasalis posterior,"The point of intersection of palatum posterior durum, palatum molle and fossa pterygopalatina."
-Hasund (Bergen),Point,A-point A (subspinale),The point at the deepest midline concavity on the maxilla between the anterior nasal spine and prosthion.
-Hasund (Bergen),Point,Ans-anterior nasal spine,The most anterior point of the anterior nasal spine.
-Hasund (Bergen),Point,Ar-articulate,The point of intersection of the images of the posterior border of the condylar process of the mandible and the inferior border of the basilar part of the occipital bone.
-Hasund (Bergen),Point,B-point B (supramentale),The point at the deepest midline concavity on the mandibular symphysis between infradentale and pogonion.
-Hasund (Bergen),Point,Ba-basion,The median point of the anterior margin of the foramen magnum located by following the image of the slope of the inferior border of the basilar part of the occipital bone to its posterior limit.
-Hasund (Bergen),Point,N-nasion,The most anterior (midline) point of the frontonasal suture.
-Hasund (Bergen),Point,S-sella,The point representing the geometric centrer of the pituitary fossa (sella turcica).
-Hasund (Bergen),Point,Pogonion,The most anterior point on the mandible in the midline.
-Hasund (Bergen),Point,Gnathion,A point on the chin determined by bisecting the angle formed by the facial and mandibular planes.
-Hasund (Bergen),Point,ii-incision inferius,The incisal point of the most prominent medial mandibular incisor.
-Hasund (Bergen),Point,is-incision superius,The incisal point of the most prominent medial maxillary incisor.
-Jarabak,Point,A-point A (subspinale),The point at the deepest midline concavity on the maxilla between the anterior nasal spine and prosthion.
-Jarabak,Point,Ans-anterior nasal spine,The most anterior point of the anterior nasal spine.
-Jarabak,Point,Ar-articulare,The point of intersection of the images of the posterior border of the condylar process of the mandible and the inferior border of the basilar part of the occipital bone.
-Jarabak,Point,B-point B (supramentale),The point at the deepest midline concavity on the mandibular symphysis between infradentale and pogonion.
-Jarabak,Point,Ba-basion,The median point of the anterior margin of the foramen magnum located by following the image of the slope of the inferior border of the basilar part of the occipital bone to its posterior limit.
-Jarabak,Point,N-nasion,The most anterior (midline) point of the frontonasal suture.
-Jarabak,Point,S-sella,The point representing the geometric centrer of the pituitary fossa (sella turcica).
-Jarabak,Point,Pogonion,The most anterior point on the mandible in the midline.
-Jarabak,Point,Gnathion,A point on the chin determined by bisecting the angle formed by the facial and mandibular planes.
-Jarabak,Point,ii-incision inferius,The incisal point of the most prominent medial mandibular incisor.
-Jarabak,Point,is-incision superius,The incisal point of the most prominent medial maxillary incisor.
-Jarabak,Point,snp-spina nasalis posterior,"The point of intersection of palatum posterior durum, palatum molle and fossa pterygo-palatina."
-Jarabak,Point,Po-porion (anatomic),"The superior point of the externalauditory meatus (superior margin of temporomandibular fossa, which lies at the same level, may be substituted in the construction of Frankfort horizontal)."
-Riedel,Point,A-point A (subspinale),The point at the deepest midline concavity on the maxilla between the anterior nasal spine and prosthion.
-Riedel,Point,Ans-anterior nasal spine,The most anterior point of the anterior nasal spine.
-Riedel,Point,B-point B (supramentale),The point at the deepest midline concavity on the mandibular symphysis between infradentale and pogonion.
-Riedel,Point,N-nasion,The most anterior (midline) point of the frontonasal suture.
-Riedel,Point,S-sella,The point representing the geometric center of the pituitary fossa (sella turcica).
-Riedel,Point,Pogonion,The most anterior point on the mandible in the midline.
-Riedel,Point,ii-incision inferius,The incisal point of the most prominent medial mandibular incisor.
-Riedel,Point,is-incision superius,The incisal point of the most prominent medial maxillary incisor.
-Riedel,Point,snp-spina nasalis posterior,"The point of intersection of palatum posterior durum, palatum molle and fossa pterygopalatina."
-Riedel,Point,Po-porion (anatomic),"The superior point of the externalauditory meatus (superior margin of temporomandibular fossa, which lies at the same level, may be substituted in the construction of Frankfort horizontal)."
-Riedel,Point,Or-orbitale,"The lowest point on the inferior margin of the orbit, midpoint between right and left images."
-Riedel,Point,Ul-maxillary central incisor (horizontal),The most labial point on the crown of the maxillary central incisor.
-Riedel,Point,Ul-maxillary central incisor (vertical),The incisal edge of the maxillary central incisor.
-Riedel,Point,L1-mandibular central incisor (horizontal),The most labial point on the crown of the mandibular central incisor.
-Riedel,Point,L1-mandibular central incisor (vertical),The incisal edge of the mandibular central incisor.
-Riedel,Point,Gnathion (GN),The most inferior point on the contour of the chin.
-Riedel,Point,Go-gonion (constructed),The point of intersection of the ramus plane and the mandibular plane.
-Riedel,Point,Iip-Incision inferius apicalis,"The root apex of the most anterior mandibular central incisor; if this point is needed only for defining the long axis of the tooth, the midpoint on the bisection of the apical root width can be used."
-Riedel,Point,APOcc-Anterior point of occlusion for the occlusal plane,"A constructed point, the midpoint of the incisor overbite in occlusion"
-Riedel,Point,PPOcc-Posterior point of occlusion for the occlusal plane,The most distal point of contact between the most posterior molars in occlusion (Rakosi).
-Riedel,Point,Maxillary central incisor,The most labial point on the crown of the maxillary central incisor.
-Riedel,Point,Mandibular central incisor,The most labial point on the crown of the mandibular central incisor.
-Schwartz,Point,A-point A (subspinale),The point at the deepest midline concavity on the maxilla between the anterior nasal spine and prosthion.
-Schwartz,Point,Ans-anterior nasal spine,The most anterior point of the anterior nasal spine.
-Schwartz,Point,B-point B (supramentale),The point at the deepest midline concavity on the mandibular symphysis between infradentale and pogonion.
-Schwartz,Point,N-nasion,The most anterior (midline) point of the frontonasal suture.
-Schwartz,Point,S-sella,The point representing the geometric center of the pituitary fossa (sella turcica).
-Schwartz,Point,Pogonion,The most anterior point on the mandible in the midline.
-Schwartz,Point,ii-incision inferius,The incisal point of the most prominent medial mandibular incisor
-Schwartz,Point,is-incision superius,The incisal point of the most prominent medial maxillary incisor.
-Wylie,Point,sp-Dorsum of sella,The most posterior point on the internal contour of the sella turcica or hypophyseal fossa or pituitary fossa.
-Wylie,Point,si-Floor of sella,The lower most point on the inner contour of the sella turcica or hypophyseal fossa or pituitary fossa.
-Wylie,Point,Cl-Clinoidale,The most superior point on the contour of the anterior clinoid.
-Wylie,Point,S-Sella,The midpoint of sella turcica or hypophyseal fossa or pituitary fossa.
-Wylie,Point,ANS-Anterior nasal spine,The tip of bony anterior nasal spine in the midline or median plane.
-Wylie,Point,A-Point A,The deepest point on the curved bony outline between the anterior nasal spine (ANS) and prosthion (Pr).
-Wylie,Point,PNS-Posterior nasal spine,The intersection of continuation of the anterior wall of the pterygopalatine fossa and the floor of the nose.
-Wylie,Point,Ptm-Pterygomaxillary fissure,"A bilateral tear drop shaped area of radiolucency, the anterior shadow of which represents the posterior surface of the tuberosity of the maxilla; the landmark is taken where the two edges, front and back appears to merge inferiorly."
-Wylie,Point,Orbitale,"The deepest point on the infraorbital margin.The midpoint, or is used where double projection gives rise to two points, or 1 and/or 2."
-Wylie,Point,Gnathion (GN),The most inferior point on the contour of the chin.
-Wylie,Point,Pogonion (PG),The most anterior point on the chin.
-Wylie,Point,Point B-supramentale,The deepest midline point on the mandible between infradentale and pogonion.
-Wylie,Point,Po-porion (anatomic),"The superior point of the externalauditory meatus (superior margin of temporomandibular fossa, which lies at the same level, may be substituted in the construction of Frankfort horizontal)."
-Steiner's,Point,N-nasion,Nasion is the most anterior point of the frontonasal suture in the middle.
-Steiner's,Point,The center of sella turcica,Located by inspection of the profile image of the fossa.
-Steiner's,Point,Orbitale,The lowest point on the left infraorbital margin.
-Steiner's,Point,Porion (cephalometric),The highest point on the superior surface of the soft tissue of the external auditory meati.
-Steiner's,Point,Point A-subspinale,The deepest midline point on the premaxilla between the anterior nasal spine and prosthion.
-Steiner's,Point,Point B-supramentale,The deepest midline point on the mandible between infradentale and pogonion.
-Steiner's,Point,ANS,Anterior nasal spine is the tip of bony anterior nasal spine in the midline or median plane.
-Steiner's,Point,PNS,Posterior nasal spine is the intersection of a continuation of the anterior wall of the pterygopalatine fossa and the floor of the nose.
-Steiner's,Point,ii-incision inferius,The incisal point of the most prominent medial mandibular incisor.
-Steiner's,Point,is - incision superius,The incisal point of the most prominent medial maxillary incisor.
-Steiner's,Point,Go-gonion (constructed),The point of intersection of the ramus plane and the mandibular plane.
-Steiner's,Point,APOcc-Anterior point of occlusion for the occlusal plane,"A constructed point, the midpoint of the incisor overbite in occlusion"
-Steiner's,Point,PPOcc-Posterior point of occlusion for the occlusal plane,The most distal point of contact between the most posterior molars in occlusion (Rakosi).
-Steiner's,Point,isa-Incision superius apicalis,"The root apex of the most anterior maxillary central incisor; if this point is needed only for defining the long axis of the tooth, the midpoint on the bisection of the apical root width can be used."
-Steiner's,Point,iia-Incision inferius apicalis,"The root apex of the most anterior mandibular central incisor; if this point is needed only for defining the long axis of the tooth, the midpoint on the bisection of the apical root width can be used."
-Steiner's,Point,Pogonion (PG),The most anterior point on the chin.
-Steiner's,Point,Pn,"The most anterior point on the midsagittal profile of the nose. In cases where the tip of the nose was more than a definite point, pronasale was determined by drawing a line parallel to the line nasion to pogonion tangent to the most anterior point on the midsagittal profile of the nose."
-Tweed's,Point,Orbitale,The lowest point on the left infraorbital margin.
-Tweed's,Point,Porion (cephalometric),The highest point on the superior surface of the soft tissue of the external auditory meati.
-Tweed's,Point,ii-incision inferius,The incisal point of the most prominent medial mandibular incisor.
-Tweed's,Point,is-incision superius,The incisal point of the most prominent medial maxillary incisor.
-Tweed's,Point,Go-gonion (constructed),The point of intersection of the ramus plane and the mandibular plane.
-Tweed's,Point,isa-Incision superius apicalis,"The root apex of the most anterior maxillary central incisor; if this point is needed only for defining the long axis of the tooth, the midpoint on the bisection of the apical root width can be used."
-Tweed's,Point,iia-Incision inferius apicalis,"The root apex of the most anterior mandibular central incisor; if this point is needed only for defining the long axis of the tooth, the midpoint on the bisection of the apical root width can be used."
-Wit's,Point,Point A-subspinale,The deepest midline point on the premaxilla between the anterior nasal spine and prosthion.
-Wit's,Point,Point B-supramentale,The deepest midline point on the mandible between infradentale and pogonion.
-Basis,Point,N-nasion,Nasion is the most anterior point of the frontonasal suture in the middle.
-Basis,Point,s-the center of sella turcica,The midpoint of the horizontal diameter.
-Basis,Point,ANS-Anterior nasal spine,The tip of bony anterior nasal spine in the midline or median plane.
-Basis,Point,PNS- Posterior nasal spine,The intersection of a continuation of the anterior wall of the pterygopalatine fossa and the floor of the nose.
-Basis,Point,Point A-subspinale,The deepest midline point on the premaxilla between the anterior nasal spine and prosthion.
-Basis,Point,Point B-supramentale,The deepest midline point on the mandible between infradentale and pogonion.
-Basis,Point,Gn-gnathion,The deepest point on the chin.
-Basis,Point,id - infradentale,The point of transition from the crown of the most prominent mandibular medial incisor to the alveolar projection.
-Basis,Point,Pog-pogonion,The most prominent point on the chin.
-Basis,Point,sm-supramentale,"The deepest point on the contour of the alveolar projection, between infradentale and pogonion."
-Basis,Point,Isi-Incision superius incisalis,The incisal edge of the maxillary central incisor.
-Basis,Point,Isa-Incision superius apicalis,"The root apex of the most anterior maxillary central incisor; if this point is needed only for defining the long axis of the tooth, the midpoint on the bisection of the apical root width can be used."
-Basis,Point,Iii-Incision inferius incisalis,The incisal edge of the most prominent mandibular central incisor.
-Basis,Point,Iia-Incision inferius apicalis,"The root apex of the most anterior mandibular central incisor; if this point is needed only for defining the long axis of the tooth, the midpoint on the bisection of the apical root width can be used."
-Cagliari,Point,N-nasion,Nasion is the most anterior point of the frontonasal suture in the middle.
-Cagliari,Point,s-The center of sella turcica,The midpoint of the horizontal diameter.
-Cagliari,Point,ANS-Anterior nasal spine,The tip of bony anterior nasal spine in the midline or median plane.
-Cagliari,Point,PNS-Posterior nasal spine,The intersection of a continuation of the anterior wall of the pterygopalatine fossa and the floor of the nose.
-Cagliari,Point,Point A-subspinale,The deepest midline point on the premaxilla between the anterior nasal spine and prosthion.
-Cagliari,Point,Point B - supramentale,The deepest midline point on the mandible between infradentale and pogonion.
-Cagliari,Point,Gn-gnathion,The deepest point on the chin.
-Cagliari,Point,id - infradentale,The point of transition from the crown of the most prominent mandibular medial incisor to the alveolar projection.
-Cagliari,Point,Pog-pogonion,The most prominent point on the chin.
-Cagliari,Point,sm-supramentale,"The deepest point on the contour of the alveolar projection, between infradentale and pogonion."
-Cagliari,Point,Isi-Incision superius incisalis,The incisal edge of the maxillary central incisor.
-Cagliari,Point,Isa-Incision superius apicalis,"The root apex of the most anterior maxillary central incisor; if this point is needed only for defining the long axis of the tooth, the midpoint on the bisection of the apical root width can be used."
-Cagliari,Point,Iii-Incision inferius incisalis,The incisal edge of the most prominent mandibular central incisor.
-Cagliari,Point,Iia-Incision inferius apicalis,"The root apex of the most anterior mandibular central incisor; if this point is needed only for defining the long axis of the tooth, the midpoint on the bisection of the apical root width can be used."
-Cagliari,Point,Go-gonion (constructed),The point of intersection of the ramus plane and the mandibular plane.
-Cagliari,Point,APOcc-Anterior point of occlusion for the occlusal plane,"A constructed point, the midpoint of the incisor overbite in occlusion."
-Cagliari,Point,PPOcc-Posterior point of occlusion for the occlusal plane,The most distal point of contact between the most posterior molars in occlusion (Rakosi).
-Cagliari,Point,Pogonion (PG),The most anterior point on the chin.
-Cagliari,Point,Po-porion (anatomic),"The superior point of the externalauditory meatus (superior margin of temporomandibular fossa, which lies at the same level, may be substituted in the construction of Frankfort horizontal)."
-Cagliari,Point,Or-orbitale,"The lowest point on the inferior margin of the orbit, midpoint between right and left images."
-Cagliari,Point,Articulare,"Articulare is the point of intersection the dorsal contours of the processus articularis mandibulare and os temporale. The midpoint, a is used where double projection gives rise to two points, a1 and a2."
-Chieti,Point,N-nasion,Nasion is the most anterior point of the frontonasal suture in the middle.
-Chieti,Point,s- the center of sella turcica,The midpoint of the horizontal diameter.
-Chieti,Point,ANS- Anterior nasal spine,The tip of bony anterior nasal spine in the midline or median plane.
-Chieti,Point,PNS- Posterior nasal spine,The intersection of a continuation of the anterior wall of the pterygopalatine fossa and the floor of the nose.
-Chieti,Point,Point A-subspinale,The deepest midline point on the premaxilla between the anterior nasal spine and prosthion.
-Chieti,Point,Point B - supramentale,The deepest midline point on the mandible between infradentale and pogonion.
-Chieti,Point,Gn-gnathion,The deepest point on the chin.
-Chieti,Point,id - infradentale,The point of transition from the crown of the most prominent mandibular medial incisor to the alveolar projection.
-Chieti,Point,Pog-pogonion,The most prominent point on the chin.
-Chieti,Point,sm-supramentale,"The deepest point on the contour of the alveolar projection, between infradentale and pogonion."
-Chieti,Point,Isi-Incision superius incisalis,The incisal edge of the maxillary central incisor.
-Chieti,Point,Isa-Incision superius apicalis,"The root apex of the most anterior maxillary central incisor; if this point is needed only for defining the long axis of the tooth, the midpoint on the bisection of the apical root width can be used."
-Chieti,Point,Iii-Incision inferius incisalis,The incisal edge of the most prominent mandibular central incisor.
-Chieti,Point,Iia-Incision inferius apicalis,"The root apex of the most anterior mandibular central incisor; if this point is needed only for defining the long axis of the tooth, the midpoint on the bisection of the apical root width can be used."
-Chieti,Point,Go-gonion (constructed),The point of intersection of the ramus plane and the mandibular plane.
-Chieti,Point,APOcc-Anterior point of occlusion for the occlusal plane,"A constructed point, the midpoint of the incisor overbite in occlusion."
-Chieti,Point,PPOcc-Posterior point of occlusion for the occlusal plane,The most distal point of contact between the most posterior molars in occlusion (Rakosi).
-Chieti,Point,Pogonion (PG),The most anterior point on the chin.
-Chieti,Point,Po-porion (anatomic),"The superior point of the external auditory meatus (superior margin of temporo mandibular fossa, which lies at the same level, may be substituted in the construction of Frankfort horizontal)."
-Chieti,Point,Or-orbitale,"The lowest point on the inferior margin of the orbit, midpoint between right and left images."
-Chieti,Point,Articulare,"Articulare is the point of intersection the dorsal contours of the processus articularis mandibulare and os temporale. The midpoint, a is used where double projection gives rise to two point, a1 and a2."
-McGann,Point,N-nasion,Nasion is the most anterior point of the frontonasal suture in the middle.
-McGann,Point,s-the center of sella turcica,The midpoint of the horizontal diameter.
-McGann,Point,ANS- Anterior nasal spine,The tip of bony anterior nasal spine in the midline or median plane.
-McGann,Point,PNS-Posterior nasal spine,The intersection of a continuation of the anterior wall of the pterygopalatine fossa and the floor of the nose.
-McGann,Point,Point A-subspinale,The deepest midline point on the premaxilla between the anterior nasal spine and prosthion.
-McGann,Point,Point B - supramentale,The deepest midline point on the mandible between infradentale and pogonion.
-McGann,Point,Gn-gnathion,The deepest point on the chin.
-McGann,Point,id - infradentale,The point of transition from the crown of the most prominent mandibular medial incisor to the alveolar projection.
-McGann,Point,Pog-pogonion,The most prominent point on the chin.
-McGann,Point,sm-supramentale,"The deepest point on the contour of the alveolar projection, between infradentale and pogonion."
-McGann,Point,Isi- Incision superius incisalis,The incisal edge of the maxillary central incisor.
-McGann,Point,Isa-Incision superius apicalis,"The root apex of the most anterior maxillary central incisor; if this point is needed only for defining the long axis of the tooth, the midpoint on the bisection of the apical root width can be used."
-McGann,Point,Iii-Incision inferius incisalis,The incisal edge of the most prominent mandibular central incisor.
-McGann,Point,Iia-Incision inferius apicalis,"The root apex of the most anterior mandibular central incisor; if this point is needed only for defining the long axis of the tooth, the midpoint on the bisection of the apical root width can be used."
-McGann,Point,Go-gonion (constructed),The point of intersection of the ramus plane and the mandibular plane.
-McGann,Point,APOcc-Anterior point of occlusion for the occlusal plane,"A constructed point, the midpoint of the incisor overbite in occlusion"
-McGann,Point,PPOcc-Posterior point of occlusion for the occlusal plane,The most distal point of contact between the most posterior molars in occlusion (Rakosi).
-McGann,Point,Pogonion (PG),The most anterior point on the chin.
-McGann,Point,Po-porion (anatomic),"The superior point of the externalauditory meatus (superior margin of temporomandi bular fossa, which lies at the same level, may be substituted in the construction of Frankfort horizontal)."
-McGann,Point,Or-orbitale,"The lowest point on the inferior margin of the orbit, midpoint between right and left images."
-McGann,Point,Articulare,"Articulare is the point of intersection the dorsal contours of the processus articularis mandibulare and os temporale.The midpoint, a is used where double projection gives rise to two points, a1 and a2."
+ÔªøAnalysis,Markup type,Landmark,Definition,Refs,Norm mean,Norm SD
+Bjork Analysis,Point,Ar-articulare,The point of intersection of the dorsal contours of processus articularis mandibulae and os temporale. The midpoint is used where double projection gives rise to two articulare points.,,,
+Bjork Analysis,Point,dd,The most prominent point of the chin in the direction of measurement.,,,
+Bjork Analysis,Point,gn-gnathion,The deepest point on the chin.,,,
+Bjork Analysis,Point,id-infradentale,The point of transition from the crown of the most prominent mandibular medial incisor to the alveolar projection.,,,
+Bjork Analysis,Point,ii-incision inferius,The incisal point of the most prominent medial mandibular incisor.,,,
+Bjork Analysis,Point,is-incision superius,The incisal point of the most prominent medial maxillary incisor.,,,
+Bjork Analysis,Point,kk,The point of intersection between the base and ramus tangents to the mandible. The midpoint is used where double projection gives rise to two points.,,,
+Bjork Analysis,Point,mi,The mesial contact point of the lower molar projected normal to the plane of occlusion.,,,
+Bjork Analysis,Point,ms,The mesial contact point of the upper molar projected normal to the plane of occlusion.,,,
+Bjork Analysis,Point,N-nasion,Nasion is the most anterior point of the frontonasal suture in the middle.,,,
+Bjork Analysis,Point,or-orbitale,The deepest point on the infraorbital margin. The midpoint is used where double projection gives rise to two points.,,,
+Bjork Analysis,Point,pg-pogonion,The most prominent point on the chin.,,,
+Bjork Analysis,Point,Po-porion,"Porion is the most superior point of the external auditory meatus (the superior margin of the TMJ fossa, which lies at the same level may be substitute in the construction of the FH).",,,
+Bjork Analysis,Point,pr-prosthion,The transition point between the crown of the most prominent medial maxillary incisor and the alveolar projection.,,,
+Bjork Analysis,Point,s,The center of sella turcica (the midpoint of the horizontal diameter).,,,
+Bjork Analysis,Point,sm-supramentale,"The deepest point on the contour of the alveolar projection, between infradentale and pogonion.",,,
+Bjork Analysis,Point,sp-the spinal point,The apex of spina nasalis anterior.,,,
+Bjork Analysis,Point,snp-spina nasalis posterior,"The point of intersection of palatum posterior durum, palatum molle and fossa pterygopalatina.",,,
+Bjork Analysis,Point,ss-subspinale,"The deepest point on the contour of the alveolar projection, between the spinal point and prosthion.",,,
+Bjork Analysis,Point,io,"The incisal point of the most prominent medial mandibular incisor, projected normal to the plane of occlusion.",,,
+Coben Craniofacial and Dentition,Point,A-point A (subspinale),The point at the deepest midline concavity on the maxilla between the anterior nasal spine and prosthion.,,,
+Coben Craniofacial and Dentition,Point,Ans-anterior nasal spine,The most anterior point of the anterior nasal spine.,,,
+Coben Craniofacial and Dentition,Point,Ar-articulare,The point of intersection of the images of the posterior border of the condylar process of the mandible and the inferior border of the basilar part of the occipital bone.,,,
+Coben Craniofacial and Dentition,Point,B-point B (supramentale),The point at the deepest midline concavity on the mandibular symphysis between infradentale and pogonion.,,,
+Coben Craniofacial and Dentition,Point,F - point F (constructed),"The point approximating foramen cecum representing the anatomic anterior limit of the cranial base, constructed as the point of intersection of a perpendicular to the S-N plane from the point of crossing of the images of the orbital roofs and the internal plate of the frontal bone.",,,
+Coben Craniofacial and Dentition,Point,Go-gonion (constructed),The point of intersection of the ramus plane and the mandibular plane.,,,
+Coben Craniofacial and Dentition,Point,M-menton,The most inferior midline point on the mandibular symphysis.,,,
+Coben Craniofacial and Dentition,Point,N-nasion,Nasion is the most anterior point of the frontonasal suture in the middle.,,,
+Coben Craniofacial and Dentition,Point,Or-orbitale,"The lowest point on the inferior margin of the orbit, midpoint between right and left images.",,,
+Coben Craniofacial and Dentition,Point,Po-porion (anatomic),"The superior point of the externa-Lauditory meatus (superior margin of temporomandibular fossa, which lies at the same level, may be substituted in the construction of Frankfort horizontal).",,,
+Coben Craniofacial and Dentition,Point,Pog-pogonion,The most anterior midline point of the mandibular symphysis.,,,
+Coben Craniofacial and Dentition,Point,Po'-pogonion' (constructed),The point of tangency of a perpendicular from the mandibular plane to the most prominent convexity of the mandibular symphysis.,,,
+Coben Craniofacial and Dentition,Point,Ptm-pterygomaxillary fissure,The point of intersection of the images of the anterior surface of the pterygoid process of the sphenoid bone and the posterior margin of the maxilla.,,,
+Coben Craniofacial and Dentition,Point,S-sella,The point representing the geometric center of the pituitary fossa (sella turcica).,,,
+Coben Craniofacial and Dentition,Point,Ul-maxillary central incisor (horizontal),The most labial point on the crown of the maxillary central incisor.,,,
+Coben Craniofacial and Dentition,Point,Ul-maxillary central incisor (vertical),The incisal edge of the maxillary central incisor.,,,
+Coben Craniofacial and Dentition,Point,L1-mandibular central incisor (horizontal),The most labial point on the crown of the mandibular central incisor.,,,
+Coben Craniofacial and Dentition,Point,L1-mandibular central incisor (vertical),The incisal edge of the mandibular central incisor.,,,
+Coben Craniofacial and Dentition,Point,U6-maxillary first molar (horizontal),The most distal point on the crown of the maxillary first permanent molar.,,,
+Coben Craniofacial and Dentition,Point,U6-maxillary first molar (vertical),The tip of the mesiobuccal cusp of the maxillary first permanent molar.,,,
+Coben Craniofacial and Dentition,Point,L6-mandibular first molar (horizontal),The most distal point on the crown of the mandibular first permanent molar.,,,
+Coben Craniofacial and Dentition,Point,L6-mandibular first molar (vertical),The tip of the mesiobuccal cusp of the mandibular first permanent molar.,,,
+Downs Analysis,Point,N-nasion,Nasion is the most anterior point of the frontonasal suture in the middle.,,,
+Downs Analysis,Point,Bolton point,The highest point on the concavity behind the occipital condyles.,,,
+Downs Analysis,Point,The centre of sella turcica,Located by inspection of the profile image of the fossa.,,,
+Downs Analysis,Point,Orbitale,The lowest point on the left infraorbital margin.,,,
+Downs Analysis,Point,Porion (cephalometric),The highest point on the superior surface of the soft tissue of the external auditory meati.,,,
+Downs Analysis,Point,Pogonion,The most anterior point on the mandible in the midline.,,,
+Downs Analysis,Point,Point A-subspinale,The deepest midline point on the premaxilla between the anterior nasal spine and prosthion.,,,
+Downs Analysis,Point,Point B-supramentale,The deepest midline point on the mandible between infradentale and pogonion.,,,
+Downs Analysis,Point,Gnathion,A point on the chin determined by bisecting the angle formed by the facial and mandibular planes.,,,
+Farkas and Coworkers Soft Tissue,Point,Trichion (tr),Point on the hairline in the midline of the forehead.,,,
+Farkas and Coworkers Soft Tissue,Point,Glabella (g),The most prominent midline point between the eyebrows.,,,
+Farkas and Coworkers Soft Tissue,Point,Subnasion (n'),Deepest point of the nasofrontal angle.,,,
+Farkas and Coworkers Soft Tissue,Point,Pronasale (prn),The most protruded point of the apex nasi.,,,
+Farkas and Coworkers Soft Tissue,Point,Subnasale (sn),Midpoint of the columella base at the apex of the nasolabial angle.,,,
+Farkas and Coworkers Soft Tissue,Point,Labiale superius (ls),Midpoint of the upper vermilion line.,,,
+Farkas and Coworkers Soft Tissue,Point,Labiale inferius (li),Midpoint of the lower vermilion line.,,,
+Farkas and Coworkers Soft Tissue,Point,Sublabiale (si),Midpoint of the horizontal labiomental skin ridge.,,,
+Farkas and Coworkers Soft Tissue,Point,Pogonion (pg),The most anterior midpoint of the chin.,,,
+Harvold,Point,Temporomandibular joint (TMJ),"A point on the contour of the glenoid fossa, where the line indicating the maximum length of the mandible intercepts the contour of the temporomandibular fossa. The midpoint between the right and left side is marked.",,,
+Harvold,Point,Anterior nasal spine (ANS),"A point on the lower contour of the anterior nasal spine where the vertical thickness is 3 mm, used for horizontal measurements; a point on the upper contour of the anterior nasal spine, where the vertical thickness is 3 mm, employed for vertical measurements.",,,
+Harvold,Point,Prognathion (PGN),A point on the contour of the chin indicating maximum mandibular length measured from the temporomandibular joint.,,,
+Harvold,Point,Gnathion (GN),The most inferior point on the contour of the chin.,,,
+Harvold,Point,Pogonion (PG),The most anterior point on the chin.,,,
+Harvold,Point,Nasion (N),"The point at which the nasofrontal suture reaches the contour line of the bones. The forward position of the maxilla, measured from TM to ANS.",,,
+Harvold,Distance,Mandibular length,Measured from TM to PGN.,,,
+Harvold,Distance,Lower face height,Measured from ANS to GN.,,,
+Harvold,Angle,The angle of convexity,The angle between the lines PG-ANS and ANS-N.,,,
+Holdaway Analysis,Line,The H line or harmony line,Drawn tangent to the soft tissue chin and the upper lip.,,,
+Holdaway Analysis,Line,Soft tissue facial line,A soft tissue facial line from soft-tissue nasion to the point on the soft tissue chin overlying Rickett's suprapogonion.,,,
+Holdaway Analysis,Plane,The usual hard tissue facial plane,The usual hard tissue facial plane.,,,
+Holdaway Analysis,Line,The sella-nasion line,The sella-nasion line.,,,
+Holdaway Analysis,Plane,Frankfort horizontal plane (FH),Frankfort horizontal plane (FH).,,,
+Holdaway Analysis,Line,Right angle to Frankfort plane,A line running at a right angle to the Frankfort plane down tangent to the vermilion border of the upper lip.,,,
+Legan and Burstone Soft Tissue,Point,Glabella (G),The most prominent point in the midsagittal plane of the forehead.,,,
+Legan and Burstone Soft Tissue,Point,Columella point (Cm),The most anterior point on the columella of the nose.,,,
+Legan and Burstone Soft Tissue,Point,Subnasale (Sn),The point at which the nasal septum merges with the upper cutaneous lip in the midsagittal plane.,,,
+Legan and Burstone Soft Tissue,Point,Labrale superius (Ls),A point indicating the mucocutaneous border of the upper lip.,,,
+Legan and Burstone Soft Tissue,Point,Stomion superius (Stms),The lowermost point on the vermilion of the upper lip.,,,
+Legan and Burstone Soft Tissue,Point,Stomion inferius (Stmi),The uppermost point on the vermilion of the lower lip.,,,
+Legan and Burstone Soft Tissue,Point,Labrale inferius (Li),A point indicating the mucocutaneous border of the lower lip.,,,
+Legan and Burstone Soft Tissue,Point,Mentolabial sulcus (Si),The point of greatest concavity in the midline between the lower lip (Li) and chin (Pg').,,,
+Legan and Burstone Soft Tissue,Point,Soft tissue pogonion (Pg'),The most anterior point on soft tissue chin.,,,
+Legan and Burstone Soft Tissue,Point,Soft tissue gnathion (Gn'),The constructed midpoint between soft tissue pogonion and soft tissue menton; can be located at the intersection of the subnasale to soft tissue pogonion line and the line from C to Me.,,,
+Legan and Burstone Soft Tissue,Point,Soft tissue menton (Me'),The lowest point on the contour of the soft tissue chin; found by dropping a perpendicular from horizontal plane through menton.,,,
+Legan and Burstone Soft Tissue,Point,Cervical point (C),The innermost point between the submental area and the neck located at the intersection of lines drawn tangent to the neck and submental areas.,,,
+Ricketts Analysis,Point,A,The deepest point on the curve of the maxilla between the anterior nasal spine and the dental alveolus.,,,
+Ricketts Analysis,Point,ANS,Tip of the anterior nasal spine.,,,
+Ricketts Analysis,Point,BA,Most inferior posterior point of the occipital bone.,,,
+Ricketts Analysis,Point,CC,Point where the basion-nasion plane and the facial axis intersect.,,,
+Ricketts Analysis,Point,DC,"A point selected in the center of the neck of the condyle, where the basion-nasion plane crosses it.",,,
+Ricketts Analysis,Point,NA,A point at the anterior limit of the nasofrontal suture.,,,
+Ricketts Analysis,Point,PM,Point selected at the anterior border of the symphysis between point B and pogonion where the curvature changes from concave to convex.,,,
+Ricketts Analysis,Point,PO,Most anterior point on the midsagittal symphysis tangent to the facial plane.,,,
+Ricketts Analysis,Point,XI,The geometric center of the ramus of the mandible.,,,
+Sassouni Analysis,Angle,Palatocranial angle,Angle formed by the palatal plane and the anterior cranial base plane.,,,
+Sassouni Analysis,Angle,Palatomandibular angle,Angle formed by the palatal plane and the mandibular base plane.,,,
+Sassouni Analysis,Angle,Occlusopalatal angle,Angle formed by the occlusal plane and the palatal plane.,,,
+Sassouni Analysis,Angle,Occlusomandibular angle,Angle formed by the occlusal plane and the mandibular base plane.,,,
+Sassouni Analysis,Angle,Angle M,Angle formed by the 6 axis and the occlusal plane.,,,
+Sassouni Analysis,Angle,Angle M',Angle formed by the 6 axis and che palatal plane.,,,
+Sassouni Analysis,Angle,Angle M''ÔøΩ,Angle formed by the 6 axis and the anterior cranial base plane.,,,
+Sassouni Analysis,Angle,Angle I,Angle formed by 1 and the occlusal plane.,,,
+Sassouni Analysis,Angle,Angle I',Angle formed by i and the palatal plane.,,,
+Sassouni Analysis,Angle,Angle I''ÔøΩ,Angle formed by I and che ancerior cranial base plane.,,,
+Sassouni Analysis,Angle,Angle R,Angle formed by the occlusal plane and the ramal plane.,,,
+Sassouni Analysis,Angle,Angle i,Angle formed by the occlusal plane and the axis of 1.,,,
+Sassouni Analysis,Angle,Angle rfl',Angle formed by the occlusal plane and the axis of 6.,,,
+Di Paolo's Quadrilateral,Point,A,The deepest point on the curve of the maxilla between the anterior nasal spine and the dental alveolus.,,,
+Di Paolo's Quadrilateral,Point,ANS,Tip of the anterior nasal spine.,,,
+Di Paolo's Quadrilateral,Point,Nasion (N),The point at which the nasofrontal suture reaches the contour line of the bones.,,,
+Di Paolo's Quadrilateral,Point,Pogonion (PG),The most anterior point on the chin.,,,
+Di Paolo's Quadrilateral,Point,Point B-supramentale,The deepest midline point on the mandible between infradentale and pogonion.,,,
+Di Paolo's Quadrilateral,Point,Ptm-pterygomaxillary fissure,The point of intersection of the images of the anterior surface of the pterygoid process of the sphenoid bone and the posterior margin of the maxilla.,,,
+Di Paolo's Quadrilateral,Point,Go-gonion (constructed),The point of intersection of the ramus plane and the mandibular plane.,,,
+Di Paolo's Quadrilateral,Point,Ar-articulare,The point of intersection of the dorsal contours of processus articularis mandibulae and os temporale. The midpoint is used where double projection gives rise to two articulare points.,,,
+Di Paolo's Quadrilateral,Point,snp-spina nasalis posterior,"The point of intersection of palatum posterior durum, palatum molle and fossa pterygopalatina.",,,
+Hasund (Bergen),Point,A-point A (subspinale),The point at the deepest midline concavity on the maxilla between the anterior nasal spine and prosthion.,,,
+Hasund (Bergen),Point,Ans-anterior nasal spine,The most anterior point of the anterior nasal spine.,,,
+Hasund (Bergen),Point,Ar-articulate,The point of intersection of the images of the posterior border of the condylar process of the mandible and the inferior border of the basilar part of the occipital bone.,,,
+Hasund (Bergen),Point,B-point B (supramentale),The point at the deepest midline concavity on the mandibular symphysis between infradentale and pogonion.,,,
+Hasund (Bergen),Point,Ba-basion,The median point of the anterior margin of the foramen magnum located by following the image of the slope of the inferior border of the basilar part of the occipital bone to its posterior limit.,,,
+Hasund (Bergen),Point,N-nasion,The most anterior (midline) point of the frontonasal suture.,,,
+Hasund (Bergen),Point,S-sella,The point representing the geometric centrer of the pituitary fossa (sella turcica).,,,
+Hasund (Bergen),Point,Pogonion,The most anterior point on the mandible in the midline.,,,
+Hasund (Bergen),Point,Gnathion,A point on the chin determined by bisecting the angle formed by the facial and mandibular planes.,,,
+Hasund (Bergen),Point,ii-incision inferius,The incisal point of the most prominent medial mandibular incisor.,,,
+Hasund (Bergen),Point,is-incision superius,The incisal point of the most prominent medial maxillary incisor.,,,
+Jarv-Bjork,Point,A-point A (subspinale),The point at the deepest midline concavity on the maxilla between the anterior nasal spine and prosthion.,,,
+Jarv-Bjork,Point,Ans-anterior nasal spine,The most anterior point of the anterior nasal spine.,,,
+Jarv-Bjork,Point,Ar-articulare,The point of intersection of the images of the posterior border of the condylar process of the mandible and the inferior border of the basilar part of the occipital bone.,,,
+Jarv-Bjork,Point,B-point B (supramentale),The point at the deepest midline concavity on the mandibular symphysis between infradentale and pogonion.,,,
+Jarv-Bjork,Point,Ba-basion,The median point of the anterior margin of the foramen magnum located by following the image of the slope of the inferior border of the basilar part of the occipital bone to its posterior limit.,,,
+Jarv-Bjork,Point,N-nasion,The most anterior (midline) point of the frontonasal suture.,,,
+Jarv-Bjork,Point,S-sella,The point representing the geometric centrer of the pituitary fossa (sella turcica).,,,
+Jarv-Bjork,Point,Pogonion,The most anterior point on the mandible in the midline.,,,
+Jarv-Bjork,Point,Gnathion,A point on the chin determined by bisecting the angle formed by the facial and mandibular planes.,,,
+Jarv-Bjork,Point,ii-incision inferius,The incisal point of the most prominent medial mandibular incisor.,,,
+Jarv-Bjork,Point,is-incision superius,The incisal point of the most prominent medial maxillary incisor.,,,
+Jarv-Bjork,Point,snp-spina nasalis posterior,"The point of intersection of palatum posterior durum, palatum molle and fossa pterygo-palatina.",,,
+Jarv-Bjork,Point,Po-porion (anatomic),"The superior point of the externalauditory meatus (superior margin of temporomandibular fossa, which lies at the same level, may be substituted in the construction of Frankfort horizontal).",,,
+Riedel,Point,A-point A (subspinale),The point at the deepest midline concavity on the maxilla between the anterior nasal spine and prosthion.,,,
+Riedel,Point,Ans-anterior nasal spine,The most anterior point of the anterior nasal spine.,,,
+Riedel,Point,B-point B (supramentale),The point at the deepest midline concavity on the mandibular symphysis between infradentale and pogonion.,,,
+Riedel,Point,N-nasion,The most anterior (midline) point of the frontonasal suture.,,,
+Riedel,Point,S-sella,The point representing the geometric center of the pituitary fossa (sella turcica).,,,
+Riedel,Point,Pogonion,The most anterior point on the mandible in the midline.,,,
+Riedel,Point,ii-incision inferius,The incisal point of the most prominent medial mandibular incisor.,,,
+Riedel,Point,is-incision superius,The incisal point of the most prominent medial maxillary incisor.,,,
+Riedel,Point,snp-spina nasalis posterior,"The point of intersection of palatum posterior durum, palatum molle and fossa pterygopalatina.",,,
+Riedel,Point,Po-porion (anatomic),"The superior point of the externalauditory meatus (superior margin of temporomandibular fossa, which lies at the same level, may be substituted in the construction of Frankfort horizontal).",,,
+Riedel,Point,Or-orbitale,"The lowest point on the inferior margin of the orbit, midpoint between right and left images.",,,
+Riedel,Point,Ul-maxillary central incisor (horizontal),The most labial point on the crown of the maxillary central incisor.,,,
+Riedel,Point,Ul-maxillary central incisor (vertical),The incisal edge of the maxillary central incisor.,,,
+Riedel,Point,L1-mandibular central incisor (horizontal),The most labial point on the crown of the mandibular central incisor.,,,
+Riedel,Point,L1-mandibular central incisor (vertical),The incisal edge of the mandibular central incisor.,,,
+Riedel,Point,Gnathion (GN),The most inferior point on the contour of the chin.,,,
+Riedel,Point,Go-gonion (constructed),The point of intersection of the ramus plane and the mandibular plane.,,,
+Riedel,Point,Iip-Incision inferius apicalis,"The root apex of the most anterior mandibular central incisor; if this point is needed only for defining the long axis of the tooth, the midpoint on the bisection of the apical root width can be used.",,,
+Riedel,Point,APOcc-Anterior point of occlusion for the occlusal plane,"A constructed point, the midpoint of the incisor overbite in occlusion",,,
+Riedel,Point,PPOcc-Posterior point of occlusion for the occlusal plane,The most distal point of contact between the most posterior molars in occlusion (Rakosi).,,,
+Riedel,Point,Maxillary central incisor,The most labial point on the crown of the maxillary central incisor.,,,
+Riedel,Point,Mandibular central incisor,The most labial point on the crown of the mandibular central incisor.,,,
+Schwartz,Point,A-point A (subspinale),The point at the deepest midline concavity on the maxilla between the anterior nasal spine and prosthion.,,,
+Schwartz,Point,Ans-anterior nasal spine,The most anterior point of the anterior nasal spine.,,,
+Schwartz,Point,B-point B (supramentale),The point at the deepest midline concavity on the mandibular symphysis between infradentale and pogonion.,,,
+Schwartz,Point,N-nasion,The most anterior (midline) point of the frontonasal suture.,,,
+Schwartz,Point,S-sella,The point representing the geometric center of the pituitary fossa (sella turcica).,,,
+Schwartz,Point,Pogonion,The most anterior point on the mandible in the midline.,,,
+Schwartz,Point,ii-incision inferius,The incisal point of the most prominent medial mandibular incisor,,,
+Schwartz,Point,is-incision superius,The incisal point of the most prominent medial maxillary incisor.,,,
+Wylie,Point,sp-Dorsum of sella,The most posterior point on the internal contour of the sella turcica or hypophyseal fossa or pituitary fossa.,,,
+Wylie,Point,si-Floor of sella,The lower most point on the inner contour of the sella turcica or hypophyseal fossa or pituitary fossa.,,,
+Wylie,Point,Cl-Clinoidale,The most superior point on the contour of the anterior clinoid.,,,
+Wylie,Point,S-Sella,The midpoint of sella turcica or hypophyseal fossa or pituitary fossa.,,,
+Wylie,Point,ANS-Anterior nasal spine,The tip of bony anterior nasal spine in the midline or median plane.,,,
+Wylie,Point,A-Point A,The deepest point on the curved bony outline between the anterior nasal spine (ANS) and prosthion (Pr).,,,
+Wylie,Point,PNS-Posterior nasal spine,The intersection of continuation of the anterior wall of the pterygopalatine fossa and the floor of the nose.,,,
+Wylie,Point,Ptm-Pterygomaxillary fissure,"A bilateral tear drop shaped area of radiolucency, the anterior shadow of which represents the posterior surface of the tuberosity of the maxilla; the landmark is taken where the two edges, front and back appears to merge inferiorly.",,,
+Wylie,Point,Orbitale,"The deepest point on the infraorbital margin.The midpoint, or is used where double projection gives rise to two points, or 1 and/or 2.",,,
+Wylie,Point,Gnathion (GN),The most inferior point on the contour of the chin.,,,
+Wylie,Point,Pogonion (PG),The most anterior point on the chin.,,,
+Wylie,Point,Point B-supramentale,The deepest midline point on the mandible between infradentale and pogonion.,,,
+Wylie,Point,Po-porion (anatomic),"The superior point of the externalauditory meatus (superior margin of temporomandibular fossa, which lies at the same level, may be substituted in the construction of Frankfort horizontal).",,,
+Steiner Analysis,Point,N-nasion,Nasion is the most anterior point of the frontonasal suture in the middle.,,,
+Steiner Analysis,Point,The center of sella turcica,Located by inspection of the profile image of the fossa.,,,
+Steiner Analysis,Point,Orbitale,The lowest point on the left infraorbital margin.,,,
+Steiner Analysis,Point,Porion (cephalometric),The highest point on the superior surface of the soft tissue of the external auditory meati.,,,
+Steiner Analysis,Point,Point A-subspinale,The deepest midline point on the premaxilla between the anterior nasal spine and prosthion.,,,
+Steiner Analysis,Point,Point B-supramentale,The deepest midline point on the mandible between infradentale and pogonion.,,,
+Steiner Analysis,Point,ANS,Anterior nasal spine is the tip of bony anterior nasal spine in the midline or median plane.,,,
+Steiner Analysis,Point,PNS,Posterior nasal spine is the intersection of a continuation of the anterior wall of the pterygopalatine fossa and the floor of the nose.,,,
+Steiner Analysis,Point,ii-incision inferius,The incisal point of the most prominent medial mandibular incisor.,,,
+Steiner Analysis,Point,is - incision superius,The incisal point of the most prominent medial maxillary incisor.,,,
+Steiner Analysis,Point,Go-gonion (constructed),The point of intersection of the ramus plane and the mandibular plane.,,,
+Steiner Analysis,Point,APOcc-Anterior point of occlusion for the occlusal plane,"A constructed point, the midpoint of the incisor overbite in occlusion",,,
+Steiner Analysis,Point,PPOcc-Posterior point of occlusion for the occlusal plane,The most distal point of contact between the most posterior molars in occlusion (Rakosi).,,,
+Steiner Analysis,Point,isa-Incision superius apicalis,"The root apex of the most anterior maxillary central incisor; if this point is needed only for defining the long axis of the tooth, the midpoint on the bisection of the apical root width can be used.",,,
+Steiner Analysis,Point,iia-Incision inferius apicalis,"The root apex of the most anterior mandibular central incisor; if this point is needed only for defining the long axis of the tooth, the midpoint on the bisection of the apical root width can be used.",,,
+Steiner Analysis,Point,Pogonion (PG),The most anterior point on the chin.,,,
+Steiner Analysis,Point,Pn,"The most anterior point on the midsagittal profile of the nose. In cases where the tip of the nose was more than a definite point, pronasale was determined by drawing a line parallel to the line nasion to pogonion tangent to the most anterior point on the midsagittal profile of the nose.",,,
+Tweed Analysis,Point,Orbitale,The lowest point on the left infraorbital margin.,,,
+Tweed Analysis,Point,Porion (cephalometric),The highest point on the superior surface of the soft tissue of the external auditory meati.,,,
+Tweed Analysis,Point,ii-incision inferius,The incisal point of the most prominent medial mandibular incisor.,,,
+Tweed Analysis,Point,is-incision superius,The incisal point of the most prominent medial maxillary incisor.,,,
+Tweed Analysis,Point,Go-gonion (constructed),The point of intersection of the ramus plane and the mandibular plane.,,,
+Tweed Analysis,Point,isa-Incision superius apicalis,"The root apex of the most anterior maxillary central incisor; if this point is needed only for defining the long axis of the tooth, the midpoint on the bisection of the apical root width can be used.",,,
+Tweed Analysis,Point,iia-Incision inferius apicalis,"The root apex of the most anterior mandibular central incisor; if this point is needed only for defining the long axis of the tooth, the midpoint on the bisection of the apical root width can be used.",,,
+Wits Analysis,Point,Point A-subspinale,The deepest midline point on the premaxilla between the anterior nasal spine and prosthion.,,,
+Wits Analysis,Point,Point B-supramentale,The deepest midline point on the mandible between infradentale and pogonion.,,,
+Basis,Point,N-nasion,Nasion is the most anterior point of the frontonasal suture in the middle.,,,
+Basis,Point,s-the center of sella turcica,The midpoint of the horizontal diameter.,,,
+Basis,Point,ANS-Anterior nasal spine,The tip of bony anterior nasal spine in the midline or median plane.,,,
+Basis,Point,PNS- Posterior nasal spine,The intersection of a continuation of the anterior wall of the pterygopalatine fossa and the floor of the nose.,,,
+Basis,Point,Point A-subspinale,The deepest midline point on the premaxilla between the anterior nasal spine and prosthion.,,,
+Basis,Point,Point B-supramentale,The deepest midline point on the mandible between infradentale and pogonion.,,,
+Basis,Point,Gn-gnathion,The deepest point on the chin.,,,
+Basis,Point,id - infradentale,The point of transition from the crown of the most prominent mandibular medial incisor to the alveolar projection.,,,
+Basis,Point,Pog-pogonion,The most prominent point on the chin.,,,
+Basis,Point,sm-supramentale,"The deepest point on the contour of the alveolar projection, between infradentale and pogonion.",,,
+Basis,Point,Isi-Incision superius incisalis,The incisal edge of the maxillary central incisor.,,,
+Basis,Point,Isa-Incision superius apicalis,"The root apex of the most anterior maxillary central incisor; if this point is needed only for defining the long axis of the tooth, the midpoint on the bisection of the apical root width can be used.",,,
+Basis,Point,Iii-Incision inferius incisalis,The incisal edge of the most prominent mandibular central incisor.,,,
+Basis,Point,Iia-Incision inferius apicalis,"The root apex of the most anterior mandibular central incisor; if this point is needed only for defining the long axis of the tooth, the midpoint on the bisection of the apical root width can be used.",,,
+Cagliari,Point,N-nasion,Nasion is the most anterior point of the frontonasal suture in the middle.,,,
+Cagliari,Point,s-The center of sella turcica,The midpoint of the horizontal diameter.,,,
+Cagliari,Point,ANS-Anterior nasal spine,The tip of bony anterior nasal spine in the midline or median plane.,,,
+Cagliari,Point,PNS-Posterior nasal spine,The intersection of a continuation of the anterior wall of the pterygopalatine fossa and the floor of the nose.,,,
+Cagliari,Point,Point A-subspinale,The deepest midline point on the premaxilla between the anterior nasal spine and prosthion.,,,
+Cagliari,Point,Point B - supramentale,The deepest midline point on the mandible between infradentale and pogonion.,,,
+Cagliari,Point,Gn-gnathion,The deepest point on the chin.,,,
+Cagliari,Point,id - infradentale,The point of transition from the crown of the most prominent mandibular medial incisor to the alveolar projection.,,,
+Cagliari,Point,Pog-pogonion,The most prominent point on the chin.,,,
+Cagliari,Point,sm-supramentale,"The deepest point on the contour of the alveolar projection, between infradentale and pogonion.",,,
+Cagliari,Point,Isi-Incision superius incisalis,The incisal edge of the maxillary central incisor.,,,
+Cagliari,Point,Isa-Incision superius apicalis,"The root apex of the most anterior maxillary central incisor; if this point is needed only for defining the long axis of the tooth, the midpoint on the bisection of the apical root width can be used.",,,
+Cagliari,Point,Iii-Incision inferius incisalis,The incisal edge of the most prominent mandibular central incisor.,,,
+Cagliari,Point,Iia-Incision inferius apicalis,"The root apex of the most anterior mandibular central incisor; if this point is needed only for defining the long axis of the tooth, the midpoint on the bisection of the apical root width can be used.",,,
+Cagliari,Point,Go-gonion (constructed),The point of intersection of the ramus plane and the mandibular plane.,,,
+Cagliari,Point,APOcc-Anterior point of occlusion for the occlusal plane,"A constructed point, the midpoint of the incisor overbite in occlusion.",,,
+Cagliari,Point,PPOcc-Posterior point of occlusion for the occlusal plane,The most distal point of contact between the most posterior molars in occlusion (Rakosi).,,,
+Cagliari,Point,Pogonion (PG),The most anterior point on the chin.,,,
+Cagliari,Point,Po-porion (anatomic),"The superior point of the externalauditory meatus (superior margin of temporomandibular fossa, which lies at the same level, may be substituted in the construction of Frankfort horizontal).",,,
+Cagliari,Point,Or-orbitale,"The lowest point on the inferior margin of the orbit, midpoint between right and left images.",,,
+Cagliari,Point,Articulare,"Articulare is the point of intersection the dorsal contours of the processus articularis mandibulare and os temporale. The midpoint, a is used where double projection gives rise to two points, a1 and a2.",,,
+Chieti,Point,N-nasion,Nasion is the most anterior point of the frontonasal suture in the middle.,,,
+Chieti,Point,s- the center of sella turcica,The midpoint of the horizontal diameter.,,,
+Chieti,Point,ANS- Anterior nasal spine,The tip of bony anterior nasal spine in the midline or median plane.,,,
+Chieti,Point,PNS- Posterior nasal spine,The intersection of a continuation of the anterior wall of the pterygopalatine fossa and the floor of the nose.,,,
+Chieti,Point,Point A-subspinale,The deepest midline point on the premaxilla between the anterior nasal spine and prosthion.,,,
+Chieti,Point,Point B - supramentale,The deepest midline point on the mandible between infradentale and pogonion.,,,
+Chieti,Point,Gn-gnathion,The deepest point on the chin.,,,
+Chieti,Point,id - infradentale,The point of transition from the crown of the most prominent mandibular medial incisor to the alveolar projection.,,,
+Chieti,Point,Pog-pogonion,The most prominent point on the chin.,,,
+Chieti,Point,sm-supramentale,"The deepest point on the contour of the alveolar projection, between infradentale and pogonion.",,,
+Chieti,Point,Isi-Incision superius incisalis,The incisal edge of the maxillary central incisor.,,,
+Chieti,Point,Isa-Incision superius apicalis,"The root apex of the most anterior maxillary central incisor; if this point is needed only for defining the long axis of the tooth, the midpoint on the bisection of the apical root width can be used.",,,
+Chieti,Point,Iii-Incision inferius incisalis,The incisal edge of the most prominent mandibular central incisor.,,,
+Chieti,Point,Iia-Incision inferius apicalis,"The root apex of the most anterior mandibular central incisor; if this point is needed only for defining the long axis of the tooth, the midpoint on the bisection of the apical root width can be used.",,,
+Chieti,Point,Go-gonion (constructed),The point of intersection of the ramus plane and the mandibular plane.,,,
+Chieti,Point,APOcc-Anterior point of occlusion for the occlusal plane,"A constructed point, the midpoint of the incisor overbite in occlusion.",,,
+Chieti,Point,PPOcc-Posterior point of occlusion for the occlusal plane,The most distal point of contact between the most posterior molars in occlusion (Rakosi).,,,
+Chieti,Point,Pogonion (PG),The most anterior point on the chin.,,,
+Chieti,Point,Po-porion (anatomic),"The superior point of the external auditory meatus (superior margin of temporo mandibular fossa, which lies at the same level, may be substituted in the construction of Frankfort horizontal).",,,
+Chieti,Point,Or-orbitale,"The lowest point on the inferior margin of the orbit, midpoint between right and left images.",,,
+Chieti,Point,Articulare,"Articulare is the point of intersection the dorsal contours of the processus articularis mandibulare and os temporale. The midpoint, a is used where double projection gives rise to two point, a1 and a2.",,,
+McGann,Point,N-nasion,Nasion is the most anterior point of the frontonasal suture in the middle.,,,
+McGann,Point,s-the center of sella turcica,The midpoint of the horizontal diameter.,,,
+McGann,Point,ANS- Anterior nasal spine,The tip of bony anterior nasal spine in the midline or median plane.,,,
+McGann,Point,PNS-Posterior nasal spine,The intersection of a continuation of the anterior wall of the pterygopalatine fossa and the floor of the nose.,,,
+McGann,Point,Point A-subspinale,The deepest midline point on the premaxilla between the anterior nasal spine and prosthion.,,,
+McGann,Point,Point B - supramentale,The deepest midline point on the mandible between infradentale and pogonion.,,,
+McGann,Point,Gn-gnathion,The deepest point on the chin.,,,
+McGann,Point,id - infradentale,The point of transition from the crown of the most prominent mandibular medial incisor to the alveolar projection.,,,
+McGann,Point,Pog-pogonion,The most prominent point on the chin.,,,
+McGann,Point,sm-supramentale,"The deepest point on the contour of the alveolar projection, between infradentale and pogonion.",,,
+McGann,Point,Isi- Incision superius incisalis,The incisal edge of the maxillary central incisor.,,,
+McGann,Point,Isa-Incision superius apicalis,"The root apex of the most anterior maxillary central incisor; if this point is needed only for defining the long axis of the tooth, the midpoint on the bisection of the apical root width can be used.",,,
+McGann,Point,Iii-Incision inferius incisalis,The incisal edge of the most prominent mandibular central incisor.,,,
+McGann,Point,Iia-Incision inferius apicalis,"The root apex of the most anterior mandibular central incisor; if this point is needed only for defining the long axis of the tooth, the midpoint on the bisection of the apical root width can be used.",,,
+McGann,Point,Go-gonion (constructed),The point of intersection of the ramus plane and the mandibular plane.,,,
+McGann,Point,APOcc-Anterior point of occlusion for the occlusal plane,"A constructed point, the midpoint of the incisor overbite in occlusion",,,
+McGann,Point,PPOcc-Posterior point of occlusion for the occlusal plane,The most distal point of contact between the most posterior molars in occlusion (Rakosi).,,,
+McGann,Point,Pogonion (PG),The most anterior point on the chin.,,,
+McGann,Point,Po-porion (anatomic),"The superior point of the externalauditory meatus (superior margin of temporomandi bular fossa, which lies at the same level, may be substituted in the construction of Frankfort horizontal).",,,
+McGann,Point,Or-orbitale,"The lowest point on the inferior margin of the orbit, midpoint between right and left images.",,,
+McGann,Point,Articulare,"Articulare is the point of intersection the dorsal contours of the processus articularis mandibulare and os temporale.The midpoint, a is used where double projection gives rise to two points, a1 and a2.",,,
+Kim Analysis,Point,N - Nasion,The most anterior point of the frontonasal suture in the midline.,,,
+Kim Analysis,Point,S - Sella,The geometric center of the pituitary fossa (sella turcica).,,,
+Kim Analysis,Point,ANS - Anterior nasal spine,The tip of the anterior nasal spine.,,,
+Kim Analysis,Point,PNS - Posterior nasal spine,The intersection of a continuation of the anterior wall of the pterygopalatine fossa and the floor of the nose.,,,
+Kim Analysis,Point,A - Point A (subspinale),The deepest midline point on the premaxilla between the anterior nasal spine and prosthion.,,,
+Kim Analysis,Point,B - Point B (supramentale),The deepest midline point on the mandible between infradentale and pogonion.,,,
+Kim Analysis,Point,Pog - Pogonion,The most anterior point on the chin.,,,
+Kim Analysis,Point,Me - Menton,The most inferior midline point on the mandibular symphysis.,,,
+Kim Analysis,Point,Go - Gonion (constructed),The point of intersection of the ramus plane and the mandibular plane.,,,
+Kim Analysis,Point,Ar - Articulare,The point of intersection of the dorsal contours of the condylar process and the temporal bone.,,,
+Kim Analysis,Point,Or - Orbitale,The lowest point on the inferior margin of the orbit.,,,
+Kim Analysis,Point,Po - Porion (anatomic),The superior point of the external auditory meatus.,,,
+Eastman Analysis,Point,Ba - Basion,The most inferior posterior point of the occipital bone.,,,
+Eastman Analysis,Point,N - Nasion,The most anterior point of the frontonasal suture in the midline.,,,
+Eastman Analysis,Point,S - Sella,The geometric center of the pituitary fossa (sella turcica).,,,
+Eastman Analysis,Point,A - Point A (subspinale),The deepest midline point on the premaxilla between the anterior nasal spine and prosthion.,,,
+Eastman Analysis,Point,B - Point B (supramentale),The deepest midline point on the mandible between infradentale and pogonion.,,,
+Eastman Analysis,Point,Pog - Pogonion,The most anterior point on the chin.,,,
+Eastman Analysis,Point,Me - Menton,The most inferior midline point on the mandibular symphysis.,,,
+Eastman Analysis,Point,Go - Gonion (constructed),The point of intersection of the ramus plane and the mandibular plane.,,,
+Eastman Analysis,Point,Po - Porion (anatomic),The superior point of the external auditory meatus.,,,
+Eastman Analysis,Point,Or - Orbitale,The lowest point on the inferior margin of the orbit.,,,
+Delaire Analysis,Point,N - Nasion,The most anterior point of the frontonasal suture in the midline.,,,
+Delaire Analysis,Point,S - Sella,The geometric center of the pituitary fossa (sella turcica).,,,
+Delaire Analysis,Point,Ba - Basion,The most inferior posterior point of the occipital bone.,,,
+Delaire Analysis,Point,Or - Orbitale,The lowest point on the inferior margin of the orbit.,,,
+Delaire Analysis,Point,Po - Porion (anatomic),The superior point of the external auditory meatus.,,,
+Delaire Analysis,Point,A - Point A (subspinale),The deepest midline point on the premaxilla between the anterior nasal spine and prosthion.,,,
+Delaire Analysis,Point,B - Point B (supramentale),The deepest midline point on the mandible between infradentale and pogonion.,,,
+Delaire Analysis,Point,Pog - Pogonion,The most anterior point on the chin.,,,
+Delaire Analysis,Point,Me - Menton,The most inferior midline point on the mandibular symphysis.,,,
+Delaire Analysis,Point,Go - Gonion (constructed),The point of intersection of the ramus plane and the mandibular plane.,,,
+Delaire Analysis,Point,Ar - Articulare,The point of intersection of the dorsal contours of the condylar process and the temporal bone.,,,
+Delaire Analysis,Point,ANS - Anterior nasal spine,The tip of the anterior nasal spine.,,,
+Delaire Analysis,Point,PNS - Posterior nasal spine,The intersection of a continuation of the anterior wall of the pterygopalatine fossa and the floor of the nose.,,,
+Delaire Analysis,Point,Co - Condylion,The most superior point of the mandibular condyle.,,,
+Delaire Analysis,Point,Is - Incision superius,The incisal point of the most prominent maxillary central incisor.,,,

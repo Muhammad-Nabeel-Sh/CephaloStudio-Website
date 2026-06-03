@@ -619,6 +619,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const processing=useMemo(()=>activeVersion?.processing||{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},[activeVersion?.processing]);
   const lutMode=activeVersion?.lutMode||"gray";const lutInvert=activeVersion?.lutInvert||false;
   const formulas=activeVersion?.formulas||[];const norms=activeVersion?.norms||[];
+  const analysisTemplate=activeVersion?.analysisTemplate||"blank";
   const selectedMarkup=markups.find(m=>m.id===selectedId);
   const compareVersion=project.versions.find(v=>v.id===compareVersionId);
 
@@ -941,12 +942,24 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     const activeMarkupsList=databaseMode&&!reproCollecting?dbMarkups:markups;
     const sp=getCanvasPos(e);let ip=toImage(sp.x,sp.y);
     ip=snapPoint(ip,activeMarkupsList,12/zoom,snapEnabled);
-    if(placingMode&&placingQueue.length>0&&placingIdx<placingQueue.length){
-      const qid=placingQueue[placingIdx];
-      updMarkup(qid,{points:[ip],placed:true});
-      if(placingIdx<placingQueue.length-1)dispatch({type:"SET",payload:{placingIdx:placingIdx+1}});else{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}
-      return;
-    }
+     if(placingMode&&placingQueue.length>0&&placingIdx<placingQueue.length){
+       const qid=placingQueue[placingIdx];
+       const updatedMarkups=markups.map(m=>m.id===qid?{...m,points:[ip],placed:true}:m);
+        const newAuto=autoCreateMeasurements(updatedMarkups,analysisTemplate);
+       const newNorms=[];
+       for(const m of newAuto){
+         if(m.norm){
+           const measureType=m.type==="angle3"||m.type==="angle4"?"angle":m.type==="line"?"length":m.type==="ratio"||m.type==="sum"?"value":"distance";
+           if(!norms.some(n=>n.markupLabel===m.label&&n.measureType===measureType)){
+             newNorms.push({id:uid(),markupLabel:m.label,measureType,mean:m.norm.mean,sd:m.norm.sd,source:analysisTemplate});
+           }
+         }
+       }
+       pushUndo();
+       updVer({markups:[...updatedMarkups,...newAuto],norms:[...norms,...newNorms]});
+       if(placingIdx<placingQueue.length-1)dispatch({type:"SET",payload:{placingIdx:placingIdx+1}});else{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}
+       return;
+     }
     if(activeTool==="pan"){isPanning.current=true;panStart.current={mx:e.clientX,my:e.clientY,px:pan.x,py:pan.y};return;}
     if(activeTool==="select"){
       const hit=hitTest(activeMarkupsList,ip,zoom,reproCollecting);
@@ -1134,7 +1147,8 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     if(["line","angle3","angle4","polygon","curve","perp"].includes(activeTool)){
       if(!currentDraw)dispatch({type:"SET",payload:{currentDraw:{type:activeTool,points:[ip],curveStyle:"linear",replacingId}}});
       else{const nps=[...currentDraw.points,ip];const need={line:2,angle3:3,angle4:4,perp:3}[activeTool];if(need&&nps.length>=need){finalizeMarkup({...currentDraw,points:nps});dispatch({type:"SET",payload:{currentDraw:null}});}else dispatch({type:"SET",payload:{currentDraw:{...currentDraw,points:nps}}});}return;}
-  },[activeTool,markups,zoom,pan,snapEnabled,currentDraw,selectedMarkup,placingMode,placingQueue,placingIdx,reproCollecting,reproStudies,databaseMode,databaseImages,currentImageIndex,replacingId,setSelectedId,updMarkup,addMarkup,finalizeMarkup,toImage,getCanvasPos,t]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[activeTool,markups,zoom,pan,snapEnabled,currentDraw,selectedMarkup,placingMode,placingQueue,placingIdx,reproCollecting,reproStudies,databaseMode,databaseImages,currentImageIndex,replacingId,setSelectedId,updMarkup,addMarkup,finalizeMarkup,toImage,getCanvasPos,t,analysisTemplate]);
 
   const handleMouseMove=useCallback(e=>{
     const currentDbImg=databaseMode&&!reproCollecting&&databaseImages.length>0?databaseImages[currentImageIndex]:null;
@@ -1216,6 +1230,68 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     setPlacingQueue(newMarkups.map(m=>m.id));dispatch({type:"SET",payload:{placingIdx:0}});dispatch({type:"SET",payload:{placingMode:true}});dispatch({type:"SET",payload:{rightPanel:"markups"}});
   };
 
+  const autoCreateMeasurements=(markups,templateName)=>{
+    const analysis=PREDEFINED.lateral.find(a=>a.name===templateName)
+      ||PREDEFINED.ap.find(a=>a.name===templateName)
+      ||PREDEFINED.smv.find(a=>a.name===templateName)
+      ||PREDEFINED.opg.find(a=>a.name===templateName);
+    if(!analysis||!analysis.measurements||analysis.measurements.length===0)return[];
+    const placed={};
+    for(const m of markups){
+      if(m.placed&&m.label)placed[m.label]=m;
+    }
+    const existingLabels=new Set(markups.map(m=>m.label));
+    const result=[];
+    for(const meas of analysis.measurements){
+      if(meas.type==="ratio"||meas.type==="sum")continue;
+      if(!meas.pts||meas.pts.length<2)continue;
+      if(existingLabels.has(meas.l))continue;
+      const allPlaced=meas.pts.every(rl=>placed[rl]);
+      if(!allPlaced)continue;
+      const points=meas.pts.map(rl=>placed[rl].points[0]);
+      result.push({
+        id:uid(),type:meas.type,points,
+        label:meas.l,definition:meas.def||"",
+        color:meas.color||"#888",
+        visible:true,locked:true,autoCreated:true,
+        norm:meas.norm,
+      });
+    }
+    const updatedLabels=new Set([...existingLabels,...result.map(m=>m.label)]);
+    const markupMap={};
+    for(const m of[...markups,...result]){
+      if(m.label)markupMap[m.label]=m;
+    }
+    for(const meas of analysis.measurements){
+      if(meas.type!=="ratio"&&meas.type!=="sum")continue;
+      if(!meas.pts||meas.pts.length<2)continue;
+      if(updatedLabels.has(meas.l))continue;
+      const allRefsExist=meas.pts.every(rl=>markupMap[rl]);
+      if(!allRefsExist)continue;
+      let computedValue=0;
+      if(meas.type==="ratio"){
+        const v0=getMeasValue(markupMap[meas.pts[0]]);
+        const v1=getMeasValue(markupMap[meas.pts[1]]);
+        computedValue=v1!==0?v0/v1:0;
+      }else{
+        computedValue=meas.pts.reduce((s,rl)=>s+getMeasValue(markupMap[rl]),0);
+      }
+      result.push({
+        id:uid(),type:meas.type,points:[],
+        label:meas.l,definition:meas.def||"",
+        color:meas.color||"#888",
+        visible:true,locked:true,autoCreated:true,
+        computedValue,norm:meas.norm,
+      });
+    }
+    return result;
+  };
+  const getMeasValue=(m)=>{
+    const ms=computeMeasurements(m,calibration);
+    const vals=Object.values(ms).filter(v=>typeof v==="number"&&isFinite(v));
+    return vals.length>0?vals[0]:0;
+  };
+
   const projectionKeyMap={
     "Submentovertex (SMV)":"smv",
     "Panoramic Radiograph (OPG)":"opg",
@@ -1229,7 +1305,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       const key=projectionKeyMap[analysis.name];
       if(key&&PREDEFINED[key]&&PREDEFINED[key].length>0){
         const template=PREDEFINED[key][0];
-        const projData={...analysis,pts:template?.pts||[]};
+        const projData={name:template?.name||analysis.name,pts:template?.pts||[]};
         if(projData.pts.length>0){loadTemplate(projData);return;}
       }
     }
@@ -1514,7 +1590,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
                 </div>
               </div>
               {selectedMarkup&&<div style={{borderTop:`1px solid ${t.bdr}`,padding:12,flexShrink:0,maxHeight:isMobile?180:260,overflowY:"auto",scrollbarWidth:"none"}}>
-                <MarkupProps m={selectedMarkup} t={t} theme={theme} onUpdate={p=>updMarkup(selectedMarkup.id,p)} onDelete={()=>delMarkup(selectedMarkup.id)} calibration={calibration} onParallel={()=>dispatch({type:"SET",payload:{activeTool:"parallel"}})} formatAngle={formatAngle}/>
+                <MarkupProps m={selectedMarkup} t={t} theme={theme} onUpdate={p=>updMarkup(selectedMarkup.id,p)} onDelete={()=>delMarkup(selectedMarkup.id)} calibration={calibration} onParallel={()=>dispatch({type:"SET",payload:{activeTool:"parallel"}})} formatAngle={formatAngle} norms={norms} onUpdateNorms={ns=>updVer({norms:ns})}/>
               </div>}
             </div>
             {/* Resize handle */}
