@@ -555,7 +555,6 @@ function drawSilhouette(ctx, m, isSel, t, zoom, pan, showAnnotations, annotation
 
   if (isSel && minX < Infinity) {
     const pad = 6 * Math.sqrt(zoom);
-    const hSize = 6 * Math.sqrt(zoom);
     const bminX = minX - pad, bmaxX = maxX + pad;
     const bminY = minY - pad, bmaxY = maxY + pad;
 
@@ -592,35 +591,39 @@ function drawSilhouette(ctx, m, isSel, t, zoom, pan, showAnnotations, annotation
       { x: bmaxX, y: bmaxY },
     ];
 
-    corners.forEach(p => {
+    corners.forEach((p, ci) => {
+      const isHov = hoveredPt?.type === "corner" && hoveredPt?.mid === m.id && hoveredPt?.cornerIdx === ci;
+      const sz = (isHov ? 9 : 6) * Math.sqrt(zoom);
       ctx.fillStyle = handleColor;
-      ctx.strokeStyle = borderColor;
-      ctx.lineWidth = 1.5;
-      ctx.fillRect(p.x - hSize / 2, p.y - hSize / 2, hSize, hSize);
-      ctx.strokeRect(p.x - hSize / 2, p.y - hSize / 2, hSize, hSize);
+      ctx.strokeStyle = isHov ? t.acc2 : borderColor;
+      ctx.lineWidth = isHov ? 2.5 : 1.5;
+      ctx.fillRect(p.x - sz / 2, p.y - sz / 2, sz, sz);
+      ctx.strokeRect(p.x - sz / 2, p.y - sz / 2, sz, sz);
     });
 
     const rotCX = (bminX + bmaxX) / 2;
     const rotCY = bminY - pad - 18 * Math.sqrt(zoom);
+    const isRotHov = hoveredPt?.type === "rotate" && hoveredPt?.mid === m.id;
+    const rotSz = (isRotHov ? 9 : 6) * Math.sqrt(zoom);
     ctx.beginPath();
-    ctx.arc(rotCX, rotCY, hSize, 0, Math.PI * 2);
-    ctx.fillStyle = handleColor;
+    ctx.arc(rotCX, rotCY, rotSz, 0, Math.PI * 2);
+    ctx.fillStyle = isRotHov ? t.acc2 : handleColor;
     ctx.fill();
-    ctx.strokeStyle = borderColor;
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = isRotHov ? t.acc2 : borderColor;
+    ctx.lineWidth = isRotHov ? 2.5 : 1.5;
     ctx.stroke();
-    ctx.strokeStyle = borderColor + "66";
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = (isRotHov ? t.acc2 : borderColor) + "66";
+    ctx.lineWidth = isRotHov ? 1.5 : 1;
     ctx.setLineDash([3 * Math.sqrt(zoom), 3 * Math.sqrt(zoom)]);
     ctx.beginPath();
-    ctx.moveTo(rotCX, rotCY + hSize);
+    ctx.moveTo(rotCX, rotCY + rotSz);
     ctx.lineTo(rotCX, corners[0].y);
     ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = borderColor;
-    ctx.font = `${10 * Math.sqrt(zoom)}px sans-serif`;
+    ctx.fillStyle = isRotHov ? t.acc2 : borderColor;
+    ctx.font = `${(isRotHov ? 13 : 10) * Math.sqrt(zoom)}px sans-serif`;
     ctx.textAlign = "center";
-    ctx.fillText("↻", rotCX, rotCY + hSize + 12 * Math.sqrt(zoom));
+    ctx.fillText("↻", rotCX, rotCY + rotSz + 12 * Math.sqrt(zoom));
     }
   }
   } catch { /*silent*/ }
@@ -888,7 +891,8 @@ function silhouetteHitTest(m, ip, zoom) {
     });
   });
   const pad = 8 / zoom;
-  return ip.x >= minX - pad && ip.x <= maxX + pad && ip.y >= minY - pad && ip.y <= maxY + pad;
+  const topPad = pad + 24 / Math.sqrt(zoom);
+  return ip.x >= minX - pad && ip.x <= maxX + pad && ip.y >= minY - topPad && ip.y <= maxY + pad;
   } catch { return false; }
 }
 
