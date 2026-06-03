@@ -28,7 +28,7 @@ export function drawMeasLabel(ctx, text, x, y, showAnnotations = true, annotatio
   ctx.font = prevFont;
 }
 
-export function drawMarkup(ctx, m, zoom, pan, cal, sel, t, reproCollecting, canvasSize, angleMode, showAnnotations = true, annotationSize = 1){
+export function drawMarkup(ctx, m, zoom, pan, cal, sel, t, reproCollecting, canvasSize, angleMode, showAnnotations = true, annotationSize = 1, hoveredPt = null){
   if(m.visible === false) return;
   if(m.type === "point" && m.repro && !isReproPointVisible(m, reproCollecting)) return;
   
@@ -66,10 +66,10 @@ export function drawMarkup(ctx, m, zoom, pan, cal, sel, t, reproCollecting, canv
         drawAngle4(ctx, m, sp, t, fmtAngle, zoom, showAnnotations, annotationSize);
         break;
       case "polygon":
-        drawPolygon(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize);
+        drawPolygon(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt);
         break;
       case "curve":
-        drawCurve(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize);
+        drawCurve(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt);
         break;
       case "perp":
         drawPerp(ctx, m, sp, t, cal, zoom, pan, showAnnotations, annotationSize);
@@ -81,7 +81,7 @@ export function drawMarkup(ctx, m, zoom, pan, cal, sel, t, reproCollecting, canv
         drawRuler(ctx, m, sp, t, zoom, showAnnotations, annotationSize);
         break;
       case "silhouette":
-        drawSilhouette(ctx, m, isSel, t, zoom, pan, showAnnotations, annotationSize);
+        drawSilhouette(ctx, m, isSel, t, zoom, pan, showAnnotations, annotationSize, hoveredPt);
         break;
     }
   } catch { /*silent*/ }
@@ -289,7 +289,7 @@ function drawAngle4(ctx, m, sp, t, fmtAngle, zoom, showAnnotations, annotationSi
   }
 }
 
-function drawPolygon(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize = 1){
+function drawPolygon(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize = 1, hoveredPt = null){
   if(sp.length < 2){ ctx.restore(); return; }
   
   ctx.beginPath();
@@ -313,11 +313,17 @@ function drawPolygon(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotatio
   ctx.setLineDash([]);
   
   if(isSel){
-    sp.forEach(p => {
+    sp.forEach((p, i) => {
+      const isHovered = hoveredPt?.ptIdx === i;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
-      ctx.fillStyle = t.color || "#ba1c1c";
+      ctx.arc(p.x, p.y, isHovered ? 8 : 5, 0, Math.PI * 2);
+      ctx.fillStyle = isHovered ? t.acc : (t.color || "#ba1c1c");
       ctx.fill();
+      if (isHovered) {
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
     });
   }
   
@@ -332,7 +338,7 @@ function drawPolygon(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotatio
   }
 }
 
-function drawCurve(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize = 1){
+function drawCurve(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize = 1, hoveredPt = null){
   if(sp.length < 2){ ctx.restore(); return; }
   
   if(m.style === "dashed") ctx.setLineDash([8 * zoom, 4 * zoom]);
@@ -352,11 +358,17 @@ function drawCurve(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationS
   ctx.setLineDash([]);
   
   if(isSel){
-    sp.forEach(p => {
+    sp.forEach((p, i) => {
+      const isHovered = hoveredPt?.ptIdx === i;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-      ctx.fillStyle =  t.color || "#ba1c1c";
+      ctx.arc(p.x, p.y, isHovered ? 7 : 4, 0, Math.PI * 2);
+      ctx.fillStyle = isHovered ? t.acc : (t.color || "#ba1c1c");
       ctx.fill();
+      if (isHovered) {
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
     });
   }
   
@@ -474,7 +486,7 @@ function drawRuler(ctx, m, sp, t, zoom, showAnnotations, annotationSize = 1){
   }
 }
 
-function drawSilhouette(ctx, m, isSel, t, zoom, pan) {
+function drawSilhouette(ctx, m, isSel, t, zoom, pan, showAnnotations, annotationSize, hoveredPt = null) {
   try {
   const paths = m.paths || SILHOUETTES[m.silhouetteType]?.paths;
   if (!paths) return;
@@ -549,15 +561,16 @@ function drawSilhouette(ctx, m, isSel, t, zoom, pan) {
 
     // Draw draggable point handles on editable silhouettes
     if (m.paths) {
-      paths.forEach(path => {
-        path.points.forEach(p => {
+      paths.forEach((path, pi) => {
+        path.points.forEach((p, ptI) => {
+          const isHovered = hoveredPt?.type === "silhouette" && hoveredPt?.mid === m.id && hoveredPt?.pathIdx === pi && hoveredPt?.ptIdx === ptI;
           const sp = transform(p);
           ctx.beginPath();
-          ctx.arc(sp.x, sp.y, 4 * Math.sqrt(zoom), 0, Math.PI * 2);
+          ctx.arc(sp.x, sp.y, (isHovered ? 8 : 4) * Math.sqrt(zoom), 0, Math.PI * 2);
           ctx.fillStyle = "#fff";
           ctx.fill();
-          ctx.strokeStyle = t.acc;
-          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = isHovered ? t.acc2 : t.acc;
+          ctx.lineWidth = isHovered ? 3 : 1.5;
           ctx.stroke();
         });
       });

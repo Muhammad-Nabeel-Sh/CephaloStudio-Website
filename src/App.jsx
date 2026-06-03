@@ -607,7 +607,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const isPanning=useRef(false);const panStart=useRef(null);
   const isDragging=useRef(false);const dragStart=useRef(null);const dragStartState=useRef(null);
   const dragMid=useRef(null);const dragPtIdx=useRef(null);
-  const silhouetteAction=useRef(null);
+  const silhouetteAction=useRef(null);const hoveredPtRef=useRef(null);
   const canvasSize=useRef({w:800,h:600});const lastTouchDist=useRef(null);
   const undoStackRef=useRef([]);
   const redoStackRef=useRef([]);
@@ -823,7 +823,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     }
     const drawMarkups=databaseMode&&databaseImages.length>0&&!reproCollecting?activeMarkups:markups;
     const drawCalibration=databaseMode&&databaseImages.length>0&&!reproCollecting?activeCalibration:calibration;
-    drawMarkups.forEach(m=>drawMarkup(ctx,m,zoom,pan,drawCalibration,selectedId,t,reproCollecting,canvasSize.current,angleMode,showAnnotations,annotationSize));
+    drawMarkups.forEach(m=>drawMarkup(ctx,m,zoom,pan,drawCalibration,selectedId,t,reproCollecting,canvasSize.current,angleMode,showAnnotations,annotationSize,hoveredPtRef.current));
     if(showDisplacement){
       if(!compareVersion){
         ctx.fillStyle="rgba(0,0,0,0.6)";ctx.fillRect(8,8,220,36);
@@ -967,18 +967,32 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
               dragStartState.current=JSON.stringify(activeMarkupsList);
               return;
             }
-            for (let hi = 0; hi < handles.corners.length; hi++) {
-              const c = handles.corners[hi];
-              if (isFinite(c.x) && dist(ip, c) < thr) {
-                const cx = (handles.bbox.minX + handles.bbox.maxX) / 2;
-                const cy = (handles.bbox.minY + handles.bbox.maxY) / 2;
-                silhouetteAction.current = {
-                  type: "resize", markupId: hit, startIp: ip,
-                  initialScale: m.scale || 1,
-                  center: { x: cx, y: cy },
-                  initialDist: dist(ip, { x: cx, y: cy }),
-                };
-                dragStartState.current=JSON.stringify(activeMarkupsList);
+            // Point-level drag on editable silhouettes (before corner handles)
+            if (m.paths) {
+              const ptThr = 8 / zoom;
+              const rot = m.rotation || 0;
+              const sc = m.scale || 1;
+              const pos = m.position || { x: 0, y: 0 };
+              const baseSize = 100;
+              const cosR = Math.cos(rot);
+              const sinR = Math.sin(rot);
+              let bestPathIdx = -1, bestPtIdx = -1, bestDist = Infinity;
+              m.paths.forEach((path, pi) => {
+                path.points.forEach((p, ptI) => {
+                  const sx = p.x * sc * baseSize;
+                  const sy = p.y * sc * baseSize;
+                  const rx = sx * cosR - sy * sinR;
+                  const ry = sx * sinR + sy * cosR;
+                  const d = dist(ip, { x: rx + pos.x, y: ry + pos.y });
+                  if (d < bestDist) { bestDist = d; bestPathIdx = pi; bestPtIdx = ptI; }
+                });
+              });
+              if (bestDist < ptThr) {
+                isDragging.current = true;
+                dragMid.current = hit;
+                dragStartState.current = JSON.stringify(activeMarkupsList);
+                dragPtIdx.current = { pathIdx: bestPathIdx, ptIdx: bestPtIdx };
+                dragStart.current = ip;
                 return;
               }
             }
@@ -1038,32 +1052,20 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
               }
               return;
             }
-            // Point-level drag on editable silhouettes
-            if (m.paths) {
-              const ptThr = 8 / zoom;
-              const rot = m.rotation || 0;
-              const sc = m.scale || 1;
-              const pos = m.position || { x: 0, y: 0 };
-              const baseSize = 100;
-              const cosR = Math.cos(rot);
-              const sinR = Math.sin(rot);
-              let bestPathIdx = -1, bestPtIdx = -1, bestDist = Infinity;
-              m.paths.forEach((path, pi) => {
-                path.points.forEach((p, ptI) => {
-                  const sx = p.x * sc * baseSize;
-                  const sy = p.y * sc * baseSize;
-                  const rx = sx * cosR - sy * sinR;
-                  const ry = sx * sinR + sy * cosR;
-                  const d = dist(ip, { x: rx + pos.x, y: ry + pos.y });
-                  if (d < bestDist) { bestDist = d; bestPathIdx = pi; bestPtIdx = ptI; }
-                });
-              });
-              if (bestDist < ptThr) {
-                isDragging.current = true;
-                dragMid.current = hit;
-                dragStartState.current = JSON.stringify(activeMarkupsList);
-                dragPtIdx.current = { pathIdx: bestPathIdx, ptIdx: bestPtIdx };
-                dragStart.current = ip;
+            // Corner resize handles (reduced threshold)
+            const cornerThr = Math.max(6, 10 * Math.sqrt(zoom)) / zoom;
+            for (let hi = 0; hi < handles.corners.length; hi++) {
+              const c = handles.corners[hi];
+              if (isFinite(c.x) && dist(ip, c) < cornerThr) {
+                const cx = (handles.bbox.minX + handles.bbox.maxX) / 2;
+                const cy = (handles.bbox.minY + handles.bbox.maxY) / 2;
+                silhouetteAction.current = {
+                  type: "resize", markupId: hit, startIp: ip,
+                  initialScale: m.scale || 1,
+                  center: { x: cx, y: cy },
+                  initialDist: dist(ip, { x: cx, y: cy }),
+                };
+                dragStartState.current=JSON.stringify(activeMarkupsList);
                 return;
               }
             }
@@ -1090,6 +1092,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         }
         isDragging.current=true;dragMid.current=hit;dragStartState.current=JSON.stringify(activeMarkupsList);
         let bi=0,bd=Infinity;(m.points||[]).forEach((p,i)=>{const d=dist(p,ip);if(d<bd){bd=d;bi=i;}});
+        if(bd>8/zoom)bi=-1;
         dragPtIdx.current=bi;dragStart.current=ip;
       }
       return;
@@ -1139,6 +1142,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     const activeMarkupsList=databaseMode&&!reproCollecting?dbMarkups:markups;
     const sp=getCanvasPos(e);dispatch({type:"SET",payload:{mousePos:sp}});
     if(snapEnabled&&activeTool!=="select"&&activeTool!=="pan"){const ip=toImage(sp.x,sp.y);const sn=snapPoint(ip,activeMarkupsList,12/zoom,snapEnabled);dispatch({type:"SET",payload:{snapPos:(Math.abs(sn.x-ip.x)>0.1||Math.abs(sn.y-ip.y)>0.1)?sn:null}});}else dispatch({type:"SET",payload:{snapPos:null}});
+    if(activeTool==="select"&&!isDragging.current&&!silhouetteAction.current){const ip=toImage(sp.x,sp.y);let best=null,bd=Infinity;const thr=8/zoom;for(const m2 of activeMarkupsList){if(m2.locked||m2.visible===false)continue;if(m2.type==="silhouette"){const paths=m2.paths||SILHOUETTES[m2.silhouetteType]?.paths;if(!paths)continue;const rot=m2.rotation||0;const sc=m2.scale||1;const pos=m2.position||{x:0,y:0};const cosR=Math.cos(rot);const sinR=Math.sin(rot);paths.forEach((path,pi)=>{path.points.forEach((p,ptI)=>{const sx=p.x*sc*100;const sy=p.y*sc*100;const rx=sx*cosR-sy*sinR;const ry=sx*sinR+sy*cosR;const d=dist(ip,{x:rx+pos.x,y:ry+pos.y});if(d<bd){bd=d;best={type:"silhouette",mid:m2.id,pathIdx:pi,ptIdx:ptI};}});});}else if(m2.type==="curve"||m2.type==="polygon"){(m2.points||[]).forEach((p,i)=>{const d=dist(ip,p);if(d<bd){bd=d;best={type:"path",mid:m2.id,ptIdx:i};}});}}hoveredPtRef.current=best&&bd<thr?best:null;}else{hoveredPtRef.current=null;}
     if(isPanning.current&&panStart.current)dispatch({type:"SET",payload:{pan:{x:panStart.current.px+(e.clientX-panStart.current.mx),y:panStart.current.py+(e.clientY-panStart.current.my)}}});
     if(isDragging.current&&dragMid.current){const ip=toImage(sp.x,sp.y);const dx=ip.x-dragStart.current.x,dy=ip.y-dragStart.current.y;const m=activeMarkupsList.find(x=>x.id===dragMid.current);if(!m)return;if(m.type==="silhouette"){if(typeof dragPtIdx.current==="object"&&dragPtIdx.current!==null){const sc=m.scale||1;const rot=m.rotation||0;const cosR=Math.cos(rot);const sinR=Math.sin(rot);const baseSize=100;const dnx=(cosR*dx+sinR*dy)/(sc*baseSize);const dny=(-sinR*dx+cosR*dy)/(sc*baseSize);const{pathIdx,ptIdx}=dragPtIdx.current;updMarkup(dragMid.current,{paths:(m.paths||[]).map((path,pi)=>({...path,points:path.points.map((p,ptI)=>pi===pathIdx&&ptI===ptIdx?{x:p.x+dnx,y:p.y+dny}:p)}))});}else{updMarkup(dragMid.current,{position:{x:(m.position?.x||0)+dx,y:(m.position?.y||0)+dy}});}}else{updMarkup(dragMid.current,{points:(m.points||[]).map((p,i)=>i===dragPtIdx.current?{x:p.x+dx,y:p.y+dy}:p)});}dragStart.current=ip;}
     if(silhouetteAction.current){
