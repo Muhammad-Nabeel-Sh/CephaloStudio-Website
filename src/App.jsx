@@ -657,7 +657,8 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     const next=redoStackRef.current.pop();
     if(next)updVer({markups:JSON.parse(next)});
   };
-  const updMarkups=fn=>{pushUndo();updVer({markups:fn(markups)});};
+  const refreshAutoMeas=(ms)=>{const placed={};const markupMap={};for(const m of ms){if(m.placed&&m.label)placed[m.label]=m;if(m.label)markupMap[m.label]=m;}return ms.map(m=>{if(!m.autoCreated||!m.refLabels||m.refLabels.length===0)return m;if(m.type==="ratio"||m.type==="sum"||m.type==="difference"||m.type==="percentage"){const allRefsExist=m.refLabels.every(rl=>markupMap[rl]);if(!allRefsExist)return m;let nv=0;if(m.type==="ratio"){const v0=getMeasValue(markupMap[m.refLabels[0]]);const v1=getMeasValue(markupMap[m.refLabels[1]]);nv=v1!==0?v0/v1:0;}else if(m.type==="difference"){nv=getMeasValue(markupMap[m.refLabels[0]])-getMeasValue(markupMap[m.refLabels[1]]);}else if(m.type==="percentage"){const v0=getMeasValue(markupMap[m.refLabels[0]]);const v1=getMeasValue(markupMap[m.refLabels[1]]);nv=v1!==0?(v0/v1)*100:0;}else{nv=m.refLabels.reduce((s,rl)=>s+getMeasValue(markupMap[rl]),0);}if(m.computedValue!==nv)return{...m,computedValue:nv};return m;}const allPlaced=m.refLabels.every(rl=>placed[rl]);if(!allPlaced)return m;const np=m.refLabels.map(rl=>placed[rl].points[0]);if(np.some((p,i)=>p.x!==m.points[i]?.x||p.y!==m.points[i]?.y))return{...m,points:np};return m;});};
+  const updMarkups=fn=>{pushUndo();updVer({markups:refreshAutoMeas(fn(markups))});};
   const syncReproStudyCoords=(repro,x,y)=>{
     if(!repro?.measurementId)return;
     dispatch({type:"SET",payload:{reproStudies:reproStudies.map(s=>{
@@ -931,7 +932,9 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       if(e.key==="Escape"){dispatch({type:"SET",payload:{currentDraw:null}});dispatch({type:"SET",payload:{selectedId:null}});if(placingMode){if(placingIdx<placingQueue.length-1)dispatch({type:"SET",payload:{placingIdx:placingIdx+1}});else{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}}return;}
       const tool=TOOLS.filter(Boolean).find(t2=>t2.key===e.key.toLowerCase());
       if(tool){dispatch({type:"SET",payload:{activeTool:tool.id}});dispatch({type:"SET",payload:{currentDraw:null}});return;}
-      if((e.key==="Delete"||e.key==="Backspace")&&selectedId){const m=markups.find(x=>x.id===selectedId);if(!m?.locked)delMarkup(selectedId);return;}
+      if(e.key==="Backspace"&&placingMode&&placingQueue.length>0){if(placingIdx>0)dispatch({type:"SET",payload:{placingIdx:placingIdx-1}});else{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}return;}
+      if(e.key==="Delete"&&selectedId){const m=markups.find(x=>x.id===selectedId);if(!m?.locked)delMarkup(selectedId);return;}
+      if(e.key==="Backspace"&&selectedId){const m=markups.find(x=>x.id===selectedId);if(!m?.locked)delMarkup(selectedId);return;}
       if(e.key==="+"||e.key==="=")dispatch({type:"SET",payload:{zoom:z=>clamp(z*1.15,0.05,15)}});
       if(e.key==="-")dispatch({type:"SET",payload:{zoom:z=>clamp(z/1.15,0.05,15)}});
       if(e.key==="0"){dispatch({type:"SET",payload:{zoom:1}});dispatch({type:"SET",payload:{pan:{x:40,y:40}}});}
@@ -947,10 +950,6 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     const sp=getCanvasPos(e);let ip=toImage(sp.x,sp.y);
     ip=snapPoint(ip,activeMarkupsList,12/zoom,snapEnabled);
      if(placingMode&&placingQueue.length>0&&placingIdx<placingQueue.length){
-       if(placingIdx===0&&!calibration.done&&project.images.length>0){
-         dispatch({type:"SET",payload:{showCalib:true}});
-         return;
-       }
        const qid=placingQueue[placingIdx];
        const updatedMarkups=markups.map(m=>m.id===qid?{...m,points:[ip],placed:true}:m);
         const newAuto=autoCreateMeasurements(updatedMarkups,analysisTemplate);
@@ -963,8 +962,8 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
            }
          }
        }
-       pushUndo();
-       updVer({markups:[...updatedMarkups,...newAuto],norms:[...norms,...newNorms]});
+        pushUndo();
+        updVer({markups:refreshAutoMeas([...updatedMarkups,...newAuto]),norms:[...norms,...newNorms]});
        if(placingIdx<placingQueue.length-1)dispatch({type:"SET",payload:{placingIdx:placingIdx+1}});else{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}
        return;
      }
@@ -1227,10 +1226,6 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   };
 
   const loadTemplate=(analysis)=>{
-    if(project.images.length===0){
-      alert("Please load a cephalometric image before loading a template.");
-      return;
-    }
     const newMarkups=[];
     const pointIds={};
     analysis.pts.forEach(pt=>{
@@ -1278,7 +1273,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         label:meas.l,definition:meas.def||"",
         color:meas.color||"#888",
         visible:true,locked:true,autoCreated:true,
-        norm:meas.norm,...extraProps,
+        refLabels:meas.pts,norm:meas.norm,...extraProps,
       });
     }
     const updatedLabels=new Set([...existingLabels,...result.map(m=>m.label)]);
@@ -1313,7 +1308,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         label:meas.l,definition:meas.def||"",
         color:meas.color||"#888",
         visible:true,locked:true,autoCreated:true,
-        computedValue,norm:meas.norm,
+        refLabels:meas.pts,computedValue,norm:meas.norm,
       });
     }
     return result;
