@@ -85,11 +85,11 @@ Jarv-Bjork,Line,Sella-Nasion line,Reference line connecting Sella to Nasion.,"S,
 Jarv-Bjork,Line,Mandibular plane,Reference plane connecting Gonion to Menton.,"Go,Me",,
 Tweed Analysis,Line,Frankfort Horizontal,Reference plane connecting Porion to Orbitale.,"Po,Or",,
 Tweed Analysis,Line,Mandibular plane,Reference plane connecting Gonion to Menton.,"Go,Me",,
-Ricketts,Distance,Zygomatic width,Width between the frontozygomatic sutures.,"Z-R,Z-L",95,4
-Ricketts,Distance,Zygomatic arch width,Width between the zygomatic arches.,"ZA-R,ZA-L",125,5
-Ricketts,Distance,Jugular width,Maxillary width at jugal points.,"J-R,J-L",65,3
-Ricketts,Distance,Antegonial width,Mandibular width at antegonial notches.,"AG-R,AG-L",90,4
-Ricketts,Distance,Nasal cavity width,Width of the nasal cavity.,"NC-R,NC-L",28,2
+Ricketts PA,Distance,Zygomatic width,Width between the frontozygomatic sutures.,"Z-R,Z-L",95,4
+Ricketts PA,Distance,Zygomatic arch width,Width between the zygomatic arches.,"ZA-R,ZA-L",125,5
+Ricketts PA,Distance,Jugular width,Maxillary width at jugal points.,"J-R,J-L",65,3
+Ricketts PA,Distance,Antegonial width,Mandibular width at antegonial notches.,"AG-R,AG-L",90,4
+Ricketts PA,Distance,Nasal cavity width,Width of the nasal cavity.,"NC-R,NC-L",28,2
 General PA Analysis,Distance,Antegonial width,Width between antegonial notches.,"ag-R,ag-L",90,4
 General PA Analysis,Distance,Condylar width,Width between condylar heads.,"cd/Con-R,cd/Con-L",115,5
 General PA Analysis,Distance,Coronoid width,Width between coronoid processes.,"cor-R,cor-L",95,4
@@ -354,3 +354,43 @@ COGS Analysis,Distance,Lower facial height,Anterior nasal spine to Menton distan
 COGS Analysis,Angle,Facial convexity,Angle between Point A-Nasion-Pogonion.,"A,N,Pog",2,4
 COGS Analysis,Angle 4-pt,U1-NA,Angle between upper incisor axis and NA line.,"Ia,Is,N,A",22,5
 COGS Analysis,Angle 4-pt,L1-NB,Angle between lower incisor axis and NB line.,"Ii,Iia,N,B",25,5
+Basis,Angle,SNA,"Angle between Sella, Nasion, and Point A","s,N,A",82,2
+Basis,Angle,SNB,"Angle between Sella, Nasion, and Point B","s,N,B",80,2
+Basis,Angle,ANB,"Angle between Point A, Nasion, and Point B","A,N,B",2,2
+Basis,Angle,Convexity,"Angle between Point A, Nasion, and Pogonion","A,N,Pog",0,5
+Basis,Angle 4-pt,Interincisal,Angle between upper and lower incisor axes.,"Isi,Isa,Iii,Iia",135,5
+Basis,Angle 4-pt,U1-SN,Angle between upper incisor axis and SN plane.,"Isi,Isa,s,N",105,5
+Cagliari,Angle,SNA,"Angle between Sella, Nasion, and Point A","s,N,A",82,2
+Cagliari,Angle,SNB,"Angle between Sella, Nasion, and Point B","s,N,B",80,2
+Cagliari,Angle,ANB,"Angle between Point A, Nasion, and Point B","A,N,B",2,2
+Cagliari,Angle,Convexity,"Angle between Point A, Nasion, and Pogonion","A,N,Pog",0,5
+Cagliari,Angle 4-pt,SN-GoGn,Angle between SN plane and Go-Gn line.,"s,N,Go,Gn",32,4
+Cagliari,Angle 4-pt,FMA,Angle between FH plane and mandibular plane.,"Po,Or,Go,Gn",22,4
+Cagliari,Angle 4-pt,Interincisal,Angle between upper and lower incisor axes.,"Isi,Isa,Iii,Iia",135,5
+Cagliari,Angle 4-pt,U1-SN,Angle between upper incisor axis and SN plane.,"Isi,Isa,s,N",105,5
+Cagliari,Angle 4-pt,Occ plane-SN,Angle between occlusal plane and SN plane.,"APOcc,PPOcc,s,N",14,4
+Cagliari,Angle 4-pt,Facial angle,Angle between FH plane and facial (N-Pog) plane.,"Po,Or,N,Pog",87,3
+Cagliari,Angle 4-pt,Y-axis,Angle between s-Gn line and FH plane.,"s,Gn,Po,Or",59,3
+Chieti,Angle,SNA,"Angle between Sella, Nasion, and Point A","s,N,A",82,2
+Chieti,Angle,SNB,"Angle between Sella, Nasion, and Point B","s,N,B",80,2
+Chieti,Angle,ANB,"Angle between Point A, Nasion, and Point B","A,N,B",2,2
+Chieti,Angle,Convexity,"Angle between Point A, Nasion, and Pogonion","A,N,Pog",0,5
+Chieti,Angle 4-pt,SN-GoGn,Angle between SN plane and Go-Gn line.,"s,N,Go,Gn",32,4
+Chieti,Angle 4-pt,FMA,Angle between FH plane and mandibular plane.,"Po,Or,Go,Gn",22,4
+Chieti,Angle 4-pt,Interincisal,Angle between upper and lower incisor axes.,"Isi,Isa,Iii,Iia",135,5
+Chieti,Angle 4-pt,U1-SN,Angle between upper incisor axis and SN plane.,"Isi,Isa,s,N",105,5
+Chieti,Angle 4-pt,Occ plane-SN,Angle between occlusal plane and SN plane.,"APOcc,PPOcc,s,N",14,4
+Chieti,Angle 4-pt,Facial angle,Angle between FH plane and facial (N-Pog) plane.,"Po,Or,N,Pog",87,3
+Chieti,Angle 4-pt,Y-axis,Angle between s-Gn line and FH plane.,"s,Gn,Po,Or",59,3
+McGann,Angle,SNA,"Angle between Sella, Nasion, and Point A","s,N,A",82,2
+McGann,Angle,SNB,"Angle between Sella, Nasion, and Point B","s,N,B",80,2
+McGann,Angle,ANB,"Angle between Point A, Nasion, and Point B","A,N,B",2,2
+McGann,Angle,Convexity,"Angle between Point A, Nasion, and Pogonion","A,N,Pog",0,5
+McGann,Angle 4-pt,SN-GoGn,Angle between SN plane and Go-Gn line.,"s,N,Go,Gn",32,4
+McGann,Angle 4-pt,FMA,Angle between FH plane and mandibular plane.,"Po,Or,Go,Gn",22,4
+McGann,Angle 4-pt,Interincisal,Angle between upper and lower incisor axes.,"Isi,Isa,Iii,Iia",135,5
+McGann,Angle 4-pt,U1-SN,Angle between upper incisor axis and SN plane.,"Isi,Isa,s,N",105,5
+McGann,Angle 4-pt,Occ plane-SN,Angle between occlusal plane and SN plane.,"APOcc,PPOcc,s,N",14,4
+McGann,Angle 4-pt,Facial angle,Angle between FH plane and facial (N-Pog) plane.,"Po,Or,N,Pog",87,3
+McGann,Angle 4-pt,Y-axis,Angle between s-Gn line and FH plane.,"s,Gn,Po,Or",59,3
+General Analysis,Distance,Incisura width,Width between incisura mandibulae points.,"Inc-L,Inc-R",90,5

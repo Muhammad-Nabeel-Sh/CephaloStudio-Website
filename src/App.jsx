@@ -1246,18 +1246,23 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     const existingLabels=new Set(markups.map(m=>m.label));
     const result=[];
     for(const meas of analysis.measurements){
-      if(meas.type==="ratio"||meas.type==="sum"||meas.type==="difference"||meas.type==="percentage"||meas.type==="projDist")continue;
+      if(meas.type==="ratio"||meas.type==="sum"||meas.type==="difference"||meas.type==="percentage")continue;
       if(!meas.pts||meas.pts.length<2)continue;
       if(existingLabels.has(meas.l))continue;
       const allPlaced=meas.pts.every(rl=>placed[rl]);
       if(!allPlaced)continue;
       const points=meas.pts.map(rl=>placed[rl].points[0]);
+      const extraProps={};
+      if(meas.type==="line"&&!meas.norm){
+        extraProps.mode="infinite";
+        extraProps.style="dashed";
+      }
       result.push({
         id:uid(),type:meas.type,points,
         label:meas.l,definition:meas.def||"",
         color:meas.color||"#888",
         visible:true,locked:true,autoCreated:true,
-        norm:meas.norm,
+        norm:meas.norm,...extraProps,
       });
     }
     const updatedLabels=new Set([...existingLabels,...result.map(m=>m.label)]);
