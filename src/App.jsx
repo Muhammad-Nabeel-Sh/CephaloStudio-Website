@@ -640,7 +640,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     return val.toFixed(1)+"°";
   };
   const pushUndo=()=>{
-    undoStackRef.current.push(JSON.stringify(markups));
+    undoStackRef.current.push(JSON.stringify({markups,norms,placingMode,placingIdx,placingQueue}));
     if(undoStackRef.current.length>50)undoStackRef.current.shift();
     redoStackRef.current=[];
   };
@@ -648,7 +648,14 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const undo=()=>{
     if(undoStackRef.current.length===0)return;
     const prev=undoStackRef.current.pop();
-    if(prev)updVer({markups:JSON.parse(prev)});
+    if(!prev)return;
+    const parsed=JSON.parse(prev);
+    if(Array.isArray(parsed)){
+      updVer({markups:parsed});
+    }else{
+      updVer({markups:parsed.markups,norms:parsed.norms});
+      dispatch({type:"SET",payload:{placingMode:parsed.placingMode,placingIdx:parsed.placingIdx,placingQueue:parsed.placingQueue}});
+    }
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const redo=()=>{
