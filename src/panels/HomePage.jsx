@@ -1,13 +1,15 @@
 import { useState, useRef } from "react";
 import { THEMES } from "../constants.js";
 import { Btn, Tag } from "../ui.jsx";
+import StartupWizard from "./StartupWizard.jsx";
 
-function NewCaseForm({t,onCreate,onCancel}){
+function NewCaseForm({t,onSubmit,onCancel}){
   const[d,setD]=useState({name:"Case 001",patientId:"",patientName:"",dob:"",age:"",gender:"",ethnicity:"",clinician:"",facility:"",referral:"",notes:""});
   const upd=(k,v)=>setD(prev=>({...prev,[k]:v}));
   return(
-    <div>
-      <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:18,color:t.tx,marginBottom:20}}>New Case</div>
+    <div style={{width:560,maxWidth:"95vw"}}>
+      <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:18,color:t.tx,marginBottom:4}}>New Case</div>
+      <div style={{fontSize:13,color:t.tx2,marginBottom:20}}>Enter patient and case details before starting the setup wizard.</div>
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
         {[["name","Case Name *",""],["patientId","Patient ID",""],["patientName","Patient Name",""],["dob","Date of Birth","date"],["age","Age","number"],["gender","","select-gender"],["ethnicity","Ethnicity",""],["clinician","Clinician",""],["facility","Facility",""],["referral","Referral",""],].map(([k,label,type])=>(
           <div key={k}>
@@ -29,13 +31,15 @@ function NewCaseForm({t,onCreate,onCancel}){
         <textarea value={d.notes} onChange={e=>upd("notes",e.target.value)} rows={2}
           style={{background:t.surf3,border:`1px solid ${t.bdr}`,borderRadius:4,padding:"4px 8px",color:t.tx,fontSize:12,width:"100%",fontFamily:"inherit",resize:"vertical",boxSizing:"border-box"}}/>
       </div>
-      <div style={{display:"flex",gap:8}}><Btn t={t} onClick={()=>onCreate(d.name||"New Case",d)} disabled={!d.name} style={{flex:1}}>Create Case →</Btn><Btn t={t} onClick={onCancel} style={{flex:1}}>Cancel</Btn></div>
+      <div style={{display:"flex",gap:8}}><Btn t={t} onClick={()=>onSubmit(d.name||"New Case",d)} disabled={!d.name} style={{flex:1}}>Start Setup →</Btn><Btn t={t} onClick={onCancel} style={{flex:1}}>Cancel</Btn></div>
     </div>
   );
 }
 
 export default function HomePage({t,theme,setTheme,projects,onOpen,onCreate,onImport}){
-  const[hov,setHov]=useState(null);const[newProj,setNewProj]=useState(null);
+  const[hov,setHov]=useState(null);
+  // flow: null | {proj, phase:"form"} | {proj, phase:"wizard", caseData:{name,meta}}
+  const[flow,setFlow]=useState(null);
   const fileRef=useRef(null);
   const portals=[
     {id:"lateral",title:"Lateral Cephalogram",subtitle:"Profile view analysis",desc:"Sagittal skeletal & dental relationships, airway analysis, vertical proportions,  growth patterns",analyses:["Steiner","Ricketts","McNamara","Downs","Tweed","Björk-Jarabak"],color:t.acc,
@@ -84,7 +88,7 @@ export default function HomePage({t,theme,setTheme,projects,onOpen,onCreate,onIm
       {/* PORTAL CARDS */}
       <div style={{maxWidth:1100,margin:"0 auto",padding:"0 32px 40px",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))",gap:20}}>
         {portals.map(portal=>(
-          <div key={portal.id} onMouseEnter={()=>setHov(portal.id)} onMouseLeave={()=>setHov(null)} onClick={()=>setNewProj(portal.id)}
+          <div key={portal.id} onMouseEnter={()=>setHov(portal.id)} onMouseLeave={()=>setHov(null)} onClick={()=>setFlow({proj:portal.id,phase:"form"})}
             style={{background:hov===portal.id?t.surf2:t.surf,border:`1px solid ${hov===portal.id?portal.color+"88":t.bdr}`,borderRadius:16,padding:28,cursor:"pointer",transition:"all 0.2s",transform:hov===portal.id?"translateY(-4px)":"none",boxShadow:hov===portal.id?`0 16px 40px ${t.shadow},0 0 0 1px ${portal.color}22`:`0 2px 8px ${t.shadow}`}}>
             <div style={{marginBottom:20,display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
               {portal.icon}
@@ -138,11 +142,18 @@ export default function HomePage({t,theme,setTheme,projects,onOpen,onCreate,onIm
         </div>
       </div>}
 
-      {/* NEW CASE FORM */}
-      {newProj&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:50,display:"flex",alignItems:"center",justifyContent:"center",padding:24}} onClick={e=>e.target===e.currentTarget&&setNewProj(null)}>
-        <div style={{background:t.surf,border:`1px solid ${t.bdr}`,borderRadius:14,padding:28,width:560,maxWidth:"95vw",maxHeight:"90vh",overflowY:"auto"}}>
-          <NewCaseForm t={t} projection={newProj} onCreate={(name,meta)=>{onCreate(newProj,name,meta);setNewProj(null);}} onCancel={()=>setNewProj(null)}/>
-        </div>
+      {/* OVERLAY: New Case Form → Startup Wizard */}
+      {flow&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:50,display:"flex",alignItems:"center",justifyContent:"center",padding:24}} onClick={e=>e.target===e.currentTarget&&setFlow(null)}>
+        {flow.phase==="form"&&<div style={{background:t.surf,border:`1px solid ${t.bdr}`,borderRadius:14,padding:28}}>
+          <NewCaseForm t={t} onSubmit={(name,meta)=>setFlow({...flow,phase:"wizard",caseData:{name,meta}})} onCancel={()=>setFlow(null)}/>
+        </div>}
+        {flow.phase==="wizard"&&<StartupWizard t={t} projection={flow.proj}
+          onComplete={(result)=>{
+            onCreate(flow.proj,{...result,name:flow.caseData.name,meta:flow.caseData.meta});
+            setFlow(null);
+          }}
+          onCancel={()=>setFlow(null)}/>
+        }
       </div>}
 
       {/* FEATURE STRIP */}

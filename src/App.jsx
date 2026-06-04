@@ -10,7 +10,6 @@ import { drawMarkup, drawInProgress, drawScaleBar, drawLUTLegend, drawSnapIndica
 import { MarkupsPanel, MeasurementsPanel, FormulasPanel, ImagePanel, LayersPanel, MarkupProps, TemplatesPanel, SilhouettesPanel } from "./panels.jsx";
 import { Modal } from "./panels/Modal.jsx";
 import HomePage from "./panels/HomePage.jsx";
-import TemplatePickerModal from "./panels/TemplatePickerModal.jsx";
 import VersionsPanel from "./panels/VersionsPanel.jsx";
 import AnonModal from "./panels/AnonModal.jsx";
 import ReproducibilityPanel from "./panels/ReproducibilityPanel.jsx";
@@ -45,22 +44,13 @@ function exportCepht(template){
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}));
   a.download=`${template.name.replace(/\s+/g,"_")}.cepht`;a.click();
 }
-function importCepht(file,onLoad){
-  const reader=new FileReader();
-  reader.onload=e=>{try{const d=JSON.parse(e.target.result);if(d.format==="cepht")onLoad(d);else alert("Invalid .cepht file");}catch(err){console.error("Cepht import error:",err);alert("Cannot parse template");}};
-  reader.readAsText(file);
-}
-function exportTemplateAsCepht(project,templateName){
-  const excludedTypes=["perp","parallel","arrow","text","ruler"];
+function exportTemplateAsCepht(project,name){
+  const excludedTypes=["polygon","arrow","text","curve"];
   const allMarkups=project.versions[0]?.markups||[];
   const markupsToExport=allMarkups.filter(m=>!excludedTypes.includes(m.type)).map(m=>({type:m.type,label:m.label,definition:m.definition,color:m.color,visible:m.visible}));
-  const template={name:templateName,projection:project.projection,markups:markupsToExport,formulas:project.versions[0]?.formulas||[],norms:project.versions[0]?.norms||[]};
-  const payload={format:"cepht",version:"1.0",exported:Date.now(),...template};
-  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}));
-  a.download=`${templateName.replace(/\s+/g,"_")}.cepht`;a.click();
+  const template={name,projection:project.projection,markups:markupsToExport,formulas:project.versions[0]?.formulas||[],norms:project.versions[0]?.norms||[]};
+  exportCepht(template);
 }
-
-
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // NEW CASE FORM
@@ -536,7 +526,6 @@ const INITIAL_WORKSPACE={
   showFormulaEditor:false,editFormulaId:null,
   placingMode:false,placingQueue:[],placingIdx:0,
   loadingImages:false,
-  showTemplatePicker:true,
   isMobile:window.innerWidth<768,showMobilePanel:false,
   toolbarPos:{x:70,y:100},toolbarDragging:false,
   rightPanelWidth:320,rightPanelResizing:false,
@@ -562,7 +551,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     rightPanel,showCalib,pendingRuler,showExport,showAnon,showAlign,showTransform,
     pendingTextPos,showFormulaEditor,editFormulaId,
     placingMode,placingQueue,placingIdx,loadingImages,
-    showTemplatePicker,isMobile,showMobilePanel,
+    isMobile,showMobilePanel,
     toolbarPos,toolbarDragging,rightPanelWidth,rightPanelResizing,
     reproStudies,activeStudyId,reproCollecting,spotlightMode,
     databaseMode,databaseImages,currentImageIndex,showDatabaseImport}=ws;
@@ -603,6 +592,21 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     window.addEventListener("mouseup",onUp);
     return()=>{window.removeEventListener("mousemove",onMove);window.removeEventListener("mouseup",onUp);};
   },[toolbarDragging]);
+
+  // Auto-start placing mode when project has unplaced markups (from wizard)
+  const placingInitRef=useRef(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(()=>{
+    if(!placingInitRef.current)return;
+    placingInitRef.current=false;
+    const unplaced=markups.filter(m=>!m.placed&&m.type==="point");
+    if(unplaced.length>0){
+      setPlacingQueue(unplaced.map(m=>m.id));
+      dispatch({type:"SET",payload:{placingIdx:0}});
+      dispatch({type:"SET",payload:{placingMode:true}});
+      dispatch({type:"SET",payload:{rightPanel:"markups"}});
+    }
+  },[]);
 
   const isPanning=useRef(false);const panStart=useRef(null);
   const isDragging=useRef(false);const dragStart=useRef(null);const dragStartState=useRef(null);
@@ -943,6 +947,10 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     const sp=getCanvasPos(e);let ip=toImage(sp.x,sp.y);
     ip=snapPoint(ip,activeMarkupsList,12/zoom,snapEnabled);
      if(placingMode&&placingQueue.length>0&&placingIdx<placingQueue.length){
+       if(placingIdx===0&&!calibration.done&&project.images.length>0){
+         dispatch({type:"SET",payload:{showCalib:true}});
+         return;
+       }
        const qid=placingQueue[placingIdx];
        const updatedMarkups=markups.map(m=>m.id===qid?{...m,points:[ip],placed:true}:m);
         const newAuto=autoCreateMeasurements(updatedMarkups,analysisTemplate);
@@ -1148,7 +1156,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       if(!currentDraw)dispatch({type:"SET",payload:{currentDraw:{type:activeTool,points:[ip],curveStyle:"linear",replacingId}}});
       else{const nps=[...currentDraw.points,ip];const need={line:2,angle3:3,angle4:4,perp:3}[activeTool];if(need&&nps.length>=need){finalizeMarkup({...currentDraw,points:nps});dispatch({type:"SET",payload:{currentDraw:null}});}else dispatch({type:"SET",payload:{currentDraw:{...currentDraw,points:nps}}});}return;}
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[activeTool,markups,zoom,pan,snapEnabled,currentDraw,selectedMarkup,placingMode,placingQueue,placingIdx,reproCollecting,reproStudies,databaseMode,databaseImages,currentImageIndex,replacingId,setSelectedId,updMarkup,addMarkup,finalizeMarkup,toImage,getCanvasPos,t,analysisTemplate]);
+  },[activeTool,markups,zoom,pan,snapEnabled,currentDraw,selectedMarkup,placingMode,placingQueue,placingIdx,reproCollecting,reproStudies,databaseMode,databaseImages,currentImageIndex,replacingId,setSelectedId,updMarkup,addMarkup,finalizeMarkup,toImage,getCanvasPos,t,analysisTemplate,calibration,project]);
 
   const handleMouseMove=useCallback(e=>{
     const currentDbImg=databaseMode&&!reproCollecting&&databaseImages.length>0?databaseImages[currentImageIndex]:null;
@@ -1219,6 +1227,10 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   };
 
   const loadTemplate=(analysis)=>{
+    if(project.images.length===0){
+      alert("Please load a cephalometric image before loading a template.");
+      return;
+    }
     const newMarkups=[];
     const pointIds={};
     analysis.pts.forEach(pt=>{
@@ -1310,37 +1322,6 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     const ms=computeMeasurements(m,calibration);
     const vals=Object.values(ms).filter(v=>typeof v==="number"&&isFinite(v));
     return vals.length>0?vals[0]:0;
-  };
-
-  const projectionKeyMap={
-    "Submentovertex (SMV)":"smv",
-    "Panoramic Radiograph (OPG)":"opg",
-    "Hand-Wrist Radiograph":"handwrist",
-    "Lateral Photo":"photolateral",
-    "Frontal Photo":"photofrontal",
-  };
-  const handleTemplatePick=(type,analysis,file)=>{
-    dispatch({type:"SET",payload:{showTemplatePicker:false}});
-    if(type==="blank")return;
-    if(type==="analysis"&&analysis){loadTemplate(analysis);return;}
-    if(type==="complete"&&analysis){loadTemplate(analysis);return;}
-    if(type==="projection"&&analysis){
-      const key=projectionKeyMap[analysis.name];
-      if(key&&PREDEFINED[key]&&PREDEFINED[key].length>0){
-        const template=PREDEFINED[key][0];
-        const projData={name:template?.name||analysis.name,pts:template?.pts||[]};
-        if(projData.pts.length>0){loadTemplate(projData);return;}
-      }
-    }
-    if(type==="upload"&&file){
-      importCepht(file,d=>{
-        if(d.markups){
-          const newMarkups=d.markups.map(m=>({...m,id:uid(),points:[{x:-99999,y:-99999}],placed:false}));
-          updVer({markups:[...markups,...newMarkups],analysisTemplate:d.name||"Imported"});
-          setPlacingQueue(newMarkups.map(m=>m.id));dispatch({type:"SET",payload:{placingIdx:0}});dispatch({type:"SET",payload:{placingMode:true}});dispatch({type:"SET",payload:{rightPanel:"markups"}});
-        }
-      });
-    }
   };
 
   const exportCSV=()=>{
@@ -1624,7 +1605,6 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
 
       {/* MODALS */}
       {showDatabaseImport&&<Modal t={t} title="Database Mode - Import Images" onClose={()=>dispatch({type:"SET",payload:{showDatabaseImport:false}})}><DatabaseImportModal t={t} onImport={loadDatabaseImages} onClose={()=>dispatch({type:"SET",payload:{showDatabaseImport:false}})}/></Modal>}
-      {showTemplatePicker&&<Modal t={t} title="" onClose={()=>dispatch({type:"SET",payload:{showTemplatePicker:false}})}><TemplatePickerModal t={t} projection={project.projection} onPick={handleTemplatePick} onClose={()=>dispatch({type:"SET",payload:{showTemplatePicker:false}})}/></Modal>}
       {showCalib&&<Modal t={t} title="Calibration" onClose={()=>dispatch({type:"SET",payload:{showCalib:false}})}><CalibModal t={t} calibration={calibration} onFinish={finalizeCalib}/></Modal>}
       {showExport&&<Modal t={t} title="Export" onClose={()=>dispatch({type:"SET",payload:{showExport:false}})}><div style={{display:"flex",flexDirection:"column",gap:10}}><Btn t={t} onClick={()=>{exportCSV();dispatch({type:"SET",payload:{showExport:false}});}}>Measurements CSV</Btn><Btn t={t} onClick={()=>{onSave?.(project);dispatch({type:"SET",payload:{showExport:false}});}}>Full Project .cephx</Btn><Btn t={t} onClick={()=>{const name=window.prompt("Template name:",project.name+" Template");if(name){exportTemplateAsCepht(project,name);dispatch({type:"SET",payload:{showExport:false}});}}}>Template .cepht</Btn></div></Modal>}
       {pendingTextPos&&<Modal t={t} title="Text Annotation" onClose={()=>dispatch({type:"SET",payload:{pendingTextPos:null}})}><TextModal t={t} defaultColor="#fbbf24" onConfirm={(txt,opts)=>{addMarkup({type:"text",points:[pendingTextPos],text:txt,...opts});dispatch({type:"SET",payload:{pendingTextPos:null}});}} onCancel={()=>dispatch({type:"SET",payload:{pendingTextPos:null}})}/></Modal>}
@@ -2845,8 +2825,28 @@ export default function CephalometryStudio(){
   const updateProject=(id,patch)=>{dirtyRef.current=true;setProjects(prev=>prev.map(p=>p.id===id?{...p,...patch,modified:Date.now()}:p));};
   const updateVersion=(projectId,versionId,patch)=>{dirtyRef.current=true;setProjects(prev=>prev.map(p=>{if(p.id!==projectId)return p;return{...p,modified:Date.now(),versions:p.versions.map(v=>v.id===versionId?{...v,...patch}:v)};}));};
 
-  const createProject=(projection,name,meta)=>{
-    const p={...mkProject(projection),name,meta:{...mkProject(projection).meta,...meta}};
+  const createProject=(projection,result)=>{
+    const p={...mkProject(projection),name:result.name};
+    if(result.image)p.images=[result.image];
+    const v=p.versions.find(v=>v.id===p.activeVersionId);
+    v.calibration=result.calibration||{done:false,pxPerMm:1,knownMm:""};
+    if(result.templateType==="analysis"||result.templateType==="complete"){
+      const analysis=result.analysis;
+      if(analysis){
+        v.markups=analysis.pts.map(pt=>({
+          id:uid(),type:"point",points:[{x:-99999,y:-99999}],
+          label:pt.l,definition:pt.def,color:pt.color,
+          size:6,visible:true,placed:false,
+        }));
+        v.analysisTemplate=analysis.name;
+      }
+    }else if(result.templateType==="upload"&&result.templateData){
+      const d=result.templateData;
+      if(d.markups){
+        v.markups=d.markups.map(m=>({...m,id:uid(),points:[{x:-99999,y:-99999}],placed:false}));
+        v.analysisTemplate=d.name||"Imported";
+      }
+    }
     setProjects(prev=>[...prev,p]);setActiveId(p.id);
   };
 
