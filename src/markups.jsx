@@ -1,4 +1,4 @@
-import { clamp, dist, angle3pt, angle4pt, perpDist, polyArea, polyLen, vpts, catmullRom, splineArea, splineLen, getInfiniteLinePoints } from "./utils.js";
+import { clamp, dist, angle3pt, angle4pt, perpDist, polyArea, polyLen, vpts, catmullRom, splineArea, splineLen, getInfiniteLinePoints, projectedDistance } from "./utils.js";
 import { SILHOUETTES } from "./silhouettes.js";
 
 function isReproPointVisible(m, reproCollecting){
@@ -76,6 +76,9 @@ export function drawMarkup(ctx, m, zoom, pan, cal, sel, t, reproCollecting, canv
         break;
       case "text":
         drawText(ctx, m, sp, isSel, t, zoom, showAnnotations, annotationSize);
+        break;
+      case "projDist":
+        drawProjDist(ctx, m, sp, isSel, t, cal, zoom, pan, showAnnotations, annotationSize);
         break;
       case "ruler":
         drawRuler(ctx, m, sp, t, zoom, showAnnotations, annotationSize);
@@ -434,6 +437,78 @@ function drawPerp(ctx, m, sp, t, cal, zoom, pan, showAnnotations, annotationSize
         drawMeasLabel(ctx, pd.toFixed(1) + " mm", lx + 5, ly, showAnnotations, annotationSize, m);
       }
     }
+  }
+}
+
+function drawProjDist(ctx, m, sp, isSel, t, cal, zoom, pan, showAnnotations, annotationSize = 1){
+  if(sp.length < 4){ ctx.restore(); return; }
+  const ip = vpts(m);
+  if(ip.length < 4) return;
+  const ppm = cal?.pxPerMm || 1;
+  const col = m.color || "#a78bfa";
+
+  // reference line (points 2 and 3)
+  ctx.strokeStyle = col + "88";
+  ctx.lineWidth = (m.width || 1.5) * Math.sqrt(zoom);
+  ctx.setLineDash([6 * Math.sqrt(zoom), 4 * Math.sqrt(zoom)]);
+  ctx.beginPath();
+  ctx.moveTo(sp[2].x, sp[2].y);
+  ctx.lineTo(sp[3].x, sp[3].y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // perpendiculars from ptA and ptB to reference line
+  const foot = (idx) => {
+    const ax = ip[2].x, ay = ip[2].y, bx = ip[3].x, by = ip[3].y;
+    const px = ip[idx].x, py = ip[idx].y;
+    const t2 = ((px - ax) * (bx - ax) + (py - ay) * (by - ay)) / Math.max(dist(ip[2], ip[3]) ** 2, 1e-9);
+    return { x: ax + t2 * (bx - ax), y: ay + t2 * (by - ay) };
+  };
+  const fA = foot(0), fB = foot(1);
+  const sfA = { x: fA.x * zoom + pan.x, y: fA.y * zoom + pan.y };
+  const sfB = { x: fB.x * zoom + pan.x, y: fB.y * zoom + pan.y };
+
+  ctx.strokeStyle = col + "66";
+  ctx.lineWidth = 1 * Math.sqrt(zoom);
+  ctx.setLineDash([3 * Math.sqrt(zoom), 3 * Math.sqrt(zoom)]);
+  ctx.beginPath(); ctx.moveTo(sp[0].x, sp[0].y); ctx.lineTo(sfA.x, sfA.y); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(sp[1].x, sp[1].y); ctx.lineTo(sfB.x, sfB.y); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // projected segment (between foot points)
+  ctx.strokeStyle = col;
+  ctx.lineWidth = (m.width || 1.5) * Math.sqrt(zoom);
+  ctx.beginPath();
+  ctx.moveTo(sfA.x, sfA.y);
+  ctx.lineTo(sfB.x, sfB.y);
+  ctx.stroke();
+
+  // right-angle markers at foot points
+  const ang = (p, ref1, ref2) => {
+    const d = Math.min(dist(p, ref1), dist(p, ref2)) * 0.15;
+    const dx = ref2.x - ref1.x, dy = ref2.y - ref1.y, len = Math.sqrt(dx * dx + dy * dy);
+    if(len < 1e-9) return;
+    const nx = dx / len * d, ny = dy / len * d;
+    const perpx = -ny, perpy = nx;
+    ctx.strokeStyle = col + "88";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(p.x + perpx, p.y + perpy);
+    ctx.lineTo(p.x + perpx + nx, p.y + perpy + ny);
+    ctx.lineTo(p.x + nx, p.y + ny);
+    ctx.stroke();
+  };
+  ang(sfA, sp[2], sp[3]);
+  ang(sfB, sp[2], sp[3]);
+
+  // annotation
+  if(cal?.done && showAnnotations && !m.noLabel){
+    const pd = projectedDistance(ip[0], ip[1], ip[2], ip[3]) / ppm;
+    const mx = (sfA.x + sfB.x) / 2;
+    const my = (sfA.y + sfB.y) / 2 - 8 * Math.sqrt(zoom);
+    ctx.font = `bold ${clamp(10 * Math.sqrt(zoom), 8, 14)}px "DM Mono",monospace`;
+    ctx.fillStyle = col;
+    drawMeasLabel(ctx, pd.toFixed(1) + " mm", mx, my, showAnnotations, annotationSize, m);
   }
 }
 
@@ -964,6 +1039,7 @@ export function hitTest(markups, ip, zoom, reproCollecting){
       }
     }
     if(m.type === "perp" && vp.length >= 2 && perpDist(ip, vp[0], vp[1]) < thr) return m.id;
+    if(m.type === "projDist" && vp.length >= 4 && perpDist(ip, vp[2], vp[3]) < thr) return m.id;
     if(m.type === "perp" && vp.length >= 3 && dist(vp[2], ip) < thr * 2) return m.id;
     if(m.type === "text" && vp.length && dist(vp[0], ip) < thr * 4) return m.id;
     if(m.type === "silhouette" && silhouetteHitTest(m, ip, zoom)) return m.id;

@@ -1,0 +1,12 @@
+Analysis,View,Markup type,Landmark,Definition
+Hand-Wrist Analysis,HandWrist,Point,Ses - Adductor sesamoid,"The adductor sesamoid of the thumb, located at the metacarpophalangeal (MP) joint of the thumb. Its ossification marks SMI stage 2+."
+Hand-Wrist Analysis,HandWrist,Point,MP3-E-L - MP3 epiphysis left,"The left (lateral) margin of the epiphysis of the middle phalanx of the third finger."
+Hand-Wrist Analysis,HandWrist,Point,MP3-E-R - MP3 epiphysis right,"The right (medial) margin of the epiphysis of the middle phalanx of the third finger."
+Hand-Wrist Analysis,HandWrist,Point,MP3-D-L - MP3 diaphysis left,"The left (lateral) margin of the distal end of the diaphysis of the middle phalanx of the third finger."
+Hand-Wrist Analysis,HandWrist,Point,MP3-D-R - MP3 diaphysis right,"The right (medial) margin of the distal end of the diaphysis of the middle phalanx of the third finger."
+Hand-Wrist Analysis,HandWrist,Point,MP3-Gap-D - MP3 gap distal,"The most distal point on the MP3 diaphysis, closest to the epiphysis — used to measure the fusion gap."
+Hand-Wrist Analysis,HandWrist,Point,MP3-Gap-P - MP3 gap proximal,"The most proximal point on the MP3 epiphysis, closest to the diaphysis — used to measure the fusion gap."
+Hand-Wrist Analysis,HandWrist,Point,PP3-Gap-D - PP3 gap distal,"The most distal point on the PP3 (proximal phalanx 3) diaphysis, defining the fusion gap."
+Hand-Wrist Analysis,HandWrist,Point,PP3-Gap-P - PP3 gap proximal,"The most proximal point on the PP3 epiphysis, defining the fusion gap."
+Hand-Wrist Analysis,HandWrist,Point,Rad-Gap-P - Radius gap proximal,"The most distal point on the radius diaphysis, closest to the epiphysis — for late-stage fusion assessment."
+Hand-Wrist Analysis,HandWrist,Point,Rad-Gap-D - Radius gap distal,"The most proximal point on the radius epiphysis, defining the distal fusion gap for late SMI staging."

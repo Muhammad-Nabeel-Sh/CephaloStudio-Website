@@ -100,6 +100,9 @@ export function computeMeasurements(m, cal) {
   if (m.type === "perp" && vp.length >= 3) { meas.distance = perpDist(vp[2], vp[0], vp[1]) / ppm; meas.lineLength = dist(vp[0], vp[1]) / ppm; }
   if (m.type === "ratio" && m.computedValue !== undefined) { meas.value = m.computedValue; }
   if (m.type === "sum" && m.computedValue !== undefined) { meas.value = m.computedValue; }
+  if (m.type === "difference" && m.computedValue !== undefined) { meas.value = m.computedValue; }
+  if (m.type === "percentage" && m.computedValue !== undefined) { meas.value = m.computedValue; }
+  if (m.type === "projDist" && vp.length >= 4) { meas.projectedDistance = projectedDistance(vp[0], vp[1], vp[2], vp[3]) / ppm; }
   return meas;
 }
 
@@ -117,6 +120,15 @@ export const catmullRom = (ctx, pts, closed = false) => {
     }
   }
   if (closed) ctx.closePath();
+};
+
+export const projectedDistance = (ptA, ptB, lineP1, lineP2) => {
+  const dx = lineP2.x - lineP1.x, dy = lineP2.y - lineP1.y;
+  const len2 = dx * dx + dy * dy;
+  if (len2 < 1e-12) return 0;
+  const tA = ((ptA.x - lineP1.x) * dx + (ptA.y - lineP1.y) * dy) / len2;
+  const tB = ((ptB.x - lineP1.x) * dx + (ptB.y - lineP1.y) * dy) / len2;
+  return (tA - tB) * Math.sqrt(len2);
 };
 
 export const perpPoint = (p, a, b) => {

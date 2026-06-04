@@ -83,3 +83,54 @@ Grayson Multiplane,PA,Point,Id - Infradentale,The highest and most anterior poin
 Grayson Multiplane,PA,Point,Me - Menton,The lowest point on the mandibular symphysis.
 Grayson Multiplane,PA,Point,Zf-R - Zygomaticofrontal suture (Right),The junction of the zygomatic and frontal bones at the lateral orbital rim on the right side.
 Grayson Multiplane,PA,Point,Zf-L - Zygomaticofrontal suture (Left),The junction of the zygomatic and frontal bones at the lateral orbital rim on the left side.
+Van Arsdale,PA,Point,Cg - Crista galli,"The most superior point of the crista galli, used to construct the mid-sagittal reference (MSR) line."
+Van Arsdale,PA,Point,ANS - Anterior nasal spine,"The tip of the anterior nasal spine, used with Cg to establish MSR."
+Van Arsdale,PA,Point,Co-R - Condylion (Right),The most superior point on the condylar head of the right mandible.
+Van Arsdale,PA,Point,Co-L - Condylion (Left),The most superior point on the condylar head of the left mandible.
+Van Arsdale,PA,Point,Lo-R - Latero-orbitale (Right),The intersection of the lateral orbital contour with the innominate line on the right side.
+Van Arsdale,PA,Point,Lo-L - Latero-orbitale (Left),The intersection of the lateral orbital contour with the innominate line on the left side.
+Van Arsdale,PA,Point,Z-R - Zygomaticofrontal (Right),The medial margin of the zygomaticofrontal suture on the right side.
+Van Arsdale,PA,Point,Z-L - Zygomaticofrontal (Left),The medial margin of the zygomaticofrontal suture on the left side.
+Van Arsdale,PA,Point,J-R - Jugale (Right),The intersection of the outline of the maxillary tuberosity and the zygomatic buttress on the right side.
+Van Arsdale,PA,Point,J-L - Jugale (Left),The intersection of the outline of the maxillary tuberosity and the zygomatic buttress on the left side.
+Van Arsdale,PA,Point,Ag-R - Antegonion (Right),The highest point of the antegonial notch on the right side.
+Van Arsdale,PA,Point,Ag-L - Antegonion (Left),The highest point of the antegonial notch on the left side.
+Van Arsdale,PA,Point,Me - Menton,The lowest point on the symphyseal shadow of the mandible.
+Grummons Simplified AP,PA,Point,Cg - Crista galli,"The most superior point of the crista galli, used to construct the mid-sagittal reference (MSR) line."
+Grummons Simplified AP,PA,Point,ANS - Anterior nasal spine,"The tip of the anterior nasal spine, used with Cg to establish MSR."
+Grummons Simplified AP,PA,Point,Co-R - Condylion (Right),The most superior point on the condylar head of the right mandible.
+Grummons Simplified AP,PA,Point,Co-L - Condylion (Left),The most superior point on the condylar head of the left mandible.
+Grummons Simplified AP,PA,Point,Z-R - Zygomaticofrontal (Right),The medial margin of the zygomaticofrontal suture on the right side.
+Grummons Simplified AP,PA,Point,Z-L - Zygomaticofrontal (Left),The medial margin of the zygomaticofrontal suture on the left side.
+Grummons Simplified AP,PA,Point,J-R - Jugale (Right),The intersection of the outline of the maxillary tuberosity and the zygomatic buttress on the right side.
+Grummons Simplified AP,PA,Point,J-L - Jugale (Left),The intersection of the outline of the maxillary tuberosity and the zygomatic buttress on the left side.
+Grummons Simplified AP,PA,Point,Ag-R - Antegonion (Right),The highest point of the antegonial notch on the right side.
+Grummons Simplified AP,PA,Point,Ag-L - Antegonion (Left),The highest point of the antegonial notch on the left side.
+Grummons Simplified AP,PA,Point,Me - Menton,The lowest point on the symphyseal shadow of the mandible.
+Sassouni Frontal,PA,Point,Cg - Crista galli,"The most superior point of the crista galli, used to construct the mid-sagittal reference (MSR) line."
+Sassouni Frontal,PA,Point,ANS - Anterior nasal spine,"The tip of the anterior nasal spine, used with Cg to establish MSR."
+Sassouni Frontal,PA,Point,Lo-R - Latero-orbitale (Right),The intersection of the lateral orbital contour with the innominate line on the right side.
+Sassouni Frontal,PA,Point,Lo-L - Latero-orbitale (Left),The intersection of the lateral orbital contour with the innominate line on the left side.
+Sassouni Frontal,PA,Point,Z-R - Zygomaticofrontal (Right),The medial margin of the zygomaticofrontal suture on the right side.
+Sassouni Frontal,PA,Point,Z-L - Zygomaticofrontal (Left),The medial margin of the zygomaticofrontal suture on the left side.
+Sassouni Frontal,PA,Point,J-R - Jugale (Right),The intersection of the outline of the maxillary tuberosity and the zygomatic buttress on the right side.
+Sassouni Frontal,PA,Point,J-L - Jugale (Left),The intersection of the outline of the maxillary tuberosity and the zygomatic buttress on the left side.
+Sassouni Frontal,PA,Point,Co-R - Condylion (Right),The most superior point on the condylar head of the right mandible.
+Sassouni Frontal,PA,Point,Co-L - Condylion (Left),The most superior point on the condylar head of the left mandible.
+Sassouni Frontal,PA,Point,Ag-R - Antegonion (Right),The highest point of the antegonial notch on the right side.
+Sassouni Frontal,PA,Point,Ag-L - Antegonion (Left),The highest point of the antegonial notch on the left side.
+Sassouni Frontal,PA,Point,Me - Menton,The lowest point on the symphyseal shadow of the mandible.
+Moorrees Mesh,PA,Point,Cg - Crista galli,"The most superior point of the crista galli, used to construct the mid-sagittal reference (MSR) line."
+Moorrees Mesh,PA,Point,N - Nasion,The most anterior point of the frontonasal suture in the midline.
+Moorrees Mesh,PA,Point,ANS - Anterior nasal spine,"The tip of the anterior nasal spine, used with Cg to establish MSR."
+Moorrees Mesh,PA,Point,Me - Menton,The lowest point on the symphyseal shadow of the mandible.
+Moorrees Mesh,PA,Point,Lo-R - Latero-orbitale (Right),The intersection of the lateral orbital contour with the innominate line on the right side.
+Moorrees Mesh,PA,Point,Lo-L - Latero-orbitale (Left),The intersection of the lateral orbital contour with the innominate line on the left side.
+Moorrees Mesh,PA,Point,Z-R - Zygomaticofrontal (Right),The medial margin of the zygomaticofrontal suture on the right side.
+Moorrees Mesh,PA,Point,Z-L - Zygomaticofrontal (Left),The medial margin of the zygomaticofrontal suture on the left side.
+Moorrees Mesh,PA,Point,J-R - Jugale (Right),The intersection of the outline of the maxillary tuberosity and the zygomatic buttress on the right side.
+Moorrees Mesh,PA,Point,J-L - Jugale (Left),The intersection of the outline of the maxillary tuberosity and the zygomatic buttress on the left side.
+Moorrees Mesh,PA,Point,Co-R - Condylion (Right),The most superior point on the condylar head of the right mandible.
+Moorrees Mesh,PA,Point,Co-L - Condylion (Left),The most superior point on the condylar head of the left mandible.
+Moorrees Mesh,PA,Point,Ag-R - Antegonion (Right),The highest point of the antegonial notch on the right side.
+Moorrees Mesh,PA,Point,Ag-L - Antegonion (Left),The highest point of the antegonial notch on the left side.

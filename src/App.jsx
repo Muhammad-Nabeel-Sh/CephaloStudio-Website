@@ -949,7 +949,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
        const newNorms=[];
        for(const m of newAuto){
          if(m.norm){
-           const measureType=m.type==="angle3"||m.type==="angle4"?"angle":m.type==="line"?"length":m.type==="ratio"||m.type==="sum"?"value":"distance";
+           const measureType=m.type==="angle3"||m.type==="angle4"?"angle":m.type==="line"?"length":m.type==="ratio"||m.type==="sum"||m.type==="difference"||m.type==="percentage"?"value":m.type==="projDist"?"projectedDistance":"distance";
            if(!norms.some(n=>n.markupLabel===m.label&&n.measureType===measureType)){
              newNorms.push({id:uid(),markupLabel:m.label,measureType,mean:m.norm.mean,sd:m.norm.sd,source:analysisTemplate});
            }
@@ -1234,7 +1234,10 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     const analysis=PREDEFINED.lateral.find(a=>a.name===templateName)
       ||PREDEFINED.ap.find(a=>a.name===templateName)
       ||PREDEFINED.smv.find(a=>a.name===templateName)
-      ||PREDEFINED.opg.find(a=>a.name===templateName);
+      ||PREDEFINED.opg.find(a=>a.name===templateName)
+      ||PREDEFINED.handwrist.find(a=>a.name===templateName)
+      ||PREDEFINED.photolateral.find(a=>a.name===templateName)
+      ||PREDEFINED.photofrontal.find(a=>a.name===templateName);
     if(!analysis||!analysis.measurements||analysis.measurements.length===0)return[];
     const placed={};
     for(const m of markups){
@@ -1243,7 +1246,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     const existingLabels=new Set(markups.map(m=>m.label));
     const result=[];
     for(const meas of analysis.measurements){
-      if(meas.type==="ratio"||meas.type==="sum")continue;
+      if(meas.type==="ratio"||meas.type==="sum"||meas.type==="difference"||meas.type==="percentage"||meas.type==="projDist")continue;
       if(!meas.pts||meas.pts.length<2)continue;
       if(existingLabels.has(meas.l))continue;
       const allPlaced=meas.pts.every(rl=>placed[rl]);
@@ -1263,7 +1266,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       if(m.label)markupMap[m.label]=m;
     }
     for(const meas of analysis.measurements){
-      if(meas.type!=="ratio"&&meas.type!=="sum")continue;
+      if(meas.type!=="ratio"&&meas.type!=="sum"&&meas.type!=="difference"&&meas.type!=="percentage")continue;
       if(!meas.pts||meas.pts.length<2)continue;
       if(updatedLabels.has(meas.l))continue;
       const allRefsExist=meas.pts.every(rl=>markupMap[rl]);
@@ -1273,6 +1276,14 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         const v0=getMeasValue(markupMap[meas.pts[0]]);
         const v1=getMeasValue(markupMap[meas.pts[1]]);
         computedValue=v1!==0?v0/v1:0;
+      }else if(meas.type==="difference"){
+        const v0=getMeasValue(markupMap[meas.pts[0]]);
+        const v1=getMeasValue(markupMap[meas.pts[1]]);
+        computedValue=v0-v1;
+      }else if(meas.type==="percentage"){
+        const v0=getMeasValue(markupMap[meas.pts[0]]);
+        const v1=getMeasValue(markupMap[meas.pts[1]]);
+        computedValue=v1!==0?(v0/v1)*100:0;
       }else{
         computedValue=meas.pts.reduce((s,rl)=>s+getMeasValue(markupMap[rl]),0);
       }
@@ -1295,6 +1306,9 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const projectionKeyMap={
     "Submentovertex (SMV)":"smv",
     "Panoramic Radiograph (OPG)":"opg",
+    "Hand-Wrist Radiograph":"handwrist",
+    "Lateral Photo":"photolateral",
+    "Frontal Photo":"photofrontal",
   };
   const handleTemplatePick=(type,analysis,file)=>{
     dispatch({type:"SET",payload:{showTemplatePicker:false}});

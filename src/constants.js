@@ -6,6 +6,9 @@ import smvCsv from "../Data/SMV.csv?raw";
 import opgCsv from "../Data/OPG.csv?raw";
 import lateralCsv from "../Data/LateralCeph.csv?raw";
 import paCsv from "../Data/PA_Ceph.csv?raw";
+import handwristCsv from "../Data/HandWrist.csv?raw";
+import photolateralCsv from "../Data/Photo_Lateral.csv?raw";
+import photofrontalCsv from "../Data/Photo_Frontal.csv?raw";
 import analysisMeasurementsCsv from "../Data/AnalysisMeasurements.csv?raw";
 import { parseAnalysisCsv } from "./csvParser.js";
 
@@ -13,6 +16,9 @@ const _smvAnalyses = parseAnalysisCsv(smvCsv);
 const _opgAnalyses = parseAnalysisCsv(opgCsv);
 const _lateralAnalyses = parseAnalysisCsv(lateralCsv);
 const _paAnalyses = parseAnalysisCsv(paCsv);
+const _handwristAnalyses = parseAnalysisCsv(handwristCsv);
+const _photolateralAnalyses = parseAnalysisCsv(photolateralCsv);
+const _photofrontalAnalyses = parseAnalysisCsv(photofrontalCsv);
 const _measurementDefs = parseAnalysisCsv(analysisMeasurementsCsv);
 
 // Build a measurement lookup by analysis name
@@ -69,6 +75,15 @@ const _lateralHardcoded = [
     { l: "Go", def: "The point of intersection of the ramus plane and the mandibular plane.", color: "#a78bfa" },
     { l: "Is", def: "The incisal point of the most prominent medial maxillary incisor.", color: "#fb923c" },
     { l: "Ii", def: "The incisal point of the most prominent medial mandibular incisor.", color: "#f472b6" },
+    { l: "Ia", def: "The root apex of the most anterior maxillary central incisor.", color: "#fb923c" },
+    { l: "Iia", def: "The root apex of the most anterior mandibular central incisor.", color: "#f472b6" },
+    { l: "APOcc", def: "Anterior point of occlusion — midpoint of incisor overbite on the functional occlusal plane.", color: "#34d399" },
+    { l: "PPOcc", def: "Posterior point of occlusion — most distal molar contact on the functional occlusal plane.", color: "#34d399" },
+    { l: "Prn", def: "Pronasale — the most protruded point of the apex nasi.", color: "#fbbf24" },
+    { l: "Sn", def: "Subnasale — the midpoint of the columella base at the apex of the nasolabial angle.", color: "#fbbf24" },
+    { l: "Pog'", def: "Soft tissue pogonion — the most anterior point on the soft tissue chin.", color: "#a78bfa" },
+    { l: "UL", def: "Labrale superius — the midpoint of the upper vermilion border.", color: "#f472b6" },
+    { l: "LL", def: "Labrale inferius — the midpoint of the lower vermilion border.", color: "#f472b6" },
   ]},
   { name: "Ricketts Analysis", pts: [
     { l: "N", def: "Nasion is the most anterior point of the frontonasal suture in the middle.", color: "#f59e0b" },
@@ -85,6 +100,18 @@ const _lateralHardcoded = [
     { l: "Gn", def: "The most inferior point on the contour of the chin.", color: "#a78bfa" },
     { l: "Me", def: "The most inferior midline point on the mandibular symphysis.", color: "#a78bfa" },
     { l: "Go", def: "The point of intersection of the ramus plane and the mandibular plane.", color: "#a78bfa" },
+    { l: "PT", def: "Pterygoid point — the most posterior-superior point of the pterygomaxillary fissure.", color: "#34d399" },
+    { l: "Xi", def: "The geometric center of the ramus of the mandible.", color: "#a78bfa" },
+    { l: "PM", def: "Point at the anterior border of the symphysis between point B and pogonion where curvature changes from concave to convex.", color: "#a78bfa" },
+    { l: "DC", def: "Point selected in the center of the neck of the condyle where the basion-nasion plane crosses it.", color: "#34d399" },
+    { l: "Is", def: "The incisal point of the most prominent medial maxillary incisor.", color: "#fb923c" },
+    { l: "Ii", def: "The incisal point of the most prominent medial mandibular incisor.", color: "#f472b6" },
+    { l: "Ia", def: "The root apex of the most anterior maxillary central incisor.", color: "#fb923c" },
+    { l: "Iia", def: "The root apex of the most anterior mandibular central incisor.", color: "#f472b6" },
+    { l: "Prn", def: "Pronasale — the most protruded point of the apex nasi.", color: "#fbbf24" },
+    { l: "Pog'", def: "Soft tissue pogonion — the most anterior point on the soft tissue chin.", color: "#a78bfa" },
+    { l: "UL", def: "Labrale superius — the midpoint of the upper vermilion border.", color: "#f472b6" },
+    { l: "LL", def: "Labrale inferius — the midpoint of the lower vermilion border.", color: "#f472b6" },
   ]},
   { name: "McNamara Analysis", pts: [
     { l: "N", def: "Nasion is the most anterior point of the frontonasal suture in the middle.", color: "#f59e0b" },
@@ -95,6 +122,9 @@ const _lateralHardcoded = [
     { l: "Co", def: "The most superior point of the mandibular condyle.", color: "#34d399" },
     { l: "ANS", def: "Tip of the anterior nasal spine.", color: "#34d399" },
     { l: "PNS", def: "The intersection of palatum posterior durum, palatum molle and fossa pterygopalatina.", color: "#34d399" },
+    { l: "Is", def: "The incisal point of the most prominent medial maxillary incisor.", color: "#fb923c" },
+    { l: "Ii", def: "The incisal point of the most prominent medial mandibular incisor.", color: "#f472b6" },
+    { l: "Ad", def: "Adenoid point — the most prominent point on the posterior pharyngeal wall opposite PNS.", color: "#fbbf24" },
   ]},
   { name: "Downs Analysis", pts: [
     { l: "N", def: "Nasion is the most anterior point of the frontonasal suture in the middle.", color: "#f59e0b" },
@@ -107,6 +137,12 @@ const _lateralHardcoded = [
     { l: "Gn", def: "A point on the chin determined by bisecting the angle formed by the facial and mandibular planes.", color: "#a78bfa" },
     { l: "Me", def: "The most inferior midline point on the mandibular symphysis.", color: "#a78bfa" },
     { l: "Go", def: "The point of intersection of the ramus plane and the mandibular plane.", color: "#a78bfa" },
+    { l: "APOcc", def: "Anterior point of occlusion — midpoint of incisor overbite on the functional occlusal plane.", color: "#34d399" },
+    { l: "PPOcc", def: "Posterior point of occlusion — most distal molar contact on the functional occlusal plane.", color: "#34d399" },
+    { l: "Is", def: "The incisal point of the most prominent medial maxillary incisor.", color: "#fb923c" },
+    { l: "Ii", def: "The incisal point of the most prominent medial mandibular incisor.", color: "#f472b6" },
+    { l: "Ia", def: "The root apex of the most anterior maxillary central incisor.", color: "#fb923c" },
+    { l: "Iia", def: "The root apex of the most anterior mandibular central incisor.", color: "#f472b6" },
   ]},
   { name: "Bjork Analysis", pts: [
     { l: "Ar", def: "The point of intersection of the dorsal contours of processus articularis mandibulae and os temporale. The midpoint is used where double projection gives rise to two articulare points.", color: "#60a5fa" },
@@ -122,15 +158,24 @@ const _lateralHardcoded = [
     { l: "Gn", def: "A point on the chin determined by bisecting the angle formed by the facial and mandibular planes.", color: "#a78bfa" },
     { l: "Me", def: "The most inferior midline point on the mandibular symphysis.", color: "#a78bfa" },
     { l: "Go", def: "The point of intersection of the ramus plane and the mandibular plane.", color: "#a78bfa" },
+    { l: "Is", def: "The incisal point of the most prominent medial maxillary incisor.", color: "#fb923c" },
+    { l: "Ii", def: "The incisal point of the most prominent medial mandibular incisor.", color: "#f472b6" },
+    { l: "Ia", def: "The root apex of the most anterior maxillary central incisor.", color: "#fb923c" },
+    { l: "Iia", def: "The root apex of the most anterior mandibular central incisor.", color: "#f472b6" },
   ]},
   { name: "Tweed Analysis", pts: [
     { l: "N", def: "Nasion is the most anterior point of the frontonasal suture in the middle.", color: "#f59e0b" },
+    { l: "S", def: "The center of sella turcica (the midpoint of the horizontal diameter).", color: "#f59e0b" },
     { l: "Or", def: "The lowest point on the left infraorbital margin.", color: "#60a5fa" },
     { l: "Po", def: "The highest point on the superior surface of the soft tissue of the external auditory meati.", color: "#60a5fa" },
+    { l: "A", def: "The deepest midline point on the premaxilla between the anterior nasal spine and prosthion.", color: "#60a5fa" },
+    { l: "B", def: "The deepest midline point on the mandible between infradentale and pogonion.", color: "#60a5fa" },
     { l: "Me", def: "The most inferior midline point on the mandibular symphysis.", color: "#a78bfa" },
     { l: "Go", def: "The point of intersection of the ramus plane and the mandibular plane.", color: "#a78bfa" },
     { l: "Xi", def: "The midpoint of the Xi path (a small round radiopacity representing the intersection of the ramus plane with the posterior border of the mandibular canal).", color: "#34d399" },
     { l: "Pog", def: "The most anterior point on the chin.", color: "#a78bfa" },
+    { l: "Ii", def: "The incisal point of the most prominent medial mandibular incisor.", color: "#f472b6" },
+    { l: "Iia", def: "The root apex of the most anterior mandibular central incisor.", color: "#f472b6" },
   ]},
   { name: "Jarv-Bjork", pts: [
     { l: "N", def: "Nasion is the most anterior point of the frontonasal suture in the middle.", color: "#f59e0b" },
@@ -155,6 +200,8 @@ const _lateralHardcoded = [
     { l: "Or", def: "The lowest point on the left infraorbital margin.", color: "#60a5fa" },
     { l: "Ba", def: "Most inferior posterior point of the occipital bone.", color: "#f59e0b" },
     { l: "N", def: "Nasion is the most anterior point of the frontonasal suture in the middle.", color: "#f59e0b" },
+    { l: "APOcc", def: "Anterior point of occlusion — midpoint of incisor overbite on the functional occlusal plane.", color: "#fb923c" },
+    { l: "PPOcc", def: "Posterior point of occlusion — most distal molar contact on the functional occlusal plane.", color: "#fb923c" },
   ]},
 ];
 
@@ -192,9 +239,19 @@ export const TOOLS = [
   { id: "ruler", icon: "⟺", label: "Ruler/Cal", key: "r" },
 ];
 
+const _existingApNames = new Set([
+  "Ricketts","General PA Analysis","Grummons Frontal Asymmetry","Hewitt","Svanholt-Solow","Grayson Multiplane",
+]);
+const _additionalAp = _paAnalyses
+  .filter(a => {
+    if (a.pts.length === 0) return false;
+    return !_existingApNames.has(a.name);
+  });
+
 export const PREDEFINED = {
   lateral: [..._lateralHardcoded, ..._additionalLateral],
   ap: [
+    ..._additionalAp,
     { name: "Ricketts", pts: [
       { l: "Crg", def: "Crista galli - the most superior point of the Crista galli.", color: "#f59e0b" },
       { l: "ANS", def: "Anterior nasal spine - tip of the anterior nasal spine.", color: "#60a5fa" },
@@ -297,6 +354,9 @@ export const PREDEFINED = {
   ],
   smv: _smvAnalyses,
   opg: _opgAnalyses,
+  handwrist: _handwristAnalyses,
+  photolateral: _photolateralAnalyses,
+  photofrontal: _photofrontalAnalyses,
   other: [
     { group: "Standard Orthodontic & Orthognathic", projections: [
       { name: "Submentovertex (SMV)", def: "Evaluating cranial base symmetry, condylar angulation, and transverse discrepancies from a bottom-up angle.", color: "#f59e0b" },
@@ -338,6 +398,21 @@ for (const a of PREDEFINED.smv) {
   }
 }
 for (const a of PREDEFINED.opg) {
+  if (_measurementLookup[a.name]) {
+    a.measurements = _measurementLookup[a.name];
+  }
+}
+for (const a of PREDEFINED.handwrist) {
+  if (_measurementLookup[a.name]) {
+    a.measurements = _measurementLookup[a.name];
+  }
+}
+for (const a of PREDEFINED.photolateral) {
+  if (_measurementLookup[a.name]) {
+    a.measurements = _measurementLookup[a.name];
+  }
+}
+for (const a of PREDEFINED.photofrontal) {
   if (_measurementLookup[a.name]) {
     a.measurements = _measurementLookup[a.name];
   }

@@ -24,6 +24,9 @@ const TYPE_MAP = {
   "Polygon": "polygon",
   "Ratio": "ratio",
   "Sum": "sum",
+  "Difference": "difference",
+  "Percentage": "percentage",
+  "Projected distance": "projDist",
 };
 
 function trimRow(row) {
