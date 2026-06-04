@@ -1,0 +1,17 @@
+Analysis,Markup type,Landmark,Definition,Refs,Norm mean,Norm SD
+Airway Analysis,Point,PNS,Posterior nasal spine - intersection of the palatum durum and the pterygopalatine fossa.,,,
+Airway Analysis,Point,Ad1,"Posterior pharyngeal wall at the level of PNS (superior pharyngeal / adenoid point).",,,
+Airway Analysis,Point,Ad2,"Posterior pharyngeal wall at the level of the soft palate (inferior adenoid point).",,,
+Airway Analysis,Point,SP,Tip of the soft palate (uvula).,,,
+Airway Analysis,Point,Ad3,"Posterior pharyngeal wall at the narrowest retropalatal level (behind SP).",,,
+Airway Analysis,Point,Vallecula,Deepest point of the vallecula (junction of the tongue base and epiglottis).,,,
+Airway Analysis,Point,Epiglottis,Tip of the epiglottis.,,,
+Airway Analysis,Point,PASbot,Posterior pharyngeal wall at the level of the epiglottis tip.,,,
+Airway Analysis,Point,Ad4,Posterior pharyngeal wall at the level of the vallecula.,,,
+Airway Analysis,Polygon Area,Nasopharynx,Nasopharyngeal airway area enclosed by PNS-Ad1-Ad2-SP.,"PNS,Ad1,Ad2,SP",250,50
+Airway Analysis,Polygon Area,Oropharynx,Oropharyngeal airway area enclosed by SP-Ad3-Vallecula.,"SP,Ad3,Vallecula",350,60
+Airway Analysis,Polygon Area,Hypopharynx,Hypopharyngeal airway area enclosed by Vallecula-Epiglottis-PASbot-Ad4.,"Vallecula,Epiglottis,PASbot,Ad4",200,40
+Airway Analysis,Distance,PNS-Ad1,Nasopharyngeal airway depth at the level of PNS.,"PNS,Ad1",15,3
+Airway Analysis,Distance,SP-Ad2,Retropalatal airway depth at the level of the soft palate.,"SP,Ad2",11,3
+Airway Analysis,Distance,Vallecula-Ad4,Hypopharyngeal airway depth at the level of the vallecula.,"Vallecula,Ad4",20,5
+Airway Analysis,Distance,Minimum PAS,Narrowest retropalatal airway dimension (behind SP).,"SP,Ad3",10,3

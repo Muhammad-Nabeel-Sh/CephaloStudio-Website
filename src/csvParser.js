@@ -22,6 +22,7 @@ const TYPE_MAP = {
   "Angle 4-pt": "angle4",
   "Perp": "perp",
   "Polygon": "polygon",
+  "Polygon Area": "polygon",
   "Ratio": "ratio",
   "Sum": "sum",
   "Difference": "difference",

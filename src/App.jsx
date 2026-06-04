@@ -949,7 +949,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
        const newNorms=[];
        for(const m of newAuto){
          if(m.norm){
-           const measureType=m.type==="angle3"||m.type==="angle4"?"angle":m.type==="line"?"length":m.type==="ratio"||m.type==="sum"||m.type==="difference"||m.type==="percentage"?"value":m.type==="projDist"?"projectedDistance":"distance";
+           const measureType=m.type==="angle3"||m.type==="angle4"?"angle":m.type==="line"?"length":m.type==="polygon"?"area":m.type==="ratio"||m.type==="sum"||m.type==="difference"||m.type==="percentage"?"value":m.type==="projDist"?"projectedDistance":"distance";
            if(!norms.some(n=>n.markupLabel===m.label&&n.measureType===measureType)){
              newNorms.push({id:uid(),markupLabel:m.label,measureType,mean:m.norm.mean,sd:m.norm.sd,source:analysisTemplate});
            }
@@ -1256,6 +1256,10 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       if(meas.type==="line"&&!meas.norm){
         extraProps.mode="infinite";
         extraProps.style="dashed";
+      }
+      if(meas.type==="polygon"){
+        extraProps.fillColor="rgba(56,189,248,0.08)";
+        extraProps.curveStyle="linear";
       }
       result.push({
         id:uid(),type:meas.type,points,

@@ -9,6 +9,7 @@ import paCsv from "../Data/PA_Ceph.csv?raw";
 import handwristCsv from "../Data/HandWrist.csv?raw";
 import photolateralCsv from "../Data/Photo_Lateral.csv?raw";
 import photofrontalCsv from "../Data/Photo_Frontal.csv?raw";
+import airwayCsv from "../Data/Airway.csv?raw";
 import analysisMeasurementsCsv from "../Data/AnalysisMeasurements.csv?raw";
 import { parseAnalysisCsv } from "./csvParser.js";
 
@@ -19,6 +20,7 @@ const _paAnalyses = parseAnalysisCsv(paCsv);
 const _handwristAnalyses = parseAnalysisCsv(handwristCsv);
 const _photolateralAnalyses = parseAnalysisCsv(photolateralCsv);
 const _photofrontalAnalyses = parseAnalysisCsv(photofrontalCsv);
+const _airwayAnalyses = parseAnalysisCsv(airwayCsv);
 const _measurementDefs = parseAnalysisCsv(analysisMeasurementsCsv);
 
 // Build a measurement lookup by analysis name
@@ -249,7 +251,7 @@ const _additionalAp = _paAnalyses
   });
 
 export const PREDEFINED = {
-  lateral: [..._lateralHardcoded, ..._additionalLateral],
+  lateral: [..._lateralHardcoded, ..._additionalLateral, ..._airwayAnalyses],
   ap: [
     ..._additionalAp,
     { name: "Ricketts", pts: [
