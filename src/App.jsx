@@ -277,7 +277,7 @@ function DatabaseImportModal({t,onImport,onClose}){
               <div key={idx} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",background:t.surf2,borderRadius:6,marginBottom:4}}>
                 <span style={{flex:1,fontSize:11,color:t.tx,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{f.name}</span>
                 <span style={{fontSize:10,color:t.tx3}}>{(f.size/1024).toFixed(1)} KB</span>
-                <button onClick={()=>removeFile(idx)} style={{background:"none",border:"none",color:t.tx3,cursor:"pointer",fontSize:14}}>×</button>
+                <button onClick={()=>removeFile(idx)} title="Remove file" style={{background:"none",border:"none",color:t.tx3,cursor:"pointer",fontSize:14}}>×</button>
               </div>
             ))}
           </div>
@@ -1335,7 +1335,30 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const cursorStyle={select:"default",pan:"grab",point:"crosshair",line:"crosshair",angle3:"crosshair",angle4:"crosshair",polygon:"crosshair",curve:"crosshair",perp:"crosshair",parallel:"crosshair",midpoint:"crosshair",perppoint:"crosshair",arrow:"crosshair",text:"text",ruler:"crosshair"}[activeTool]||"default";
   const _availAnalyses=PREDEFINED[project.projection]||[];
 
-  const panelIcons={markups:"◉",measurements:"📏",formulas:"∑",image:"▦",layers:"🗐",versions:"⏲",reproducibility:"↻",statistics:"𝛀",interpretation:"◇",templates:"▤",silhouettes:"⊡"};
+  const panelIcons={
+    markups:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M621.5-338.5Q680-397 680-480t-58.5-141.5Q563-680 480-680t-141.5 58.5Q280-563 280-480t58.5 141.5Q397-280 480-280t141.5-58.5ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Z"/></svg>,
+    measurements:<svg fill="currentColor" height="24px" width="24px" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512" xml:space="preserve"> <g><g>
+		<path d="M418.364,0L0,418.364L93.636,512L512,93.636L418.364,0z M22.153,418.364l16.443-16.443l54.875,54.875l11.076-11.076
+			l-54.875-54.875l10.939-10.939l16.477,16.477l11.076-11.077l-16.477-16.477l10.939-10.939l27.485,27.485l11.077-11.076
+			l-27.485-27.485l10.939-10.939l16.477,16.477l11.076-11.077l-16.477-16.477l10.939-10.939l54.874,54.875l11.076-11.077
+			l-54.875-54.875l10.939-10.939l16.477,16.477l11.076-11.076l-16.476-16.474l10.939-10.939l27.485,27.485l11.076-11.076
+			l-27.485-27.485l10.939-10.939l16.477,16.477l11.076-11.076l-16.477-16.477l10.939-10.939l54.874,54.875l11.077-11.076
+			l-54.874-54.875l10.939-10.939l16.477,16.477l11.076-11.076l-16.477-16.477l10.939-10.939l27.485,27.485l11.076-11.076
+			L269.83,170.69l10.939-10.939l16.477,16.477l11.077-11.076l-16.477-16.477l10.939-10.939l54.875,54.875l11.077-11.076
+			l-54.875-54.874l10.939-10.939l16.477,16.477l11.077-11.076l-16.477-16.477l10.939-10.939l27.485,27.485l11.076-11.076
+			l-27.489-27.487l10.939-10.939l16.477,16.477l11.077-11.076l-16.478-16.477l10.939-10.939l54.875,54.875l11.076-11.076
+			l-54.875-54.875l16.443-16.443l71.482,71.482L93.636,489.847L22.153,418.364z"/>
+	</g></g></svg>,
+    formulas:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M240-160v-80l260-240-260-240v-80h480v120H431l215 200-215 200h289v120H240Z"/></svg>,
+    image:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm40-80h480L570-480 450-320l-90-120-120 160Zm-40 80v-560 560Z"/></svg>,
+    layers:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M480-118 120-398l66-50 294 228 294-228 66 50-360 280Zm0-202L120-600l360-280 360 280-360 280Zm0-280Zm0 178 230-178-230-178-230 178 230 178Z"/></svg>,
+    versions:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M200-80q-33 0-56.5-23.5T120-160v-560q0-33 23.5-56.5T200-800h40v-80h80v80h320v-80h80v80h40q33 0 56.5 23.5T840-720v560q0 33-23.5 56.5T760-80H200Zm0-80h560v-400H200v400Zm0-480h560v-80H200v80Zm0 0v-80 80Zm280 240q-17 0-28.5-11.5T440-440q0-17 11.5-28.5T480-480q17 0 28.5 11.5T520-440q0 17-11.5 28.5T480-400Zm-188.5-11.5Q280-423 280-440t11.5-28.5Q303-480 320-480t28.5 11.5Q360-457 360-440t-11.5 28.5Q337-400 320-400t-28.5-11.5ZM640-400q-17 0-28.5-11.5T600-440q0-17 11.5-28.5T640-480q17 0 28.5 11.5T680-440q0 17-11.5 28.5T640-400ZM480-240q-17 0-28.5-11.5T440-280q0-17 11.5-28.5T480-320q17 0 28.5 11.5T520-280q0 17-11.5 28.5T480-240Zm-188.5-11.5Q280-263 280-280t11.5-28.5Q303-320 320-320t28.5 11.5Q360-297 360-280t-11.5 28.5Q337-240 320-240t-28.5-11.5ZM640-240q-17 0-28.5-11.5T600-280q0-17 11.5-28.5T640-320q17 0 28.5 11.5T680-280q0 17-11.5 28.5T640-240Z"/></svg>,
+    reproducibility:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M390-240v-140h-60v-144q0-23 31.5-39.5T440-580q47 0 78.5 16.5T550-524v144h-60v140H390Zm7-377q-17-17-17-43t17-43q17-17 43-17t43 17q17 17 17 43t-17 43q-17 17-43 17t-43-17Zm43 497q-150 0-255-105T80-480q0-75 28.5-140.5t77-114q48.5-48.5 114-77T440-840q75 0 140.5 28.5t114 77q48.5 48.5 77 114T800-480v8l73-74 57 56-170 170-170-170 57-56 73 73v-7q0-116-82-198t-198-82q-116 0-198 82t-82 198q1 116 82.5 198T440-200q57 0 107-21.5t88-58.5l57 57q-49 48-113.5 75.5T440-120Z"/></svg>,
+    statistics:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M320-414v-306h120v306l-60-56-60 56Zm200 60v-526h120v406L520-354ZM120-216v-344h120v224L120-216Zm0 98 258-258 142 122 224-224h-64v-80h200v200h-80v-64L524-146 382-268 232-118H120Z"/></svg>,
+    interpretation:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M280-280h280v-80H280v80Zm0-160h400v-80H280v80Zm0-160h400v-80H280v80Zm-80 480q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm0-560v560-560Z"/></svg>,
+    templates:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M480-60q-50 0-85-35t-35-85q0-39 22.5-70t57.5-43v-73q-11-4-21-9.5T401-389l-63 37q1 5 1.5 10.5t.5 11.5q0 50-35 85t-85 35q-50 0-85-35t-35-85q0-50 35-85t85-35q23 0 43 7.5t36 21.5l62-36q-1-5-1.5-11t-.5-12q0-6 .5-11.5T361-502l-62-37q-16 14-36 21.5t-43 7.5q-50 0-85-35t-35-85q0-50 35-85t85-35q50 0 85 35t35 85q0 6-.5 12t-1.5 11l63 36q8-8 18-13t21-9v-73q-35-12-57.5-43.5T360-780q0-50 35-85t85-35q50 0 85 35t35 85q0 39-22.5 70.5T520-666v73q11 4 20.5 9.5T558-570l64-38q-1-5-1.5-10.5T620-630q0-50 35-85t85-35q50 0 85 35t35 85q0 50-35 85t-85 35q-23 0-42.5-7.5T662-539l-65 38q1 5 1.5 10.5t.5 10.5q0 5-.5 11t-1.5 11l65 37q16-14 35.5-21.5T740-450q50 0 85 35t35 85q0 50-35 85t-85 35q-50 0-85-35t-35-85q0-6 .5-11.5T622-352l-64-37q-8 8-17.5 13t-20.5 9v74q35 12 57.5 43t22.5 70q0 50-35 85t-85 35Zm0-80q17 0 28.5-11.5T520-180q0-17-11.5-28.5T480-220q-17 0-28.5 11.5T440-180q0 17 11.5 28.5T480-140ZM220-290q17 0 28.5-11.5T260-330q0-17-11.5-28.5T220-370q-17 0-28.5 11.5T180-330q0 17 11.5 28.5T220-290Zm520 0q17 0 28.5-11.5T780-330q0-17-11.5-28.5T740-370q-17 0-28.5 11.5T700-330q0 17 11.5 28.5T740-290ZM480-440q17 0 28.5-11.5T520-480q0-17-11.5-28.5T480-520q-17 0-28.5 11.5T440-480q0 17 11.5 28.5T480-440ZM220-590q17 0 28.5-11.5T260-630q0-17-11.5-28.5T220-670q-17 0-28.5 11.5T180-630q0 17 11.5 28.5T220-590Zm520 0q17 0 28.5-11.5T780-630q0-17-11.5-28.5T740-670q-17 0-28.5 11.5T700-630q0 17 11.5 28.5T740-590ZM480-740q17 0 28.5-11.5T520-780q0-17-11.5-28.5T480-820q-17 0-28.5 11.5T440-780q0 17 11.5 28.5T480-740Z"/></svg>,
+    silhouettes:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M240-80v-170q-39-17-68.5-45.5t-50-64.5q-20.5-36-31-77T80-520q0-158 112-259t288-101q176 0 288 101t112 259q0 42-10.5 83t-31 77q-20.5 36-50 64.5T720-250v170H240Zm80-80h40v-80h80v80h80v-80h80v80h40v-142q38-9 67.5-30t50-50q20.5-29 31.5-64t11-74q0-125-88.5-202.5T480-800q-143 0-231.5 77.5T160-520q0 39 11 74t31.5 64q20.5 29 50.5 50t67 30v142Zm100-200h120l-60-120-60 120Zm-80-80q33 0 56.5-23.5T420-520q0-33-23.5-56.5T340-600q-33 0-56.5 23.5T260-520q0 33 23.5 56.5T340-440Zm280 0q33 0 56.5-23.5T700-520q0-33-23.5-56.5T620-600q-33 0-56.5 23.5T540-520q0 33 23.5 56.5T620-440ZM480-160Z"/></svg>
+  };
   const panelTabs=[["markups","Markups"],["measurements","Measure"],["formulas","Formulas"],["image","Image"],["layers","Layers"],["versions","Versions"],["reproducibility","Reproducibility"],["statistics","Statistics"],["interpretation","Interpret"],["templates","Templates"],["silhouettes","Silhouettes"]];
 
   return(
@@ -1359,43 +1382,43 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         {project.meta?.anonymized&&<Tag color={t.ok}>🔒 Anon</Tag>}
         {calibration.done&&!databaseMode&&<Tag color={t.ok}>⟺ {calibration.pxPerMm.toFixed(2)}px/mm</Tag>}
         {databaseMode&&<div style={{display:"flex",alignItems:"center",gap:4}}>
-          <button onClick={()=>navigateImage("prev")} disabled={currentImageIndex===0} style={{background:"none",border:`1px solid ${t.bdr}`,borderRadius:4,padding:"2px 8px",cursor:currentImageIndex===0?"not-allowed":"pointer",color:currentImageIndex===0?t.tx3:t.tx}}>◀</button>
+          <button onClick={()=>navigateImage("prev")} disabled={currentImageIndex===0} title="Previous image" style={{background:"none",border:`1px solid ${t.bdr}`,borderRadius:4,padding:"2px 8px",cursor:currentImageIndex===0?"not-allowed":"pointer",color:currentImageIndex===0?t.tx3:t.tx}}>◀</button>
           <span style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:t.acc}}>{currentImageIndex+1} / {databaseImages.length}</span>
-          <button onClick={()=>navigateImage("next")} disabled={currentImageIndex>=databaseImages.length-1} style={{background:"none",border:`1px solid ${t.bdr}`,borderRadius:4,padding:"2px 8px",cursor:currentImageIndex>=databaseImages.length-1?"not-allowed":"pointer",color:currentImageIndex>=databaseImages.length-1?t.tx3:t.tx}}>▶</button>
+          <button onClick={()=>navigateImage("next")} disabled={currentImageIndex>=databaseImages.length-1} title="Next image" style={{background:"none",border:`1px solid ${t.bdr}`,borderRadius:4,padding:"2px 8px",cursor:currentImageIndex>=databaseImages.length-1?"not-allowed":"pointer",color:currentImageIndex>=databaseImages.length-1?t.tx3:t.tx}}>▶</button>
         </div>}
         {placingMode&&<Tag color={t.warn}>📍 {placingIdx+1}/{placingQueue.length}</Tag>}
         <div style={{flex:1}}/>
         {!isMobile&&<>
-           <Btn ghost t={t} small active={snapEnabled} onClick={()=>dispatch({type:"SET",payload:{snapEnabled:!snapEnabled}})}>
-            <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M565-395q35-35 35-85t-35-85q-35-35-85-35t-85 35q-35 35-35 85t35 85q35 35 85 35t85-35ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 8５.５T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></svg>
-          </Btn>
-           <Btn ghost t={t} small active={showScaleBar} onClick={()=>dispatch({type:"SET",payload:{showScaleBar:!showScaleBar}})}>
+           <Btn ghost t={t} small active={snapEnabled} title="Snap to grid" onClick={()=>dispatch({type:"SET",payload:{snapEnabled:!snapEnabled}})}>
+            <svg fill={t.tx} width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M21.7,12.818a1.022,1.022,0,0,1,0,1.445L20.154,15.81l-3.589-3.589,1.547-1.548a1.022,1.022,0,0,1,1.444,0ZM9.737,2.3,8.19,3.846l3.59,3.589,1.546-1.547a1.021,1.021,0,0,0,0-1.444L11.181,2.3A1.021,1.021,0,0,0,9.737,2.3ZM4.478,19.522a8.458,8.458,0,0,0,11.963,0l2.269-2.268-3.589-3.589-2.269,2.268a3.384,3.384,0,0,1-4.785-4.785l2.269-2.269L6.747,5.29,4.478,7.559A8.458,8.458,0,0,0,4.478,19.522Z"/></svg>
+            </Btn>
+           <Btn ghost t={t} small active={showScaleBar} title="Toggle scale bar" onClick={()=>dispatch({type:"SET",payload:{showScaleBar:!showScaleBar}})}>
              <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M160-240q-33 0-56.5-23.5T80-320v-320q0-33 23.5-56.5T160-720h640q33 0 56.5 23.5T880-640v320q0 33-23.5 56.5T800-240H160Zm0-80h640v-320H680v160h-80v-160h-80v160h-80v-160h-80v160h-80v-160H160v320Zm120-160h80-80Zm160 0h80-80Zm160 0h80-80Zm-120 0Z"/></svg>
            </Btn>
-           <Btn ghost t={t} small active={showAnnotations} onClick={()=>dispatch({type:"SET",payload:{showAnnotations:!showAnnotations}})}>
+           <Btn ghost t={t} small active={showAnnotations} title="Toggle annotations" onClick={()=>dispatch({type:"SET",payload:{showAnnotations:!showAnnotations}})}>
             <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M338-241q16 0 23-10.5t9-24.5q2-10 3.5-20t3.5-22q2-11 4.5-24t5.5-30q23-5 45-8.5t43-5.5q23-3 45.5-4.5T564-394q5 24 10.5 43t11.5 36q8 23 17.5 38t23.5 26q14 11 30.5 12t28.5-9q9-7 9-21t-8-35q-5-11-8.5-22.5T670-350q-5-14-9-25.5t-7-22.5q13-1 23.5-4.5T695-412q7-6 10.5-14.5T709-445q0-11-4.5-18.5T691-476q-9-5-22.5-6.5t-30.5.5q-2-18-4-35.5t-5-35.5q-3-17-5.5-35t-7.5-35q-6-26-17-44.5T574-698q-13-11-28.5-16.5T511-720q-22 0-42 9t-40 27q-11 11-22 23.5T386-631q-8-6-14.5-8t-14.5-2q-11 0-18.5 6t-7.5 20q0 18-2 36t-6 36q-5 26-11 51.5T301-440q-11 2-19.5 5.5T267-427q-8 5-11.5 12.5T252-399q0 7 2 13t7 11q5 5 12 7.5t16 3.5q-1 12-1.5 22.5T287-321q0 21 3 36t9 25q6 10 15.5 14.5T338-241Zm71-223q6-23 14-44.5t18-44.5q16-37 34-59t32-22q11 0 19 17t13 51q3 20 5 43t4 43q-17 1-35 2.5t-35 3.5q-17 2-34.5 4.5T409-464ZM160-80q-33 0-56.5-23.5T80-160v-640q0-33 23.5-56.5T160-880h640q33 0 56.5 23.5T880-800v640q0 33-23.5 56.5T800-80H160Zm0-80h640v-640H160v640Zm0 0v-640 640Z"/></svg>
           </Btn>
           {showAnnotations&&<input type="range" min="0.5" max="2" step="0.1" value={annotationSize} onChange={e=>dispatch({type:"SET",payload:{annotationSize:+e.target.value}})} style={{width:60,marginLeft:4,accentColor:t.acc}} title={`Annotation size: ${annotationSize.toFixed(1)}`}/>}
-          {project.images.length>1&&<Btn ghost t={t} small active={showDisplacement} onClick={()=>dispatch({type:"SET",payload:{showDisplacement:!showDisplacement}})}>⇝ Vec</Btn>}
+          {project.images.length>1&&<Btn ghost t={t} small active={showDisplacement} title="Toggle displacement vectors" onClick={()=>dispatch({type:"SET",payload:{showDisplacement:!showDisplacement}})}>⇝ Vec</Btn>}
           <div style={{width:1,height:20,background:t.bdr}}/>
         </>}
-        <Btn ghost t={t} small onClick={()=>openImgRef.current?.click()}>
+        <Btn ghost t={t} small title="Open image" onClick={()=>openImgRef.current?.click()}>
           <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}>
           <path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm40-80h480L570-480 450-320l-90-120-120 160Zm-40 80v-560 560Z"/> 
           </svg>
         </Btn>
-        <Btn ghost t={t} small onClick={()=>importRef.current?.click()}>
+        <Btn ghost t={t} small title="Import (.cephx)" onClick={()=>importRef.current?.click()}>
           <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}>
             <path d="M440-320v-326L336-542l-56-58 200-200 200 200-56 58-104-104v326h-80ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z"/>
           </svg>
         </Btn>
-        <Btn ghost t={t} small onClick={()=>onSave?.(project)}>
+        <Btn ghost t={t} small title="Save project" onClick={()=>onSave?.(project)}>
           <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}>
             <path d="M840-680v480q0 33-23.5 56.5T760-120H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h480l160 160Zm-80 34L646-760H200v560h560v-446ZM565-275q35-35 35-85t-35-85q-35-35-85-35t-85 35q-35 35-35 85t35 85q35 35 85 35t85-35ZM240-560h360v-160H240v160Zm-40-86v446-560 114Z"/>
           </svg>
         </Btn>
         {!isMobile&&<div style={{display:"flex",alignItems:"center",gap:6}}>
-          <Btn ghost t={t} small onClick={()=>dispatch({type:"SET",payload:{showDatabaseImport:true}})}>
+          <Btn ghost t={t} small title="Database" onClick={()=>dispatch({type:"SET",payload:{showDatabaseImport:true}})}>
             <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}>
             <path d="M480-120q-151 0-255.5-46.5T120-280v-400q0-66 105.5-113T480-840q149 0 254.5 47T840-680v400q0 67-104.5 113.5T480-120Zm0-479q89 0 179-25.5T760-679q-11-29-100.5-55T480-760q-91 0-178.5 25.5T200-679q14 30 101.5 55T480-599Zm0 199q42 0 81-4t74.5-11.5q35.5-7.5 67-18.5t57.5-25v-120q-26 14-57.5 25t-67 18.5Q600-528 561-524t-81 4q-42 0-82-4t-75.5-11.5Q287-543 256-554t-56-25v120q25 14 56 25t66.5 18.5Q358-408 398-404t82 4Zm0 200q46 0 93.5-7t87.5-18.5q40-11.5 67-26t32-29.5v-98q-26 14-57.5 25t-67 18.5Q600-328 561-324t-81 4q-42 0-82-4t-75.5-11.5Q287-343 256-354t-56-25v99q5 15 31.5 29t66.5 25.5q40 11.5 88 18.5t94 7Z"/></svg>
           </Btn>
@@ -1405,13 +1428,13 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
             </div>
           </button>
         </div>}
-        {!isMobile&&<Btn ghost t={t} small onClick={()=>dispatch({type:"SET",payload:{showExport:true}})}>
+        {!isMobile&&<Btn ghost t={t} small title="Export" onClick={()=>dispatch({type:"SET",payload:{showExport:true}})}>
           <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M160-80v-80h640v80H160Zm320-160L200-600h160v-280h240v280h160L480-240Zm0-130 116-150h-76v-280h-80v280h-76l116 150Zm0-150Z"/></svg>
           </Btn>}
-        {!isMobile&&<Btn ghost t={t} small onClick={()=>dispatch({type:"SET",payload:{showNormogram:true}})}>
+        {!isMobile&&<Btn ghost t={t} small title="Normogram" onClick={()=>dispatch({type:"SET",payload:{showNormogram:true}})}>
           <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M200-120q-33 0-56.5-23.5T120-200v-640h80v640h640v80H200Zm40-120v-360h160v360H240Zm200 0v-560h160v560H440Zm200 0v-200h160v200H640Z"/></svg>
           </Btn>}
-        {!isMobile&&<Btn ghost t={t} small onClick={()=>dispatch({type:"SET",payload:{showAnon:true}})}>
+        {!isMobile&&<Btn ghost t={t} small title="Anonymize" onClick={()=>dispatch({type:"SET",payload:{showAnon:true}})}>
           <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="m644-428-58-58q9-47-27-88t-93-32l-58-58q17-8 34.5-12t37.5-4q75 0 127.5 52.5T660-500q0 20-4 37.5T644-428Zm128 126-58-56q38-29 67.5-63.5T832-500q-50-101-143.5-160.5T480-720q-29 0-57 4t-55 12l-62-62q41-17 84-25.5t90-8.5q151 0 269 83.5T920-500q-23 59-60.5 109.5T772-302Zm20 246L624-222q-35 11-70.5 16.5T480-200q-151 0-269-83.5T40-500q21-53 53-98.5t73-81.5L56-792l56-56 736 736-56 56ZM222-624q-29 26-53 57t-41 67q50 101 143.5 160.5T480-280q20 0 39-2.5t39-5.5l-36-38q-11 3-21 4.5t-21 1.5q-75 0-127.5-52.5T300-500q0-11 1.5-21t4.5-21l-84-82Zm319 93Zm-151 75Z"/></svg>
           </Btn>}
         <div style={{width:1,height:20,background:t.bdr,flexShrink:0}}/>
@@ -1420,7 +1443,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
             <div style={{width:10,height:10,borderRadius:3,background:th.acc}}/>
           </button>
         ))}
-        {isMobile&&<Btn ghost t={t} small active={showMobilePanel} onClick={()=>setShowMobilePanel(v=>!v)}>≡</Btn>}
+        {isMobile&&<Btn ghost t={t} small active={showMobilePanel} title="Toggle panel" onClick={()=>setShowMobilePanel(v=>!v)}>≡</Btn>}
       </div>
 
       {/* BODY */}
@@ -1524,7 +1547,30 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
             {/* Vertical tabs on left side */}
             <div style={{display:"flex",flexDirection:"column",alignItems:"center",paddingTop:8,flexShrink:0,background:t.surf2}}>
               {panelTabs.map(([id,label])=>{
-                const icons={markups:"◉",measurements:"📏",formulas:"∑",image:"▦",layers:"🗐",versions:"⏲",reproducibility:"↻",statistics:"𝛀",interpretation:"◇",templates:"▤",silhouettes:"⊡",themes:"◐"};
+                const icons={
+                  markups:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M621.5-338.5Q680-397 680-480t-58.5-141.5Q563-680 480-680t-141.5 58.5Q280-563 280-480t58.5 141.5Q397-280 480-280t141.5-58.5ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Z"/></svg>,
+                  measurements: <svg fill="currentColor" height="24px" width="24px" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512" xml:space="preserve"> <g><g>
+                                <path d="M418.364,0L0,418.364L93.636,512L512,93.636L418.364,0z M22.153,418.364l16.443-16.443l54.875,54.875l11.076-11.076
+                                  l-54.875-54.875l10.939-10.939l16.477,16.477l11.076-11.077l-16.477-16.477l10.939-10.939l27.485,27.485l11.077-11.076
+                                  l-27.485-27.485l10.939-10.939l16.477,16.477l11.076-11.077l-16.477-16.477l10.939-10.939l54.874,54.875l11.076-11.077
+                                  l-54.875-54.875l10.939-10.939l16.477,16.477l11.076-11.076l-16.476-16.474l10.939-10.939l27.485,27.485l11.076-11.076
+                                  l-27.485-27.485l10.939-10.939l16.477,16.477l11.076-11.076l-16.477-16.477l10.939-10.939l54.874,54.875l11.077-11.076
+                                  l-54.874-54.875l10.939-10.939l16.477,16.477l11.076-11.076l-16.477-16.477l10.939-10.939l27.485,27.485l11.076-11.076
+                                  L269.83,170.69l10.939-10.939l16.477,16.477l11.077-11.076l-16.477-16.477l10.939-10.939l54.875,54.875l11.077-11.076
+                                  l-54.875-54.874l10.939-10.939l16.477,16.477l11.077-11.076l-16.477-16.477l10.939-10.939l27.485,27.485l11.076-11.076
+                                  l-27.489-27.487l10.939-10.939l16.477,16.477l11.077-11.076l-16.478-16.477l10.939-10.939l54.875,54.875l11.076-11.076
+                                  l-54.875-54.875l16.443-16.443l71.482,71.482L93.636,489.847L22.153,418.364z"/>
+                              </g></g></svg>,
+                  formulas:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M240-160v-80l260-240-260-240v-80h480v120H431l215 200-215 200h289v120H240Z"/></svg>,
+                  image:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm40-80h480L570-480 450-320l-90-120-120 160Zm-40 80v-560 560Z"/></svg>,
+                  layers:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M480-118 120-398l66-50 294 228 294-228 66 50-360 280Zm0-202L120-600l360-280 360 280-360 280Zm0-280Zm0 178 230-178-230-178-230 178 230 178Z"/></svg>,
+                  versions:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M200-80q-33 0-56.5-23.5T120-160v-560q0-33 23.5-56.5T200-800h40v-80h80v80h320v-80h80v80h40q33 0 56.5 23.5T840-720v560q0 33-23.5 56.5T760-80H200Zm0-80h560v-400H200v400Zm0-480h560v-80H200v80Zm0 0v-80 80Zm280 240q-17 0-28.5-11.5T440-440q0-17 11.5-28.5T480-480q17 0 28.5 11.5T520-440q0 17-11.5 28.5T480-400Zm-188.5-11.5Q280-423 280-440t11.5-28.5Q303-480 320-480t28.5 11.5Q360-457 360-440t-11.5 28.5Q337-400 320-400t-28.5-11.5ZM640-400q-17 0-28.5-11.5T600-440q0-17 11.5-28.5T640-480q17 0 28.5 11.5T680-440q0 17-11.5 28.5T640-400ZM480-240q-17 0-28.5-11.5T440-280q0-17 11.5-28.5T480-320q17 0 28.5 11.5T520-280q0 17-11.5 28.5T480-240Zm-188.5-11.5Q280-263 280-280t11.5-28.5Q303-320 320-320t28.5 11.5Q360-297 360-280t-11.5 28.5Q337-240 320-240t-28.5-11.5ZM640-240q-17 0-28.5-11.5T600-280q0-17 11.5-28.5T640-320q17 0 28.5 11.5T680-280q0 17-11.5 28.5T640-240Z"/></svg>,
+                  reproducibility:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M390-240v-140h-60v-144q0-23 31.5-39.5T440-580q47 0 78.5 16.5T550-524v144h-60v140H390Zm7-377q-17-17-17-43t17-43q17-17 43-17t43 17q17 17 17 43t-17 43q-17 17-43 17t-43-17Zm43 497q-150 0-255-105T80-480q0-75 28.5-140.5t77-114q48.5-48.5 114-77T440-840q75 0 140.5 28.5t114 77q48.5 48.5 77 114T800-480v8l73-74 57 56-170 170-170-170 57-56 73 73v-7q0-116-82-198t-198-82q-116 0-198 82t-82 198q1 116 82.5 198T440-200q57 0 107-21.5t88-58.5l57 57q-49 48-113.5 75.5T440-120Z"/></svg>,
+                  statistics:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M320-414v-306h120v306l-60-56-60 56Zm200 60v-526h120v406L520-354ZM120-216v-344h120v224L120-216Zm0 98 258-258 142 122 224-224h-64v-80h200v200h-80v-64L524-146 382-268 232-118H120Z"/></svg>,
+                  interpretation:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M280-280h280v-80H280v80Zm0-160h400v-80H280v80Zm0-160h400v-80H280v80Zm-80 480q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm0-560v560-560Z"/></svg>,
+                  templates:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M480-60q-50 0-85-35t-35-85q0-39 22.5-70t57.5-43v-73q-11-4-21-9.5T401-389l-63 37q1 5 1.5 10.5t.5 11.5q0 50-35 85t-85 35q-50 0-85-35t-35-85q0-50 35-85t85-35q23 0 43 7.5t36 21.5l62-36q-1-5-1.5-11t-.5-12q0-6 .5-11.5T361-502l-62-37q-16 14-36 21.5t-43 7.5q-50 0-85-35t-35-85q0-50 35-85t85-35q50 0 85 35t35 85q0 6-.5 12t-1.5 11l63 36q8-8 18-13t21-9v-73q-35-12-57.5-43.5T360-780q0-50 35-85t85-35q50 0 85 35t35 85q0 39-22.5 70.5T520-666v73q11 4 20.5 9.5T558-570l64-38q-1-5-1.5-10.5T620-630q0-50 35-85t85-35q50 0 85 35t35 85q0 50-35 85t-85 35q-23 0-42.5-7.5T662-539l-65 38q1 5 1.5 10.5t.5 10.5q0 5-.5 11t-1.5 11l65 37q16-14 35.5-21.5T740-450q50 0 85 35t35 85q0 50-35 85t-85 35q-50 0-85-35t-35-85q0-6 .5-11.5T622-352l-64-37q-8 8-17.5 13t-20.5 9v74q35 12 57.5 43t22.5 70q0 50-35 85t-85 35Zm0-80q17 0 28.5-11.5T520-180q0-17-11.5-28.5T480-220q-17 0-28.5 11.5T440-180q0 17 11.5 28.5T480-140ZM220-290q17 0 28.5-11.5T260-330q0-17-11.5-28.5T220-370q-17 0-28.5 11.5T180-330q0 17 11.5 28.5T220-290Zm520 0q17 0 28.5-11.5T780-330q0-17-11.5-28.5T740-370q-17 0-28.5 11.5T700-330q0 17 11.5 28.5T740-290ZM480-440q17 0 28.5-11.5T520-480q0-17-11.5-28.5T480-520q-17 0-28.5 11.5T440-480q0 17 11.5 28.5T480-440ZM220-590q17 0 28.5-11.5T260-630q0-17-11.5-28.5T220-670q-17 0-28.5 11.5T180-630q0 17 11.5 28.5T220-590Zm520 0q17 0 28.5-11.5T780-630q0-17-11.5-28.5T740-670q-17 0-28.5 11.5T700-630q0 17 11.5 28.5T740-590ZM480-740q17 0 28.5-11.5T520-780q0-17-11.5-28.5T480-820q-17 0-28.5 11.5T440-780q0 17 11.5 28.5T480-740Z"/></svg>,
+                  silhouettes:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M240-80v-170q-39-17-68.5-45.5t-50-64.5q-20.5-36-31-77T80-520q0-158 112-259t288-101q176 0 288 101t112 259q0 42-10.5 83t-31 77q-20.5 36-50 64.5T720-250v170H240Zm80-80h40v-80h80v80h80v-80h80v80h40v-142q38-9 67.5-30t50-50q20.5-29 31.5-64t11-74q0-125-88.5-202.5T480-800q-143 0-231.5 77.5T160-520q0 39 11 74t31.5 64q20.5 29 50.5 50t67 30v142Zm100-200h120l-60-120-60 120Zm-80-80q33 0 56.5-23.5T420-520q0-33-23.5-56.5T340-600q-33 0-56.5 23.5T260-520q0 33 23.5 56.5T340-440Zm280 0q33 0 56.5-23.5T700-520q0-33-23.5-56.5T620-600q-33 0-56.5 23.5T540-520q0 33 23.5 56.5T620-440ZM480-160Z"/></svg>,
+                };
                 return(
                   <button key={id} onClick={()=>setRightPanel(id)} title={label}
                     onMouseEnter={e=>{if(rightPanel!==id)e.currentTarget.style.background=t.accMuted;e.currentTarget.style.color=t.acc;}}
@@ -2757,7 +2803,7 @@ function DatabaseDashboard({t,databaseImages}){
                   <div style={{overflowX:"auto"}}>
                     <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
                       <thead><tr style={{borderBottom:`1px solid ${t.bdr}`}}><th style={{textAlign:"left",padding:4,color:t.tx2}}>Label</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Norm Mean</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Norm SD</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Action</th></tr></thead>
-                      <tbody>{norms.map((n,i)=>(<tr key={i} style={{borderBottom:`1px solid ${t.bdr}44`}}><td style={{padding:4,color:t.tx,fontWeight:600}}>{n.label}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{n.mean.toFixed(1)} mm</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{n.sd.toFixed(1)} mm</td><td style={{padding:4,textAlign:"right"}}><button onClick={()=>removeNorm(i)} style={{padding:"2px 6px",borderRadius:4,border:"none",background:t.err+"22",color:t.err,cursor:"pointer",fontSize:9}}>✕</button></td></tr>))}</tbody>
+                      <tbody>{norms.map((n,i)=>(<tr key={i} style={{borderBottom:`1px solid ${t.bdr}44`}}><td style={{padding:4,color:t.tx,fontWeight:600}}>{n.label}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{n.mean.toFixed(1)} mm</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{n.sd.toFixed(1)} mm</td><td style={{padding:4,textAlign:"right"}}>                <button onClick={()=>removeNorm(i)} title="Remove norm" style={{padding:"2px 6px",borderRadius:4,border:"none",background:t.err+"22",color:t.err,cursor:"pointer",fontSize:9}}>✕</button></td></tr>))}</tbody>
                     </table>
                   </div>
                 </div>
@@ -2792,7 +2838,7 @@ function DatabaseDashboard({t,databaseImages}){
               <div style={{fontSize:13,fontWeight:700,color:t.tx}}>Correlation Matrix — Heatmap</div>
               <div style={{display:"flex",gap:6}}>
                 <button onClick={downloadCorrPNG} style={{padding:"4px 10px",borderRadius:6,border:`1px solid ${t.bdr}`,background:t.acc+"18",color:t.acc,cursor:"pointer",fontSize:10,fontWeight:600}} title="Download as PNG">⬇ PNG</button>
-                <button onClick={()=>setCorrModalOpen(false)} style={{padding:"4px 8px",borderRadius:6,border:`1px solid ${t.bdr}`,background:"transparent",color:t.tx2,cursor:"pointer",fontSize:12}}>✕</button>
+                <button onClick={()=>setCorrModalOpen(false)} title="Close" style={{padding:"4px 8px",borderRadius:6,border:`1px solid ${t.bdr}`,background:"transparent",color:t.tx2,cursor:"pointer",fontSize:12}}>✕</button>
               </div>
             </div>
             <canvas ref={corrCanvasRef} style={{borderRadius:8,border:`1px solid ${t.bdr}`}}/>

@@ -11,6 +11,7 @@ export function Btn({ onClick, children, style, active, small, danger, t, disabl
       onClick={onClick}
       disabled={disabled}
       title={title}
+      aria-label={title}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{

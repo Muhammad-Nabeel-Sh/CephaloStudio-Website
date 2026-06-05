@@ -162,7 +162,7 @@ export function FloatingHistogram({ hist, t, lutMode, lutInvert, processing, onP
     <div style={{ position: "fixed", left: pos.x, top: pos.y, width: size.w, background: t.surf, border: `1px solid ${t.bdr}`, borderRadius: 10, boxShadow: `0 8px 32px ${t.shadow}`, zIndex: 200, display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <div onMouseDown={onHeaderMD} style={{ padding: "8px 12px", background: t.surf2, borderBottom: `1px solid ${t.bdr}`, cursor: "move", display: "flex", justifyContent: "space-between", alignItems: "center", userSelect: "none" }}>
         <span style={{ fontSize: 12, fontWeight: 700, color: t.tx }}>Histogram</span>
-        <button onClick={onClose} style={{ background: "none", border: "none", color: t.tx2, cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
+        <button onClick={onClose} title="Close" style={{ background: "none", border: "none", color: t.tx2, cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
       </div>
       <div style={{ padding: "10px 12px", flex: 1, overflowY: "auto" }}>
         <canvas ref={histCanvas} width={size.w - 24} height={hh} style={{ width: "100%", borderRadius: 4, display: "block", marginBottom: 10 }} />

@@ -47,7 +47,7 @@ export function LatexFloatingPanel({ latex, onClose }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center" }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{ background: "#ffffff", borderRadius: 16, padding: "48px 60px", maxWidth: "80vw", minWidth: 360, boxShadow: "0 32px 80px rgba(0,0,0,0.5)", position: "relative" }}>
-        <button onClick={onClose} style={{ position: "absolute", top: 12, right: 16, background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: 22, lineHeight: 1 }}>×</button>
+        <button onClick={onClose} title="Close" style={{ position: "absolute", top: 12, right: 16, background: "none", border: "none", color: "#666", cursor: "pointer", fontSize: 22, lineHeight: 1 }}>×</button>
         <div style={{ color: "#111", fontSize: "40pt", fontFamily: "'KaTeX_Main',serif", textAlign: "center", lineHeight: 1.4 }}>
           <KatexSpan latex={latex} block fontSize={40} />
         </div>

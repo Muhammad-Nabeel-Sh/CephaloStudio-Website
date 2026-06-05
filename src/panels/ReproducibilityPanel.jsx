@@ -155,7 +155,7 @@ export default function ReproducibilityPanel({t,markups,studies,onUpdateStudies,
               </div>
               <div style={{display:"flex",alignItems:"center",gap:6,flexShrink:0}}>
                 {statusBadge(s)}
-                <button type="button" onClick={e=>{e.stopPropagation();deleteStudy(s.id);}} style={{background:"none",border:"none",color:t.tx3,cursor:"pointer",fontSize:16}}>×</button>
+                <button type="button" onClick={e=>{e.stopPropagation();deleteStudy(s.id);}} title="Delete study" style={{background:"none",border:"none",color:t.tx3,cursor:"pointer",fontSize:16}}>×</button>
               </div>
             </div>
             {expandedId===s.id&&(
@@ -220,7 +220,7 @@ export default function ReproducibilityPanel({t,markups,studies,onUpdateStudies,
                                 <td style={{padding:"2px",textAlign:"right",fontFamily:"'DM Mono',monospace",color:t.acc}}>{m.x.toFixed(2)}</td>
                                 <td style={{padding:"2px",textAlign:"right",fontFamily:"'DM Mono',monospace",color:t.acc}}>{m.y.toFixed(2)}</td>
                                 <td>
-                                  <button type="button" onClick={()=>{onUpdateStudies(studies.map(st=>st.id===s.id?{...st,operators:st.operators.map(o=>o.id===op.id?{...o,trials:o.trials.map((tr,ti)=>ti===tIdx?{...tr,measurements:tr.measurements.filter(mm=>mm.id!==m.id)}:tr)}:o)}:st));}} style={{background:"none",border:"none",color:t.tx3,cursor:"pointer",fontSize:10}}>×</button>
+                                  <button type="button" onClick={()=>{onUpdateStudies(studies.map(st=>st.id===s.id?{...st,operators:st.operators.map(o=>o.id===op.id?{...o,trials:o.trials.map((tr,ti)=>ti===tIdx?{...tr,measurements:tr.measurements.filter(mm=>mm.id!==m.id)}:tr)}:o)}:st));}} title="Delete measurement" style={{background:"none",border:"none",color:t.tx3,cursor:"pointer",fontSize:10}}>×</button>
                                 </td>
                               </tr>
                             ))}

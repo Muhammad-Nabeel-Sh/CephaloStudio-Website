@@ -3,7 +3,7 @@ import { useState } from "react";
 export default function ToolBtn({tool,active,onClick,theme,t,style}){
   const[hov,setHov]=useState(false);
   return(
-    <button title={`${tool.label} (${tool.key})`} onClick={onClick}
+    <button title={tool.label} aria-label={tool.label} onClick={onClick}
       onMouseEnter={()=>setHov(true)} onMouseLeave={()=>setHov(false)}
       style={{width:42,height:42,borderRadius:8,border:"none",
         background:active?t.acc:hov?t.accMuted:"transparent",

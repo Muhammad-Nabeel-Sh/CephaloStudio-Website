@@ -115,7 +115,7 @@ export function MarkupsPanel({ markups, t, theme, selectedId, onSelect, onDelete
                       {ms && !isHidden && <div style={{ fontSize: 10, color: t.acc, fontFamily: "'DM Mono',monospace" }}>{ms}</div>}
                       {relNorms.length > 0 && !isHidden && ms && <NormBadges norms={relNorms} meas={meas} t={t} />}
                     </div>
-                    <button onClick={() => onDelete(m.id)} style={{ background: "none", border: "none", color: t.tx3, cursor: "pointer", fontSize: 14, flexShrink: 0 }}>×</button>
+                    <button onClick={() => onDelete(m.id)} title="Delete markup" style={{ background: "none", border: "none", color: t.tx3, cursor: "pointer", fontSize: 14, flexShrink: 0 }}>×</button>
                   </div>
                 </div>
               );
@@ -254,7 +254,7 @@ export function FormulasPanel({ formulas, t, scope, onAdd, onEdit, onDelete }) {
           <div key={f.id} style={{ marginBottom: 10, padding: 10, background: t.surf2, borderRadius: 8, border: `1px solid ${t.bdr}` }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
               <div><div style={{ fontSize: 12, fontWeight: 700, color: t.acc }}>{f.name}</div>{f.unit && <div style={{ fontSize: 10, color: t.tx3 }}>{f.unit}</div>}</div>
-              <div style={{ display: "flex", gap: 4 }}><button onClick={() => onEdit(f.id)} style={{ background: "none", border: `1px solid ${t.bdr}`, color: t.tx2, borderRadius: 4, padding: "2px 6px", cursor: "pointer", fontSize: 10 }}>Edit</button><button onClick={() => onDelete(f.id)} style={{ background: "none", border: "none", color: t.tx3, cursor: "pointer", fontSize: 14 }}>×</button></div>
+              <div style={{ display: "flex", gap: 4 }}><button onClick={() => onEdit(f.id)} style={{ background: "none", border: `1px solid ${t.bdr}`, color: t.tx2, borderRadius: 4, padding: "2px 6px", cursor: "pointer", fontSize: 10 }}>Edit</button><button onClick={() => onDelete(f.id)} title="Delete formula" style={{ background: "none", border: "none", color: t.tx3, cursor: "pointer", fontSize: 14 }}>×</button></div>
             </div>
             {f.latex && <div onClick={() => setBigLatex(f.latex)} style={{ background: t.surf3, borderRadius: 4, padding: "6px 10px", marginBottom: 8, cursor: "pointer", border: `1px solid ${t.bdr}`, minHeight: 28, display: "flex", alignItems: "center" }}>
               <KatexSpan latex={f.latex} block={false} fontSize={10} />
@@ -338,13 +338,13 @@ export function LayersPanel({ t, images, onUpdateImages, onAddImage, showDisplac
       {images.map((img, idx) => (
         <div key={img.id} style={{ marginBottom: 10, border: `1px solid ${t.bdr}`, borderRadius: 8, padding: 10, background: t.surf2 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
-            <button onClick={() => updImg(img.id, { visible: !img.visible })} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: img.visible ? t.acc : t.tx3 }}>{img.visible ? "◎" : "○"}</button>
+            <button onClick={() => updImg(img.id, { visible: !img.visible })} title="Toggle visibility" style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, color: img.visible ? t.acc : t.tx3 }}>{img.visible ? "◎" : "○"}</button>
             <span style={{ flex: 1, fontSize: 12, fontWeight: 600, color: t.tx, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{img.name || `Img ${idx + 1}`}</span>
             <div style={{ display: "flex", gap: 2 }}>
-              {idx > 0 && <button onClick={() => move(idx, -1)} style={{ background: "none", border: `1px solid ${t.bdr}`, color: t.tx2, borderRadius: 3, padding: "1px 4px", cursor: "pointer", fontSize: 10 }}>↑</button>}
-              {idx < images.length - 1 && <button onClick={() => move(idx, 1)} style={{ background: "none", border: `1px solid ${t.bdr}`, color: t.tx2, borderRadius: 3, padding: "1px 4px", cursor: "pointer", fontSize: 10 }}>↓</button>}
+              {idx > 0 && <button onClick={() => move(idx, -1)} title="Move up" style={{ background: "none", border: `1px solid ${t.bdr}`, color: t.tx2, borderRadius: 3, padding: "1px 4px", cursor: "pointer", fontSize: 10 }}>↑</button>}
+              {idx < images.length - 1 && <button onClick={() => move(idx, 1)} title="Move down" style={{ background: "none", border: `1px solid ${t.bdr}`, color: t.tx2, borderRadius: 3, padding: "1px 4px", cursor: "pointer", fontSize: 10 }}>↓</button>}
             </div>
-            <button onClick={() => onUpdateImages(images.filter(i => i.id !== img.id))} style={{ background: "none", border: "none", color: t.tx3, cursor: "pointer", fontSize: 14 }}>×</button>
+            <button onClick={() => onUpdateImages(images.filter(i => i.id !== img.id))} title="Remove image" style={{ background: "none", border: "none", color: t.tx3, cursor: "pointer", fontSize: 14 }}>×</button>
           </div>
           <Sld label="Opacity" value={Math.round((img.opacity || 1) * 100)} min={0} max={100} onChange={v => updImg(img.id, { opacity: v / 100 })} t={t} unit="%" />
           <div style={{ marginBottom: 6 }}>
@@ -357,7 +357,7 @@ export function LayersPanel({ t, images, onUpdateImages, onAddImage, showDisplac
           </div>
           <div style={{ display: "flex", gap: 4 }}>
             {["X", "Y"].map((ax, ai) => (<div key={ax} style={{ flex: 1 }}><div style={{ fontSize: 9, color: t.tx3, marginBottom: 2 }}>{ax} offset</div><input type="number" value={ai === 0 ? img.dx || 0 : img.dy || 0} onChange={e => updImg(img.id, { [ai === 0 ? "dx" : "dy"]: +e.target.value })} style={{ width: "100%", background: t.surf3, border: `1px solid ${t.bdr}`, borderRadius: 4, padding: "3px 5px", color: t.tx, fontSize: 11, fontFamily: "'DM Mono',monospace", boxSizing: "border-box" }} /></div>))}
-            <button onClick={() => updImg(img.id, { dx: 0, dy: 0 })} style={{ alignSelf: "flex-end", background: "none", border: `1px solid ${t.bdr}`, color: t.tx2, borderRadius: 4, padding: "3px 5px", cursor: "pointer", fontSize: 10, height: 24 }}>⊙</button>
+            <button onClick={() => updImg(img.id, { dx: 0, dy: 0 })} title="Reset offset" style={{ alignSelf: "flex-end", background: "none", border: `1px solid ${t.bdr}`, color: t.tx2, borderRadius: 4, padding: "3px 5px", cursor: "pointer", fontSize: 10, height: 24 }}>⊙</button>
           </div>
         </div>
       ))}
@@ -429,7 +429,7 @@ export function TemplatesPanel({ t, projection, onLoadTemplate, onImportCepht })
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
         <div style={{ padding: "10px 12px", borderBottom: `1px solid ${t.bdr}`, display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          <button onClick={() => setSelectedTemplate(null)} style={{ background: "none", border: "none", color: t.tx2, cursor: "pointer", fontSize: 18, padding: 4, display: "flex", alignItems: "center" }}>←</button>
+          <button onClick={() => setSelectedTemplate(null)} title="Back to templates" style={{ background: "none", border: "none", color: t.tx2, cursor: "pointer", fontSize: 18, padding: 4, display: "flex", alignItems: "center" }}>←</button>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: t.tx, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{displayName}</div>
             <div style={{ fontSize: 10, color: t.tx2 }}>{totalItems} items</div>
@@ -587,7 +587,7 @@ export function NormsReferenceModal({ t, onAdd, onClose }) {
           <span style={{ fontSize: 16 }}>📖</span>
           <span style={{ fontSize: 13, fontWeight: 700, color: t.tx, flex: 1 }}>Norms Reference Gallery</span>
           <span style={{ fontSize: 10, color: t.tx3, fontFamily: "'DM Mono',monospace" }}>{Object.values(PREDEFINED_NORMS).reduce((s, p) => s + p.norms.length, 0)} norms</span>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: t.tx3, cursor: "pointer", fontSize: 18, lineHeight: 1, padding: "0 4px" }}>×</button>
+          <button onClick={onClose} title="Close" style={{ background: "none", border: "none", color: t.tx3, cursor: "pointer", fontSize: 18, lineHeight: 1, padding: "0 4px" }}>×</button>
         </div>
         <div style={{ padding: "8px 16px", borderBottom: `1px solid ${t.bdr}44`, flexShrink: 0 }}>
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search norms by name, preset, or source..." style={{ width: "80%", padding: "8px 10px", border: `1px solid ${t.bdr}`, borderRadius: 8, background: t.surf3, color: t.tx, fontSize: 12, outline: "none" }} />
