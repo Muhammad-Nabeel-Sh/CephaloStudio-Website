@@ -539,7 +539,7 @@ function wsReducer(state,action){
   if(action.type==="SET"){const n={...state};for(const[k,v]of Object.entries(action.payload))n[k]=typeof v==="function"?v(state[k]):v;return n;}
   return state;
 }
-function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTheme,onSave}){
+function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTheme,onSave,onImport}){
   const canvasRef=useRef(null);const containerRef=useRef(null);
   const procCache=useRef(new Map());const imgRefs=useRef({});const rafRef=useRef(null);
 
@@ -1366,7 +1366,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       {/* hidden file inputs */}
       <input ref={openImgRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{if(e.target.files[0])loadImage(e.target.files[0]);e.target.value="";}}/>
       <input ref={stackImgRef} type="file" accept="image/*" style={{display:"none"}} onChange={e=>{if(e.target.files[0])loadImage(e.target.files[0],true);e.target.value="";}}/>
-      <input ref={importRef} type="file" accept=".cephx" style={{display:"none"}} onChange={e=>{if(e.target.files[0])importCephx(e.target.files[0],p=>{onUpdateProject(p);});e.target.value="";}}/>
+      <input ref={importRef} type="file" accept=".cephx" style={{display:"none"}} onChange={e=>{if(e.target.files[0])onImport(e.target.files[0]);e.target.value="";}}/>
 
       {/* TOP BAR */}
       <div style={{display:"flex",alignItems:"center",gap:6,padding:"0 10px",height:isMobile?42:46,background:t.surf,flexShrink:0,overflowX:"auto"}}>
@@ -2943,7 +2943,8 @@ export default function CephalometryStudio(){
           onUpdateProject={patch=>updateProject(activeId,patch)}
           onUpdateVersion={(versionId,patch)=>updateVersion(activeId,versionId,patch)}
           onHome={()=>setActiveId(null)} t={t} theme={theme} setTheme={setTheme}
-          onSave={proj=>{exportCephx(proj);dirtyRef.current=false;}}/>
+          onSave={proj=>{exportCephx(proj);dirtyRef.current=false;}}
+          onImport={importCephxFile}/>
       )}
     </div>
   );
