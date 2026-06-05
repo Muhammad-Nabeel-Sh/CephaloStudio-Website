@@ -4,7 +4,7 @@
 
 import { useState } from "react";
 
-export function Btn({ onClick, children, style, active, small, danger, t, disabled, title }) {
+export function Btn({ onClick, children, style, active, small, danger, t, disabled, title, ghost }) {
   const [hov, setHov] = useState(false);
   return (
     <button
@@ -16,7 +16,7 @@ export function Btn({ onClick, children, style, active, small, danger, t, disabl
       style={{
         background: active ? t.acc : hov ? "rgba(255,255,255,0.07)" : "transparent",
         color: active ? (t.id === "light" ? "#fff" : t.bg) : danger ? t.err : hov ? t.tx : t.tx2,
-        border: `1px solid ${active ? t.acc : hov ? t.bdr + "cc" : t.bdr}`,
+        border: ghost ? "none" : `1px solid ${active ? t.acc : hov ? t.bdr + "cc" : t.bdr}`,
         borderRadius: 6,
         padding: small ? "6px 10px" : "8px 16px",
         fontSize: small ? 13 : 15,
