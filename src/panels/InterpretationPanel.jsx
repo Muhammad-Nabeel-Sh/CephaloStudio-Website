@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import { generateInterpretation } from "../interpretation.js";
 import { deviationColor } from "../utils.js";
 
@@ -12,6 +12,15 @@ const CATEGORY_ICONS = {
 };
 
 export default function InterpretationPanel({ allMeas, norms, t, formatAngle }) {
+  const [userEdits, setUserEdits] = useState({});
+  const [editingKey, setEditingKey] = useState(null);
+  const editRef = useRef(null);
+
+  const handleEdit = useCallback((key, text) => {
+    setUserEdits(prev => ({ ...prev, [key]: text }));
+    setEditingKey(null);
+  }, []);
+
   const { deviations, patterns } = useMemo(
     () => generateInterpretation(allMeas, norms),
     [allMeas, norms]
@@ -99,8 +108,23 @@ export default function InterpretationPanel({ allMeas, norms, t, formatAngle }) 
                   {d.description && (
                     <div style={{ fontSize: 10, color: t.tx3, marginBottom: 4, lineHeight: 1.4 }}>{d.description}</div>
                   )}
-                  <div style={{ fontSize: 11, color: t.tx2, fontWeight: 500, lineHeight: 1.5 }}>
-                    {d.interpretation || "No specific interpretation available."}
+                  <div style={{ fontSize: 11, color: t.tx2, fontWeight: 500, lineHeight: 1.5, display: "flex", gap: 6, alignItems: "flex-start" }}>
+                    {editingKey === d.label + d.measureType ? (
+                      <textarea ref={editRef}
+                        defaultValue={userEdits[d.label + d.measureType] || d.interpretation}
+                        onBlur={e => handleEdit(d.label + d.measureType, e.target.value)}
+                        onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleEdit(d.label + d.measureType, e.target.value); } }}
+                        autoFocus
+                        style={{ flex: 1, fontSize: 11, lineHeight: 1.5, background: t.surf3, color: t.tx, border: `1px solid ${t.acc}`, borderRadius: 4, padding: "4px 6px", outline: "none", resize: "vertical", fontFamily: "inherit" }}
+                      />
+                    ) : (
+                      <>
+                        <span style={{ flex: 1 }}>{userEdits[d.label + d.measureType] || d.interpretation || "No specific interpretation available."}</span>
+                        <span onClick={() => setEditingKey(d.label + d.measureType)}
+                          style={{ cursor: "pointer", fontSize: 12, color: t.acc, opacity: 0.7, userSelect: "none", flexShrink: 0, padding: "1px 4px", borderRadius: 3, background: t.acc + "15" }}
+                          title="Edit interpretation">✏</span>
+                      </>
+                    )}
                   </div>
                   <div style={{ fontSize: 9, color: t.tx3, marginTop: 4 }}>
                     Patient: {d.measureType === "angle" && formatAngle ? formatAngle(d.value) : d.value.toFixed(2)} &nbsp;|&nbsp; Norm: {d.mean.toFixed(1)} ± {d.sd.toFixed(1)}

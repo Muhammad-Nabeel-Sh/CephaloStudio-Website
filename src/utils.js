@@ -86,7 +86,15 @@ export function computeMeasurements(m, cal) {
   const ppm = cal?.pxPerMm || 1, meas = {}, vp = vpts(m);
   if (vp.length > 0) { meas.x = vp[0].x; meas.y = vp[0].y; }
   if ((m.type === "line" || m.type === "parallel") && vp.length >= 2 && m.mode !== "infinite") meas.length = dist(vp[0], vp[1]) / ppm;
-  if (m.type === "angle3" && vp.length >= 3) meas.angle = angle3pt(vp[0], vp[1], vp[2]);
+  if (m.type === "angle3" && vp.length >= 3) {
+    if (m.label === "ANB") {
+      const u = { x: vp[0].x - vp[1].x, y: vp[0].y - vp[1].y };
+      const w = { x: vp[2].x - vp[1].x, y: vp[2].y - vp[1].y };
+      meas.angle = Math.atan2(u.x * w.y - u.y * w.x, u.x * w.x + u.y * w.y) * 180 / Math.PI;
+    } else {
+      meas.angle = angle3pt(vp[0], vp[1], vp[2]);
+    }
+  }
   if (m.type === "angle4" && vp.length >= 4) meas.angle = angle4pt(vp[0], vp[1], vp[2], vp[3]);
   if (m.type === "polygon" && vp.length >= 3) {
     const useSpline = m.curveStyle === "bspline" && vp.length >= 3;

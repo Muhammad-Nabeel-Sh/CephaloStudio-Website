@@ -27,10 +27,10 @@ const RULES = {
   ANB: {
     category: "skeletal", subgroup: "ap-differential",
     label: "ANB Angle",
-    description: "Sagittal jaw relationship — difference between SNA and SNB",
-    interpret: (v, m) => {
-      if (v > m + 1) return "Skeletal Class II pattern (mandibular retrognathism or maxillary prognathism)";
-      if (v < m - 1) return "Skeletal Class III pattern (mandibular prognathism or maxillary retrognathism)";
+    description: "Sagittal jaw relationship — difference between SNA and SNB (derived, can be negative)",
+    interpret: (v) => {
+      if (v > 4) return "Skeletal Class II pattern (mandibular retrognathism or maxillary prognathism)";
+      if (v < 0) return "Skeletal Class III pattern (mandibular prognathism or maxillary retrognathism)";
       return "Sagittal jaw relationship is within normal range (Class I)";
     },
   },
@@ -529,6 +529,906 @@ const RULES = {
       if (v > m) return "Steep occlusal plane — associated with hyperdivergent pattern";
       if (v < m) return "Flat occlusal plane — associated with hypodivergent pattern";
       return "Occlusal plane inclination is within normal range";
+    },
+  },
+  // ═══════════════════════════════════════════
+  // SKELETAL — Additional Plane/Length
+  // ═══════════════════════════════════════════
+  "SN-GoGn": {
+    category: "skeletal", subgroup: "vertical",
+    label: "SN-GoGn Angle",
+    description: "Mandibular plane angle relative to SN (same as GoGn-SN)",
+    interpret: (v, m) => {
+      if (v > m) return "Steep mandibular plane — hyperdivergent growth pattern";
+      if (v < m) return "Flat mandibular plane — hypodivergent growth pattern";
+      return "Mandibular plane angle is within normal range";
+    },
+  },
+  "SN-GoMe": {
+    category: "skeletal", subgroup: "vertical",
+    label: "SN-GoMe Angle",
+    description: "Mandibular plane angle relative to SN (measured at menton)",
+    interpret: (v, m) => {
+      if (v > m) return "Steep mandibular plane — hyperdivergent growth pattern";
+      if (v < m) return "Flat mandibular plane — hypodivergent growth pattern";
+      return "Mandibular plane angle is within normal range";
+    },
+  },
+  "Occ plane-SN": {
+    category: "dental", subgroup: "occlusion",
+    label: "Occ Plane-SN Angle",
+    description: "Occlusal plane inclination relative to SN (same as SN-Occ)",
+    interpret: (v, m) => {
+      if (v > m) return "Steep occlusal plane — associated with hyperdivergent pattern";
+      if (v < m) return "Flat occlusal plane — associated with hypodivergent pattern";
+      return "Occlusal plane inclination is within normal range";
+    },
+  },
+  "Occlusal Plane-SN": {
+    category: "dental", subgroup: "occlusion",
+    label: "Occlusal Plane-SN Angle",
+    description: "Occlusal plane inclination relative to SN",
+    interpret: (v, m) => {
+      if (v > m) return "Steep occlusal plane — associated with hyperdivergent pattern";
+      if (v < m) return "Flat occlusal plane — associated with hypodivergent pattern";
+      return "Occlusal plane inclination is within normal range";
+    },
+  },
+  "SN-FH": {
+    category: "skeletal", subgroup: "overall",
+    label: "SN-FH Angle",
+    description: "Angle between SN plane and Frankfort horizontal",
+    interpret: (v, m) => {
+      if (v > m) return "SN plane is steeply inclined relative to Frankfort horizontal";
+      if (v < m) return "SN plane is flat relative to Frankfort horizontal";
+      return "SN-FH relationship is within normal range";
+    },
+  },
+  "S-N": {
+    category: "skeletal", subgroup: "cranial-base",
+    label: "S-N Length",
+    description: "Anterior cranial base length (sella to nasion)",
+    interpret: (v, m) => {
+      if (v > m) return "Anterior cranial base is long";
+      if (v < m) return "Anterior cranial base is short";
+      return "Anterior cranial base length is within normal range";
+    },
+  },
+  "Anterior cranial base": {
+    category: "skeletal", subgroup: "cranial-base",
+    label: "Anterior Cranial Base (S-N)",
+    description: "Length of anterior cranial base",
+    interpret: (v, m) => {
+      if (v > m) return "Anterior cranial base is long";
+      if (v < m) return "Anterior cranial base is short";
+      return "Anterior cranial base length is within normal range";
+    },
+  },
+  "Posterior cranial base": {
+    category: "skeletal", subgroup: "cranial-base",
+    label: "Posterior Cranial Base (S-Ba)",
+    description: "Length of posterior cranial base",
+    interpret: (v, m) => {
+      if (v > m) return "Posterior cranial base is long";
+      if (v < m) return "Posterior cranial base is short";
+      return "Posterior cranial base length is within normal range";
+    },
+  },
+  "S-Ar": {
+    category: "skeletal", subgroup: "cranial-base",
+    label: "S-Ar Length",
+    description: "Posterior cranial base segment from sella to articulare",
+    interpret: (v, m) => {
+      if (v > m) return "Posterior cranial base (S-Ar segment) is long";
+      if (v < m) return "Posterior cranial base (S-Ar segment) is short";
+      return "Posterior cranial base length is within normal range";
+    },
+  },
+  "Ar-Go": {
+    category: "skeletal", subgroup: "mandibular-shape",
+    label: "Ar-Go Length",
+    description: "Ramus height from articulare to gonion",
+    interpret: (v, m) => {
+      if (v > m) return "Mandibular ramus height is increased";
+      if (v < m) return "Mandibular ramus height is decreased";
+      return "Ramus height is within normal range";
+    },
+  },
+  "Go-Pog": {
+    category: "skeletal", subgroup: "mandibular-shape",
+    label: "Go-Pog Length",
+    description: "Mandibular body length from gonion to pogonion",
+    interpret: (v, m) => {
+      if (v > m) return "Mandibular body length is increased";
+      if (v < m) return "Mandibular body length is decreased";
+      return "Mandibular body length is within normal range";
+    },
+  },
+  "Ramus height": {
+    category: "skeletal", subgroup: "mandibular-shape",
+    label: "Ramus Height",
+    description: "Vertical height of mandibular ramus",
+    interpret: (v, m) => {
+      if (v > m) return "Ramus height is increased";
+      if (v < m) return "Ramus height is decreased";
+      return "Ramus height is within normal range";
+    },
+  },
+  "S-N-A": {
+    category: "skeletal", subgroup: "maxilla-ap",
+    label: "S-N-A Angle",
+    description: "Maxillary position relative to cranial base (same as SNA)",
+    interpret: (v, m) => {
+      if (v > m) return "Maxilla is protruded relative to cranial base";
+      if (v < m) return "Maxilla is retruded relative to cranial base";
+      return "Maxillary position is within normal range";
+    },
+  },
+  "S-N-B": {
+    category: "skeletal", subgroup: "mandible-ap",
+    label: "S-N-B Angle",
+    description: "Mandibular position relative to cranial base (same as SNB)",
+    interpret: (v, m) => {
+      if (v > m) return "Mandible is prognathic relative to cranial base";
+      if (v < m) return "Mandible is retrognathic relative to cranial base";
+      return "Mandibular position is within normal range";
+    },
+  },
+  "Facial plane": {
+    category: "skeletal", subgroup: "overall",
+    label: "Facial Plane (N-Pog)",
+    description: "Facial plane line from nasion to pogonion",
+    interpret: (v, m) => {
+      if (v > m) return "Facial plane is more anteriorly inclined";
+      if (v < m) return "Facial plane is more posteriorly inclined";
+      return "Facial plane inclination is within normal range";
+    },
+  },
+  "Facial convexity": {
+    category: "skeletal", subgroup: "ap-differential",
+    label: "Facial Convexity Angle",
+    description: "Angle of facial convexity — soft tissue profile assessment",
+    interpret: (v, m) => {
+      if (v > m) return "Facial profile is more convex";
+      if (v < m) return "Facial profile is more concave or straight";
+      return "Facial convexity is within normal range";
+    },
+  },
+  "BaN-A": {
+    category: "skeletal", subgroup: "maxilla-ap",
+    label: "BaN-A Angle",
+    description: "Maxillary position relative to cranial base (basion-nasion)",
+    interpret: (v, m) => {
+      if (v > m) return "Maxilla is protruded relative to basion-nasion plane";
+      if (v < m) return "Maxilla is retruded relative to basion-nasion plane";
+      return "Maxillary position (BaN-A) is within normal range";
+    },
+  },
+  "BaN-B": {
+    category: "skeletal", subgroup: "mandible-ap",
+    label: "BaN-B Angle",
+    description: "Mandibular position relative to cranial base (basion-nasion)",
+    interpret: (v, m) => {
+      if (v > m) return "Mandible is prognathic relative to basion-nasion plane";
+      if (v < m) return "Mandible is retrognathic relative to basion-nasion plane";
+      return "Mandibular position (BaN-B) is within normal range";
+    },
+  },
+  "BaN-Pog": {
+    category: "skeletal", subgroup: "mandible-ap",
+    label: "BaN-Pog Angle",
+    description: "Chin position relative to cranial base (basion-nasion)",
+    interpret: (v, m) => {
+      if (v > m) return "Chin is more prominent relative to basion-nasion plane";
+      if (v < m) return "Chin is more retrusive relative to basion-nasion plane";
+      return "Chin position (BaN-Pog) is within normal range";
+    },
+  },
+  "Cranial base angle": {
+    category: "skeletal", subgroup: "cranial-base",
+    label: "Cranial Base Angle (N-S-Ba)",
+    description: "Angle at sella between anterior and posterior cranial base",
+    interpret: (v, m) => {
+      if (v > m) return "Cranial base is more flexed (kyphotic)";
+      if (v < m) return "Cranial base is more extended (lordotic)";
+      return "Cranial base angle is within normal range";
+    },
+  },
+  "Craniofacial angle": {
+    category: "skeletal", subgroup: "overall",
+    label: "Craniofacial Angle",
+    description: "Overall craniofacial relationship (Delaire)",
+    interpret: (v, m) => {
+      if (v > m) return "Craniofacial angle is increased — dorsal rotation pattern";
+      if (v < m) return "Craniofacial angle is decreased — ventral rotation pattern";
+      return "Craniofacial angle is within normal range";
+    },
+  },
+  // ═══════════════════════════════════════════
+  // SKELETAL — Facial Height / Length
+  // ═══════════════════════════════════════════
+  "Anterior facial height (N-Me)": {
+    category: "skeletal", subgroup: "vertical",
+    label: "Anterior Facial Height (N-Me)",
+    description: "Total anterior facial height from nasion to menton",
+    interpret: (v, m) => {
+      if (v > m) return "Anterior facial height is increased — long face pattern";
+      if (v < m) return "Anterior facial height is decreased — short face pattern";
+      return "Anterior facial height is within normal range";
+    },
+  },
+  "N-Go": {
+    category: "skeletal", subgroup: "vertical",
+    label: "N-Go Length",
+    description: "Posterior facial height from nasion to gonion",
+    interpret: (v, m) => {
+      if (v > m) return "Posterior facial height is increased";
+      if (v < m) return "Posterior facial height is decreased";
+      return "Posterior facial height is within normal range";
+    },
+  },
+  "Posterior facial height (S-Go)": {
+    category: "skeletal", subgroup: "vertical",
+    label: "Posterior Facial Height (S-Go)",
+    description: "Posterior facial height from sella to gonion",
+    interpret: (v, m) => {
+      if (v > m) return "Posterior facial height is increased";
+      if (v < m) return "Posterior facial height is decreased";
+      return "Posterior facial height is within normal range";
+    },
+  },
+  "N-ANS": {
+    category: "skeletal", subgroup: "vertical",
+    label: "Upper Facial Height (N-ANS)",
+    description: "Upper anterior facial height from nasion to anterior nasal spine",
+    interpret: (v, m) => {
+      if (v > m) return "Upper facial height is increased";
+      if (v < m) return "Upper facial height is decreased";
+      return "Upper facial height is within normal range";
+    },
+  },
+  "Upper facial height": {
+    category: "skeletal", subgroup: "vertical",
+    label: "Upper Facial Height",
+    description: "Upper third of facial height",
+    interpret: (v, m) => {
+      if (v > m) return "Upper facial height is increased";
+      if (v < m) return "Upper facial height is decreased";
+      return "Upper facial height is within normal range";
+    },
+  },
+  "Midface height": {
+    category: "skeletal", subgroup: "vertical",
+    label: "Midface Height",
+    description: "Midface vertical dimension",
+    interpret: (v, m) => {
+      if (v > m) return "Midface height is increased";
+      if (v < m) return "Midface height is decreased";
+      return "Midface height is within normal range";
+    },
+  },
+  "Upper:lower facial ratio": {
+    category: "skeletal", subgroup: "vertical",
+    label: "Upper:Lower Facial Height Ratio",
+    description: "Proportion of upper to lower facial height",
+    interpret: (v, m) => {
+      if (v > m) return "Upper facial height is proportionally greater than lower";
+      if (v < m) return "Lower facial height is proportionally greater than upper";
+      return "Upper:lower facial height ratio is within normal range";
+    },
+  },
+  "Vertical facial ratio": {
+    category: "skeletal", subgroup: "vertical",
+    label: "Vertical Facial Ratio",
+    description: "Ratio of posterior to anterior facial height",
+    interpret: (v, m) => {
+      if (v > m) return "Posterior facial height is proportionally large — hypodivergent tendency";
+      if (v < m) return "Anterior facial height is proportionally large — hyperdivergent tendency";
+      return "Vertical facial ratio is within normal range";
+    },
+  },
+  "Facial width/height ratio": {
+    category: "skeletal", subgroup: "vertical",
+    label: "Facial Width/Height Ratio",
+    description: "Overall facial proportion (width vs height)",
+    interpret: (v, m) => {
+      if (v > m) return "Face is proportionally wider relative to height";
+      if (v < m) return "Face is proportionally taller relative to width";
+      return "Facial width/height ratio is within normal range";
+    },
+  },
+  // ═══════════════════════════════════════════
+  // SKELETAL — AP Linear (McNamara / Wylie)
+  // ═══════════════════════════════════════════
+  "Co-A": {
+    category: "skeletal", subgroup: "maxilla-ap",
+    label: "Co-A Length (McNamara)",
+    description: "Maxillary length from condylion to Point A",
+    interpret: (v, m) => {
+      if (v > m) return "Maxilla is long — maxillary prognathism";
+      if (v < m) return "Maxilla is short — maxillary retrognathism";
+      return "Maxillary length is within normal range";
+    },
+  },
+  "Co-Pog": {
+    category: "skeletal", subgroup: "mandible-ap",
+    label: "Co-Pog Length (McNamara)",
+    description: "Mandibular length from condylion to pogonion",
+    interpret: (v, m) => {
+      if (v > m) return "Mandible is long — mandibular prognathism";
+      if (v < m) return "Mandible is short — mandibular retrognathism";
+      return "Mandibular length is within normal range";
+    },
+  },
+  "ANS-Me": {
+    category: "skeletal", subgroup: "vertical",
+    label: "ANS-Me (McNamara)",
+    description: "Lower anterior facial height (McNamara analysis)",
+    interpret: (v, m) => {
+      if (v > m) return "Lower facial height is increased — vertical maxillary excess";
+      if (v < m) return "Lower facial height is decreased";
+      return "Lower facial height is within normal range";
+    },
+  },
+  "MMD": {
+    category: "skeletal", subgroup: "ap-differential",
+    label: "Maxillomandibular Difference",
+    description: "Difference between mandibular length (Co-Pog) and maxillary length (Co-A)",
+    interpret: (v, m) => {
+      if (v > m) return "Mandibular length is disproportionately greater than maxillary length";
+      if (v < m) return "Maxillary length is disproportionately greater than mandibular length";
+      return "Maxillomandibular difference is within normal range";
+    },
+  },
+  "Maxillary depth": {
+    category: "skeletal", subgroup: "maxilla-ap",
+    label: "Maxillary Depth",
+    description: "AP position of maxilla relative to a reference plane",
+    interpret: (v, m) => {
+      if (v > m) return "Maxilla is more anteriorly positioned";
+      if (v < m) return "Maxilla is more posteriorly positioned";
+      return "Maxillary depth is within normal range";
+    },
+  },
+  "Mandibular depth": {
+    category: "skeletal", subgroup: "mandible-ap",
+    label: "Mandibular Depth",
+    description: "AP position of mandible relative to a reference plane",
+    interpret: (v, m) => {
+      if (v > m) return "Mandible is more anteriorly positioned";
+      if (v < m) return "Mandible is more posteriorly positioned";
+      return "Mandibular depth is within normal range";
+    },
+  },
+  "N-PG": {
+    category: "skeletal", subgroup: "mandible-ap",
+    label: "N-Pog Length (Wylie)",
+    description: "Facial plane distance from nasion to pogonion (projected)",
+    interpret: (v, m) => {
+      if (v > m) return "Mandibular projection is increased";
+      if (v < m) return "Mandibular projection is decreased";
+      return "Mandibular projection is within normal range";
+    },
+  },
+  "A-B distance": {
+    category: "skeletal", subgroup: "ap-differential",
+    label: "A-B Distance",
+    description: "Linear distance between Point A and Point B",
+    interpret: (v, m) => {
+      if (v > m) return "Increased sagittal discrepancy between maxilla and mandible";
+      if (v < m) return "Decreased sagittal distance — jaws are closer together";
+      return "A-B distance is within normal range";
+    },
+  },
+  // ═══════════════════════════════════════════
+  // ANALYSIS-SPECIFIC INDICES
+  // ═══════════════════════════════════════════
+  "ODI": {
+    category: "skeletal", subgroup: "vertical",
+    label: "Overbite Depth Indicator (Kim)",
+    description: "Combined assessment of vertical skeletal relationship (Kim analysis)",
+    interpret: (v, m) => {
+      if (v < m) return "Low ODI — suggests open bite skeletal tendency";
+      if (v > m) return "High ODI — suggests deep bite skeletal tendency";
+      return "ODI is within normal range";
+    },
+  },
+  "APDI": {
+    category: "skeletal", subgroup: "ap-differential",
+    label: "AP Dysplasia Indicator (Kim)",
+    description: "Combined assessment of sagittal skeletal relationship (Kim analysis)",
+    interpret: (v, m) => {
+      if (v > m) return "High APDI — suggests skeletal Class III tendency";
+      if (v < m) return "Low APDI — suggests skeletal Class II tendency";
+      return "APDI is within normal range";
+    },
+  },
+  "CF": {
+    category: "skeletal", subgroup: "overall",
+    label: "Combination Factor (Kim)",
+    description: "Combined vertical and sagittal index (Kim analysis)",
+    interpret: (v, m) => {
+      if (v > m) return "CF is elevated — see ODI and APDI components";
+      if (v < m) return "CF is decreased — see ODI and APDI components";
+      return "Combination factor is within normal range";
+    },
+  },
+  "Z-angle": {
+    category: "soft-tissue", subgroup: "profile",
+    label: "Z-Angle (Merrifield)",
+    description: "Angle between Frankfort horizontal and profile line (Merrifield)",
+    interpret: (v, m) => {
+      if (v > m) return "Facial profile is more convex";
+      if (v < m) return "Facial profile is more concave or straight";
+      return "Z-angle is within normal range";
+    },
+  },
+  "H-line": {
+    category: "soft-tissue", subgroup: "profile",
+    label: "H-Line (Holdaway)",
+    description: "Harmony line from soft tissue chin to upper lip (Holdaway)",
+    interpret: (v, m) => {
+      if (v > m) return "Soft tissue profile is more convex";
+      if (v < m) return "Soft tissue profile is more concave";
+      return "H-line is within normal range";
+    },
+  },
+  "H-angle": {
+    category: "soft-tissue", subgroup: "profile",
+    label: "H-Angle (Holdaway)",
+    description: "Angle between NB line and soft tissue harmony line (Holdaway)",
+    interpret: (v, m) => {
+      if (v > m) return "Soft tissue profile is more convex — increased upper lip prominence";
+      if (v < m) return "Soft tissue profile is more concave — decreased upper lip prominence";
+      return "H-angle is within normal range";
+    },
+  },
+  "Björk sum": {
+    category: "skeletal", subgroup: "overall",
+    label: "Björk Sum of Angles",
+    description: "Sum of saddle + articular + gonial angles — overall facial type",
+    interpret: (v, m) => {
+      if (v > m) return "Increased sum — hyperdivergent facial type (vertical growth tendency)";
+      if (v < m) return "Decreased sum — hypodivergent facial type (horizontal growth tendency)";
+      return "Facial type is within normal range";
+    },
+  },
+  // ═══════════════════════════════════════════
+  // DENTAL — Additional / Aliases
+  // ═══════════════════════════════════════════
+  "Upper incisor to NA line": {
+    category: "dental", subgroup: "maxillary-incisor",
+    label: "Upper Incisor to NA (mm)",
+    description: "Maxillary incisor protrusion relative to NA line (same as U1-NA-mm)",
+    interpret: (v, m) => {
+      if (v > m) return "Maxillary incisors are protrusive";
+      if (v < m) return "Maxillary incisors are retrusive";
+      return "Maxillary incisor position is within normal range";
+    },
+  },
+  "Lower incisor to A-Pog": {
+    category: "dental", subgroup: "mandibular-incisor",
+    label: "Lower Incisor to A-Pog (mm)",
+    description: "Mandibular incisor position relative to A-Pog line (same as L1-APog-mm)",
+    interpret: (v, m) => {
+      if (v > m) return "Mandibular incisors are protrusive relative to A-Pog line";
+      if (v < m) return "Mandibular incisors are retrusive relative to A-Pog line";
+      return "Mandibular incisor position is within normal range";
+    },
+  },
+  "U1-ML": {
+    category: "dental", subgroup: "mandibular-incisor",
+    label: "U1-ML Angle",
+    description: "Angle between maxillary incisor and mandibular line",
+    interpret: (v, m) => {
+      if (v > m) return "Maxillary incisor is proclined relative to mandibular plane";
+      if (v < m) return "Maxillary incisor is retroclined relative to mandibular plane";
+      return "U1-ML angle is within normal range";
+    },
+  },
+  "U1-NSL": {
+    category: "dental", subgroup: "maxillary-incisor",
+    label: "U1-NSL Angle",
+    description: "Maxillary incisor inclination relative to NSL",
+    interpret: (v, m) => {
+      if (v > m) return "Maxillary incisors are proclined";
+      if (v < m) return "Maxillary incisors are retroclined";
+      return "Maxillary incisor inclination is within normal range";
+    },
+  },
+  // ═══════════════════════════════════════════
+  // SOFT TISSUE — Profile / Esthetic
+  // ═══════════════════════════════════════════
+  "Upper lip to E-plane": {
+    category: "soft-tissue", subgroup: "profile",
+    label: "Upper Lip to E-Plane (Ricketts)",
+    description: "Distance from upper lip to esthetic plane (nose-chin line)",
+    interpret: (v, m) => {
+      if (v > m) return "Upper lip is protrusive relative to esthetic plane";
+      if (v < m) return "Upper lip is retrusive relative to esthetic plane";
+      return "Upper lip position is within normal range";
+    },
+  },
+  "Lower lip to E-plane": {
+    category: "soft-tissue", subgroup: "profile",
+    label: "Lower Lip to E-Plane (Ricketts)",
+    description: "Distance from lower lip to esthetic plane (nose-chin line)",
+    interpret: (v, m) => {
+      if (v > m) return "Lower lip is protrusive relative to esthetic plane";
+      if (v < m) return "Lower lip is retrusive relative to esthetic plane";
+      return "Lower lip position is within normal range";
+    },
+  },
+  "Upper lip to S-line": {
+    category: "soft-tissue", subgroup: "profile",
+    label: "Upper Lip to S-Line (Steiner)",
+    description: "Distance from upper lip to Steiner's S-line (SN-pogonion)",
+    interpret: (v, m) => {
+      if (v > m) return "Upper lip is protrusive relative to S-line";
+      if (v < m) return "Upper lip is retrusive relative to S-line";
+      return "Upper lip position is within normal range";
+    },
+  },
+  "Lower lip to S-line": {
+    category: "soft-tissue", subgroup: "profile",
+    label: "Lower Lip to S-Line (Steiner)",
+    description: "Distance from lower lip to Steiner's S-line (SN-pogonion)",
+    interpret: (v, m) => {
+      if (v > m) return "Lower lip is protrusive relative to S-line";
+      if (v < m) return "Lower lip is retrusive relative to S-line";
+      return "Lower lip position is within normal range";
+    },
+  },
+  "Upper lip protrusion": {
+    category: "soft-tissue", subgroup: "profile",
+    label: "Upper Lip Protrusion",
+    description: "Upper lip prominence relative to a reference line",
+    interpret: (v, m) => {
+      if (v > m) return "Upper lip is protrusive";
+      if (v < m) return "Upper lip is retrusive";
+      return "Upper lip protrusion is within normal range";
+    },
+  },
+  "Lower lip protrusion": {
+    category: "soft-tissue", subgroup: "profile",
+    label: "Lower Lip Protrusion",
+    description: "Lower lip prominence relative to a reference line",
+    interpret: (v, m) => {
+      if (v > m) return "Lower lip is protrusive";
+      if (v < m) return "Lower lip is retrusive";
+      return "Lower lip protrusion is within normal range";
+    },
+  },
+  "Nasofrontal angle": {
+    category: "soft-tissue", subgroup: "profile",
+    label: "Nasofrontal Angle",
+    description: "Angle between forehead and nasal dorsum",
+    interpret: (v, m) => {
+      if (v > m) return "Nasofrontal angle is increased — deeper nasal root";
+      if (v < m) return "Nasofrontal angle is decreased — shallower nasal root";
+      return "Nasofrontal angle is within normal range";
+    },
+  },
+  "Mentolabial angle": {
+    category: "soft-tissue", subgroup: "profile",
+    label: "Mentolabial Angle",
+    description: "Angle between lower lip and chin contour",
+    interpret: (v, m) => {
+      if (v > m) return "Mentolabial angle is increased — deeper labiomental groove";
+      if (v < m) return "Mentolabial angle is decreased — shallower labiomental groove";
+      return "Mentolabial angle is within normal range";
+    },
+  },
+  "Cervicomental angle": {
+    category: "soft-tissue", subgroup: "profile",
+    label: "Cervicomental Angle",
+    description: "Angle between neck and chin — defines cervicomental definition",
+    interpret: (v, m) => {
+      if (v > m) return "Cervicomental angle is increased — poor cervicomental definition";
+      if (v < m) return "Cervicomental angle is decreased — well-defined cervicomental contour";
+      return "Cervicomental angle is within normal range";
+    },
+  },
+  "Lip-chin-throat angle": {
+    category: "soft-tissue", subgroup: "profile",
+    label: "Lip-Chin-Throat Angle (Arnett)",
+    description: "Angle formed by lower lip, chin, and throat (Arnett analysis)",
+    interpret: (v, m) => {
+      if (v > m) return "Angle is increased — poor lower face-neck definition";
+      if (v < m) return "Angle is decreased — well-defined lower face-neck contour";
+      return "Lip-chin-throat angle is within normal range";
+    },
+  },
+  "Interlabial gap": {
+    category: "soft-tissue", subgroup: "profile",
+    label: "Interlabial Gap",
+    description: "Distance between upper and lower lip at rest",
+    interpret: (v, m) => {
+      if (v > m) return "Increased interlabial gap — possible lip incompetence";
+      if (v < m) return "Lip closure is within normal limits";
+      return "Interlabial gap is within normal range";
+    },
+  },
+  "Upper lip vertical": {
+    category: "soft-tissue", subgroup: "profile",
+    label: "Upper Lip Vertical (Arnett)",
+    description: "Vertical height of the upper lip (Arnett analysis)",
+    interpret: (v, m) => {
+      if (v > m) return "Upper lip vertical height is increased";
+      if (v < m) return "Upper lip vertical height is decreased";
+      return "Upper lip vertical height is within normal range";
+    },
+  },
+  "Upper lip height": {
+    category: "soft-tissue", subgroup: "profile",
+    label: "Upper Lip Height",
+    description: "Vertical height of upper lip",
+    interpret: (v, m) => {
+      if (v > m) return "Upper lip height is increased";
+      if (v < m) return "Upper lip height is decreased";
+      return "Upper lip height is within normal range";
+    },
+  },
+  "Lower lip height": {
+    category: "soft-tissue", subgroup: "profile",
+    label: "Lower Lip Height",
+    description: "Vertical height of lower lip",
+    interpret: (v, m) => {
+      if (v > m) return "Lower lip height is increased";
+      if (v < m) return "Lower lip height is decreased";
+      return "Lower lip height is within normal range";
+    },
+  },
+  "Nasal bridge length": {
+    category: "soft-tissue", subgroup: "nasal",
+    label: "Nasal Bridge Length",
+    description: "Length of nasal bridge from nasion to pronasale",
+    interpret: (v, m) => {
+      if (v > m) return "Nasal bridge is long";
+      if (v < m) return "Nasal bridge is short";
+      return "Nasal bridge length is within normal range";
+    },
+  },
+  "Nasal protrusion": {
+    category: "soft-tissue", subgroup: "nasal",
+    label: "Nasal Protrusion",
+    description: "Anterior projection of the nose from the facial plane",
+    interpret: (v, m) => {
+      if (v > m) return "Nasal protrusion is increased — prominent nose";
+      if (v < m) return "Nasal protrusion is decreased — flat nose";
+      return "Nasal protrusion is within normal range";
+    },
+  },
+  "Nasal width": {
+    category: "soft-tissue", subgroup: "nasal",
+    label: "Nasal Width",
+    description: "Transverse width of the nose at alar base",
+    interpret: (v, m) => {
+      if (v > m) return "Nasal width is increased — wide nose";
+      if (v < m) return "Nasal width is decreased — narrow nose";
+      return "Nasal width is within normal range";
+    },
+  },
+  "Nasal height": {
+    category: "soft-tissue", subgroup: "nasal",
+    label: "Nasal Height",
+    description: "Vertical height of the nose from nasion to subnasale",
+    interpret: (v, m) => {
+      if (v > m) return "Nasal height is increased";
+      if (v < m) return "Nasal height is decreased";
+      return "Nasal height is within normal range";
+    },
+  },
+  "Soft tissue facial plane": {
+    category: "soft-tissue", subgroup: "profile",
+    label: "Soft Tissue Facial Plane",
+    description: "Soft tissue facial plane from glabella to soft tissue pogonion (Holdaway)",
+    interpret: (v, m) => {
+      if (v > m) return "Soft tissue facial plane is more anteriorly inclined";
+      if (v < m) return "Soft tissue facial plane is more posteriorly inclined";
+      return "Soft tissue facial plane is within normal range";
+    },
+  },
+  "Lower facial profile": {
+    category: "soft-tissue", subgroup: "profile",
+    label: "Lower Facial Profile (Arnett)",
+    description: "Overall lower facial soft tissue profile assessment (Arnett)",
+    interpret: (v, m) => {
+      if (v > m) return "Lower facial profile is more convex";
+      if (v < m) return "Lower facial profile is more concave";
+      return "Lower facial profile is within normal range";
+    },
+  },
+  // ═══════════════════════════════════════════
+  // AIRWAY
+  // ═══════════════════════════════════════════
+  "Minimum PAS": {
+    category: "airway", subgroup: "pharyngeal",
+    label: "Minimum Posterior Airway Space",
+    description: "Narrowest sagittal dimension of the pharyngeal airway",
+    interpret: (v, m) => {
+      if (v < m) return "Minimum pharyngeal airway is narrowed — potential airway restriction";
+      if (v > m) return "Pharyngeal airway is adequate";
+      return "Minimum PAS is within normal range";
+    },
+  },
+  "PNS-Ad1": {
+    category: "airway", subgroup: "nasopharyngeal",
+    label: "PNS-Ad1 (Nasopharyngeal Airway)",
+    description: "Nasopharyngeal airway depth at PNS level",
+    interpret: (v, m) => {
+      if (v < m) return "Nasopharyngeal airway is narrowed";
+      if (v > m) return "Nasopharyngeal airway is adequate";
+      return "Nasopharyngeal airway depth is within normal range";
+    },
+  },
+  "SP-Ad2": {
+    category: "airway", subgroup: "oropharyngeal",
+    label: "SP-Ad2 (Oropharyngeal Airway)",
+    description: "Oropharyngeal airway depth at level of soft palate",
+    interpret: (v, m) => {
+      if (v < m) return "Oropharyngeal airway is narrowed at the level of the soft palate";
+      if (v > m) return "Oropharyngeal airway is adequate at the level of the soft palate";
+      return "Oropharyngeal airway depth is within normal range";
+    },
+  },
+  "Vallecula-Ad4": {
+    category: "airway", subgroup: "hypopharyngeal",
+    label: "Vallecula-Ad4 (Hypopharyngeal Airway)",
+    description: "Hypopharyngeal airway depth at vallecula level",
+    interpret: (v, m) => {
+      if (v < m) return "Hypopharyngeal airway is narrowed at the level of the vallecula";
+      if (v > m) return "Hypopharyngeal airway is adequate at the level of the vallecula";
+      return "Hypopharyngeal airway depth is within normal range";
+    },
+  },
+  "PNS-Ad (airway)": {
+    category: "airway", subgroup: "nasopharyngeal",
+    label: "PNS-Ad (Nasopharyngeal)",
+    description: "Nasopharyngeal airway depth at PNS to adenoid",
+    interpret: (v, m) => {
+      if (v < m) return "Nasopharyngeal airway is narrowed (adenoid hypertrophy possible)";
+      if (v > m) return "Nasopharyngeal airway is adequate";
+      return "Nasopharyngeal airway depth is within normal range";
+    },
+  },
+  // ═══════════════════════════════════════════
+  // VERTICAL — Additional Plane Angles
+  // ═══════════════════════════════════════════
+  "Occlusomandibular angle": {
+    category: "dental", subgroup: "occlusion",
+    label: "Occlusomandibular Angle",
+    description: "Angle between occlusal plane and mandibular plane",
+    interpret: (v, m) => {
+      if (v > m) return "Occlusomandibular angle is increased";
+      if (v < m) return "Occlusomandibular angle is decreased";
+      return "Occlusomandibular angle is within normal range";
+    },
+  },
+  "Occlusopalatal angle": {
+    category: "dental", subgroup: "occlusion",
+    label: "Occlusopalatal Angle",
+    description: "Angle between occlusal plane and palatal plane",
+    interpret: (v, m) => {
+      if (v > m) return "Occlusopalatal angle is increased";
+      if (v < m) return "Occlusopalatal angle is decreased";
+      return "Occlusopalatal angle is within normal range";
+    },
+  },
+  "Palatocranial angle": {
+    category: "skeletal", subgroup: "vertical",
+    label: "Palatocranial Angle",
+    description: "Angle between palatal plane and cranial base",
+    interpret: (v, m) => {
+      if (v > m) return "Palatal plane is steep relative to cranial base";
+      if (v < m) return "Palatal plane is flat relative to cranial base";
+      return "Palatocranial angle is within normal range";
+    },
+  },
+  "Palatomandibular angle": {
+    category: "skeletal", subgroup: "vertical",
+    label: "Palatomandibular Angle",
+    description: "Angle between palatal plane and mandibular plane",
+    interpret: (v, m) => {
+      if (v > m) return "Palatomandibular angle is increased — hyperdivergent pattern";
+      if (v < m) return "Palatomandibular angle is decreased — hypodivergent pattern";
+      return "Palatomandibular angle is within normal range";
+    },
+  },
+  // ═══════════════════════════════════════════
+  // DENTAL — Sassouni Angles
+  // ═══════════════════════════════════════════
+  "Angle I": {
+    category: "dental", subgroup: "maxillary-incisor",
+    label: "Sassouni Angle I",
+    description: "Sassouni archial analysis — maxillary incisor angle",
+    interpret: (v, m) => {
+      if (v > m) return "Maxillary incisor angle is increased";
+      if (v < m) return "Maxillary incisor angle is decreased";
+      return "Sassouni Angle I is within normal range";
+    },
+  },
+  "Angle I'": {
+    category: "dental", subgroup: "maxillary-incisor",
+    label: "Sassouni Angle I'",
+    description: "Sassouni archial analysis — maxillary incisor angle (variant)",
+    interpret: (v, m) => {
+      if (v > m) return "Maxillary incisor angle (I') is increased";
+      if (v < m) return "Maxillary incisor angle (I') is decreased";
+      return "Sassouni Angle I' is within normal range";
+    },
+  },
+  "Angle I''": {
+    category: "dental", subgroup: "maxillary-incisor",
+    label: "Sassouni Angle I''",
+    description: "Sassouni archial analysis — maxillary incisor angle (variant 2)",
+    interpret: (v, m) => {
+      if (v > m) return "Maxillary incisor angle (I'') is increased";
+      if (v < m) return "Maxillary incisor angle (I'') is decreased";
+      return "Sassouni Angle I'' is within normal range";
+    },
+  },
+  "Angle M": {
+    category: "dental", subgroup: "occlusion",
+    label: "Sassouni Angle M",
+    description: "Sassouni archial analysis — molar angle",
+    interpret: (v, m) => {
+      if (v > m) return "Molar angle (M) is increased";
+      if (v < m) return "Molar angle (M) is decreased";
+      return "Sassouni Angle M is within normal range";
+    },
+  },
+  "Angle M'": {
+    category: "dental", subgroup: "occlusion",
+    label: "Sassouni Angle M'",
+    description: "Sassouni archial analysis — molar angle (variant)",
+    interpret: (v, m) => {
+      if (v > m) return "Molar angle (M') is increased";
+      if (v < m) return "Molar angle (M') is decreased";
+      return "Sassouni Angle M' is within normal range";
+    },
+  },
+  "Angle M''": {
+    category: "dental", subgroup: "occlusion",
+    label: "Sassouni Angle M''",
+    description: "Sassouni archial analysis — molar angle (variant 2)",
+    interpret: (v, m) => {
+      if (v > m) return "Molar angle (M'') is increased";
+      if (v < m) return "Molar angle (M'') is decreased";
+      return "Sassouni Angle M'' is within normal range";
+    },
+  },
+  "Angle R": {
+    category: "skeletal", subgroup: "mandibular-shape",
+    label: "Sassouni Angle R",
+    description: "Sassouni archial analysis — ramus angle",
+    interpret: (v, m) => {
+      if (v > m) return "Ramus angle (R) is increased";
+      if (v < m) return "Ramus angle (R) is decreased";
+      return "Sassouni Angle R is within normal range";
+    },
+  },
+  "Angle rfl'": {
+    category: "skeletal", subgroup: "mandibular-shape",
+    label: "Sassouni Angle rfl'",
+    description: "Sassouni archial analysis — ramus/molar relationship angle",
+    interpret: (v, m) => {
+      if (v > m) return "Angle rfl' is increased";
+      if (v < m) return "Angle rfl' is decreased";
+      return "Sassouni Angle rfl' is within normal range";
+    },
+  },
+  // ═══════════════════════════════════════════
+  // AB plane aliases
+  // ═══════════════════════════════════════════
+  "AB plane": {
+    category: "skeletal", subgroup: "ap-differential",
+    label: "AB Plane Angle (Downs)",
+    description: "Angle between AB line and facial plane (Downs)",
+    interpret: (v, m) => {
+      if (v > m) return "AB plane angle increased — skeletal Class II tendency (Point B posterior to A)";
+      if (v < m) return "AB plane angle decreased or negative — skeletal Class III tendency (Point B anterior to A)";
+      return "AB plane angle is within normal range (Class I)";
     },
   },
   "SNB/Facial angle": {

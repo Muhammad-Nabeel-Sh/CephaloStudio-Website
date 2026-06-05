@@ -255,7 +255,12 @@ function drawAngle3(ctx, m, sp, isSel, t, cal, zoom, fmtAngle, showAnnotations, 
   ctx.stroke();
   
   if(showAnnotations && !m.noLabel){
-    const ang = angle3pt(ip[0], ip[1], ip[2]);
+    const ang = m.label === "ANB"
+      ? Math.atan2(
+          (ip[0].x - ip[1].x) * (ip[2].y - ip[1].y) - (ip[0].y - ip[1].y) * (ip[2].x - ip[1].x),
+          (ip[0].x - ip[1].x) * (ip[2].x - ip[1].x) + (ip[0].y - ip[1].y) * (ip[2].y - ip[1].y)
+        ) * 180 / Math.PI
+      : angle3pt(ip[0], ip[1], ip[2]);
     const midA = (startA + endA) / 2;
     ctx.font = `bold ${clamp(11 * Math.sqrt(zoom), 9, 15)}px "DM Mono",monospace`;
     ctx.fillStyle = m.color || "#f472b6";
