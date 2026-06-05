@@ -1,5 +1,6 @@
 import { useRef, useMemo, useCallback, useState } from "react";
 import { normDeviation } from "../utils.js";
+import { RULES } from "../interpretation.js";
 
 const ROW_H = 28;
 const LABEL_W = 160;
@@ -20,6 +21,29 @@ const CATEGORY_LABELS = {
   skeletal: "Skeletal", dental: "Dental", "soft-tissue": "Soft Tissue",
   airway: "Airway", other: "Other",
 };
+
+function normCdf(z) {
+  const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
+  const a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
+  const sign = z < 0 ? -1 : 1;
+  const x = Math.abs(z) / Math.SQRT2;
+  const t = 1 / (1 + p * x);
+  const y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
+  return +(0.5 * (1 + sign * y)).toFixed(1);
+}
+
+function measurementCategory(label) {
+  const rule = RULES[label];
+  return rule && rule.category ? rule.category : "other";
+}
+
+function interpretationText(label, value, normMean) {
+  try {
+    const rule = RULES[label];
+    if (rule && rule.interpret) return rule.interpret(value, normMean);
+  } catch { return ""; }
+  return "";
+}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // POLYGON CHART (existing)
@@ -188,6 +212,284 @@ function WiggleChart({ rows, t, formatValue, getSeverityColor, totalH, svgRef })
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// RADAR CHART — circular z-score pattern
+// ═══════════════════════════════════════════════════════════════════════════════
+function RadarChart({ rows, t, getSeverityColor }) {
+  const n = rows.length;
+  if (n === 0) return null;
+  const CX = 350, CY = 260, R = 190, labelR = R + 28;
+  const clamp = (v) => Math.max(-SD_RANGE, Math.min(SD_RANGE, v));
+
+  const points = rows.map((row, i) => {
+    const angle = (2 * Math.PI * i) / n - Math.PI / 2;
+    const sd = clamp(row.dev.sdUnits);
+    const r = R * ((sd + SD_RANGE) / (2 * SD_RANGE));
+    return { ...row, angle, sd, r, x: CX + r * Math.cos(angle), y: CY + r * Math.sin(angle) };
+  });
+
+  const ringLabels = [-2, -1, 1, 2];
+
+  return (
+    <svg viewBox="0 0 700 540" style={{ maxWidth: "100%", width: 700, height: 540, display: "block", overflow: "visible", fontFamily: "'DM Sans','DM Mono',sans-serif", userSelect: "none" }}>
+      <rect x="0" y="0" width="700" height="540" fill={t.bg} rx="4" />
+
+      <text x={CX} y={16} textAnchor="middle" fill={t.tx2} fontSize="13" fontWeight="700" fontFamily="'Syne',sans-serif">
+        Radar Normogram — Z-score Pattern
+      </text>
+
+      {ringLabels.map(sd => {
+        const r = R * ((sd + SD_RANGE) / (2 * SD_RANGE));
+        return (
+          <circle key={`ring-${sd}`} cx={CX} cy={CY} r={r}
+            fill="none" stroke={sd === 0 ? t.tx3 : t.bdr} strokeWidth={sd === 0 ? 0.5 : 0.3}
+            strokeDasharray={sd === 0 ? "3,3" : "2,3"} opacity="0.5" />
+        );
+      })}
+
+      {ringLabels.map(sd => {
+        const r = R * ((sd + SD_RANGE) / (2 * SD_RANGE));
+        return (
+          <text key={`rlab-${sd}`} x={CX + 4} y={CY - r - 4} fill={t.tx3} fontSize="9" fontFamily="'DM Mono',monospace" opacity="0.6">
+            {sd > 0 ? `+${sd}σ` : `${sd}σ`}
+          </text>
+        );
+      })}
+
+      {points.map(p => (
+          <line key={`spoke-${points.indexOf(p)}`} x1={CX} y1={CY} x2={p.x} y2={p.y}
+            stroke={t.bdr} strokeWidth="0.5" opacity="0.15" />
+      ))}
+
+      <polygon
+        points={points.map(p => `${p.x},${p.y}`).join(" ")}
+        fill={t.acc + "18"} stroke={t.acc} strokeWidth="2" strokeLinejoin="round"
+      />
+
+      {points.map(p => {
+        const lx = CX + labelR * Math.cos(p.angle);
+        const ly = CY + labelR * Math.sin(p.angle);
+        const anchor = lx > CX + 5 ? "start" : lx < CX - 5 ? "end" : "middle";
+        return (
+          <g key={p.label}>
+            <circle cx={p.x} cy={p.y} r="4.5" fill={getSeverityColor(p.sd)} stroke="#fff" strokeWidth="1.5" />
+            <text x={lx} y={ly} textAnchor={anchor} dominantBaseline="middle"
+              fill={p.color || t.tx} fontSize="8" fontWeight="600" fontFamily="'DM Mono',monospace">
+              {p.label}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SEVERITY SUMMARY — aggregated by category
+// ═══════════════════════════════════════════════════════════════════════════════
+function SummaryView({ rows, t, formatValue }) {
+  const grouped = useMemo(() => {
+    const map = {};
+    for (const row of rows) {
+      const cat = measurementCategory(row.label);
+      if (!map[cat]) map[cat] = { rows: [], normal: 0, mild: 0, severe: 0 };
+      map[cat].rows.push(row);
+      const a = Math.abs(row.dev.sdUnits);
+      if (a <= 1) map[cat].normal++;
+      else if (a <= 2) map[cat].mild++;
+      else map[cat].severe++;
+    }
+    return map;
+  }, [rows]);
+
+  const grandTotal = rows.length;
+  const grandNormal = rows.filter(r => Math.abs(r.dev.sdUnits) <= 1).length;
+  const grandMild = rows.filter(r => Math.abs(r.dev.sdUnits) > 1 && Math.abs(r.dev.sdUnits) <= 2).length;
+  const grandSevere = rows.filter(r => Math.abs(r.dev.sdUnits) > 2).length;
+
+  return (
+    <div style={{ width: "100%", fontFamily: "'DM Sans',sans-serif" }}>
+      {/* Grand total badge row */}
+      <div style={{ display: "flex", gap: 12, marginBottom: 16, justifyContent: "center" }}>
+        {[
+          { label: "Normal (≤1σ)", count: grandNormal, color: t.ok },
+          { label: "Mild (1–2σ)", count: grandMild, color: t.warn },
+          { label: "Severe (>2σ)", count: grandSevere, color: t.err },
+        ].map(b => (
+          <div key={b.label} style={{
+            background: b.color + "18", border: `1px solid ${b.color}40`, borderRadius: 10,
+            padding: "10px 18px", textAlign: "center", minWidth: 110,
+          }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: b.color }}>{b.count}</div>
+            <div style={{ fontSize: 10, color: t.tx2, marginTop: 2 }}>{b.label}</div>
+            <div style={{ fontSize: 11, color: t.tx3, marginTop: 1 }}>
+              {grandTotal > 0 ? Math.round(b.count / grandTotal * 100) + "%" : "—"}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Per-category sections */}
+      {CATEGORY_ORDER.filter(c => grouped[c]).map(cat => {
+        const g = grouped[cat];
+        const total = g.rows.length;
+        return (
+          <div key={cat} style={{
+            background: t.surf2, border: `1px solid ${t.bdr}`, borderRadius: 10,
+            padding: 12, marginBottom: 10,
+          }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: t.tx, marginBottom: 8, fontFamily: "'Syne',sans-serif" }}>
+              {CATEGORY_LABELS[cat] || cat}
+              <span style={{ fontSize: 11, color: t.tx3, fontWeight: 400, marginLeft: 8 }}>{total} measurements</span>
+            </div>
+
+            {/* Stacked bar */}
+            <div style={{ display: "flex", height: 8, borderRadius: 4, overflow: "hidden", marginBottom: 8 }}>
+              {g.normal > 0 && <div style={{ flex: g.normal, background: t.ok, minWidth: 1 }} />}
+              {g.mild > 0 && <div style={{ flex: g.mild, background: t.warn, minWidth: 1 }} />}
+              {g.severe > 0 && <div style={{ flex: g.severe, background: t.err, minWidth: 1 }} />}
+            </div>
+
+            {/* Badge row */}
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {g.normal > 0 && <Badge color={t.ok} label="Normal" count={g.normal} total={total} />}
+              {g.mild > 0 && <Badge color={t.warn} label="Mild" count={g.mild} total={total} />}
+              {g.severe > 0 && <Badge color={t.err} label="Severe" count={g.severe} total={total} />}
+            </div>
+
+            {/* Measurement list */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 8 }}>
+              {g.rows.map(r => {
+                const a = Math.abs(r.dev.sdUnits);
+                const c = a <= 1 ? t.ok : a <= 2 ? t.warn : t.err;
+                return (
+                  <span key={r.label} style={{
+                    fontSize: 10, padding: "2px 7px", borderRadius: 4,
+                    background: c + "18", color: c, border: `1px solid ${c}30`,
+                    fontWeight: 600,
+                  }}>
+                    {r.label} {formatValue(r)}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function Badge({ color, label, count, total }) {
+  return (
+    <span style={{
+      fontSize: 10, fontWeight: 700, padding: "2px 10px", borderRadius: 12,
+      background: color + "15", color, border: `1px solid ${color}30`,
+      display: "inline-flex", alignItems: "center", gap: 4,
+    }}>
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, display: "inline-block" }} />
+      {label}: {count}/{total} ({Math.round(count / total * 100)}%)
+    </span>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DATA TABLE — sortable, all columns
+// ═══════════════════════════════════════════════════════════════════════════════
+function DataTable({ rows, t, formatValue }) {
+  const [sortCol, setSortCol] = useState(null);
+  const [sortDir, setSortDir] = useState("asc");
+
+  const sorted = useMemo(() => {
+    if (!sortCol) return rows;
+    const dir = sortDir === "asc" ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      let va, vb;
+      if (sortCol === "label") { va = a.label; vb = b.label; }
+      else if (sortCol === "value") { va = a.value; vb = b.value; }
+      else if (sortCol === "mean") { va = a.norm.mean; vb = b.norm.mean; }
+      else if (sortCol === "sd") { va = a.norm.sd; vb = b.norm.sd; }
+      else if (sortCol === "zscore") { va = a.dev.sdUnits; vb = b.dev.sdUnits; }
+      if (typeof va === "string") return va.localeCompare(vb) * dir;
+      return (va - vb) * dir;
+    });
+  }, [rows, sortCol, sortDir]);
+
+  const toggleSort = (col) => {
+    if (sortCol === col) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortCol(col); setSortDir("asc"); }
+  };
+
+  const SORT_ICON = (col) => sortCol === col ? (sortDir === "asc" ? " ▲" : " ▼") : "";
+
+  const cols = [
+    { key: "label", label: "Measurement", align: "left" },
+    { key: "value", label: "Value", align: "right" },
+    { key: "mean", label: "Norm Mean", align: "right" },
+    { key: "sd", label: "Norm SD", align: "right" },
+    { key: "zscore", label: "Z-score", align: "right" },
+  ];
+
+  const headerStyle = (col) => ({
+    padding: "6px 10px", fontSize: 11, fontWeight: 700, color: t.tx, cursor: "pointer",
+    textAlign: col.align, borderBottom: `2px solid ${t.bdr}`,
+    whiteSpace: "nowrap", fontFamily: "'DM Sans',sans-serif",
+    userSelect: "none", background: sortCol === col.key ? t.surf2 + "80" : "transparent",
+  });
+
+  return (
+    <div style={{ width: "100%", overflowX: "auto", fontFamily: "'DM Sans','DM Mono',sans-serif" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+        <thead>
+          <tr>
+            {cols.map(c => (
+              <th key={c.key} onClick={() => toggleSort(c.key)} style={headerStyle(c)}>
+                {c.label}{SORT_ICON(c.key)}
+              </th>
+            ))}
+            <th style={{ ...headerStyle({ align: "left" }), cursor: "default" }}>Percentile</th>
+            <th style={{ ...headerStyle({ align: "left" }), cursor: "default" }}>Severity</th>
+            <th style={{ ...headerStyle({ align: "left" }), cursor: "default" }}>Interpretation</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map(row => {
+            const a = Math.abs(row.dev.sdUnits);
+            const sevColor = a <= 1 ? t.ok : a <= 2 ? t.warn : t.err;
+            const sevLabel = a <= 1 ? "Normal" : a <= 2 ? "Mild" : "Severe";
+            const pct = normCdf(row.dev.sdUnits);
+            const interp = interpretationText(row.label, row.value, row.norm.mean);
+            return (
+              <tr key={row.label} style={{ borderBottom: `1px solid ${t.bdr}40` }}>
+                <td style={{ padding: "5px 10px", fontWeight: 600, color: row.color || t.tx }}>{row.label}</td>
+                <td style={{ padding: "5px 10px", textAlign: "right", fontFamily: "'DM Mono',monospace", color: sevColor, fontWeight: 700 }}>{formatValue(row)}</td>
+                <td style={{ padding: "5px 10px", textAlign: "right", color: t.tx2 }}>{row.norm.mean.toFixed(1)}{row.measureType === "angle" ? "°" : " mm"}</td>
+                <td style={{ padding: "5px 10px", textAlign: "right", color: t.tx2 }}>{row.norm.sd.toFixed(2)}</td>
+                <td style={{ padding: "5px 10px", textAlign: "right", fontFamily: "'DM Mono',monospace", color: sevColor, fontWeight: 700 }}>
+                  {row.dev.sdUnits > 0 ? "+" : ""}{row.dev.sdUnits.toFixed(2)}
+                </td>
+                <td style={{ padding: "5px 10px", textAlign: "right", color: t.tx2 }}>
+                  {pct < 1 ? "<1%" : pct > 99 ? ">99%" : pct + "%"}
+                </td>
+                <td style={{ padding: "5px 10px" }}>
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, padding: "1px 8px", borderRadius: 8,
+                    background: sevColor + "18", color: sevColor,
+                  }}>{sevLabel}</span>
+                </td>
+                <td style={{ padding: "5px 10px", color: t.tx2, fontSize: 10, maxWidth: 200, lineHeight: 1.3 }}>{interp}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <div style={{ fontSize: 10, color: t.tx3, marginTop: 6, textAlign: "center" }}>
+        {rows.length} measurements &middot; Click column headers to sort
+      </div>
+    </div>
+  );
+}
+
 export default function NormogramPanel({ allMeas, norms, t, formatAngle }) {
   const svgRef = useRef(null);
   const containerRef = useRef(null);
@@ -301,15 +603,18 @@ export default function NormogramPanel({ allMeas, norms, t, formatAngle }) {
         {[
           { id: "polygon", label: "Polygon", icon: "⬡" },
           { id: "wiggle", label: "Wiggle", icon: "▬" },
+          { id: "radar", label: "Radar", icon: "◎" },
+          { id: "summary", label: "Summary", icon: "☰" },
+          { id: "table", label: "Table", icon: "⊞" },
         ].map(mode => (
           <button key={mode.id} onClick={() => setChartMode(mode.id)}
             style={{
-              padding: "5px 14px", borderRadius: 6, border: "none", cursor: "pointer",
+              padding: "5px 12px", borderRadius: 6, border: "none", cursor: "pointer",
               background: chartMode === mode.id ? t.acc : "transparent",
               color: chartMode === mode.id ? (t.id === "light" ? "#fff" : t.bg) : t.tx2,
-              fontSize: 12, fontWeight: 600, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 5, transition: "all 0.15s"
+              fontSize: 11, fontWeight: 600, fontFamily: "inherit", display: "flex", alignItems: "center", gap: 4, transition: "all 0.15s"
             }}>
-            <span style={{ fontSize: 14 }}>{mode.icon}</span> {mode.label}
+            <span style={{ fontSize: 13 }}>{mode.icon}</span> {mode.label}
           </button>
         ))}
       </div>
@@ -317,6 +622,9 @@ export default function NormogramPanel({ allMeas, norms, t, formatAngle }) {
       <div style={{ width: "100%", maxWidth: 780, overflowX: "auto" }}>
         {chartMode === "polygon" && <PolygonChart {...chartProps} svgRef={svgRef} />}
         {chartMode === "wiggle" && <WiggleChart {...chartProps} svgRef={svgRef} />}
+        {chartMode === "radar" && <RadarChart rows={rows} t={t} formatValue={formatValue} getSeverityColor={getSeverityColor} />}
+        {chartMode === "summary" && <SummaryView rows={rows} t={t} formatValue={formatValue} getSeverityColor={getSeverityColor} />}
+        {chartMode === "table" && <DataTable rows={rows} t={t} formatValue={formatValue} />}
       </div>
 
       {/* Norm source footer */}
@@ -326,17 +634,19 @@ export default function NormogramPanel({ allMeas, norms, t, formatAngle }) {
         </div>
       )}
 
-      {/* Download buttons */}
-      <div style={{ display: "flex", gap: 8, marginTop: 12, justifyContent: "center" }}>
-        <button onClick={downloadSVG}
-          style={{ padding: "6px 14px", borderRadius: 6, border: `1px solid ${t.bdr}`, background: t.surf2, color: t.tx, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
-          Download SVG
-        </button>
-        <button onClick={downloadPNG}
-          style={{ padding: "6px 14px", borderRadius: 6, border: "none", background: t.acc, color: t.bg, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>
-          Download PNG
-        </button>
-      </div>
+      {/* Download buttons — SVG modes only */}
+      {chartMode !== "summary" && chartMode !== "table" && (
+        <div style={{ display: "flex", gap: 8, marginTop: 12, justifyContent: "center" }}>
+          <button onClick={downloadSVG}
+            style={{ padding: "6px 14px", borderRadius: 6, border: `1px solid ${t.bdr}`, background: t.surf2, color: t.tx, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
+            Download SVG
+          </button>
+          <button onClick={downloadPNG}
+            style={{ padding: "6px 14px", borderRadius: 6, border: "none", background: t.acc, color: t.bg, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>
+            Download PNG
+          </button>
+        </div>
+      )}
     </div>
   );
 }

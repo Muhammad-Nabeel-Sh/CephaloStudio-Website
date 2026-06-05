@@ -1,6 +1,6 @@
 import { normDeviation } from "./utils.js";
 
-const RULES = {
+export const RULES = {
   // ═══════════════════════════════════════════
   // SKELETAL — AP
   // ═══════════════════════════════════════════
