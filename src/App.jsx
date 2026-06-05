@@ -13,6 +13,8 @@ import HomePage from "./panels/HomePage.jsx";
 import VersionsPanel from "./panels/VersionsPanel.jsx";
 import AnonModal from "./panels/AnonModal.jsx";
 import ReproducibilityPanel from "./panels/ReproducibilityPanel.jsx";
+import InterpretationPanel from "./panels/InterpretationPanel.jsx";
+import NormogramPanel from "./panels/NormogramPanel.jsx";
 
 // PROJECT MODEL
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -520,7 +522,7 @@ const INITIAL_WORKSPACE={
   showAnnotations:true,annotationSize:1,showDisplacement:false,compareVersionId:null,
   rightPanel:"markups",
   showCalib:false,pendingRuler:null,
-  showExport:false,showAnon:false,
+  showExport:false,showAnon:false,showNormogram:false,
   showAlign:false,showTransform:false,
   pendingTextPos:null,
   showFormulaEditor:false,editFormulaId:null,
@@ -548,7 +550,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const{zoom,pan,mousePos,snapPos,selectedId,replacingId,currentDraw,
     activeTool,snapEnabled,showScaleBar,
     showLUT,showHistogram,showAnnotations,annotationSize,showDisplacement,compareVersionId,
-    rightPanel,showCalib,pendingRuler,showExport,showAnon,showAlign,showTransform,
+    rightPanel,showCalib,pendingRuler,showExport,showAnon,showNormogram,showAlign,showTransform,
     pendingTextPos,showFormulaEditor,editFormulaId,
     placingMode,placingQueue,placingIdx,loadingImages,
     isMobile,showMobilePanel,
@@ -557,7 +559,6 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     databaseMode,databaseImages,currentImageIndex,showDatabaseImport}=ws;
   const rightPanelWidthRef=useRef(rightPanelWidth);rightPanelWidthRef.current=rightPanelWidth;
   const toolbarPosRef=useRef(toolbarPos);toolbarPosRef.current=toolbarPos;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const setSelectedId=v=>dispatch({type:"SET",payload:{selectedId:typeof v==="function"?v(selectedId):v}});
   const setShowLUT=v=>dispatch({type:"SET",payload:{showLUT:typeof v==="function"?v(showLUT):v}});
   const setShowScaleBar=v=>dispatch({type:"SET",payload:{showScaleBar:typeof v==="function"?v(showScaleBar):v}});
@@ -595,7 +596,6 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
 
   // Auto-start placing mode when project has unplaced markups (from wizard)
   const placingInitRef=useRef(true);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(()=>{
     if(!placingInitRef.current)return;
     placingInitRef.current=false;
@@ -730,7 +730,6 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       })}});
     }
   };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const addMarkup=partial=>{
     const useDb=databaseMode&&databaseImages.length>0&&!reproCollecting;
     const currentDbImg=useDb?databaseImages[currentImageIndex]:null;
@@ -750,7 +749,6 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     }
     updMarkups(ms=>[...ms,m]);dispatch({type:"SET",payload:{selectedId:m.id}});return m;
   };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const finalizeMarkup=draw=>{
     const useDb=databaseMode&&databaseImages.length>0&&!reproCollecting;
     const currentDbImg=useDb?databaseImages[currentImageIndex]:null;
@@ -1337,8 +1335,8 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const cursorStyle={select:"default",pan:"grab",point:"crosshair",line:"crosshair",angle3:"crosshair",angle4:"crosshair",polygon:"crosshair",curve:"crosshair",perp:"crosshair",parallel:"crosshair",midpoint:"crosshair",perppoint:"crosshair",arrow:"crosshair",text:"text",ruler:"crosshair"}[activeTool]||"default";
   const _availAnalyses=PREDEFINED[project.projection]||[];
 
-  const panelIcons={markups:"◉",measurements:"📏",formulas:"∑",image:"▦",layers:"🗐",versions:"⏲",reproducibility:"↻",statistics:"𝛀",templates:"▤",silhouettes:"⊡"};
-  const panelTabs=[["markups","Markups"],["measurements","Measure"],["formulas","Formulas"],["image","Image"],["layers","Layers"],["versions","Versions"],["reproducibility","Reproducibility"],["statistics","Statistics"],["templates","Templates"],["silhouettes","Silhouettes"]];
+  const panelIcons={markups:"◉",measurements:"📏",formulas:"∑",image:"▦",layers:"🗐",versions:"⏲",reproducibility:"↻",statistics:"𝛀",interpretation:"◇",templates:"▤",silhouettes:"⊡"};
+  const panelTabs=[["markups","Markups"],["measurements","Measure"],["formulas","Formulas"],["image","Image"],["layers","Layers"],["versions","Versions"],["reproducibility","Reproducibility"],["statistics","Statistics"],["interpretation","Interpret"],["templates","Templates"],["silhouettes","Silhouettes"]];
 
   return(
     <div style={{height:"100vh",display:"flex",flexDirection:"column",background:t.bg,color:t.tx,fontFamily:"'DM Sans',sans-serif",overflow:"hidden"}}>
@@ -1387,6 +1385,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
           </button>
         </div>}
         {!isMobile&&<Btn t={t} small onClick={()=>dispatch({type:"SET",payload:{showExport:true}})}>Export</Btn>}
+        {!isMobile&&<Btn t={t} small onClick={()=>dispatch({type:"SET",payload:{showNormogram:true}})}>Normogram</Btn>}
         {!isMobile&&<Btn t={t} small onClick={()=>dispatch({type:"SET",payload:{showAnon:true}})}>Anonymization</Btn>}
         <div style={{width:1,height:20,background:t.bdr,flexShrink:0}}/>
         {Object.values(THEMES).map(th=>(
@@ -1498,7 +1497,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
             {/* Vertical tabs on left side */}
             <div style={{display:"flex",flexDirection:"column",alignItems:"center",paddingTop:8,flexShrink:0,background:t.surf2}}>
               {panelTabs.map(([id,label])=>{
-                const icons={markups:"◉",measurements:"📏",formulas:"∑",image:"▦",layers:"🗐",versions:"⏲",reproducibility:"↻",statistics:"𝛀",templates:"▤",silhouettes:"⊡",themes:"◐"};
+                const icons={markups:"◉",measurements:"📏",formulas:"∑",image:"▦",layers:"🗐",versions:"⏲",reproducibility:"↻",statistics:"𝛀",interpretation:"◇",templates:"▤",silhouettes:"⊡",themes:"◐"};
                 return(
                   <button key={id} onClick={()=>setRightPanel(id)} title={label}
                     onMouseEnter={e=>{if(rightPanel!==id)e.currentTarget.style.background=t.accMuted;e.currentTarget.style.color=t.acc;}}
@@ -1563,6 +1562,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
                   {rightPanel==="versions"&&<VersionsPanel project={project} t={t} onUpdateProject={onUpdateProject} onUpdateVersion={onUpdateVersion} onExportTemplate={v=>exportCepht({name:`${project.name}`,projection:project.projection,markups:v.markups||[],formulas:v.formulas||[],norms:v.norms||[]})}/>}
                   {rightPanel==="reproducibility"&&<ReproducibilityPanel t={t} markups={markups} studies={reproStudies} onUpdateStudies={setReproStudies} activeStudyId={activeStudyId} setActiveStudyId={setActiveStudyId} reproCollecting={reproCollecting} setReproCollecting={setReproCollecting}/>}
                   {rightPanel==="statistics"&&<StatisticsPanel t={t} studies={reproStudies} databaseMode={databaseMode} databaseImages={databaseImages} formatAngle={formatAngle}/>}
+                  {rightPanel==="interpretation"&&<InterpretationPanel allMeas={allMeas} norms={norms} t={t} formatAngle={formatAngle}/>}
                   {rightPanel==="silhouettes"&&<SilhouettesPanel t={t} onInsert={(silhouetteType) => {
                     try {
                       const def = SILHOUETTES[silhouetteType];
@@ -1611,6 +1611,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       {showExport&&<Modal t={t} title="Export" onClose={()=>dispatch({type:"SET",payload:{showExport:false}})}><div style={{display:"flex",flexDirection:"column",gap:10}}><Btn t={t} onClick={()=>{exportCSV();dispatch({type:"SET",payload:{showExport:false}});}}>Measurements CSV</Btn><Btn t={t} onClick={()=>{onSave?.(project);dispatch({type:"SET",payload:{showExport:false}});}}>Full Project .cephx</Btn><Btn t={t} onClick={()=>{const name=window.prompt("Template name:",project.name+" Template");if(name){exportTemplateAsCepht(project,name);dispatch({type:"SET",payload:{showExport:false}});}}}>Template .cepht</Btn></div></Modal>}
       {pendingTextPos&&<Modal t={t} title="Text Annotation" onClose={()=>dispatch({type:"SET",payload:{pendingTextPos:null}})}><TextModal t={t} defaultColor="#fbbf24" onConfirm={(txt,opts)=>{addMarkup({type:"text",points:[pendingTextPos],text:txt,...opts});dispatch({type:"SET",payload:{pendingTextPos:null}});}} onCancel={()=>dispatch({type:"SET",payload:{pendingTextPos:null}})}/></Modal>}
       {showAnon&&<Modal t={t} title="Anonymization" onClose={()=>dispatch({type:"SET",payload:{showAnon:false}})}><AnonModal t={t} project={project} onUpdateProject={onUpdateProject} onClose={()=>dispatch({type:"SET",payload:{showAnon:false}})}/></Modal>}
+      {showNormogram&&<Modal t={t} title="Cephalometric Normogram" wide onClose={()=>dispatch({type:"SET",payload:{showNormogram:false}})}><NormogramPanel allMeas={allMeas} norms={norms} t={t} formatAngle={formatAngle}/></Modal>}
       {showAlign&&<Modal t={t} title="Point-Based Alignment" onClose={()=>dispatch({type:"SET",payload:{showAlign:false}})}><AlignModal t={t} markups={markups} images={project.images} onUpdateImages={imgs=>onUpdateProject({images:imgs})} onClose={()=>dispatch({type:"SET",payload:{showAlign:false}})}/></Modal>}
       {showTransform&&<Modal t={t} title="Image Transform" onClose={()=>dispatch({type:"SET",payload:{showTransform:false}})}><TransformModal t={t} images={project.images} onUpdateImages={imgs=>onUpdateProject({images:imgs})} onClose={()=>dispatch({type:"SET",payload:{showTransform:false}})}/></Modal>}
       {showFormulaEditor&&<Modal t={t} title={editFormulaId?"Edit Formula":"New Formula"} onClose={()=>dispatch({type:"SET",payload:{showFormulaEditor:false}})}><FormulaEditor t={t} formula={editFormulaId?formulas.find(f=>f.id===editFormulaId):null} scope={measScope} onSave={f=>{const newFs=editFormulaId?formulas.map(x=>x.id===editFormulaId?f:x):[...formulas,f];updVer({formulas:newFs});dispatch({type:"SET",payload:{showFormulaEditor:false}});}} onClose={()=>dispatch({type:"SET",payload:{showFormulaEditor:false}})}/></Modal>}
