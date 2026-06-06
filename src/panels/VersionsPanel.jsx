@@ -4,7 +4,7 @@ import { Btn, Inp, Divider, PanelHeader, Tag } from "../ui.jsx";
 
 function mkVersion(label="T0",name="Initial"){
   return{id:uid(),name,label,timestamp:Date.now(),calibration:{done:false,pxPerMm:1,knownMm:""},
-    markups:[],analysisTemplate:"blank",
+    images:[],markups:[],analysisTemplate:"blank",
     processing:{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},
     lutMode:"gray",lutInvert:false,formulas:[],norms:[]};
 }
@@ -52,6 +52,7 @@ export default function VersionsPanel({project,t,onUpdateProject,onUpdateVersion
       lutMode:v.lutMode,
       lutInvert:v.lutInvert,
       analysisTemplate:v.analysisTemplate,
+      images:(v.images||[]).map(img=>({...img,id:uid()})),
       markups:(v.markups||[]).map(m=>({...m,id:uid()})),
       formulas:(v.formulas||[]).map(f=>({...f,id:uid()})),
       norms:(v.norms||[]).map(n=>({...n,id:uid()})),
@@ -147,8 +148,15 @@ export default function VersionsPanel({project,t,onUpdateProject,onUpdateVersion
                   <span style={{fontSize:9,color:t.tx3}}>✎</span>
                 </div>
               )}
-              <div style={{fontSize:10,color:t.tx3}}>{new Date(v.timestamp).toLocaleDateString()} · {(v.markups||[]).length} markups</div>
+              <div style={{fontSize:10,color:t.tx3}}>{new Date(v.timestamp).toLocaleDateString()} · {(v.markups||[]).length} markups · {(v.images||[]).length} image{(v.images||[]).length!==1?"s":""}</div>
             </div>
+            {(v.images||[]).length>0&&<div style={{marginTop:6,display:"flex",gap:4}}>
+              {v.images.slice(0,3).map(img=>(
+                <img key={img.id} src={img.dataUrl} alt={img.name||""}
+                  style={{width:48,height:36,borderRadius:4,objectFit:"cover",border:`1px solid ${t.bdr}`}}/>
+              ))}
+              {(v.images||[]).length>3&&<span style={{fontSize:10,color:t.tx3,alignSelf:"center"}}>+{v.images.length-3}</span>}
+            </div>}
             <div style={{display:"flex",gap:4,flexShrink:0}}>
               {!isActive&&<button onClick={()=>onUpdateProject({activeVersionId:v.id})} style={{background:t.acc,border:"none",color:t.id==="light"?"#fff":t.bg,borderRadius:4,padding:"2px 8px",cursor:"pointer",fontSize:10,fontWeight:700}}>Switch</button>}
               {isActive&&<Tag color={t.acc}>Active</Tag>}

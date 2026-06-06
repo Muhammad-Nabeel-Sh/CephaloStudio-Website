@@ -20,7 +20,7 @@ import NormogramPanel from "./panels/NormogramPanel.jsx";
 // ═══════════════════════════════════════════════════════════════════════════════
 function mkVersion(label="T0",name="Initial"){
   return{id:uid(),name,label,timestamp:Date.now(),calibration:{done:false,pxPerMm:1,knownMm:""},
-    markups:[],analysisTemplate:"blank",
+    images:[],markups:[],analysisTemplate:"blank",
     processing:{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},
     lutMode:"gray",lutInvert:false,formulas:[],norms:[]};
 }
@@ -28,11 +28,12 @@ function mkProject(projection){
   const v=mkVersion();
   return{id:uid(),name:"New Case",projection,created:Date.now(),modified:Date.now(),
     meta:{patientId:"",name:"",dob:"",age:"",gender:"",ethnicity:"",clinician:"",facility:"",referral:"",notes:"",anonymized:false},
-    activeVersionId:v.id,versions:[v],images:[]};
+    activeVersionId:v.id,versions:[v]};
 }
 
 function exportCephx(project){
-  const payload={format:"cephx",version:"2.0",exported:Date.now(),project};
+  const cleaned=project.images?{...project,images:undefined}:project;
+  const payload={format:"cephx",version:"2.1",exported:Date.now(),project:cleaned};
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}));
   a.download=`${project.name.replace(/\s+/g,"_")}.cephx`;a.click();
 }
@@ -661,6 +662,15 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     return()=>{window.removeEventListener("mousemove",onMove);window.removeEventListener("mouseup",onUp);};
   },[toolbarDragging]);
 
+  // Migration: project-level images -> active version's images
+  useEffect(()=>{
+    if(!project.images||project.images.length===0)return;
+    if(!activeVersion)return;
+    if(activeVersion.images&&activeVersion.images.length>0)return;
+    onUpdateVersion(activeVersion.id,{images:[...project.images]});
+    onUpdateProject({images:[]});
+  },[]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Auto-start placing mode when project has unplaced markups (from wizard)
   const placingInitRef=useRef(true);
   useEffect(()=>{
@@ -685,6 +695,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
 
   const activeVersion=project.versions.find(v=>v.id===project.activeVersionId)||project.versions[0];
   const markups=useMemo(()=>activeVersion?.markups||[],[activeVersion?.markups]);
+  const verImages=useMemo(()=>activeVersion?.images||[],[activeVersion?.images]);
 
   const calibration=useMemo(()=>activeVersion?.calibration||{done:false,pxPerMm:1},[activeVersion?.calibration]);
   const processing=useMemo(()=>activeVersion?.processing||{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},[activeVersion?.processing]);
@@ -839,12 +850,12 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
 
   // load images
   useEffect(()=>{
-    const pending=project.images.filter(imgE=>!imgRefs.current[imgE.id]&&imgE.dataUrl);
+    const pending=verImages.filter(imgE=>!imgRefs.current[imgE.id]&&imgE.dataUrl);
     if(!pending.length)return;
     dispatch({type:"SET",payload:{loadingImages:true}});
     let loaded=0;
     pending.forEach(imgE=>{const img=new Image();img.onload=()=>{imgRefs.current[imgE.id]=img;loaded++;if(loaded===pending.length)dispatch({type:"SET",payload:{loadingImages:false}});scheduleRedraw();};img.src=imgE.dataUrl;});
-  },[project.images]); // eslint-disable-line react-hooks/exhaustive-deps
+  },[verImages]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const getProcessed=useCallback(imgEntry=>{
     const key=`${imgEntry.id}-${JSON.stringify(processing)}-${lutMode}-${lutInvert}`;
@@ -884,11 +895,11 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         ctx.drawImage(src,0,0,nw,nh);
         ctx.restore();
       }
-    }else if(project.images.length===0){
+    }else if(verImages.length===0){
       ctx.fillStyle=t.surf;ctx.fillRect(pan.x,pan.y,600*zoom,500*zoom);ctx.strokeStyle=t.bdr;ctx.lineWidth=1;ctx.strokeRect(pan.x,pan.y,600*zoom,500*zoom);
       ctx.fillStyle=t.tx3;ctx.font=`15px "DM Sans",sans-serif`;ctx.textAlign="center";ctx.fillText("Drop or open a cephalogram image",pan.x+300*zoom,pan.y+240*zoom);ctx.fillText("Open Image  •  drag & drop",pan.x+300*zoom,pan.y+265*zoom);ctx.textAlign="left";
     } else {
-      project.images.forEach(imgE=>{
+      verImages.forEach(imgE=>{
         if(!imgE.visible)return;const src=getProcessed(imgE)||imgRefs.current[imgE.id];if(!src)return;
         const tf=imgE.transform||{tx:0,ty:0,rot:0,scale:1};const nw=src.naturalWidth||src.width||600,nh=src.naturalHeight||src.height||500;
         ctx.save();ctx.globalAlpha=imgE.opacity??1;ctx.globalCompositeOperation=imgE.blendMode||"normal";
@@ -1012,7 +1023,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         ctx.restore();
       }
     }
-  },[markups,selectedId,zoom,pan,project.images,calibration,t,currentDraw,mousePos,snapEnabled,snapPos,showScaleBar,showDefTooltips,showLUT,showAnnotations,annotationSize,placingMode,placingQueue,placingIdx,showDisplacement,compareVersion,getProcessed,reproCollecting,angleMode,databaseMode,databaseImages,currentImageIndex,activeTool,displacementOverlay,overlayBlend,refLandmark1,refLandmark2]);
+  },[markups,selectedId,zoom,pan,verImages,calibration,t,currentDraw,mousePos,snapEnabled,snapPos,showScaleBar,showDefTooltips,showLUT,showAnnotations,annotationSize,placingMode,placingQueue,placingIdx,showDisplacement,compareVersion,getProcessed,reproCollecting,angleMode,databaseMode,databaseImages,currentImageIndex,activeTool,displacementOverlay,overlayBlend,refLandmark1,refLandmark2]);
 
   useEffect(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});});
   const scheduleRedraw=useCallback(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});},[redraw]);
@@ -1026,8 +1037,8 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       img.onload=()=>{
         const id=uid();imgRefs.current[id]=img;
         const entry={id,name:file.name,dataUrl,dx:0,dy:0,opacity:1,blendMode:"normal",visible:true,color:"none",transform:{tx:0,ty:0,rot:0,scale:1}};
-        const newImages=addToStack?[...project.images,entry]:[entry];
-        onUpdateProject({images:newImages});
+        const newImages=addToStack?[...verImages,entry]:[entry];
+        updVer({images:newImages});
         dispatch({type:"SET",payload:{loadingImages:false}});
         if(!addToStack){const cw=canvasSize.current.w-80,ch=canvasSize.current.h-80;const sc=Math.min(cw/(img.naturalWidth||600),ch/(img.naturalHeight||500),1);dispatch({type:"SET",payload:{zoom:sc}});dispatch({type:"SET",payload:{pan:{x:40,y:40}}});}
       };img.src=dataUrl;
@@ -1562,7 +1573,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
             <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M338-241q16 0 23-10.5t9-24.5q2-10 3.5-20t3.5-22q2-11 4.5-24t5.5-30q23-5 45-8.5t43-5.5q23-3 45.5-4.5T564-394q5 24 10.5 43t11.5 36q8 23 17.5 38t23.5 26q14 11 30.5 12t28.5-9q9-7 9-21t-8-35q-5-11-8.5-22.5T670-350q-5-14-9-25.5t-7-22.5q13-1 23.5-4.5T695-412q7-6 10.5-14.5T709-445q0-11-4.5-18.5T691-476q-9-5-22.5-6.5t-30.5.5q-2-18-4-35.5t-5-35.5q-3-17-5.5-35t-7.5-35q-6-26-17-44.5T574-698q-13-11-28.5-16.5T511-720q-22 0-42 9t-40 27q-11 11-22 23.5T386-631q-8-6-14.5-8t-14.5-2q-11 0-18.5 6t-7.5 20q0 18-2 36t-6 36q-5 26-11 51.5T301-440q-11 2-19.5 5.5T267-427q-8 5-11.5 12.5T252-399q0 7 2 13t7 11q5 5 12 7.5t16 3.5q-1 12-1.5 22.5T287-321q0 21 3 36t9 25q6 10 15.5 14.5T338-241Zm71-223q6-23 14-44.5t18-44.5q16-37 34-59t32-22q11 0 19 17t13 51q3 20 5 43t4 43q-17 1-35 2.5t-35 3.5q-17 2-34.5 4.5T409-464ZM160-80q-33 0-56.5-23.5T80-160v-640q0-33 23.5-56.5T160-880h640q33 0 56.5 23.5T880-800v640q0 33-23.5 56.5T800-80H160Zm0-80h640v-640H160v640Zm0 0v-640 640Z"/></svg>
           </Btn>
           {showAnnotations&&<input type="range" min="0.5" max="2" step="0.1" value={annotationSize} onChange={e=>dispatch({type:"SET",payload:{annotationSize:+e.target.value}})} style={{width:60,marginLeft:4,accentColor:t.acc}} title={`Annotation size: ${annotationSize.toFixed(1)}`}/>}
-          {project.images.length>1&&<Btn ghost t={t} small active={showDisplacement} title="Toggle displacement vectors" onClick={()=>dispatch({type:"SET",payload:{showDisplacement:!showDisplacement}})}>⇝ Vec</Btn>}
+          {verImages.length>1&&<Btn ghost t={t} small active={showDisplacement} title="Toggle displacement vectors" onClick={()=>dispatch({type:"SET",payload:{showDisplacement:!showDisplacement}})}>⇝ Vec</Btn>}
           <div style={{width:1,height:20,background:t.bdr}}/>
         </>}
         <Btn ghost t={t} small title="Open image" onClick={()=>openImgRef.current?.click()}>
@@ -1657,7 +1668,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
               </div>
               {/* Row 8b: Spotlight mode */}
               <div style={{display:"flex",justifyContent:"center"}}>
-                <button onClick={()=>{const next=!spotlightMode;dispatch({type:"SET",payload:{spotlightMode:next}});if(databaseMode){setDatabaseImages(prev=>prev.map(img=>{if(next){return{...img,opacityBeforeSpotlight:img.opacity||1,opacity:0.5};}return{...img,opacity:img.opacityBeforeSpotlight||1};}));}else if(project.images.length>0){const imgs=project.images.map(img=>{if(next){return{...img,opacityBeforeSpotlight:img.opacity||1,opacity:0.5};}return{...img,opacity:img.opacityBeforeSpotlight||1};});onUpdateProject({images:imgs});}}} title="Spotlight (reduce image opacity)" style={{width:42,height:42,borderRadius:8,border:"none",background:spotlightMode?t.acc:t.surf2,color:spotlightMode?(theme==="light"?"#fff":t.bg):t.tx,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:spotlightMode?`0 0 0 2px ${t.acc}`:"none"}}>💡</button>
+                <button onClick={()=>{const next=!spotlightMode;dispatch({type:"SET",payload:{spotlightMode:next}});if(databaseMode){setDatabaseImages(prev=>prev.map(img=>{if(next){return{...img,opacityBeforeSpotlight:img.opacity||1,opacity:0.5};}return{...img,opacity:img.opacityBeforeSpotlight||1};}));}else if(verImages.length>0){const imgs=verImages.map(img=>{if(next){return{...img,opacityBeforeSpotlight:img.opacity||1,opacity:0.5};}return{...img,opacity:img.opacityBeforeSpotlight||1};});updVer({images:imgs});}}} title="Spotlight (reduce image opacity)" style={{width:42,height:42,borderRadius:8,border:"none",background:spotlightMode?t.acc:t.surf2,color:spotlightMode?(theme==="light"?"#fff":t.bg):t.tx,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:spotlightMode?`0 0 0 2px ${t.acc}`:"none"}}>💡</button>
               </div>
               {/* Separator */}
               <div style={{width:"100%",height:1,background:t.bdr,margin:"4px 0"}}/>
@@ -1798,7 +1809,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
                     :<MeasurementsPanel allMeas={allMeas} t={t} calibration={calibration} norms={norms} onUpdateNorms={ns=>updVer({norms:ns})} onExportCSV={exportCSV} onOpenCalib={()=>dispatch({type:"SET",payload:{showCalib:true}})} formatAngle={formatAngle}/>)}
                   {rightPanel==="formulas"&&<FormulasPanel formulas={formulas} t={t} scope={measScope} onAdd={()=>{dispatch({type:"SET",payload:{editFormulaId:null}});dispatch({type:"SET",payload:{showFormulaEditor:true}});}} onEdit={id=>{dispatch({type:"SET",payload:{editFormulaId:id}});dispatch({type:"SET",payload:{showFormulaEditor:true}});}} onDelete={id=>updVer({formulas:formulas.filter(f=>f.id!==id)})}/>}
                   {rightPanel==="image"&&<ImagePanel t={t} processing={processing} setProcessing={p=>updVer({processing:p})} lutMode={lutMode} setLutMode={m=>updVer({lutMode:m})} lutInvert={lutInvert} setLutInvert={v=>updVer({lutInvert:v})} showLUT={showLUT} setShowLUT={setShowLUT} showScaleBar={showScaleBar} setShowScaleBar={setShowScaleBar} calibration={calibration} onOpenCalib={()=>dispatch({type:"SET",payload:{showCalib:true}})} onReset={()=>updVer({processing:{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},lutMode:"gray",lutInvert:false})} onShowHist={()=>setShowHistogram(v=>!v)} showHistogram={showHistogram}/>}
-                  {rightPanel==="layers"&&<LayersPanel t={t} images={project.images} onUpdateImages={imgs=>onUpdateProject({images:imgs})} onAddImage={e=>{if(e.target.files[0])loadImage(e.target.files[0],true);}} onShowAlign={()=>dispatch({type:"SET",payload:{showAlign:true}})} onShowTransform={()=>dispatch({type:"SET",payload:{showTransform:true}})}/>}
+                  {rightPanel==="layers"&&<LayersPanel t={t} images={verImages} onUpdateImages={imgs=>updVer({images:imgs})} onAddImage={e=>{if(e.target.files[0])loadImage(e.target.files[0],true);}} onShowAlign={()=>dispatch({type:"SET",payload:{showAlign:true}})} onShowTransform={()=>dispatch({type:"SET",payload:{showTransform:true}})}/>}
                   {rightPanel==="versions"&&<VersionsPanel project={project} t={t} onUpdateProject={onUpdateProject} onUpdateVersion={onUpdateVersion} onExportTemplate={v=>exportCepht({name:`${project.name}`,projection:project.projection,markups:v.markups||[],formulas:v.formulas||[],norms:v.norms||[]})} showDisplacement={showDisplacement} setShowDisplacement={setShowDisplacement} compareVersionId={compareVersionId} setCompareVersionId={setCompareVersionId} displacementOverlay={displacementOverlay} setDisplacementOverlay={setDisplacementOverlay} refLandmark1={refLandmark1} setRefLandmark1={setRefLandmark1} refLandmark2={refLandmark2} setRefLandmark2={setRefLandmark2} overlayBlend={overlayBlend} setOverlayBlend={setOverlayBlend} calibration={calibration} formatAngle={formatAngle} onShowAlign={()=>dispatch({type:"SET",payload:{showAlign:true}})}/>}
                   {rightPanel==="reproducibility"&&<ReproducibilityPanel t={t} markups={markups} studies={reproStudies} onUpdateStudies={setReproStudies} activeStudyId={activeStudyId} setActiveStudyId={setActiveStudyId} reproCollecting={reproCollecting} setReproCollecting={setReproCollecting}/>}
                   {rightPanel==="statistics"&&<StatisticsPanel t={t} studies={reproStudies} databaseMode={databaseMode} databaseImages={databaseImages} formatAngle={formatAngle}/>}
@@ -1852,10 +1863,10 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       {pendingTextPos&&<Modal t={t} title="Text Annotation" onClose={()=>dispatch({type:"SET",payload:{pendingTextPos:null}})}><TextModal t={t} defaultColor="#fbbf24" onConfirm={(txt,opts)=>{addMarkup({type:"text",points:[pendingTextPos],text:txt,...opts});dispatch({type:"SET",payload:{pendingTextPos:null}});}} onCancel={()=>dispatch({type:"SET",payload:{pendingTextPos:null}})}/></Modal>}
       {showAnon&&<Modal t={t} title="Anonymization" onClose={()=>dispatch({type:"SET",payload:{showAnon:false}})}><AnonModal t={t} project={project} onUpdateProject={onUpdateProject} onClose={()=>dispatch({type:"SET",payload:{showAnon:false}})}/></Modal>}
       {showNormogram&&<Modal t={t} title="Cephalometric Normogram" wide onClose={()=>dispatch({type:"SET",payload:{showNormogram:false}})}><NormogramPanel allMeas={allMeas} norms={norms} t={t} formatAngle={formatAngle}/></Modal>}
-      {showAlign&&<Modal t={t} title="Point-Based Alignment" onClose={()=>dispatch({type:"SET",payload:{showAlign:false}})}><AlignModal t={t} markups={markups} images={project.images} onUpdateImages={imgs=>onUpdateProject({images:imgs})} onClose={()=>dispatch({type:"SET",payload:{showAlign:false}})}/></Modal>}
-      {showTransform&&<Modal t={t} title="Image Transform" onClose={()=>dispatch({type:"SET",payload:{showTransform:false}})}><TransformModal t={t} images={project.images} onUpdateImages={imgs=>onUpdateProject({images:imgs})} onClose={()=>dispatch({type:"SET",payload:{showTransform:false}})}/></Modal>}
+      {showAlign&&<Modal t={t} title="Point-Based Alignment" onClose={()=>dispatch({type:"SET",payload:{showAlign:false}})}><AlignModal t={t} markups={markups} images={verImages} onUpdateImages={imgs=>updVer({images:imgs})} onClose={()=>dispatch({type:"SET",payload:{showAlign:false}})}/></Modal>}
+      {showTransform&&<Modal t={t} title="Image Transform" onClose={()=>dispatch({type:"SET",payload:{showTransform:false}})}><TransformModal t={t} images={verImages} onUpdateImages={imgs=>updVer({images:imgs})} onClose={()=>dispatch({type:"SET",payload:{showTransform:false}})}/></Modal>}
       {showFormulaEditor&&<Modal t={t} title={editFormulaId?"Edit Formula":"New Formula"} onClose={()=>dispatch({type:"SET",payload:{showFormulaEditor:false}})}><FormulaEditor t={t} formula={editFormulaId?formulas.find(f=>f.id===editFormulaId):null} scope={measScope} onSave={f=>{const newFs=editFormulaId?formulas.map(x=>x.id===editFormulaId?f:x):[...formulas,f];updVer({formulas:newFs});dispatch({type:"SET",payload:{showFormulaEditor:false}});}} onClose={()=>dispatch({type:"SET",payload:{showFormulaEditor:false}})}/></Modal>}
-      {showHistogram&&<FloatingHistogram hist={computeHistogram(project.images[0]?imgRefs.current[project.images[0].id]:null)} t={t} lutMode={lutMode} lutInvert={lutInvert} processing={processing} onProcessingChange={p=>updVer({processing:p})} onClose={()=>dispatch({type:"SET",payload:{showHistogram:false}})}/>}
+      {showHistogram&&<FloatingHistogram hist={computeHistogram(verImages[0]?imgRefs.current[verImages[0].id]:null)} t={t} lutMode={lutMode} lutInvert={lutInvert} processing={processing} onProcessingChange={p=>updVer({processing:p})} onClose={()=>dispatch({type:"SET",payload:{showHistogram:false}})}/>}
     </div>
   );
 }
@@ -3070,8 +3081,8 @@ export default function CephalometryStudio(){
 
   const createProject=(projection,result)=>{
     const p={...mkProject(projection),name:result.name};
-    if(result.image)p.images=[result.image];
     const v=p.versions.find(v=>v.id===p.activeVersionId);
+    if(result.image)v.images=[result.image];
     v.calibration=result.calibration||{done:false,pxPerMm:1,knownMm:""};
     if(result.templateType==="analysis"||result.templateType==="complete"){
       const analysis=result.analysis;
@@ -3095,6 +3106,12 @@ export default function CephalometryStudio(){
 
   const importCephxFile=(file)=>{
     importCephx(file,proj=>{
+      // Migration: project-level images -> version-level
+      if(proj.images&&proj.images.length>0&&proj.versions.length>0){
+        if(!proj.versions[0].images||proj.versions[0].images.length===0)
+          proj.versions[0].images=[...proj.images];
+        delete proj.images;
+      }
       const existing=projects.find(p=>p.id===proj.id);
       if(existing&&!window.confirm("A case with this ID already exists. Overwrite?"))return;
       setProjects(prev=>[...prev.filter(p=>p.id!==proj.id),proj]);setActiveId(proj.id);
