@@ -1,7 +1,7 @@
 # CephaloStudio — Cephalometric Analysis Gap Analysis
 
-> **Date**: 2026-06-05
-> **Purpose**: Identify gaps between our current analysis library and industry-standard cephalometric software (Dolphin, AudaxCeph, WebCeph, NemoCeph, OnyxCeph, BCeph, CephX).
+> **Date**: 2026-06-06
+> **Purpose**: Identify gaps between our current analysis library and industry-standard cephalometric software (Dolphin, AudaxCeph, WebCeph, NemoCeph, CephX, OnyxCeph, Planmeca Romexis, BCeph, LabCeph).
 
 ---
 
@@ -9,13 +9,14 @@
 
 | Projection | Analyses | Points | Measurements | Status |
 |------------|----------|--------|--------------|--------|
-| **Lateral Ceph** | 39 (9 hardcoded + 30 CSV) | ~500 | ~355 defined in CSV | ✅ Full coverage |
+| **Lateral Ceph** | 39+ (9 hardcoded + 30 CSV) | ~500+ | ~396 defined in CSV + hardcoded | ✅ Full coverage |
 | **AP/PA Ceph** | 10 (6 hardcoded + 4 CSV) | ~135 | ~45 defined with norms | ✅ Strong coverage |
 | **SMV** | 1 | 43 | 7 with norms | ✅ Norms populated |
 | **OPG** | 1 | 22 | 4 with norms | ✅ Norms populated |
+| **Airway** | 1 | 12+ | Airway space analysis | ✅ Added |
 | **Lateral Photo** | 1 | 15 | 12 with norms | ✅ Supported |
 | **Frontal Photo** | 1 | 19 | 12 with norms | ✅ Supported |
-| **Hand-Wrist** | 1 | 11 | 6 | ✅ Supported |
+| **Hand-Wrist** | 1 | 11 | 6 (CVM, MP3 fusion) | ✅ Supported |
 | **Study Models** | 0 | 0 | 0 | ❌ Not supported |
 | **CBCT/3D** | 0 | 0 | 0 | ❌ Not supported |
 
@@ -28,12 +29,12 @@
 | Analysis | Points | Measurements | Norms | Status |
 |----------|--------|-------------|-------|--------|
 | General Ceph Analysis | 25 | 11 | Partial | ✅ |
-| Steiner Analysis | 21 | 14 | Full | ✅ |
-| Ricketts Analysis | 26 | 14 | Full | ✅ |
-| McNamara Analysis | 11 | 10 | Partial | ✅ |
-| Downs Analysis | 16 | 10 | Full | ✅ |
-| Bjork Analysis | 17 | 10 | Full | ✅ |
-| Tweed Analysis | 12 | 8 | Full | ✅ |
+| Steiner Analysis | 21 | 14 (expanded) | Full | ✅ |
+| Ricketts Analysis | 26 | 14 (expanded) | Full | ✅ |
+| McNamara Analysis | 11 | 10 (expanded) | Partial | ✅ |
+| Downs Analysis | 16 | 10 (expanded) | Full | ✅ |
+| Bjork Analysis | 17 | 10 (expanded) | Full | ✅ |
+| Tweed Analysis | 12 | 8 (expanded) | Full | ✅ |
 | Jarv-Bjork (Jarabak) | 14 | 8 | Full | ✅ |
 | Wits Analysis | 8 | 1 (projDist) | Full | ✅ |
 | Holdaway Soft Tissue | 10 | 3 | Full | ✅ |
@@ -65,16 +66,19 @@
 | Riedel | 19 | 11 | ✅ |
 | Schwarz | 13 | 5 | ✅ |
 | Wylie ISBI | 19 | 10 | ✅ |
+| Moorrees Mesh | 14 | 9 | ✅ |
 
-### Orphan CSV Analyses (Points Only, No Measurements)
+### CSV Point-Identification Templates (with measurements now added)
 
 | Analysis | Points | Notes |
 |----------|--------|-------|
-| Basis (ISBI) | 14 | Italian School point-identification template |
-| Cagliari (ISBI) | 21 | Italian School point-identification template |
-| Chieti (ISBI) | 21 | Italian School point-identification template |
-| McGann (ISBI) | 21 | Italian School point-identification template |
+| Basis (ISBI) | 14 | Italian School — point identification, measurements added |
+| Cagliari (ISBI) | 21 | Italian School — point identification, measurements added |
+| Chieti (ISBI) | 21 | Italian School — point identification, measurements added |
+| McGann (ISBI) | 21 | Italian School — point identification, measurements added |
 | Coben Dentition | 4 | Dentition subset — points only |
+
+**Status Update**: Orphan analyses Basis, Cagliari, Chieti, and McGann previously had zero measurements. These have been resolved — measurements are now merged from `AnalysisMeasurements.csv` where matching analyses exist. Remaining orphan points have no auto-created measurements.
 
 ---
 
@@ -101,6 +105,7 @@
 |------------|----------|-------------|--------|
 | SMV (Submentovertex) | 1 (General SMV) | 7 widths | ✅ |
 | OPG (Panoramic) | 1 (General OPG) | 4 widths | ✅ |
+| Airway | 1 (Pharyngeal Airway) | Cross-sectional airway dimensions | ✅ |
 | Lateral Photo | 1 (Lateral Photo) | 12 (angles + TVL perps) | ✅ |
 | Frontal Photo | 1 (Frontal Photo) | 12 (widths, heights, ratios) | ✅ |
 | Hand-Wrist Radiograph | 1 (Hand-Wrist) | 6 (gaps + ratio) | ✅ |
@@ -111,19 +116,25 @@
 
 ### 🔴 Bugs / Cleanup
 - **8 unnecessary `eslint-disable` comments** in `App.jsx` (lines 571, 643, 649, 671, 695, 721, 741, 779) on plain `const` declarations — rule doesn't apply, comments are cargo-culted
-- **PA naming mismatch**: `PA_Ceph.csv` uses `"Ricketts PA"` but `AnalysisMeasurements.csv` uses `"Ricketts"` — measurements don't merge into the PA Ricketts analysis; they merge into the lateral Ricketts analysis instead (same name `"Ricketts"` in `_measurementLookup`)
+- **OPG "General Analysis"** — 2 orphan points (Inc-L, Inc-R) with no measurements
+- **No TypeScript** — entire codebase is plain JS, increasing maintenance risk as app grows
 
 ### 🟡 Medium Priority
-- **4 orphan CSV analyses** (Basis, Cagliari, Chieti, McGann) have 14–21 points each but zero measurements — users can place landmarks but nothing auto-creates
-- **OPG "General Analysis"** — 2 orphan points (Inc-L, Inc-R) with no measurements
+- **No true DICOM parser** — app says "Supports DICOM" in the UI but relies on browser's native image rendering for DICOM files (which may not work reliably). No DICOM tag reading, DICOMDIR, or modality detection.
+- **Study model analysis** (Bolton discrepancy, Schwarz arch analysis) — needs different input model
+- **PA naming resolved**: `PA_Ceph.csv` naming mismatch was fixed — `"Ricketts PA"` now correctly merges into the PA Ricketts analysis
+- **OPG orphan points**: Inc-L, Inc-R remain with no auto-created measurements
 
 ### 🟢 Low Priority (Major Features)
-- **Study model analysis** (Bolton discrepancy, Schwarz arch analysis) — needs different input model
 - **VTO/Growth prediction** — requires growth forecasting algorithms
 - **CBCT/3D analysis** — volumetric assessment with 3D norms
-- **PDF reporting** — export analysis results to PDF
+- **PDF reporting** — export analysis results to professional PDF
 - **Patient database** — only basic study mode exists
 - **AI auto-landmark detection** — automatic point placement
+- **Superimposition** — true structural superimposition (Ba-N, S-N) rather than just displacement vectors
+- **Multi-language support**
+- **Touch/tablet optimization**
+- **PWA/offline support** (service worker, manifest)
 
 ---
 
@@ -131,15 +142,21 @@
 
 | Change | Description |
 |--------|-------------|
-| Wits auto-creation fix | Removed `projDist` from first-pass skip list — now auto-creates when all 4 points (A, B, APOcc, PPOcc) placed |
-| Reference planes as infinite dashed lines | All `Line` type measurements without norms auto-create with `mode: "infinite"` + `style: "dashed"` — covers SN, FH, NBo, N-Ba, Mandibular, Occlusal, Palatal, Dental (A-Pg), Facial (N-Pg), A-B, Y-axis, etc. |
-| Property panel toggle | Lines/parallels have "Type" toggle (2-Point / Infinite) and "Dash" dropdown (Solid / Dashed / Dotted) |
-| Steiner expanded | Added 9 measurements: Occlusal Plane-SN, SN-GoGn, U1-NA (mm+°), L1-NB (mm+°), Interincisal, Upper/Lower lip to S-line; added 11 points (Ia, Iia, APOcc, PPOcc, Prn, Sn, Pog', UL, LL) |
-| Ricketts expanded | Added 8 measurements: Facial axis, Mandibular plane, Lower facial height, Mandibular arc, L1 to A-Pog, Interincisal, Upper/Lower lip to E-plane; added 12 points |
-| McNamara expanded | Added MMD (Difference), U1 to NA line, L1 to A-Pog, PNS-Ad airway |
-| Downs expanded | Added AB plane angle, Occlusal plane angle, Angle of convexity, Interincisal angle |
-| Björk expanded | Added Interincisal, U1-ML, U1-NSL |
-| Tweed expanded | Added FMIA, IMPA, SNA, SNB, ANB |
+| **Clinical Interpretation Engine** | 100+ rule-based engine auto-generates plain-English clinical text for skeletal class, growth pattern, dental relationship, soft tissue, airway, asymmetry, TMJ, and growth assessment |
+| **Normogram Panel** | SVG polygon/radar chart + list view showing all measurements on SD-scaled axes with color-coded severity |
+| **Silhouette Overlays** | 4 anatomical silhouettes (cranial/soft-tissue, mandibular, occlusal/dental, airway) rendered as SVG paths with configurable opacity and color |
+| **Version Comparison** | Side-by-side version comparison with displacement vector visualization between markup positions |
+| **Startup Wizard** | 4-step guided new-case wizard: upload image → select projection → choose analysis → calibration |
+| **Airway Analysis Module** | Pharyngeal airway space analysis with cross-sectional measurements |
+| **Anonymization Module** | Patient metadata editor with irreversible data wipe |
+| **PA Naming Mismatch Fixed** | `PA_Ceph.csv`'s `"Ricketts PA"` now correctly maps to PA Ricketts analysis instead of lateral |
+| **Orphan Analyses Fixed** | Basis, Cagliari, Chieti, McGann now merge measurements from `AnalysisMeasurements.csv` |
+| **Expanded Analyses** | Steiner, Ricketts, McNamara, Downs, Björk, Tweed all expanded with additional points and measurements |
+| **Reference Planes** | All `Line` type measurements without norms auto-render as infinite dashed lines (SN, FH, N-Bo, Mandibular, Occlusal, Palatal, etc.) |
+| **Property Panel Toggle** | Lines/parallels have "Type" toggle (2-Point / Infinite) and "Dash" dropdown (Solid / Dashed / Dotted) |
+| **Wits Auto-Creation** | Now auto-creates when all 4 points (A, B, APOcc, PPOcc) placed |
+| **UI Icons to SVG** | All toolbar and panel icons migrated from text/emoji to inline SVG |
+| **Theme Refinements** | 3 themes (dark, light, bluish) with consistent color tokens |
 
 ---
 
@@ -168,20 +185,50 @@
 
 ---
 
-## 8. Future Development Priorities
+## 8. Current Feature Inventory (New Since Last Analysis)
 
-### Phase 7 (Next)
-- Fix 8 unnecessary eslint-disable comments
-- Fix PA naming mismatch (`Ricketts PA` → `Ricketts` or vice versa)
-- Add measurements to orphan ISBI analyses (Basis, Cagliari, Chieti, McGann)
-- Study model analysis (Bolton discrepancy, Schwarz arch analysis)
-
-### Phase 8 (Future)
-- VTO growth prediction
-- CBCT frontal norms / 3D analysis
-- PDF reporting / patient database
-- AI auto-landmark detection
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Clinical interpretation engine | ✅ | 100+ rules, 11 diagnostic categories |
+| Normogram visualization | ✅ | Radar chart + list view with SD-scaled axes |
+| Silhouette overlays | ✅ | 4 anatomical SVG silhouettes |
+| Version comparison | ✅ | Displacement vectors between versions |
+| Startup wizard | ✅ | 4-step guided case setup |
+| Airway analysis | ✅ | Pharyngeal airway measurements |
+| Anonymization | ✅ | Patient data editor + irreversible wipe |
+| Template system (.cepht) | ✅ | Export/import analysis templates |
+| 13 LUT presets | ✅ | False-color rendering presets |
+| Image histogram | ✅ | Grayscale pixel intensity distribution |
+| Right-click context menu | ✅ | Copy, paste, lock, order, visibility |
+| Keyboard shortcuts | ✅ | Delete, Undo/Redo, tool switching |
+| Undo/Redo | ✅ | Full markup state history |
+| Snap/alignment | ✅ | Grid snap, angle snap, point snap |
+| Floating KaTeX panel | ✅ | LaTeX formula preview |
 
 ---
 
-*Generated by CephaloStudio Development — 2026-06-05*
+## 9. Future Development Priorities
+
+### Near-Term
+- Fix 8 unnecessary eslint-disable comments
+- Add measurements for OPG orphan points (Inc-L, Inc-R)
+- PDF report generation (highest-ROI clinical feature)
+- Semi-automated landmarking for reliable points (Nasion, Sella, Porion, Orbitale)
+- Tablet/touch optimization (larger targets, gesture support)
+
+### Medium-Term
+- Study model analysis (Bolton discrepancy, Schwarz arch analysis)
+- True superimposition module (structural superimposition)
+- AI landmark pipeline (TensorFlow.js or ONNX runtime)
+- PWA support (service worker, offline cache)
+
+### Long-Term
+- VTO growth prediction
+- CBCT frontal norms / 3D analysis
+- Patient database with search/analytics
+- Research collaboration hub (multi-center studies)
+- Multi-language support
+
+---
+
+*Generated by CephaloStudio Development — 2026-06-06*

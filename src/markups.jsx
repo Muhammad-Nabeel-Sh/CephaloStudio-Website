@@ -893,6 +893,113 @@ export function drawSnapIndicator(ctx, sn, zoom, pan){
   ctx.restore();
 }
 
+export function drawAirwayOverlay(ctx, markups, zoom, pan, cal) {
+  if (!cal?.done) return;
+  const ppm = cal.pxPerMm;
+  const sc = p => ({ x: p.x * zoom + pan.x, y: p.y * zoom + pan.y });
+
+  const findPt = (label) => {
+    const m = markups.find(mk => mk.type === "point" && mk.label === label && mk.visible !== false);
+    if (!m) return null;
+    const vp = vpts(m);
+    return vp.length ? vp[0] : null;
+  };
+
+  const pns = findPt("PNS"), ad1 = findPt("Ad1"), ad2 = findPt("Ad2");
+  const sp = findPt("SP"), ad3 = findPt("Ad3");
+  const val = findPt("Vallecula"), ad4 = findPt("Ad4");
+  const epi = findPt("Epiglottis"), pasbot = findPt("PASbot");
+  if (!pns || !ad1 || !ad2 || !sp) return;
+
+  const anteriorPoints = [pns];
+  if (sp) anteriorPoints.push(sp);
+  if (val) anteriorPoints.push(val);
+  if (epi) anteriorPoints.push(epi);
+  const posteriorPoints = [ad1, ad2];
+  if (ad3) posteriorPoints.push(ad3);
+  if (pasbot) posteriorPoints.push(pasbot);
+  if (ad4) posteriorPoints.push(ad4);
+
+  const n = Math.min(anteriorPoints.length, posteriorPoints.length);
+  if (n < 2) return;
+
+  ctx.save();
+
+  // Build the column path — anterior then reverse posterior
+  ctx.beginPath();
+  ctx.moveTo(sc(anteriorPoints[0]).x, sc(anteriorPoints[0]).y);
+  for (let i = 1; i < n; i++) ctx.lineTo(sc(anteriorPoints[i]).x, sc(anteriorPoints[i]).y);
+  for (let i = n - 1; i >= 0; i--) ctx.lineTo(sc(posteriorPoints[i]).x, sc(posteriorPoints[i]).y);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(56, 189, 248, 0.06)";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(56, 189, 248, 0.25)";
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4 * zoom, 4 * zoom]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Cross-sectional width markers at each level
+  let minWidth = Infinity, minIdx = -1;
+  const levelLabels = [];
+
+  if (pns && ad1) { levelLabels.push({ ant: pns, post: ad1, label: "PNS-Ad1" }); }
+  if (sp && ad2) { levelLabels.push({ ant: sp, post: ad2, label: "SP-Ad2" }); }
+  if (sp && ad3) { levelLabels.push({ ant: sp, post: ad3, label: "McUP" }); }
+  if (val && ad4) { levelLabels.push({ ant: val, post: ad4, label: "MAS" }); }
+  if (epi && pasbot) { levelLabels.push({ ant: epi, post: pasbot, label: "McLP" }); }
+  if (epi && ad4) { levelLabels.push({ ant: epi, post: ad4, label: "IAS" }); }
+
+  levelLabels.forEach((ll, i) => {
+    const w = dist(ll.ant, ll.post) / ppm;
+    const spA = sc(ll.ant), spP = sc(ll.post);
+    const mx = (spA.x + spP.x) / 2, my = (spA.y + spP.y) / 2;
+
+    if (w < minWidth) { minWidth = w; minIdx = i; }
+
+    // Color gradient: green >= norm, yellow ~75%, red <50%
+    const normVal = { "PNS-Ad1": 15, "SP-Ad2": 11, "McUP": 10, "MAS": 15, "McLP": 11, "IAS": 12 }[ll.label] || 10;
+    const ratio = w / normVal;
+    const r = ratio < 0.5 ? 255 : ratio < 0.75 ? 255 : Math.round(255 * (1 - (ratio - 0.5) / 0.5));
+    const g = ratio > 1 ? 200 : ratio > 0.75 ? 255 : Math.round(255 * (ratio / 0.75));
+    const color = `rgb(${Math.min(255, r)}, ${Math.min(255, g)}, 80)`;
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2 * Math.sqrt(zoom);
+    ctx.beginPath();
+    ctx.moveTo(spA.x, spA.y);
+    ctx.lineTo(spP.x, spP.y);
+    ctx.stroke();
+
+    // Label with width value
+    ctx.fillStyle = "#fff";
+    ctx.font = `bold ${clamp(9 * Math.sqrt(zoom), 7, 12)}px "DM Mono",monospace`;
+    ctx.textAlign = "center";
+    ctx.fillText(`${w.toFixed(1)} mm`, mx, my - 6 * Math.sqrt(zoom));
+    ctx.textAlign = "left";
+  });
+
+  // Narrowest point indicator
+  if (minIdx >= 0) {
+    const ll = levelLabels[minIdx];
+    const spA = sc(ll.ant), spP = sc(ll.post);
+    const mx = (spA.x + spP.x) / 2, my = (spA.y + spP.y) / 2;
+    ctx.strokeStyle = "#f87171";
+    ctx.lineWidth = 3 * Math.sqrt(zoom);
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.arc(mx, my, 8 * Math.sqrt(zoom), 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "#f87171";
+    ctx.font = `bold ${clamp(10 * Math.sqrt(zoom), 8, 14)}px "DM Mono",monospace`;
+    ctx.textAlign = "center";
+    ctx.fillText(`⬇ Narrowest`, mx, my - 14 * Math.sqrt(zoom));
+    ctx.textAlign = "left";
+  }
+
+  ctx.restore();
+}
+
 export function drawDisplacementVectors(ctx, m1arr, m2arr, zoom, pan){
   ctx.save();
   

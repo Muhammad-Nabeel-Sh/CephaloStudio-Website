@@ -6,7 +6,7 @@ import { processImageToCanvas, computeHistogram, FloatingHistogram } from "./ima
 import { KatexSpan, LatexFloatingPanel } from "./hooks.jsx";
 import { Btn, Tag, Sld, PropRow, Inp } from "./ui.jsx";
 import ToolBtn from "./ToolBtn.jsx";
-import { drawMarkup, drawInProgress, drawScaleBar, drawLUTLegend, drawSnapIndicator, drawDisplacementVectors, hitTest, getSilhouetteHandlesImage } from "./markups.jsx";
+import { drawMarkup, drawInProgress, drawScaleBar, drawLUTLegend, drawSnapIndicator, drawDisplacementVectors, drawAirwayOverlay, hitTest, getSilhouetteHandlesImage } from "./markups.jsx";
 import { MarkupsPanel, MeasurementsPanel, FormulasPanel, ImagePanel, LayersPanel, MarkupProps, TemplatesPanel, SilhouettesPanel } from "./panels.jsx";
 import { Modal } from "./panels/Modal.jsx";
 import HomePage from "./panels/HomePage.jsx";
@@ -517,7 +517,7 @@ const INITIAL_WORKSPACE={
   mousePos:null,snapPos:null,
   selectedId:null,replacingId:null,currentDraw:null,
   activeTool:"select",
-  snapEnabled:true,showScaleBar:false,
+  snapEnabled:true,showScaleBar:false,showDefTooltips:true,
   showLUT:false,showHistogram:false,
   showAnnotations:true,annotationSize:1,showDisplacement:false,compareVersionId:null,
   rightPanel:"markups",
@@ -548,7 +548,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
 
   const[ws,dispatch]=useReducer(wsReducer,INITIAL_WORKSPACE);
   const{zoom,pan,mousePos,snapPos,selectedId,replacingId,currentDraw,
-    activeTool,snapEnabled,showScaleBar,
+    activeTool,snapEnabled,showScaleBar,showDefTooltips,
     showLUT,showHistogram,showAnnotations,annotationSize,showDisplacement,compareVersionId,
     rightPanel,showCalib,pendingRuler,showExport,showAnon,showNormogram,showAlign,showTransform,
     pendingTextPos,showFormulaEditor,editFormulaId,
@@ -844,15 +844,81 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         drawDisplacementVectors(ctx,drawMarkups,compareVersion.markups||[],zoom,pan);
       }
     }
+    drawAirwayOverlay(ctx,drawMarkups,zoom,pan,drawCalibration);
+    // Point definition tooltip on hover
+    if(showDefTooltips&&hoveredPtRef.current?.type==="point"&&activeTool==="select"){
+      const hp=drawMarkups.find(m=>m.id===hoveredPtRef.current.mid);
+      if(hp&&hp.definition){
+        const vp=vpts(hp);
+        if(vp.length){
+          const sp={x:vp[0].x*zoom+pan.x,y:vp[0].y*zoom+pan.y};
+          const tipW=Math.min(340,canvas.width-sp.x-20);
+          const lines=[];let line="";
+          for(const word of hp.definition.split(" ")){
+            const test=line?line+" "+word:word;
+            if(ctx.measureText(test).width>tipW-24&&line){lines.push(line);line=word;}else line=test;
+          }
+          if(line)lines.push(line);
+          const tipH=Math.max(54,38+lines.length*18);
+          let tx=sp.x+14,ty=sp.y-10;
+          if(tx+tipW>canvas.width-8)tx=sp.x-tipW-14;
+          if(ty+tipH>canvas.height-8)ty=canvas.height-tipH-8;
+          if(ty<8)ty=8;
+          ctx.save();
+          ctx.shadowColor="rgba(0,0,0,0.4)";ctx.shadowBlur=10;ctx.shadowOffsetY=2;
+          ctx.fillStyle=t.surf2;ctx.beginPath();ctx.roundRect(tx,ty,tipW,tipH,8);ctx.fill();
+          ctx.shadowBlur=0;
+          ctx.fillStyle=t.acc;ctx.beginPath();ctx.roundRect(tx,ty,tipW,3,{upperLeft:8,upperRight:8});ctx.fill();
+          ctx.fillStyle=t.tx;ctx.font=`bold 12px "DM Sans",sans-serif`;
+          ctx.fillText(hp.label,tx+12,ty+20);
+          ctx.fillStyle=t.tx2;ctx.font=`11px "DM Sans",sans-serif`;
+          lines.forEach((l,i)=>ctx.fillText(l,tx+12,ty+38+i*16));
+          ctx.restore();
+        }
+      }
+    }
     if(currentDraw)drawInProgress(ctx,currentDraw,mousePos,zoom,pan,t);
     if(snapEnabled&&snapPos)drawSnapIndicator(ctx,snapPos,zoom,pan);
     if(showScaleBar)drawScaleBar(ctx,zoom,drawCalibration,canvas.width,canvas.height);
     if(showLUT&&activeLutMode!=="gray")drawLUTLegend(ctx,activeLutMode,activeLutInvert,canvas.width,canvas.height,t);
     if(placingMode&&placingQueue.length>0&&placingIdx<placingQueue.length){
       const m=drawMarkups.find(x=>x.id===placingQueue[placingIdx]);
-      if(m){ctx.save();ctx.fillStyle="rgba(0,0,0,0.8)";ctx.fillRect(0,0,canvas.width,36);ctx.fillStyle=t.acc;ctx.font=`bold 13px "DM Sans",sans-serif`;ctx.fillText(`📍 Placing: ${m.label}${m.definition?" — "+m.definition:""} · Click image · Esc to skip`,12,23);ctx.restore();}
+      if(m){
+        const cw=canvas.width;
+        const cardW=Math.min(520,cw-32), cardH=110;
+        const cardX=(cw-cardW)/2, cardY=canvas.height-cardH-20;
+        ctx.save();
+        // Shadow
+        ctx.shadowColor="rgba(0,0,0,0.5)";ctx.shadowBlur=16;ctx.shadowOffsetY=4;
+        ctx.fillStyle=t.surf;ctx.beginPath();ctx.roundRect(cardX,cardY,cardW,cardH,10);ctx.fill();
+        ctx.shadowBlur=0;ctx.shadowOffsetY=0;
+        // Border accent top
+        ctx.fillStyle=t.acc;ctx.beginPath();ctx.roundRect(cardX,cardY,cardW,4,{upperLeft:10,upperRight:10});ctx.fill();
+        // Header row — icon + label + progress
+        ctx.fillStyle=t.tx;ctx.font=`bold 15px "DM Sans",sans-serif`;
+        ctx.fillText(`📍 ${m.label}`,cardX+16,cardY+30);
+        ctx.fillStyle=t.tx3;ctx.font=`11px "DM Sans",sans-serif`;
+        ctx.textAlign="right";ctx.fillText(`${placingIdx+1}/${placingQueue.length}`,cardX+cardW-16,cardY+30);ctx.textAlign="left";
+        // Definition text (wrapped)
+        ctx.fillStyle=t.tx2;ctx.font=`13px "DM Sans",sans-serif`;
+        const defText=m.definition||"No definition available";
+        const maxW=cardW-36;let line="",lineY=cardY+54;
+        for(const word of defText.split(" ")){
+          const test=line?line+" "+word:word;
+          if(ctx.measureText(test).width>maxW&&line){ctx.fillText(line,cardX+16,lineY);line=word;lineY+=18;}
+          else line=test;
+        }
+        if(line)ctx.fillText(line,cardX+16,lineY);
+        // Footer hints
+        const hintY=cardY+cardH-10;
+        ctx.fillStyle=t.tx3;ctx.font=`10px "DM Mono",monospace`;
+        ctx.fillText(`🖱 Click to place`,cardX+16,hintY);
+        const hints=[{t:"Esc skip",x:cardX+140},{t:"⌫ Back",x:cardX+260},{t:"🔄 Pause",x:cardX+340}];
+        hints.forEach(h=>ctx.fillText(h.t,h.x,hintY));
+        ctx.restore();
+      }
     }
-  },[markups,selectedId,zoom,pan,project.images,calibration,t,currentDraw,mousePos,snapEnabled,snapPos,showScaleBar,showLUT,showAnnotations,annotationSize,placingMode,placingQueue,placingIdx,showDisplacement,compareVersion,getProcessed,reproCollecting,angleMode,databaseMode,databaseImages,currentImageIndex]);
+  },[markups,selectedId,zoom,pan,project.images,calibration,t,currentDraw,mousePos,snapEnabled,snapPos,showScaleBar,showDefTooltips,showLUT,showAnnotations,annotationSize,placingMode,placingQueue,placingIdx,showDisplacement,compareVersion,getProcessed,reproCollecting,angleMode,databaseMode,databaseImages,currentImageIndex]);
 
   useEffect(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});});
   const scheduleRedraw=useCallback(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});},[redraw]);
@@ -1168,7 +1234,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     const activeMarkupsList=databaseMode&&!reproCollecting?dbMarkups:markups;
     const sp=getCanvasPos(e);dispatch({type:"SET",payload:{mousePos:sp}});
     if(snapEnabled&&activeTool!=="select"&&activeTool!=="pan"){const ip=toImage(sp.x,sp.y);const sn=snapPoint(ip,activeMarkupsList,12/zoom,snapEnabled);dispatch({type:"SET",payload:{snapPos:(Math.abs(sn.x-ip.x)>0.1||Math.abs(sn.y-ip.y)>0.1)?sn:null}});}else dispatch({type:"SET",payload:{snapPos:null}});
-    if(activeTool==="select"&&!isDragging.current&&!silhouetteAction.current){const ip=toImage(sp.x,sp.y);let best=null,bd=Infinity;const ptThr=8/zoom;for(const m2 of activeMarkupsList){if(m2.locked||m2.visible===false)continue;if(m2.type==="silhouette"){const paths=m2.paths||SILHOUETTES[m2.silhouetteType]?.paths;if(!paths)continue;const rot=m2.rotation||0;const sc=m2.scale||1;const pos=m2.position||{x:0,y:0};const cosR=Math.cos(rot);const sinR=Math.sin(rot);paths.forEach((path,pi)=>{path.points.forEach((p,ptI)=>{const sx=p.x*sc*100;const sy=p.y*sc*100;const rx=sx*cosR-sy*sinR;const ry=sx*sinR+sy*cosR;const d=dist(ip,{x:rx+pos.x,y:ry+pos.y});if(d<bd&&d<ptThr){bd=d;best={type:"silhouette",mid:m2.id,pathIdx:pi,ptIdx:ptI};}});});if(m2.id===selectedId){try{const h=getSilhouetteHandlesImage(m2,zoom);const rotThr=Math.max(10,22*Math.sqrt(zoom))/zoom;if(h.rotCenter&&isFinite(h.rotCenter.x)){const d=dist(ip,h.rotCenter);if(d<rotThr&&d<bd){bd=d;best={type:"rotate",mid:m2.id};}}const cornerThr=Math.max(8,12*Math.sqrt(zoom))/zoom;h.corners.forEach((c,ci)=>{if(isFinite(c.x)){const d=dist(ip,c);if(d<cornerThr&&d<bd){bd=d;best={type:"corner",mid:m2.id,cornerIdx:ci};}}});}catch{/*silent*/}}}else if(m2.type==="curve"||m2.type==="polygon"){(m2.points||[]).forEach((p,i)=>{const d=dist(ip,p);if(d<bd&&d<ptThr){bd=d;best={type:"path",mid:m2.id,ptIdx:i};}});}}hoveredPtRef.current=best;}else{hoveredPtRef.current=null;}
+    if(activeTool==="select"&&!isDragging.current&&!silhouetteAction.current){const ip=toImage(sp.x,sp.y);let best=null,bd=Infinity;const ptThr=8/zoom;for(const m2 of activeMarkupsList){if(m2.locked||m2.visible===false)continue;if(m2.type==="point"){const vp=vpts(m2);if(vp.length){const d=dist(ip,vp[0]);if(d<bd&&d<ptThr){bd=d;best={type:"point",mid:m2.id};}}}if(m2.type==="silhouette"){const paths=m2.paths||SILHOUETTES[m2.silhouetteType]?.paths;if(!paths)continue;const rot=m2.rotation||0;const sc=m2.scale||1;const pos=m2.position||{x:0,y:0};const cosR=Math.cos(rot);const sinR=Math.sin(rot);paths.forEach((path,pi)=>{path.points.forEach((p,ptI)=>{const sx=p.x*sc*100;const sy=p.y*sc*100;const rx=sx*cosR-sy*sinR;const ry=sx*sinR+sy*cosR;const d=dist(ip,{x:rx+pos.x,y:ry+pos.y});if(d<bd&&d<ptThr){bd=d;best={type:"silhouette",mid:m2.id,pathIdx:pi,ptIdx:ptI};}});});if(m2.id===selectedId){try{const h=getSilhouetteHandlesImage(m2,zoom);const rotThr=Math.max(10,22*Math.sqrt(zoom))/zoom;if(h.rotCenter&&isFinite(h.rotCenter.x)){const d=dist(ip,h.rotCenter);if(d<rotThr&&d<bd){bd=d;best={type:"rotate",mid:m2.id};}}const cornerThr=Math.max(8,12*Math.sqrt(zoom))/zoom;h.corners.forEach((c,ci)=>{if(isFinite(c.x)){const d=dist(ip,c);if(d<cornerThr&&d<bd){bd=d;best={type:"corner",mid:m2.id,cornerIdx:ci};}}});}catch{/*silent*/}}}else if(m2.type==="curve"||m2.type==="polygon"){(m2.points||[]).forEach((p,i)=>{const d=dist(ip,p);if(d<bd&&d<ptThr){bd=d;best={type:"path",mid:m2.id,ptIdx:i};}});}}hoveredPtRef.current=best;}else{hoveredPtRef.current=null;}
     if(isPanning.current&&panStart.current)dispatch({type:"SET",payload:{pan:{x:panStart.current.px+(e.clientX-panStart.current.mx),y:panStart.current.py+(e.clientY-panStart.current.my)}}});
     if(isDragging.current&&dragMid.current){const ip=toImage(sp.x,sp.y);const dx=ip.x-dragStart.current.x,dy=ip.y-dragStart.current.y;const m=activeMarkupsList.find(x=>x.id===dragMid.current);if(!m)return;if(m.type==="silhouette"){if(typeof dragPtIdx.current==="object"&&dragPtIdx.current!==null){const sc=m.scale||1;const rot=m.rotation||0;const cosR=Math.cos(rot);const sinR=Math.sin(rot);const baseSize=100;const dnx=(cosR*dx+sinR*dy)/(sc*baseSize);const dny=(-sinR*dx+cosR*dy)/(sc*baseSize);const{pathIdx,ptIdx}=dragPtIdx.current;updMarkup(dragMid.current,{paths:(m.paths||[]).map((path,pi)=>({...path,points:path.points.map((p,ptI)=>pi===pathIdx&&ptI===ptIdx?{x:p.x+dnx,y:p.y+dny}:p)}))});}else{updMarkup(dragMid.current,{position:{x:(m.position?.x||0)+dx,y:(m.position?.y||0)+dy}});}}else{updMarkup(dragMid.current,{points:(m.points||[]).map((p,i)=>i===dragPtIdx.current?{x:p.x+dx,y:p.y+dy}:p)});}dragStart.current=ip;}
     if(silhouetteAction.current){
@@ -1393,8 +1459,11 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
             <svg fill={t.tx} width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M21.7,12.818a1.022,1.022,0,0,1,0,1.445L20.154,15.81l-3.589-3.589,1.547-1.548a1.022,1.022,0,0,1,1.444,0ZM9.737,2.3,8.19,3.846l3.59,3.589,1.546-1.547a1.021,1.021,0,0,0,0-1.444L11.181,2.3A1.021,1.021,0,0,0,9.737,2.3ZM4.478,19.522a8.458,8.458,0,0,0,11.963,0l2.269-2.268-3.589-3.589-2.269,2.268a3.384,3.384,0,0,1-4.785-4.785l2.269-2.269L6.747,5.29,4.478,7.559A8.458,8.458,0,0,0,4.478,19.522Z"/></svg>
             </Btn>
            <Btn ghost t={t} small active={showScaleBar} title="Toggle scale bar" onClick={()=>dispatch({type:"SET",payload:{showScaleBar:!showScaleBar}})}>
-             <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M160-240q-33 0-56.5-23.5T80-320v-320q0-33 23.5-56.5T160-720h640q33 0 56.5 23.5T880-640v320q0 33-23.5 56.5T800-240H160Zm0-80h640v-320H680v160h-80v-160h-80v160h-80v-160h-80v160h-80v-160H160v320Zm120-160h80-80Zm160 0h80-80Zm160 0h80-80Zm-120 0Z"/></svg>
-           </Btn>
+              <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M160-240q-33 0-56.5-23.5T80-320v-320q0-33 23.5-56.5T160-720h640q33 0 56.5 23.5T880-640v320q0 33-23.5 56.5T800-240H160Zm0-80h640v-320H680v160h-80v-160h-80v160h-80v-160h-80v160h-80v-160H160v320Zm120-160h80-80Zm160 0h80-80Zm160 0h80-80Zm-120 0Z"/></svg>
+            </Btn>
+           <Btn ghost t={t} small active={showDefTooltips} title="Toggle definition tooltips" onClick={()=>dispatch({type:"SET",payload:{showDefTooltips:!showDefTooltips}})}>
+              <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M440-280h80v-240h-80v240Zm40-320q17 0 28.5-11.5T520-640q0-17-11.5-28.5T480-680q-17 0-28.5 11.5T440-640q0 17 11.5 28.5T480-600Zm0 520q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></svg>
+            </Btn>
            <Btn ghost t={t} small active={showAnnotations} title="Toggle annotations" onClick={()=>dispatch({type:"SET",payload:{showAnnotations:!showAnnotations}})}>
             <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M338-241q16 0 23-10.5t9-24.5q2-10 3.5-20t3.5-22q2-11 4.5-24t5.5-30q23-5 45-8.5t43-5.5q23-3 45.5-4.5T564-394q5 24 10.5 43t11.5 36q8 23 17.5 38t23.5 26q14 11 30.5 12t28.5-9q9-7 9-21t-8-35q-5-11-8.5-22.5T670-350q-5-14-9-25.5t-7-22.5q13-1 23.5-4.5T695-412q7-6 10.5-14.5T709-445q0-11-4.5-18.5T691-476q-9-5-22.5-6.5t-30.5.5q-2-18-4-35.5t-5-35.5q-3-17-5.5-35t-7.5-35q-6-26-17-44.5T574-698q-13-11-28.5-16.5T511-720q-22 0-42 9t-40 27q-11 11-22 23.5T386-631q-8-6-14.5-8t-14.5-2q-11 0-18.5 6t-7.5 20q0 18-2 36t-6 36q-5 26-11 51.5T301-440q-11 2-19.5 5.5T267-427q-8 5-11.5 12.5T252-399q0 7 2 13t7 11q5 5 12 7.5t16 3.5q-1 12-1.5 22.5T287-321q0 21 3 36t9 25q6 10 15.5 14.5T338-241Zm71-223q6-23 14-44.5t18-44.5q16-37 34-59t32-22q11 0 19 17t13 51q3 20 5 43t4 43q-17 1-35 2.5t-35 3.5q-17 2-34.5 4.5T409-464ZM160-80q-33 0-56.5-23.5T80-160v-640q0-33 23.5-56.5T160-880h640q33 0 56.5 23.5T880-800v640q0 33-23.5 56.5T800-80H160Zm0-80h640v-640H160v640Zm0 0v-640 640Z"/></svg>
           </Btn>

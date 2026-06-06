@@ -1292,6 +1292,160 @@ export const RULES = {
       return "Nasopharyngeal airway depth is within normal range";
     },
   },
+  "Nasopharynx": {
+    category: "airway", subgroup: "nasopharyngeal",
+    label: "Nasopharyngeal Airway Area",
+    description: "Cross-sectional area of the nasopharynx (PNS-Ad1-Ad2-SP)",
+    interpret: (v, m) => {
+      if (v < m - m * 0.3) return "Nasopharyngeal airway area is significantly reduced — possible adenoid hypertrophy or narrow nasopharynx";
+      if (v < m) return "Nasopharyngeal airway area is mildly reduced";
+      if (v > m + m * 0.3) return "Nasopharyngeal airway area is increased — patent nasopharynx";
+      return "Nasopharyngeal airway area is within normal range";
+    },
+  },
+  "Oropharynx": {
+    category: "airway", subgroup: "oropharyngeal",
+    label: "Oropharyngeal Airway Area",
+    description: "Cross-sectional area of the oropharynx (SP-Ad3-Vallecula-Epiglottis-UP)",
+    interpret: (v, m) => {
+      if (v < m - m * 0.3) return "Oropharyngeal airway area is significantly reduced — potential obstruction at soft palate or tongue base level";
+      if (v < m) return "Oropharyngeal airway area is mildly reduced — possible retropalatal or retroglossal narrowing";
+      if (v > m + m * 0.3) return "Oropharyngeal airway area is increased — patent oropharynx";
+      return "Oropharyngeal airway area is within normal range";
+    },
+  },
+  "Hypopharynx": {
+    category: "airway", subgroup: "hypopharyngeal",
+    label: "Hypopharyngeal Airway Area",
+    description: "Cross-sectional area of the hypopharynx (Vallecula-Epiglottis-PASbot-Ad4)",
+    interpret: (v, m) => {
+      if (v < m - m * 0.3) return "Hypopharyngeal airway area is significantly reduced — possible retroglossal or epiglottic obstruction";
+      if (v < m) return "Hypopharyngeal airway area is mildly reduced";
+      if (v > m + m * 0.3) return "Hypopharyngeal airway area is increased — patent hypopharynx";
+      return "Hypopharyngeal airway area is within normal range";
+    },
+  },
+  "PNS-Ad2": {
+    category: "airway", subgroup: "nasopharyngeal",
+    label: "PNS-Ad2 (Nasopharyngeal Depth at So)",
+    description: "Nasopharyngeal airway depth at the So level (midpoint S-Ba)",
+    interpret: (v, m) => {
+      if (v < m) return "Nasopharyngeal airway is narrowed at the So level";
+      if (v > m) return "Nasopharyngeal airway is adequate at the So level";
+      return "Nasopharyngeal airway depth at So level is within normal range";
+    },
+  },
+  "UP width": {
+    category: "airway", subgroup: "oropharyngeal",
+    label: "Upper Pharyngeal Width (Retropalatal)",
+    description: "Width of the nasopharynx at the level of the uvula posterior",
+    interpret: (v, m) => {
+      if (v < m) return "Retropalatal airway width is narrowed — possible velopharyngeal obstruction";
+      if (v > m) return "Retropalatal airway width is adequate";
+      return "Retropalatal airway width is within normal range";
+    },
+  },
+  "LP width": {
+    category: "airway", subgroup: "hypopharyngeal",
+    label: "Lower Pharyngeal Width",
+    description: "Width of the lower pharynx at the C3-C4 level",
+    interpret: (v, m) => {
+      if (v < m) return "Lower pharyngeal width is narrowed — possible hypopharyngeal restriction";
+      if (v > m) return "Lower pharyngeal width is adequate";
+      return "Lower pharyngeal width is within normal range";
+    },
+  },
+  "McUP": {
+    category: "airway", subgroup: "oropharyngeal",
+    label: "Minimum Cross-sectional Width — Upper Pharynx",
+    description: "Minimum cross-sectional width of the upper pharynx (retropalatal)",
+    interpret: (v, m) => {
+      if (v < m) return "Critical narrowing of the upper pharynx — high risk of retropalatal collapse";
+      if (v > m) return "Upper pharynx minimum width is adequate";
+      return "Upper pharynx minimum width is within normal range";
+    },
+  },
+  "McLP": {
+    category: "airway", subgroup: "hypopharyngeal",
+    label: "Minimum Cross-sectional Width — Lower Pharynx",
+    description: "Minimum cross-sectional width of the lower pharynx (retroglossal)",
+    interpret: (v, m) => {
+      if (v < m) return "Critical narrowing of the lower pharynx — high risk of retroglossal collapse";
+      if (v > m) return "Lower pharynx minimum width is adequate";
+      return "Lower pharynx minimum width is within normal range";
+    },
+  },
+  "SPAS": {
+    category: "airway", subgroup: "oropharyngeal",
+    label: "Superior Posterior Airway Space",
+    description: "Posterior airway space at the level of the soft palate tip",
+    interpret: (v, m) => {
+      if (v < m) return "Superior PAS is narrowed — retropalatal airway restriction";
+      if (v > m) return "Superior PAS is adequate";
+      return "Superior PAS is within normal range";
+    },
+  },
+  "MAS": {
+    category: "airway", subgroup: "oropharyngeal",
+    label: "Middle Airway Space",
+    description: "Airway space at the mid-oropharyngeal level",
+    interpret: (v, m) => {
+      if (v < m) return "Middle airway space is narrowed — possible mid-oropharyngeal obstruction";
+      if (v > m) return "Middle airway space is adequate";
+      return "Middle airway space is within normal range";
+    },
+  },
+  "IAS": {
+    category: "airway", subgroup: "hypopharyngeal",
+    label: "Inferior Airway Space",
+    description: "Airway space at the hypopharyngeal level",
+    interpret: (v, m) => {
+      if (v < m) return "Inferior airway space is narrowed — possible hypopharyngeal obstruction";
+      if (v > m) return "Inferior airway space is adequate";
+      return "Inferior airway space is within normal range";
+    },
+  },
+  "Vertical Airway Length": {
+    category: "airway", subgroup: "overall",
+    label: "Vertical Airway Length",
+    description: "Vertical distance from PNS to the base of the epiglottis",
+    interpret: (v, m) => {
+      if (v > m) return "Vertical airway length is increased — possible long soft palate or low epiglottis";
+      if (v < m) return "Vertical airway length is decreased — possible short pharynx";
+      return "Vertical airway length is within normal range";
+    },
+  },
+  "Eb-PNS": {
+    category: "airway", subgroup: "overall",
+    label: "Oblique Airway Length",
+    description: "Oblique distance from the base of the epiglottis to PNS",
+    interpret: (v, m) => {
+      if (v > m) return "Oblique airway length is increased";
+      if (v < m) return "Oblique airway length is decreased";
+      return "Oblique airway length is within normal range";
+    },
+  },
+  "Angle of Nasopharynx": {
+    category: "airway", subgroup: "nasopharyngeal",
+    label: "Angle of the Nasopharynx",
+    description: "Angle formed by the nasopharyngeal airway walls (PNS-Ad1-Ad2)",
+    interpret: (v, m) => {
+      if (v < m) return "Nasopharyngeal angle is acute — possible constricted nasopharyngeal inlet";
+      if (v > m) return "Nasopharyngeal angle is obtuse — patent nasopharyngeal inlet";
+      return "Nasopharyngeal angle is within normal range";
+    },
+  },
+  "Adenoid/Nasopharynx Ratio": {
+    category: "airway", subgroup: "nasopharyngeal",
+    label: "Adenoid/Nasopharynx Ratio",
+    description: "Ratio of adenoid thickness to nasopharyngeal depth",
+    interpret: (v, m) => {
+      if (v > m + m * 0.3) return "Adenoid/nasopharynx ratio is significantly increased — adenoid hypertrophy causing airway compromise";
+      if (v > m) return "Adenoid/nasopharynx ratio is mildly increased — borderline adenoid enlargement";
+      if (v < m - m * 0.3) return "Adenoid/nasopharynx ratio is decreased — minimal adenoid tissue";
+      return "Adenoid/nasopharynx ratio is within normal range";
+    },
+  },
   // ═══════════════════════════════════════════
   // VERTICAL — Additional Plane Angles
   // ═══════════════════════════════════════════
@@ -1480,6 +1634,44 @@ const PATTERN_RECOGNIZERS = [
       if (upper.zScore > 1 && lower.zScore > 1) return { severity: "moderate", summary: "Bimaxillary protrusion", detail: "Both maxillary and mandibular incisors are proclined — common in bimaxillary dentoalveolar protrusion." };
       if (upper.zScore > 1 && lower.zScore < -1) return { severity: "moderate", summary: "Compensated Class II Division 2 pattern", detail: "Maxillary incisors are proclined while mandibular incisors are retroclined — compensatory mechanism." };
       if (upper.zScore < -1 && lower.zScore > 1) return { severity: "moderate", summary: "Proclined lower incisors with retroclined upper incisors", detail: "May indicate dentoalveolar compensation for skeletal discrepancy." };
+      return null;
+    },
+  },
+  {
+    id: "airway-skeletal-crossref",
+    label: "Airway-Skeletal Correlation",
+    analyze: (deviations) => {
+      const airway = deviations.filter(d => d.category === "airway");
+      if (airway.length < 2) return null;
+      const avgAirZ = airway.reduce((s, d) => s + d.zScore, 0) / airway.length;
+      const vert = deviations.filter(d => d.category === "skeletal" && ["vertical", "overall"].includes(d.subgroup));
+      const sag = deviations.filter(d => d.category === "skeletal" && ["ap-differential", "sagittal"].includes(d.subgroup));
+      const vertZ = vert.length ? vert.reduce((s, d) => s + d.zScore, 0) / vert.length : 0;
+      const sagZ = sag.length ? sag.reduce((s, d) => s + d.zScore, 0) / sag.length : 0;
+      if (avgAirZ < -1 && vertZ > 1) return { severity: Math.min(Math.abs(avgAirZ), vertZ) > 2 ? "severe" : "moderate", summary: "Narrow airway with hyperdivergent pattern", detail: "Hyperdivergent facial type associated with reduced pharyngeal airway — increased risk of sleep-disordered breathing." };
+      if (avgAirZ < -1 && sagZ < -1) return { severity: Math.min(Math.abs(avgAirZ), Math.abs(sagZ)) > 2 ? "severe" : "moderate", summary: "Narrow airway with Class III pattern", detail: "Skeletal Class III pattern with reduced pharyngeal airway — may have macroglossia-related airway restriction." };
+      if (avgAirZ < -1 && sagZ > 1) return { severity: Math.min(Math.abs(avgAirZ), sagZ) > 2 ? "severe" : "moderate", summary: "Narrow airway with Class II pattern", detail: "Skeletal Class II pattern with mandibular deficiency contributing to reduced pharyngeal airway space." };
+      if (avgAirZ > 1 && vertZ < -1) return { severity: "mild", summary: "Wide airway with hypodivergent pattern", detail: "Hypodivergent facial type with wide pharyngeal airway — typical association." };
+      return null;
+    },
+  },
+  {
+    id: "osa-risk",
+    label: "OSA Risk Screening",
+    analyze: (deviations) => {
+      const criticalNarrowing = deviations.filter(d =>
+        d.category === "airway" && d.zScore < -1.5
+      );
+      if (criticalNarrowing.length < 2) return null;
+      const hasMinimal = deviations.some(d => (d.label === "Minimum PAS" || d.label === "McUP" || d.label === "McLP") && d.zScore < -1.5);
+      const hasArea = deviations.some(d => (d.label === "Oropharynx" || d.label === "Hypopharynx") && d.zScore < -1.5);
+      const hasNaso = deviations.some(d => d.label === "Nasopharynx" && d.zScore < -1.5);
+      const vert = deviations.filter(d => d.category === "skeletal" && ["vertical", "overall"].includes(d.subgroup));
+      const vertZ = vert.length ? vert.reduce((s, d) => s + d.zScore, 0) / vert.length : 0;
+      if ((hasMinimal || hasArea) && vertZ > 1.5) return { severity: "severe", summary: "High OSA risk — narrow airway with hyperdivergent pattern", detail: "Multiple airway segments show critical narrowing (>1.5 SD below mean) in a hyperdivergent skeletal pattern. Strongly recommend sleep study (polysomnography) referral." };
+      if (hasMinimal && hasArea) return { severity: "severe", summary: "High OSA risk — multi-level airway narrowing", detail: "Both cross-sectional widths and airway areas show significant narrowing. Sleep-disordered breathing likely. Consider ENT/sleep medicine referral." };
+      if (criticalNarrowing.length >= 3) return { severity: "moderate", summary: "Moderate OSA risk — generalized airway narrowing", detail: "Three or more airway measurements show narrowing >1.5 SD. Consider OSA screening questionnaire (STOP-BANG, Epworth)." };
+      if (hasMinimal || (hasNaso && hasArea)) return { severity: "mild", summary: "Low-moderate OSA risk — focal airway narrowing", detail: "Focal airway narrowing detected in one or two segments. Monitor for symptoms of sleep-disordered breathing." };
       return null;
     },
   },
