@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo, useReducer } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, useReducer, useLayoutEffect } from "react";
 import { THEMES, TOOLS, PREDEFINED, LUT_PRESETS } from "./constants.js";
 import { SILHOUETTES } from "./silhouettes.js";
 import { uid, clamp, dist, vpts, computeMeasurements, snapPoint, alignOnePoint, alignTwoPoints, buildScope, evalFormula, getMissingVars, mean, stdev, tTestPaired, calculateICC, calculateICC_CI, dahlbergError, blandAltman, median, iqr, coefficientOfVariation, standardError, minimalDetectableChange, spearmanCorrelation, pearsonCorrelation, correlationMatrix, computePerLandmarkError, detectSystematicBias, anovaAcrossSessions, computeNormsComparison, detectOutliers, confidenceInterval, linearRegression } from "./utils.js";
@@ -559,7 +559,7 @@ const INITIAL_WORKSPACE={
   loadingImages:false,
   isMobile:window.innerWidth<768,showMobilePanel:false,
   toolbarPos:{x:70,y:100},toolbarDragging:false,
-  rightPanelWidth:440,rightPanelResizing:false,rightPanelCollapsed:false,
+  rightPanelWidth:440,rightPanelResizing:false,
   reproStudies:[],activeStudyId:null,reproCollecting:null,
   spotlightMode:false,
   databaseMode:false,databaseImages:[],currentImageIndex:0,showDatabaseImport:false,
@@ -584,7 +584,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     pendingTextPos,showFormulaEditor,editFormulaId,
     placingMode,placingQueue,placingIdx,loadingImages,
     isMobile,showMobilePanel,
-    toolbarPos,toolbarDragging,rightPanelWidth,rightPanelResizing,rightPanelCollapsed,
+    toolbarPos,toolbarDragging,rightPanelWidth,rightPanelResizing,
     reproStudies,activeStudyId,reproCollecting,spotlightMode,
     databaseMode,databaseImages,currentImageIndex,showDatabaseImport,
     displacementOverlay,refLandmark1,refLandmark2,overlayBlend}=ws;
@@ -608,7 +608,38 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const setRefLandmark1=v=>dispatch({type:"SET",payload:{refLandmark1:typeof v==="function"?v(refLandmark1):v}});
   const setRefLandmark2=v=>dispatch({type:"SET",payload:{refLandmark2:typeof v==="function"?v(refLandmark2):v}});
   const setOverlayBlend=v=>dispatch({type:"SET",payload:{overlayBlend:typeof v==="function"?v(overlayBlend):v}});
-  const setRightPanelCollapsed=v=>dispatch({type:"SET",payload:{rightPanelCollapsed:typeof v==="function"?v(rightPanelCollapsed):v}});
+  // Panel collapse state — useRef + DOM manipulation to avoid canvas re-renders
+  const collapsedRef=useRef(false);
+  const panelRef=useRef(null);
+  const contentRef=useRef(null);
+  const toggleBtnRef=useRef(null);
+  const skipResizeRef=useRef(false);
+  const syncCollapsed=()=>{
+    if(!panelRef.current)return;
+    if(collapsedRef.current){
+      panelRef.current.style.width="52px";
+      if(contentRef.current){contentRef.current.style.maxWidth="0px";contentRef.current.style.opacity="0";}
+      if(toggleBtnRef.current)toggleBtnRef.current.innerText="◀";
+    } else {
+      panelRef.current.style.width=rightPanelWidth+"px";
+      if(contentRef.current){contentRef.current.style.maxWidth="800px";contentRef.current.style.opacity="1";}
+      if(toggleBtnRef.current)toggleBtnRef.current.innerText="▶";
+    }
+  };
+  useLayoutEffect(syncCollapsed);
+  const toggleCollapsed=()=>{
+    collapsedRef.current=!collapsedRef.current;
+    skipResizeRef.current=true;
+    syncCollapsed();
+    setTimeout(()=>{
+      skipResizeRef.current=false;
+      const el=containerRef.current;
+      if(el){
+        const c=canvasRef.current;
+        if(c){c.width=el.clientWidth;c.height=el.clientHeight;canvasSize.current={w:el.clientWidth,h:el.clientHeight};scheduleRedraw();}
+      }
+    },300);
+  };
 
   useEffect(()=>{const fn=()=>dispatch({type:"SET",payload:{isMobile:window.innerWidth<768}});window.addEventListener("resize",fn);return()=>window.removeEventListener("resize",fn);},[]);
 
@@ -826,7 +857,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const getCanvasPos=e=>{const r=canvasRef.current.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};};
 
   useEffect(()=>{
-    const obs=new ResizeObserver(()=>{const el=containerRef.current;if(!el)return;const c=canvasRef.current;if(!c)return;c.width=el.clientWidth;c.height=el.clientHeight;canvasSize.current={w:el.clientWidth,h:el.clientHeight};scheduleRedraw();});
+    const obs=new ResizeObserver(()=>{if(skipResizeRef.current)return;const el=containerRef.current;if(!el)return;const c=canvasRef.current;if(!c)return;c.width=el.clientWidth;c.height=el.clientHeight;canvasSize.current={w:el.clientWidth,h:el.clientHeight};scheduleRedraw();});
     if(containerRef.current)obs.observe(containerRef.current);return()=>obs.disconnect();
   },[]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1675,7 +1706,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
 
         {/* RIGHT PANEL — VSCode-style vertical tabs on left */}
         {(!isMobile||(isMobile&&showMobilePanel))&&(
-          <div style={{...(isMobile?{position:"fixed",top:42,right:0,bottom:52,width:"85vw",maxWidth:300,zIndex:15,boxShadow:`-4px 0 20px ${t.shadow}`}:{width:rightPanelCollapsed?52:rightPanelWidth,flexShrink:0}),background:t.surf,display:"flex",flexDirection:"row",userSelect:rightPanelResizing?"none":"auto",cursor:rightPanelResizing?"col-resize":"auto",transition:"width 0.25s ease"}}>
+          <div ref={panelRef} style={{...(isMobile?{position:"fixed",top:42,right:0,bottom:52,width:"85vw",maxWidth:300,zIndex:15,boxShadow:`-4px 0 20px ${t.shadow}`}:{width:rightPanelWidth,flexShrink:0}),background:t.surf,display:"flex",flexDirection:"row",userSelect:rightPanelResizing?"none":"auto",cursor:rightPanelResizing?"col-resize":"auto",transition:"width 0.25s ease"}}>
             {/* Vertical tabs on left side */}
             <div style={{display:"flex",flexDirection:"column",alignItems:"center",paddingTop:8,flexShrink:0,background:t.surf2}}>
               {panelTabs.map(([id,label])=>{
@@ -1714,14 +1745,14 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
               })}
               {/* Collapse/expand toggle */}
               <div style={{flex:1,display:"flex",flexDirection:"column",justifyContent:"flex-end",paddingBottom:8}}>
-                <button onClick={()=>setRightPanelCollapsed(v=>!v)} title={rightPanelCollapsed?"Show panel":"Hide panel"}
+                <button ref={toggleBtnRef} onClick={toggleCollapsed} title="Toggle panel"
                   style={{width:44,height:36,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"center",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx2,cursor:"pointer",fontSize:16,transition:"all 0.15s"}}>
-                  {rightPanelCollapsed?"◀":"▶"}
+                  ▶
                 </button>
               </div>
             </div>
               {/* Panel content — scrollbar hidden but scrollable */}
-            <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0,maxWidth:rightPanelCollapsed?0:800,opacity:rightPanelCollapsed?0:1,transition:"max-width 0.25s ease, opacity 0.2s ease"}}>
+            <div ref={contentRef} style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0,maxWidth:800,opacity:1,transition:"max-width 0.25s ease, opacity 0.2s ease"}}>
               {/* Panel header — double-click to collapse/expand */}
               <div style={{padding:"12px 14px 10px",borderBottom:`1px solid ${t.bdr}`,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                 <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}>
