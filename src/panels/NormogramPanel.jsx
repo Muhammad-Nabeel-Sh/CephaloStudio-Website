@@ -584,6 +584,28 @@ export default function NormogramPanel({ allMeas, norms, t, formatAngle }) {
     img.src = url;
   }, [t.bg, totalH]);
 
+  const downloadCSV = useCallback(() => {
+    const header = ["Measurement", "Value", "Norm Mean", "Norm SD", "Z-score", "Percentile", "Severity", "Interpretation"];
+    const escape = v => {
+      const s = String(v ?? "");
+      return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const lines = [header.join(",")];
+    for (const r of rows) {
+      const z = r.deviation !== null ? r.deviation : "";
+      const pct = r.deviation !== null ? normCdf(r.deviation) + "%" : "";
+      const sevLabel = r.deviation !== null ? (Math.abs(r.deviation) <= 1 ? "Normal" : Math.abs(r.deviation) <= 2 ? "Mild" : "Severe") : "";
+      lines.push([r.label, r.value, r.norm.mean, r.norm.sd, z, pct, sevLabel, r.interpretation].map(escape).join(","));
+    }
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "normogram.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [rows]);
+
   if (rows.length === 0) {
     return (
       <div style={{ padding: 40, textAlign: "center", color: t.tx2, fontSize: 14 }}>
@@ -634,7 +656,7 @@ export default function NormogramPanel({ allMeas, norms, t, formatAngle }) {
         </div>
       )}
 
-      {/* Download buttons — SVG modes only */}
+      {/* Download buttons */}
       {chartMode !== "summary" && chartMode !== "table" && (
         <div style={{ display: "flex", gap: 8, marginTop: 12, justifyContent: "center" }}>
           <button onClick={downloadSVG}
@@ -644,6 +666,14 @@ export default function NormogramPanel({ allMeas, norms, t, formatAngle }) {
           <button onClick={downloadPNG}
             style={{ padding: "6px 14px", borderRadius: 6, border: "none", background: t.acc, color: t.bg, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>
             Download PNG
+          </button>
+        </div>
+      )}
+      {chartMode === "table" && (
+        <div style={{ display: "flex", gap: 8, marginTop: 12, justifyContent: "center" }}>
+          <button onClick={downloadCSV}
+            style={{ padding: "6px 14px", borderRadius: 6, border: "none", background: t.acc, color: t.bg, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>
+            Download CSV
           </button>
         </div>
       )}

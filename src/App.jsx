@@ -159,7 +159,8 @@ function TransformModal({t,images,onUpdateImages,onClose}){
 
 function FormulaEditor({t,formula,scope,onSave,onClose}){
   const[name,setName]=useState(formula?.name||"");const[latex,setLatex]=useState(formula?.latex||"");
-  const[expr,setExpr]=useState(formula?.expression||"");const[unit,setUnit]=useState(formula?.unit||"");const[desc,setDesc]=useState(formula?.description||"");
+  const[expr,setExpr]=useState(formula?.expression||"");const[unit,setUnit]=useState(formula?.unit||"");const[unitCustom,setUnitCustom]=useState("");
+  const[desc,setDesc]=useState(formula?.description||"");
   const[bigLatex,setBigLatex]=useState(null);const[showFx,setShowFx]=useState(false);const inputRef=useRef(null);
   const preview=useMemo(()=>evalFormula(expr,scope),[expr,scope]);
   const missing=useMemo(()=>getMissingVars(expr,scope),[expr,scope]);
@@ -181,6 +182,31 @@ function FormulaEditor({t,formula,scope,onSave,onClose}){
     const start=el.selectionStart??expr.length;const end=el.selectionEnd??expr.length;
     setExpr(prev=>prev.slice(0,start)+varName+prev.slice(end));
     setTimeout(()=>{el.focus();const p=start+varName.length;el.setSelectionRange(p,p);},0);
+  };
+  const handleSelect=(cat,e)=>{
+    const v=e.target.value;
+    if(v&&v!=="__placeholder")insertVar(v);
+    e.target.value="__placeholder";
+  };
+
+  const UNIT_OPTIONS=[
+    {value:"",label:"None"},
+    {value:"°",label:"Degrees (°)"},
+    {value:"mm",label:"Millimeters (mm)"},
+    {value:"mm²",label:"Square mm (mm²)"},
+    {value:"mm³",label:"Cubic mm (mm³)"},
+    {value:"%",label:"Percent (%)"},
+    {value:"ratio",label:"Ratio"},
+    {value:"°_mm",label:"°/mm"},
+    {value:"__custom__",label:"Custom…"},
+  ];
+  const isCustomUnit=unit==="__custom__"||(!!unit&&!UNIT_OPTIONS.some(o=>o.value===unit));
+  const displayUnit=isCustomUnit?(unitCustom||unit):unit;
+
+  const selectStyle={
+    background:t.surf3,border:`1px solid ${t.bdr}`,borderRadius:4,
+    padding:"4px 6px",color:t.tx,fontSize:11,fontFamily:"'DM Mono',monospace",
+    width:"100%",cursor:"pointer",outline:"none",
   };
 
   return(
@@ -206,19 +232,15 @@ function FormulaEditor({t,formula,scope,onSave,onClose}){
           <b style={{color:t.tx}}>Constants:</b> pi, e
         </div>}
         <Inp ref={inputRef} value={expr} onChange={setExpr} t={t} placeholder="SNA_angle - SNB_angle"/>
-        {groups.length>0&&<div style={{marginTop:6}}>
-          <div style={{fontSize:10,color:t.tx3,marginBottom:4}}>Click a variable to insert:</div>
+        {groups.length>0&&<div style={{marginTop:8,display:"flex",flexDirection:"column",gap:6}}>
+          <div style={{fontSize:10,color:t.tx3}}>Insert a variable:</div>
           {groups.map(([cat,vars])=>(
-            <div key={cat} style={{marginBottom:4}}>
-              <div style={{fontSize:9,color:t.tx2,fontWeight:700,marginBottom:2,textTransform:"uppercase",letterSpacing:0.5}}>{cat}</div>
-              <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-                {vars.map(v=><button key={v} type="button" onClick={()=>insertVar(v)} title={`${scope[v]?.toFixed(2)??"?"}`}
-                  style={{fontSize:11,padding:"2px 8px",borderRadius:4,border:`1px solid ${t.bdr}`,background:t.surf3,color:t.tx,cursor:"pointer",fontFamily:"'DM Mono',monospace"}}
-                  onMouseEnter={e=>{e.currentTarget.style.borderColor=t.acc;e.currentTarget.style.background=t.accMuted;}}
-                  onMouseLeave={e=>{e.currentTarget.style.borderColor=t.bdr;e.currentTarget.style.background=t.surf3;}}>
-                  {v}
-                </button>)}
-              </div>
+            <div key={cat} style={{display:"flex",alignItems:"center",gap:6}}>
+              <div style={{fontSize:9,color:t.tx2,fontWeight:700,textTransform:"uppercase",letterSpacing:0.5,width:60,flexShrink:0,textAlign:"right"}}>{cat}</div>
+              <select style={selectStyle} onChange={e=>handleSelect(cat,e)} defaultValue="__placeholder">
+                <option value="__placeholder" disabled>Select {cat.toLowerCase()}…</option>
+                {vars.map(v=><option key={v} value={v}>{v} {scope[v]!==undefined?`(${typeof scope[v]==="number"?scope[v].toFixed(2):scope[v]})`:""}</option>)}
+              </select>
             </div>
           ))}
         </div>}
@@ -226,12 +248,19 @@ function FormulaEditor({t,formula,scope,onSave,onClose}){
       <div style={{display:"flex",justifyContent:"space-between",padding:"6px 8px",background:preview!==null?t.ok+"11":expr?t.err+"11":t.surf2,borderRadius:6,marginBottom:8}}>
         <span style={{fontSize:12,color:t.tx2}}>Preview</span>
         <span style={{fontFamily:"'DM Mono',monospace",fontSize:13,fontWeight:700,color:preview!==null?t.ok:expr?t.err:t.tx3}}>
-          {preview!==null?`${preview.toFixed(2)} ${unit}`:expr?(missing.length>0?`Unknown: ${missing.join(", ")}`:"Error"):"—"}
+          {preview!==null?`${preview.toFixed(2)} ${displayUnit}`:expr?(missing.length>0?`Unknown: ${missing.join(", ")}`:"Error"):"—"}
         </span>
       </div>
-      <PropRow label="Unit" t={t}><Inp value={unit} onChange={setUnit} t={t} placeholder="°, mm, ratio"/></PropRow>
+      <PropRow label="Unit" t={t}>
+        <div style={{display:"flex",flexDirection:"column",gap:4,width:"100%"}}>
+          <select style={selectStyle} value={isCustomUnit?"__custom__":unit} onChange={e=>{if(e.target.value==="__custom__"){setUnit("__custom__");setUnitCustom("")}else{setUnit(e.target.value);setUnitCustom("")}}}>
+            {UNIT_OPTIONS.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+          {isCustomUnit&&<Inp value={unitCustom||(unit!=="__custom__"?unit:"")} onChange={v=>setUnitCustom(v)} t={t} placeholder="e.g. pixels" style={{width:"100%",boxSizing:"border-box"}}/>}
+        </div>
+      </PropRow>
       <PropRow label="Notes" t={t}><Inp value={desc} onChange={setDesc} t={t} placeholder="Reference"/></PropRow>
-      <div style={{display:"flex",gap:8,marginTop:14}}><Btn t={t} onClick={()=>onSave({id:formula?.id||uid(),name,latex,expression:expr,unit,description:desc})} style={{flex:1}} disabled={!name||!expr}>Save</Btn><Btn t={t} onClick={onClose} style={{flex:1}}>Cancel</Btn></div>
+      <div style={{display:"flex",gap:8,marginTop:14}}><Btn t={t} onClick={()=>onSave({id:formula?.id||uid(),name,latex,expression:expr,unit:displayUnit,description:desc})} style={{flex:1}} disabled={!name||!expr}>Save</Btn><Btn t={t} onClick={onClose} style={{flex:1}}>Cancel</Btn></div>
       {bigLatex&&<LatexFloatingPanel latex={bigLatex} onClose={()=>setBigLatex(null)}/>}
     </div>
   );
@@ -534,6 +563,7 @@ const INITIAL_WORKSPACE={
   reproStudies:[],activeStudyId:null,reproCollecting:null,
   spotlightMode:false,
   databaseMode:false,databaseImages:[],currentImageIndex:0,showDatabaseImport:false,
+  displacementOverlay:false,refLandmark1:"",refLandmark2:"",overlayBlend:0.5,
 };
 function wsReducer(state,action){
   if(action.type==="SET"){const n={...state};for(const[k,v]of Object.entries(action.payload))n[k]=typeof v==="function"?v(state[k]):v;return n;}
@@ -556,7 +586,8 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     isMobile,showMobilePanel,
     toolbarPos,toolbarDragging,rightPanelWidth,rightPanelResizing,
     reproStudies,activeStudyId,reproCollecting,spotlightMode,
-    databaseMode,databaseImages,currentImageIndex,showDatabaseImport}=ws;
+    databaseMode,databaseImages,currentImageIndex,showDatabaseImport,
+    displacementOverlay,refLandmark1,refLandmark2,overlayBlend}=ws;
   const rightPanelWidthRef=useRef(rightPanelWidth);rightPanelWidthRef.current=rightPanelWidth;
   const toolbarPosRef=useRef(toolbarPos);toolbarPosRef.current=toolbarPos;
   const setSelectedId=v=>dispatch({type:"SET",payload:{selectedId:typeof v==="function"?v(selectedId):v}});
@@ -573,6 +604,10 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const setActiveTool=v=>dispatch({type:"SET",payload:{activeTool:typeof v==="function"?v(activeTool):v}});
   const setDatabaseImages=v=>dispatch({type:"SET",payload:{databaseImages:typeof v==="function"?v(databaseImages):v}});
   const setRightPanel=v=>dispatch({type:"SET",payload:{rightPanel:typeof v==="function"?v(rightPanel):v}});
+  const setDisplacementOverlay=v=>dispatch({type:"SET",payload:{displacementOverlay:typeof v==="function"?v(displacementOverlay):v}});
+  const setRefLandmark1=v=>dispatch({type:"SET",payload:{refLandmark1:typeof v==="function"?v(refLandmark1):v}});
+  const setRefLandmark2=v=>dispatch({type:"SET",payload:{refLandmark2:typeof v==="function"?v(refLandmark2):v}});
+  const setOverlayBlend=v=>dispatch({type:"SET",payload:{overlayBlend:typeof v==="function"?v(overlayBlend):v}});
 
   useEffect(()=>{const fn=()=>dispatch({type:"SET",payload:{isMobile:window.innerWidth<768}});window.addEventListener("resize",fn);return()=>window.removeEventListener("resize",fn);},[]);
 
@@ -834,14 +869,41 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     }
     const drawMarkups=databaseMode&&databaseImages.length>0&&!reproCollecting?activeMarkups:markups;
     const drawCalibration=databaseMode&&databaseImages.length>0&&!reproCollecting?activeCalibration:calibration;
+    // Overlay mode: draw compare version's markups first with reduced opacity
+    if(displacementOverlay && compareVersion){
+      ctx.save();
+      ctx.globalAlpha = overlayBlend;
+      const compMarkups = compareVersion.markups || [];
+      // Structural reference alignment
+      if(refLandmark1 && refLandmark2){
+        const p1a = vpts(markups.find(m => m.type === "point" && m.label === refLandmark1)||{});
+        const p1b = vpts(markups.find(m => m.type === "point" && m.label === refLandmark2)||{});
+        const p2a = vpts(compMarkups.find(m => m.type === "point" && m.label === refLandmark1)||{});
+        const p2b = vpts(compMarkups.find(m => m.type === "point" && m.label === refLandmark2)||{});
+        if(p1a.length && p1b.length && p2a.length && p2b.length){
+          const tf = alignTwoPoints(p2a[0], p2b[0], p1a[0], p1b[0]);
+          ctx.translate(pan.x, pan.y);
+          ctx.scale(zoom, zoom);
+          ctx.translate(tf.tx, tf.ty);
+          ctx.rotate(tf.rot);
+          ctx.scale(tf.scale, tf.scale);
+          compMarkups.forEach(m => drawMarkup(ctx, m, 1, {x:0,y:0}, drawCalibration, null, t, false, canvasSize.current, angleMode, false, annotationSize, null));
+        } else {
+          compMarkups.forEach(m => drawMarkup(ctx, m, zoom, pan, drawCalibration, null, t, false, canvasSize.current, angleMode, false, annotationSize, null));
+        }
+      } else {
+        compMarkups.forEach(m => drawMarkup(ctx, m, zoom, pan, drawCalibration, null, t, false, canvasSize.current, angleMode, false, annotationSize, null));
+      }
+      ctx.restore();
+    }
     drawMarkups.forEach(m=>drawMarkup(ctx,m,zoom,pan,drawCalibration,selectedId,t,reproCollecting,canvasSize.current,angleMode,showAnnotations,annotationSize,hoveredPtRef.current));
     if(showDisplacement){
       if(!compareVersion){
         ctx.fillStyle="rgba(0,0,0,0.6)";ctx.fillRect(8,8,220,36);
         ctx.fillStyle="#ffd700";ctx.font="bold 12px 'DM Sans',sans-serif";
-        ctx.fillText("⇝ Select a compare version in Layers panel",16,28);
+        ctx.fillText("⇝ Select a compare version in Versions panel",16,28);
       } else {
-        drawDisplacementVectors(ctx,drawMarkups,compareVersion.markups||[],zoom,pan);
+        drawDisplacementVectors(ctx,drawMarkups,compareVersion.markups||[],zoom,pan,drawCalibration);
       }
     }
     drawAirwayOverlay(ctx,drawMarkups,zoom,pan,drawCalibration);
@@ -918,7 +980,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         ctx.restore();
       }
     }
-  },[markups,selectedId,zoom,pan,project.images,calibration,t,currentDraw,mousePos,snapEnabled,snapPos,showScaleBar,showDefTooltips,showLUT,showAnnotations,annotationSize,placingMode,placingQueue,placingIdx,showDisplacement,compareVersion,getProcessed,reproCollecting,angleMode,databaseMode,databaseImages,currentImageIndex]);
+  },[markups,selectedId,zoom,pan,project.images,calibration,t,currentDraw,mousePos,snapEnabled,snapPos,showScaleBar,showDefTooltips,showLUT,showAnnotations,annotationSize,placingMode,placingQueue,placingIdx,showDisplacement,compareVersion,getProcessed,reproCollecting,angleMode,databaseMode,databaseImages,currentImageIndex,activeTool,displacementOverlay,overlayBlend,refLandmark1,refLandmark2]);
 
   useEffect(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});});
   const scheduleRedraw=useCallback(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});},[redraw]);
@@ -1700,8 +1762,8 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
                     :<MeasurementsPanel allMeas={allMeas} t={t} calibration={calibration} norms={norms} onUpdateNorms={ns=>updVer({norms:ns})} onExportCSV={exportCSV} onOpenCalib={()=>dispatch({type:"SET",payload:{showCalib:true}})} formatAngle={formatAngle}/>)}
                   {rightPanel==="formulas"&&<FormulasPanel formulas={formulas} t={t} scope={measScope} onAdd={()=>{dispatch({type:"SET",payload:{editFormulaId:null}});dispatch({type:"SET",payload:{showFormulaEditor:true}});}} onEdit={id=>{dispatch({type:"SET",payload:{editFormulaId:id}});dispatch({type:"SET",payload:{showFormulaEditor:true}});}} onDelete={id=>updVer({formulas:formulas.filter(f=>f.id!==id)})}/>}
                   {rightPanel==="image"&&<ImagePanel t={t} processing={processing} setProcessing={p=>updVer({processing:p})} lutMode={lutMode} setLutMode={m=>updVer({lutMode:m})} lutInvert={lutInvert} setLutInvert={v=>updVer({lutInvert:v})} showLUT={showLUT} setShowLUT={setShowLUT} showScaleBar={showScaleBar} setShowScaleBar={setShowScaleBar} calibration={calibration} onOpenCalib={()=>dispatch({type:"SET",payload:{showCalib:true}})} onReset={()=>updVer({processing:{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},lutMode:"gray",lutInvert:false})} onShowHist={()=>setShowHistogram(v=>!v)} showHistogram={showHistogram}/>}
-                  {rightPanel==="layers"&&<LayersPanel t={t} images={project.images} onUpdateImages={imgs=>onUpdateProject({images:imgs})} onAddImage={e=>{if(e.target.files[0])loadImage(e.target.files[0],true);}} showDisplacement={showDisplacement} setShowDisplacement={setShowDisplacement} compareVersionId={compareVersionId} setCompareVersionId={setCompareVersionId} versions={project.versions} onShowAlign={()=>dispatch({type:"SET",payload:{showAlign:true}})} onShowTransform={()=>dispatch({type:"SET",payload:{showTransform:true}})}/>}
-                  {rightPanel==="versions"&&<VersionsPanel project={project} t={t} onUpdateProject={onUpdateProject} onUpdateVersion={onUpdateVersion} onExportTemplate={v=>exportCepht({name:`${project.name}`,projection:project.projection,markups:v.markups||[],formulas:v.formulas||[],norms:v.norms||[]})}/>}
+                  {rightPanel==="layers"&&<LayersPanel t={t} images={project.images} onUpdateImages={imgs=>onUpdateProject({images:imgs})} onAddImage={e=>{if(e.target.files[0])loadImage(e.target.files[0],true);}} onShowAlign={()=>dispatch({type:"SET",payload:{showAlign:true}})} onShowTransform={()=>dispatch({type:"SET",payload:{showTransform:true}})}/>}
+                  {rightPanel==="versions"&&<VersionsPanel project={project} t={t} onUpdateProject={onUpdateProject} onUpdateVersion={onUpdateVersion} onExportTemplate={v=>exportCepht({name:`${project.name}`,projection:project.projection,markups:v.markups||[],formulas:v.formulas||[],norms:v.norms||[]})} showDisplacement={showDisplacement} setShowDisplacement={setShowDisplacement} compareVersionId={compareVersionId} setCompareVersionId={setCompareVersionId} displacementOverlay={displacementOverlay} setDisplacementOverlay={setDisplacementOverlay} refLandmark1={refLandmark1} setRefLandmark1={setRefLandmark1} refLandmark2={refLandmark2} setRefLandmark2={setRefLandmark2} overlayBlend={overlayBlend} setOverlayBlend={setOverlayBlend} calibration={calibration} formatAngle={formatAngle} onShowAlign={()=>dispatch({type:"SET",payload:{showAlign:true}})}/>}
                   {rightPanel==="reproducibility"&&<ReproducibilityPanel t={t} markups={markups} studies={reproStudies} onUpdateStudies={setReproStudies} activeStudyId={activeStudyId} setActiveStudyId={setActiveStudyId} reproCollecting={reproCollecting} setReproCollecting={setReproCollecting}/>}
                   {rightPanel==="statistics"&&<StatisticsPanel t={t} studies={reproStudies} databaseMode={databaseMode} databaseImages={databaseImages} formatAngle={formatAngle}/>}
                   {rightPanel==="interpretation"&&<InterpretationPanel allMeas={allMeas} norms={norms} t={t} formatAngle={formatAngle}/>}

@@ -96,13 +96,13 @@ export function MarkupsPanel({ markups, t, theme, selectedId, onSelect, onDelete
                       <span style={{ fontSize: 11, color: isLocked ? t.warn : t.tx3 }}>{isLocked ? "🔒" : "🔓"}</span>
                     </button>
                     <button onClick={() => onToggleLabel(m.id)} style={{ background: "none", border: "none", cursor: "pointer", padding: 2, flexShrink: 0 }} title={m.noLabel ? "Show label" : "Hide label"}>
-                      <span style={{ fontSize: 10, color: m.noLabel ? t.tx3 : t.acc }}>{m.noLabel ? "Aa" : "Aa"}</span>
+                      <span style={{ fontSize: 12, color: m.noLabel ? t.tx3 : t.acc }}>{m.noLabel ? "Aa" : "Aa"}</span>
                     </button>
                     {m.type !== "text" && <button onClick={() => onReplace && onReplace(m.type, m.id)} style={{ background: replacingId === m.id ? t.accMuted : "none", border: "none", cursor: "pointer", padding: 2, flexShrink: 0 }} title="Replace mode">
-                      <span style={{ fontSize: 11, color: replacingId === m.id ? t.acc : t.tx2 }}>⚙</span>
+                      <span style={{ fontSize: 16, color: replacingId === m.id ? t.acc : t.tx2 }}>⚙</span>
                     </button>}
                     <div onClick={() => onSelect(m.id === selectedId ? null : m.id)} style={{ flex: 1, minWidth: 0, cursor: "pointer" }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: isHidden ? t.tx3 : t.tx, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: isHidden ? t.tx3 : t.tx, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {isPlacing && <span style={{ color: t.warn, marginRight: 4 }}>📍</span>}
                         {unplaced && !isPlacing && <span style={{ color: t.tx3, marginRight: 4 }}>○</span>}
                         {m.label || m.type}
@@ -112,7 +112,7 @@ export function MarkupsPanel({ markups, t, theme, selectedId, onSelect, onDelete
                         {m.type === "arrow" && <span style={{ fontSize: 9, color: t.tx3, marginLeft: 4 }}>→</span>}
                         {isLocked && <span style={{ fontSize: 9, color: t.warn, marginLeft: 4 }}>[locked]</span>}
                       </div>
-                      {ms && !isHidden && <div style={{ fontSize: 10, color: t.acc, fontFamily: "'DM Mono',monospace" }}>{ms}</div>}
+                      {ms && !isHidden && <div style={{ fontSize: 12, color: t.acc, fontFamily: "'DM Mono',monospace" }}>{ms}</div>}
                       {relNorms.length > 0 && !isHidden && ms && <NormBadges norms={relNorms} meas={meas} t={t} />}
                     </div>
                     <button onClick={() => onDelete(m.id)} title="Delete markup" style={{ background: "none", border: "none", color: t.tx3, cursor: "pointer", fontSize: 14, flexShrink: 0 }}>×</button>
@@ -315,7 +315,7 @@ export function ImagePanel({ t, processing, setProcessing, lutMode, setLutMode, 
 // ═══════════════════════════════════════════════════════════════════════════════════════
 // LAYERS PANEL
 // ═══════════════════════════════════════════════════════════════════════════════════════
-export function LayersPanel({ t, images, onUpdateImages, onAddImage, showDisplacement, setShowDisplacement, compareVersionId, setCompareVersionId, versions, onShowAlign, onShowTransform }) {
+export function LayersPanel({ t, images, onUpdateImages, onAddImage, onShowAlign, onShowTransform }) {
   const updImg = (id, patch) => onUpdateImages(images.map(i => i.id === id ? { ...i, ...patch } : i));
   const move = (idx, dir) => { const imgs = [...images]; [imgs[idx], imgs[idx + dir]] = [imgs[idx + dir], imgs[idx]]; onUpdateImages(imgs); };
   const SCOLS = ["none", "#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#a855f7"];
@@ -323,17 +323,9 @@ export function LayersPanel({ t, images, onUpdateImages, onAddImage, showDisplac
     <div style={{ padding: 12 }}>
       <PanelHeader t={t}>Image Stack ({images.length})</PanelHeader>
       <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
-        <Btn t={t} small active={showDisplacement} onClick={() => setShowDisplacement(v => !v)}>⇝ Displacement</Btn>
         <Btn t={t} small onClick={onShowAlign}>⊕ Align</Btn>
         <Btn t={t} small onClick={onShowTransform}>⟲ Transform</Btn>
       </div>
-      {versions.length > 1 && <div style={{ marginBottom: 10 }}>
-        <div style={{ fontSize: 10, color: t.tx2, marginBottom: 4 }}>Compare landmarks with:</div>
-        <select value={compareVersionId || ""} onChange={e => setCompareVersionId(e.target.value || null)} style={{ width: "100%", background: t.surf3, border: `1px solid ${t.bdr}`, borderRadius: 4, padding: "4px 8px", color: t.tx, fontSize: 12, fontFamily: "inherit" }}>
-          <option value="">— None —</option>
-          {versions.map(v => <option key={v.id} value={v.id}>{v.label}: {v.name}</option>)}
-        </select>
-      </div>}
       {images.length === 0 && <div style={{ color: t.tx3, fontSize: 12 }}>No images loaded.</div>}
       {images.map((img, idx) => (
         <div key={img.id} style={{ marginBottom: 10, border: `1px solid ${t.bdr}`, borderRadius: 8, padding: 10, background: t.surf2 }}>

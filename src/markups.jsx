@@ -1000,55 +1000,187 @@ export function drawAirwayOverlay(ctx, markups, zoom, pan, cal) {
   ctx.restore();
 }
 
-export function drawDisplacementVectors(ctx, m1arr, m2arr, zoom, pan){
+function drawDisplacementArrow(ctx, x1, y1, x2, y2, lenPx, scale, color, label){
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if(len < 1) return;
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2 * scale;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+
+  // dot at origin (current version)
+  ctx.beginPath();
+  ctx.arc(x1, y1, 3.5 * scale, 0, Math.PI * 2);
+  ctx.fillStyle = "#38bdf8";
+  ctx.fill();
+
+  // dot at destination (compare version)
+  ctx.beginPath();
+  ctx.arc(x2, y2, 3.5 * scale, 0, Math.PI * 2);
+  ctx.fillStyle = "#f472b6";
+  ctx.fill();
+
+  // arrowhead at destination
+  const angle = Math.atan2(dy, dx);
+  const hl = Math.min(len * 0.25, 10 * scale);
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - hl * Math.cos(angle - 0.45), y2 - hl * Math.sin(angle - 0.45));
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - hl * Math.cos(angle + 0.45), y2 - hl * Math.sin(angle + 0.45));
+  ctx.stroke();
+
+  // label
+  ctx.fillStyle = color;
+  ctx.font = `${clamp(9 * scale, 7, 12)}px "DM Mono",monospace`;
+  ctx.fillText(label, (x1 + x2) / 2 + 4, (y1 + y2) / 2 - 4);
+}
+
+function displacementColor(px, pxPerMm){
+  const mm = pxPerMm > 0 ? px / pxPerMm : px;
+  if(mm < 2) return "#22c55e";
+  if(mm < 5) return "#eab308";
+  return "#ef4444";
+}
+
+export function drawDisplacementVectors(ctx, m1arr, m2arr, zoom, pan, calibration){
   ctx.save();
-  
+  const pxPerMm = calibration?.done ? calibration.pxPerMm : 0;
+  const scale = Math.sqrt(zoom);
+
+  const pairs = [];  // { label, type, lenPx, color, from, to }
+
+  // ── Points ──
   m1arr.filter(m => m.type === "point").forEach(m1 => {
     const m2 = m2arr.find(m => m.type === "point" && m.label === m1.label);
     if(!m2) return;
-    
     const vp1 = vpts(m1), vp2 = vpts(m2);
     if(!vp1.length || !vp2.length) return;
-    
     const p1 = { x: vp1[0].x * zoom + pan.x, y: vp1[0].y * zoom + pan.y };
     const p2 = { x: vp2[0].x * zoom + pan.x, y: vp2[0].y * zoom + pan.y };
-    
     const dx = p2.x - p1.x, dy = p2.y - p1.y;
-    const len = Math.sqrt(dx * dx + dy * dy);
-    if(len < 1) return;
-    
-    ctx.strokeStyle = "#ffd700";
-    ctx.lineWidth = 2;
-    ctx.setLineDash([]);
-    ctx.beginPath();
-    ctx.moveTo(p1.x, p1.y);
-    ctx.lineTo(p2.x, p2.y);
-    ctx.stroke();
-    
-    ctx.beginPath();
-    ctx.arc(p1.x, p1.y, 4, 0, Math.PI * 2);
-    ctx.fillStyle = "#38bdf8";
-    ctx.fill();
-    
-    ctx.beginPath();
-    ctx.arc(p2.x, p2.y, 4, 0, Math.PI * 2);
-    ctx.fillStyle = "#f472b6";
-    ctx.fill();
-    
-    const angle = Math.atan2(dy, dx);
-    const hl = Math.min(len * 0.3, 14);
-    ctx.beginPath();
-    ctx.moveTo(p2.x, p2.y);
-    ctx.lineTo(p2.x - hl * Math.cos(angle - 0.4), p2.y - hl * Math.sin(angle - 0.4));
-    ctx.moveTo(p2.x, p2.y);
-    ctx.lineTo(p2.x - hl * Math.cos(angle + 0.4), p2.y - hl * Math.sin(angle + 0.4));
-    ctx.stroke();
-    
-    ctx.fillStyle = "#ffd700";
-    ctx.font = `${clamp(9 * Math.sqrt(zoom), 7, 12)}px "DM Mono",monospace`;
-    ctx.fillText(len.toFixed(1) + "px", (p1.x + p2.x) / 2 + 4, (p1.y + p2.y) / 2 - 4);
+    const lenPx = Math.sqrt(dx * dx + dy * dy);
+    if(lenPx < 1) return;
+    const color = displacementColor(lenPx, pxPerMm);
+    const mmStr = pxPerMm > 0 ? (lenPx / pxPerMm).toFixed(1) + "mm" : "";
+    const label = pxPerMm > 0 ? mmStr : lenPx.toFixed(1) + "px";
+    drawDisplacementArrow(ctx, p1.x, p1.y, p2.x, p2.y, lenPx, scale, color, label);
+    pairs.push({ label: m1.label, type: "point", lenPx, color, from: p1, to: p2, labelText: label });
   });
-  
+
+  // ── Lines (endpoints) ──
+  m1arr.filter(m => m.type === "line").forEach(m1 => {
+    const m2 = m2arr.find(m => m.type === "line" && m.label === m1.label);
+    if(!m2) return;
+    const pts1 = vpts(m1), pts2 = vpts(m2);
+    if(pts1.length < 2 || pts2.length < 2) return;
+    for(let i = 0; i < 2; i++){
+      const p1 = { x: pts1[i].x * zoom + pan.x, y: pts1[i].y * zoom + pan.y };
+      const p2 = { x: pts2[i].x * zoom + pan.x, y: pts2[i].y * zoom + pan.y };
+      const dx = p2.x - p1.x, dy = p2.y - p1.y;
+      const lenPx = Math.sqrt(dx * dx + dy * dy);
+      if(lenPx < 1) continue;
+      const color = displacementColor(lenPx, pxPerMm);
+      const mmStr = pxPerMm > 0 ? (lenPx / pxPerMm).toFixed(1) + "mm" : "";
+      const label = pxPerMm > 0 ? mmStr : lenPx.toFixed(1) + "px";
+      drawDisplacementArrow(ctx, p1.x, p1.y, p2.x, p2.y, lenPx, scale, color, label);
+      pairs.push({ label: m1.label + "[" + i + "]", type: "line", lenPx, color, from: p1, to: p2, labelText: label });
+    }
+  });
+
+  // ── Angles (angle change) ──
+  m1arr.filter(m => m.type === "angle3" || m.type === "angle4").forEach(m1 => {
+    const m2 = m2arr.find(m => (m.type === "angle3" || m.type === "angle4") && m.label === m1.label);
+    if(!m2) return;
+    const pts1 = vpts(m1), pts2 = vpts(m2);
+    if(pts1.length < (m1.type === "angle3" ? 3 : 4) || pts2.length < (m2.type === "angle3" ? 3 : 4)) return;
+    const a1 = m1.type === "angle3" ? angle3pt(pts1[0], pts1[1], pts1[2]) : angle4pt(pts1[0], pts1[1], pts1[2], pts1[3]);
+    const a2 = m1.type === "angle3" ? angle3pt(pts2[0], pts2[1], pts2[2]) : angle4pt(pts2[0], pts2[1], pts2[2], pts2[3]);
+    const diff = a2 - a1;
+    // draw indicator at vertex
+    const ctr = pts1.length >= 2 ? { x: pts1[1].x * zoom + pan.x, y: pts1[1].y * zoom + pan.y } : null;
+    if(ctr){
+      ctx.strokeStyle = "#a855f7";
+      ctx.lineWidth = 1.5 * scale;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.arc(ctr.x, ctr.y, 12 * scale, Math.min(a1, a2), Math.max(a1, a2));
+      ctx.stroke();
+      ctx.setLineDash([]);
+      const sign = diff >= 0 ? "+" : "";
+      ctx.fillStyle = "#a855f7";
+      ctx.font = `bold ${clamp(10 * scale, 8, 14)}px "DM Mono",monospace`;
+      ctx.fillText(sign + diff.toFixed(1) + "°", ctr.x + 14 * scale, ctr.y - 6 * scale);
+    }
+    pairs.push({ label: m1.label, type: "angle", lenPx: Math.abs(diff), color: "#a855f7", from: null, to: null, labelText: diff.toFixed(1) + "°" });
+  });
+
+  // ── Polygons (vertex displacement) ──
+  m1arr.filter(m => m.type === "polygon").forEach(m1 => {
+    const m2 = m2arr.find(m => m.type === "polygon" && m.label === m1.label);
+    if(!m2) return;
+    const pts1 = vpts(m1), pts2 = vpts(m2);
+    const n = Math.min(pts1.length, pts2.length);
+    for(let i = 0; i < n; i++){
+      const p1 = { x: pts1[i].x * zoom + pan.x, y: pts1[i].y * zoom + pan.y };
+      const p2 = { x: pts2[i].x * zoom + pan.x, y: pts2[i].y * zoom + pan.y };
+      const dx = p2.x - p1.x, dy = p2.y - p1.y;
+      const lenPx = Math.sqrt(dx * dx + dy * dy);
+      if(lenPx < 1) continue;
+      const color = displacementColor(lenPx, pxPerMm);
+      const mmStr = pxPerMm > 0 ? (lenPx / pxPerMm).toFixed(1) + "mm" : "";
+      const label = pxPerMm > 0 ? mmStr : lenPx.toFixed(1) + "px";
+      drawDisplacementArrow(ctx, p1.x, p1.y, p2.x, p2.y, lenPx, scale, color, label);
+      pairs.push({ label: m1.label + "[" + i + "]", type: "polygon", lenPx, color, from: p1, to: p2, labelText: label });
+    }
+  });
+
+  // ── Stats summary ──
+  const mmPairs = pairs.filter(p => p.lenPx > 0 && p.from && p.to);
+  if(mmPairs.length > 0 && pxPerMm > 0){
+    const mmVals = mmPairs.map(p => p.lenPx / pxPerMm);
+    const avgMM = mmVals.reduce((a, b) => a + b, 0) / mmVals.length;
+    const maxMM = Math.max(...mmVals);
+    const minMM = Math.min(...mmVals);
+    const boxW = 180, boxH = 72, boxX = 10, boxY = 10;
+    ctx.fillStyle = "rgba(0,0,0,0.75)";
+    ctx.roundRect ? ctx.roundRect(boxX, boxY, boxW, boxH, 6) : ctx.rect(boxX, boxY, boxW, boxH);
+    ctx.fill();
+    ctx.fillStyle = "#ffd700";
+    ctx.font = `bold 11px "DM Sans",sans-serif`;
+    ctx.fillText("⇝ Displacement stats", boxX + 10, boxY + 16);
+    ctx.font = `10px "DM Mono",monospace`;
+    ctx.fillStyle = "#22c55e";
+    ctx.fillText("Mean: " + avgMM.toFixed(1) + "mm", boxX + 10, boxY + 34);
+    ctx.fillStyle = "#eab308";
+    ctx.fillText("Max: " + maxMM.toFixed(1) + "mm", boxX + 10, boxY + 50);
+    ctx.fillStyle = "#38bdf8";
+    ctx.fillText("Min: " + minMM.toFixed(1) + "mm", boxX + 10, boxY + 66);
+  } else if(mmPairs.length > 0){
+    const avgPx = mmPairs.reduce((s, p) => s + p.lenPx, 0) / mmPairs.length;
+    const maxPx = Math.max(...mmPairs.map(p => p.lenPx));
+    const minPx = Math.min(...mmPairs.map(p => p.lenPx));
+    const boxW = 180, boxH = 72, boxX = 10, boxY = 10;
+    ctx.fillStyle = "rgba(0,0,0,0.75)";
+    ctx.roundRect ? ctx.roundRect(boxX, boxY, boxW, boxH, 6) : ctx.rect(boxX, boxY, boxW, boxH);
+    ctx.fill();
+    ctx.fillStyle = "#ffd700";
+    ctx.font = `bold 11px "DM Sans",sans-serif`;
+    ctx.fillText("⇝ Displacement stats", boxX + 10, boxY + 16);
+    ctx.font = `10px "DM Mono",monospace`;
+    ctx.fillStyle = "#22c55e";
+    ctx.fillText("Mean: " + avgPx.toFixed(1) + "px", boxX + 10, boxY + 34);
+    ctx.fillStyle = "#eab308";
+    ctx.fillText("Max: " + maxPx.toFixed(1) + "px", boxX + 10, boxY + 50);
+    ctx.fillStyle = "#38bdf8";
+    ctx.fillText("Min: " + minPx.toFixed(1) + "px", boxX + 10, boxY + 66);
+  }
+
   ctx.restore();
 }
 
