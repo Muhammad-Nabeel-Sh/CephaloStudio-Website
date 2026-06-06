@@ -559,7 +559,7 @@ const INITIAL_WORKSPACE={
   loadingImages:false,
   isMobile:window.innerWidth<768,showMobilePanel:false,
   toolbarPos:{x:70,y:100},toolbarDragging:false,
-  rightPanelWidth:320,rightPanelResizing:false,
+  rightPanelWidth:440,rightPanelResizing:false,rightPanelCollapsed:false,
   reproStudies:[],activeStudyId:null,reproCollecting:null,
   spotlightMode:false,
   databaseMode:false,databaseImages:[],currentImageIndex:0,showDatabaseImport:false,
@@ -584,7 +584,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     pendingTextPos,showFormulaEditor,editFormulaId,
     placingMode,placingQueue,placingIdx,loadingImages,
     isMobile,showMobilePanel,
-    toolbarPos,toolbarDragging,rightPanelWidth,rightPanelResizing,
+    toolbarPos,toolbarDragging,rightPanelWidth,rightPanelResizing,rightPanelCollapsed,
     reproStudies,activeStudyId,reproCollecting,spotlightMode,
     databaseMode,databaseImages,currentImageIndex,showDatabaseImport,
     displacementOverlay,refLandmark1,refLandmark2,overlayBlend}=ws;
@@ -608,6 +608,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const setRefLandmark1=v=>dispatch({type:"SET",payload:{refLandmark1:typeof v==="function"?v(refLandmark1):v}});
   const setRefLandmark2=v=>dispatch({type:"SET",payload:{refLandmark2:typeof v==="function"?v(refLandmark2):v}});
   const setOverlayBlend=v=>dispatch({type:"SET",payload:{overlayBlend:typeof v==="function"?v(overlayBlend):v}});
+  const setRightPanelCollapsed=v=>dispatch({type:"SET",payload:{rightPanelCollapsed:typeof v==="function"?v(rightPanelCollapsed):v}});
 
   useEffect(()=>{const fn=()=>dispatch({type:"SET",payload:{isMobile:window.innerWidth<768}});window.addEventListener("resize",fn);return()=>window.removeEventListener("resize",fn);},[]);
 
@@ -1674,7 +1675,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
 
         {/* RIGHT PANEL — VSCode-style vertical tabs on left */}
         {(!isMobile||(isMobile&&showMobilePanel))&&(
-          <div style={{...(isMobile?{position:"fixed",top:42,right:0,bottom:52,width:"85vw",maxWidth:300,zIndex:15,boxShadow:`-4px 0 20px ${t.shadow}`}:{width:rightPanelWidth,flexShrink:0}),background:t.surf,display:"flex",flexDirection:"row",userSelect:rightPanelResizing?"none":"auto",cursor:rightPanelResizing?"col-resize":"auto"}}>
+          <div style={{...(isMobile?{position:"fixed",top:42,right:0,bottom:52,width:"85vw",maxWidth:300,zIndex:15,boxShadow:`-4px 0 20px ${t.shadow}`}:{width:rightPanelCollapsed?52:rightPanelWidth,flexShrink:0}),background:t.surf,display:"flex",flexDirection:"row",userSelect:rightPanelResizing?"none":"auto",cursor:rightPanelResizing?"col-resize":"auto"}}>
             {/* Vertical tabs on left side */}
             <div style={{display:"flex",flexDirection:"column",alignItems:"center",paddingTop:8,flexShrink:0,background:t.surf2}}>
               {panelTabs.map(([id,label])=>{
@@ -1711,18 +1712,22 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
                   </button>
                 );
               })}
+              {/* Collapse/expand toggle */}
+              <div style={{flex:1,display:"flex",flexDirection:"column",justifyContent:"flex-end",paddingBottom:8}}>
+                <button onClick={()=>setRightPanelCollapsed(v=>!v)} title={rightPanelCollapsed?"Show panel":"Hide panel"}
+                  style={{width:44,height:36,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"center",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx2,cursor:"pointer",fontSize:16,transition:"all 0.15s"}}>
+                  {rightPanelCollapsed?"◀":"▶"}
+                </button>
+              </div>
             </div>
               {/* Panel content — scrollbar hidden but scrollable */}
-            <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0}}>
-              {/* Panel header */}
+            {!rightPanelCollapsed && <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0}}>
+              {/* Panel header — double-click to collapse/expand */}
               <div style={{padding:"12px 14px 10px",borderBottom:`1px solid ${t.bdr}`,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
                 <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}>
                  <span style={{fontSize:18}}>{panelIcons[rightPanel]||"𝛜"}</span>
                   <span style={{fontSize:13,fontWeight:700,color:t.tx,textTransform:"capitalize",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{panelTabs.find(([id])=>id===rightPanel)?.[1]}</span>
                 </div>
-                <button onClick={()=>dispatch({type:"SET",payload:{rightPanelWidth:rightPanelWidth<440?440:320}})} style={{background:"none",border:"none",color:t.tx2,cursor:"pointer",fontSize:14,padding:4}} title={rightPanelWidth<440?"Expand panel":"Collapse panel"}>
-                  {rightPanelWidth<400?"⤢":"⤥"}
-                </button>
               </div>
               <div style={{flex:1,overflowY:"auto",scrollbarWidth:"none"}}>
                 <style>{`.panel-scroll::-webkit-scrollbar{display:none}`}</style>
@@ -1802,7 +1807,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
               {selectedMarkup&&<div style={{borderTop:`1px solid ${t.bdr}`,padding:12,flexShrink:0,maxHeight:isMobile?180:260,overflowY:"auto",scrollbarWidth:"none"}}>
                 <MarkupProps m={selectedMarkup} t={t} theme={theme} onUpdate={p=>updMarkup(selectedMarkup.id,p)} onDelete={()=>delMarkup(selectedMarkup.id)} calibration={calibration} onParallel={()=>dispatch({type:"SET",payload:{activeTool:"parallel"}})} formatAngle={formatAngle} norms={norms} onUpdateNorms={ns=>updVer({norms:ns})}/>
               </div>}
-            </div>
+            </div>}
             {/* Resize handle */}
             <div onMouseDown={()=>dispatch({type:"SET",payload:{rightPanelResizing:true}})} style={{width:4,cursor:"col-resize",background: rightPanelResizing ? t.acc : "transparent",transition:"background 0.15s",flexShrink:0}}/>
           </div>
