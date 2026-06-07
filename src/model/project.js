@@ -17,6 +17,7 @@ export function mkProject(projection) {
     sessions: [session],
     activeSessionId: session.id,
     reproStudies: [],
+    researchStudies: [],
   };
 }
 

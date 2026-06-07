@@ -1,0 +1,271 @@
+import { useState } from "react";
+import { STUDY_TYPES, mkStudy } from "./studyModel.js";
+import { runStudy } from "./engine.js";
+
+export default function ResearchPanel({ t, project, onUpdateProject, calibration, angleMode }) {
+  const studies = project?.researchStudies || [];
+  const sessions = project?.sessions || [];
+  const [tab, setTab] = useState("list");
+  const [selectedType, setSelectedType] = useState("reliability");
+  const [selectedId, setSelectedId] = useState(null);
+
+  const handleCreate = () => {
+    const study = mkStudy(selectedType, {
+      name: `${STUDY_TYPES.find(t => t.id === selectedType)?.name || selectedType} ${studies.length + 1}`,
+      sessionIds: sessions.map(s => s.id),
+    });
+    onUpdateProject({
+      ...project,
+      researchStudies: [...studies, study],
+    });
+    setSelectedId(study.id);
+    setTab("list");
+  };
+
+  const handleRun = (studyId) => {
+    const study = studies.find(s => s.id === studyId);
+    if (!study) return;
+    const updated = runStudy(study, sessions, calibration, angleMode);
+    onUpdateProject({
+      ...project,
+      researchStudies: studies.map(s => s.id === studyId ? updated : s),
+    });
+  };
+
+  const handleRemove = (studyId) => {
+    if (!window.confirm("Remove this study?")) return;
+    onUpdateProject({
+      ...project,
+      researchStudies: studies.filter(s => s.id !== studyId),
+    });
+    if (selectedId === studyId) setSelectedId(null);
+  };
+
+  const handleToggleLabel = (studyId, labelId) => {
+    const study = studies.find(s => s.id === studyId);
+    if (!study) return;
+    const ids = study.config.labelIds || [];
+    const next = ids.includes(labelId) ? ids.filter(id => id !== labelId) : [...ids, labelId];
+    onUpdateProject({
+      ...project,
+      researchStudies: studies.map(s => s.id === studyId ? { ...s, config: { ...s.config, labelIds: next } } : s),
+    });
+  };
+
+  return (
+    <div style={{ padding: 12 }}>
+      <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+        <button onClick={() => setTab("new")}
+          style={{ flex: 1, padding: "6px 10px", borderRadius: 6, border: "none", background: t.acc, color: t.bg, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+          + New Study
+        </button>
+        <button onClick={() => setTab("list")}
+          style={{ flex: 1, padding: "6px 10px", borderRadius: 6, border: `1px solid ${t.bdr}`, background: tab === "list" ? t.surf2 : "transparent", color: t.tx, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+          Studies ({studies.length})
+        </button>
+      </div>
+
+      {tab === "new" && (
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: t.tx, marginBottom: 10 }}>Choose Study Type</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {STUDY_TYPES.map(st => (
+              <div key={st.id} onClick={() => setSelectedType(st.id)}
+                style={{
+                  padding: "10px 12px", borderRadius: 8, cursor: "pointer",
+                  border: `1px solid ${selectedType === st.id ? st.color : t.bdr}`,
+                  background: selectedType === st.id ? st.color + "18" : t.surf2,
+                  transition: "all 0.15s",
+                }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 18 }}>{st.icon}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: t.tx }}>{st.name}</div>
+                    <div style={{ fontSize: 10, color: t.tx2, marginTop: 2 }}>{st.desc}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <button onClick={handleCreate} disabled={!selectedType}
+            style={{ width: "100%", marginTop: 12, padding: "8px 12px", borderRadius: 6, border: "none", background: t.acc, color: t.bg, fontSize: 12, fontWeight: 700, cursor: "pointer", opacity: selectedType ? 1 : 0.4 }}>
+            Create Study
+          </button>
+        </div>
+      )}
+
+      {tab === "list" && studies.length === 0 && (
+        <div style={{ fontSize: 12, color: t.tx3, textAlign: "center", padding: 20 }}>
+          No research studies yet. Create one to begin analysis.
+        </div>
+      )}
+
+      {tab === "list" && studies.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {studies.map(s => {
+            const meta = STUDY_TYPES.find(st => st.id === s.type);
+            return (
+              <div key={s.id} onClick={() => setSelectedId(s.id === selectedId ? null : s.id)}
+                style={{
+                  padding: "8px 10px", borderRadius: 6,
+                  background: s.id === selectedId ? t.acc + "18" : t.surf2,
+                  border: s.id === selectedId ? `1px solid ${t.acc}` : `1px solid ${t.bdr}`,
+                  cursor: "pointer", transition: "all 0.15s",
+                }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 16 }}>{meta?.icon || "📋"}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: t.tx, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
+                      <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 3, background: (meta?.color || t.acc) + "22", color: meta?.color || t.acc, fontWeight: 600 }}>{meta?.name || s.type}</span>
+                      <span style={{ fontSize: 9, color: s.status === "completed" ? t.ok : s.status === "error" ? t.err : t.tx3 }}>
+                        {s.status}
+                      </span>
+                      {s.results?.sessions && <span style={{ fontSize: 9, color: t.tx3 }}>· {s.results.sessions} sessions</span>}
+                    </div>
+                  </div>
+                  {s.status !== "completed" && (
+                    <button onClick={e => { e.stopPropagation(); handleRun(s.id); }}
+                      style={{ padding: "4px 8px", borderRadius: 4, border: "none", background: t.acc, color: t.bg, fontSize: 9, fontWeight: 700, cursor: "pointer" }}>
+                      Run
+                    </button>
+                  )}
+                  <button onClick={e => { e.stopPropagation(); handleRemove(s.id); }}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: t.tx3, padding: 2, fontSize: 12 }}>
+                    ✕
+                  </button>
+                </div>
+
+                {/* Expanded details */}
+                {s.id === selectedId && (
+                  <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${t.bdr}44` }}>
+                    {/* Label selection */}
+                    {sessions.length > 0 && (
+                      <div style={{ marginBottom: 8 }}>
+                        <div style={{ fontSize: 9, fontWeight: 600, color: t.tx3, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 4 }}>Measurements</div>
+                        <LabelSelector sessions={sessions} selected={s.config.labelIds || []} onToggle={l => handleToggleLabel(s.id, l)} t={t} />
+                      </div>
+                    )}
+
+                    {/* Results */}
+                    {s.status === "completed" && s.results && (
+                      <StudyResults study={s} t={t} />
+                    )}
+                    {s.status === "error" && (
+                      <div style={{ fontSize: 11, color: t.err, padding: 8, background: t.err + "12", borderRadius: 4 }}>
+                        {s.results?.error || "Unknown error"}
+                      </div>
+                    )}
+                    {s.status === "configured" && (
+                      <button onClick={() => handleRun(s.id)}
+                        style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "none", background: t.acc, color: t.bg, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                        Run Analysis
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function LabelSelector({ sessions, selected, onToggle, t }) {
+  const labels = [...new Set((sessions || []).flatMap(s => (s.markups || []).filter(m => m.label && m.type !== "ruler" && m.type !== "silhouette").map(m => m.label)))].sort();
+  if (labels.length === 0) return <div style={{ fontSize: 10, color: t.tx3 }}>No labeled markups found.</div>;
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+      {selected.length === 0 && <span style={{ fontSize: 10, color: t.tx3, padding: "2px 0" }}>All ({labels.length})</span>}
+      {selected.length > 0 && <button onClick={() => selected.forEach(l => { if (selected.includes(l)) onToggle(l); })}
+        style={{ fontSize: 9, padding: "1px 5px", borderRadius: 3, border: `1px solid ${t.bdr}`, background: "transparent", color: t.tx3, cursor: "pointer" }}>Clear</button>}
+      {labels.map(l => (
+        <button key={l} onClick={() => onToggle(l)}
+          style={{
+            fontSize: 9, padding: "2px 6px", borderRadius: 3, cursor: "pointer",
+            border: `1px solid ${selected.includes(l) ? t.acc : t.bdr}`,
+            background: selected.includes(l) ? t.acc + "22" : "transparent",
+            color: selected.includes(l) ? t.acc : t.tx2,
+            fontWeight: selected.includes(l) ? 700 : 400,
+            fontFamily: "'DM Mono',monospace",
+          }}>
+          {l}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function StudyResults({ study, t }) {
+  const res = study.results;
+  const details = res.details || [];
+
+  if (res.note) {
+    return (
+      <div style={{ fontSize: 11, color: t.tx2, padding: 8, background: t.surf3, borderRadius: 4, textAlign: "center" }}>
+        {res.note}
+      </div>
+    );
+  }
+
+  if (study.type === "reliability") return <ReliabilityResults details={details} t={t} />;
+
+  return null;
+}
+
+function ReliabilityResults({ details, t }) {
+  const passed = details.filter(d => d.icc !== undefined || d.meanDiff !== undefined);
+  if (passed.length === 0) return <div style={{ fontSize: 11, color: t.tx3, textAlign: "center", padding: 8 }}>Insufficient data for reliability analysis.</div>;
+
+  return (
+    <div>
+      <div style={{ fontSize: 10, fontWeight: 600, color: t.tx3, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 6 }}>Results ({passed.length} labels)</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {passed.map(r => (
+          <div key={r.label} style={{ padding: 10, borderRadius: 6, background: t.surf3, border: `1px solid ${t.bdr}44` }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: t.tx, fontFamily: "'DM Mono',monospace", marginBottom: 6 }}>{r.label}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 12px", fontSize: 10, color: t.tx2 }}>
+              {r.icc !== undefined && r.icc !== null && (
+                <>
+                  <span>ICC ({r.iccType || "2"}):</span>
+                  <span style={{ fontFamily: "'DM Mono',monospace", color: iccColor(r.icc), fontWeight: 700 }}>{r.icc.toFixed(4)}</span>
+                </>
+              )}
+              {r.meanDiff !== undefined && (
+                <>
+                  <span>Mean diff:</span>
+                  <span style={{ fontFamily: "'DM Mono',monospace" }}>{r.meanDiff.toFixed(4)}</span>
+                  <span>SD diff:</span>
+                  <span style={{ fontFamily: "'DM Mono',monospace" }}>{r.sdDiff.toFixed(4)}</span>
+                  <span>LoA:</span>
+                  <span style={{ fontFamily: "'DM Mono',monospace" }}>[{r.loaLower?.toFixed(2)}, {r.loaUpper?.toFixed(2)}]</span>
+                </>
+              )}
+              {r.dahlberg !== undefined && (
+                <>
+                  <span>Dahlberg:</span>
+                  <span style={{ fontFamily: "'DM Mono',monospace" }}>{r.dahlberg.toFixed(4)}</span>
+                  <span>SEM:</span>
+                  <span style={{ fontFamily: "'DM Mono',monospace" }}>{r.sem?.toFixed(4)}</span>
+                  <span>CV:</span>
+                  <span style={{ fontFamily: "'DM Mono',monospace" }}>{r.cv?.toFixed(2)}%</span>
+                  <span>SDD:</span>
+                  <span style={{ fontFamily: "'DM Mono',monospace" }}>{r.sdd?.toFixed(4)}</span>
+                </>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function iccColor(val) {
+  if (val >= 0.9) return "#34d399";
+  if (val >= 0.75) return "#60a5fa";
+  if (val >= 0.5) return "#fb923c";
+  return "#f87171";
+}
