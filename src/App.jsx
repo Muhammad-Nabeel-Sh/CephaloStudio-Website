@@ -11,6 +11,7 @@ import { MarkupsPanel, MeasurementsPanel, FormulasPanel, ImagePanel, MarkupProps
 import { Modal } from "./panels/Modal.jsx";
 import HomePage from "./panels/HomePage.jsx";
 import SessionsPanel from "./panels/SessionsPanel.jsx";
+import SessionFilmstrip from "./panels/SessionFilmstrip.jsx";
 import AnonModal from "./panels/AnonModal.jsx";
 import ReproStudiesPanel from "./panels/ReproStudiesPanel.jsx";
 import InterpretationPanel from "./panels/InterpretationPanel.jsx";
@@ -1168,6 +1169,10 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
               {["polygon","curve"].includes(activeTool)?`${currentDraw.points.length} pts · dbl-click done`:(()=>{const n={line:2,angle3:3,angle4:4,perp:3,ruler:2}[activeTool];return`${currentDraw.points.length}/${n}`;})()}
             </div>}
           </div>}
+          {/* Floating session filmstrip at bottom */}
+          <div style={{position:"absolute",bottom:8,left:"50%",transform:"translateX(-50%)",zIndex:5,borderRadius:8,background:t.surf+"ee",border:`1px solid ${t.bdr}`,boxShadow:`0 2px 12px ${t.shadow}44`,backdropFilter:"blur(6px)"}}>
+            <SessionFilmstrip project={project} t={t} onUpdateProject={onUpdateProject}/>
+          </div>
         </div>
 
         {/* RIGHT PANEL — VSCode-style vertical tabs on left */}
