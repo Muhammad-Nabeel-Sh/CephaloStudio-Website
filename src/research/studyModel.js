@@ -8,10 +8,14 @@ export const STUDY_TYPES = [
   { id: "morphometrics",name: "Morphometrics",   icon: "🧬", desc: "Procrustes, PCA, shape analysis",                color: "#22d3ee", needsGroups: false },
 ];
 
+function uid() {
+  return Math.random().toString(36).slice(2, 10);
+}
+
 export function mkStudy(type, opts = {}) {
   const meta = STUDY_TYPES.find(s => s.id === type);
-  return {
-    id: opts.id || Math.random().toString(36).slice(2, 10),
+  const base = {
+    id: opts.id || uid(),
     type,
     name: opts.name || `New ${meta?.name || "Study"}`,
     description: opts.description || "",
@@ -26,4 +30,18 @@ export function mkStudy(type, opts = {}) {
     createdAt: Date.now(),
     updatedAt: Date.now(),
   };
+
+  if (type === "reliability") {
+    base.config.design = opts.config?.design || "intra";
+    base.config.minTimeSeparation = opts.config?.minTimeSeparation ?? 14;
+    base.config.operators = opts.config?.operators || [{ id: uid(), name: "Operator 1", role: "primary" }];
+    base.config.cases = opts.config?.cases || [];
+    base.config.protocol = {
+      occasions: opts.config?.protocol?.occasions ?? 2,
+      blindingEnforced: opts.config?.protocol?.blindingEnforced ?? false,
+      revealAfter: opts.config?.protocol?.revealAfter || "all_complete",
+    };
+  }
+
+  return base;
 }

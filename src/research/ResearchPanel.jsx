@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { STUDY_TYPES, mkStudy } from "./studyModel.js";
 import { runStudy } from "./engine.js";
+import { ReliabilityConfig, ReliabilityResults } from "./ReliabilityPanel.jsx";
 
 export default function ResearchPanel({ t, project, onUpdateProject, calibration, angleMode }) {
   const studies = project?.researchStudies || [];
@@ -11,7 +12,7 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
 
   const handleCreate = () => {
     const study = mkStudy(selectedType, {
-      name: `${STUDY_TYPES.find(t => t.id === selectedType)?.name || selectedType} ${studies.length + 1}`,
+      name: `${STUDY_TYPES.find(st => st.id === selectedType)?.name || selectedType} ${studies.length + 1}`,
       sessionIds: sessions.map(s => s.id),
     });
     onUpdateProject({
@@ -39,6 +40,13 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
       researchStudies: studies.filter(s => s.id !== studyId),
     });
     if (selectedId === studyId) setSelectedId(null);
+  };
+
+  const handleUpdateStudy = (updated) => {
+    onUpdateProject({
+      ...project,
+      researchStudies: studies.map(s => s.id === updated.id ? updated : s),
+    });
   };
 
   const handleToggleLabel = (studyId, labelId) => {
@@ -105,14 +113,15 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
           {studies.map(s => {
             const meta = STUDY_TYPES.find(st => st.id === s.type);
             return (
-              <div key={s.id} onClick={() => setSelectedId(s.id === selectedId ? null : s.id)}
+              <div key={s.id}
                 style={{
                   padding: "8px 10px", borderRadius: 6,
                   background: s.id === selectedId ? t.acc + "18" : t.surf2,
                   border: s.id === selectedId ? `1px solid ${t.acc}` : `1px solid ${t.bdr}`,
                   cursor: "pointer", transition: "all 0.15s",
                 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div onClick={() => setSelectedId(s.id === selectedId ? null : s.id)}
+                  style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontSize: 16 }}>{meta?.icon || "📋"}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12, fontWeight: 600, color: t.tx, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
@@ -121,15 +130,8 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
                       <span style={{ fontSize: 9, color: s.status === "completed" ? t.ok : s.status === "error" ? t.err : t.tx3 }}>
                         {s.status}
                       </span>
-                      {s.results?.sessions && <span style={{ fontSize: 9, color: t.tx3 }}>· {s.results.sessions} sessions</span>}
                     </div>
                   </div>
-                  {s.status !== "completed" && (
-                    <button onClick={e => { e.stopPropagation(); handleRun(s.id); }}
-                      style={{ padding: "4px 8px", borderRadius: 4, border: "none", background: t.acc, color: t.bg, fontSize: 9, fontWeight: 700, cursor: "pointer" }}>
-                      Run
-                    </button>
-                  )}
                   <button onClick={e => { e.stopPropagation(); handleRemove(s.id); }}
                     style={{ background: "none", border: "none", cursor: "pointer", color: t.tx3, padding: 2, fontSize: 12 }}>
                     ✕
@@ -138,27 +140,40 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
 
                 {/* Expanded details */}
                 {s.id === selectedId && (
-                  <div style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${t.bdr}44` }}>
-                    {/* Label selection */}
-                    {sessions.length > 0 && (
+                  <div onClick={e => e.stopPropagation()} style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${t.bdr}44` }}>
+                    {s.status === "configured" && s.type === "reliability" && (
+                      <ReliabilityConfig study={s} sessions={sessions} onUpdateStudy={handleUpdateStudy} t={t} />
+                    )}
+
+                    {s.status !== "reliability" && sessions.length > 0 && (
                       <div style={{ marginBottom: 8 }}>
                         <div style={{ fontSize: 9, fontWeight: 600, color: t.tx3, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 4 }}>Measurements</div>
                         <LabelSelector sessions={sessions} selected={s.config.labelIds || []} onToggle={l => handleToggleLabel(s.id, l)} t={t} />
                       </div>
                     )}
 
-                    {/* Results */}
                     {s.status === "completed" && s.results && (
-                      <StudyResults study={s} t={t} />
+                      s.type === "reliability"
+                        ? <ReliabilityResults results={s.results} t={t} />
+                        : <StudyResults study={s} t={t} />
                     )}
+
                     {s.status === "error" && (
                       <div style={{ fontSize: 11, color: t.err, padding: 8, background: t.err + "12", borderRadius: 4 }}>
                         {s.results?.error || "Unknown error"}
                       </div>
                     )}
-                    {s.status === "configured" && (
+
+                    {s.status === "configured" && s.type !== "reliability" && (
                       <button onClick={() => handleRun(s.id)}
                         style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "none", background: t.acc, color: t.bg, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                        Run Analysis
+                      </button>
+                    )}
+
+                    {s.status === "configured" && s.type === "reliability" && (
+                      <button onClick={() => handleRun(s.id)}
+                        style={{ width: "100%", marginTop: 8, padding: "8px 12px", borderRadius: 6, border: "none", background: t.acc, color: t.bg, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                         Run Analysis
                       </button>
                     )}
@@ -200,8 +215,7 @@ function LabelSelector({ sessions, selected, onToggle, t }) {
 
 function StudyResults({ study, t }) {
   const res = study.results;
-  const details = res.details || [];
-
+  if (!res) return null;
   if (res.note) {
     return (
       <div style={{ fontSize: 11, color: t.tx2, padding: 8, background: t.surf3, borderRadius: 4, textAlign: "center" }}>
@@ -209,63 +223,5 @@ function StudyResults({ study, t }) {
       </div>
     );
   }
-
-  if (study.type === "reliability") return <ReliabilityResults details={details} t={t} />;
-
   return null;
-}
-
-function ReliabilityResults({ details, t }) {
-  const passed = details.filter(d => d.icc !== undefined || d.meanDiff !== undefined);
-  if (passed.length === 0) return <div style={{ fontSize: 11, color: t.tx3, textAlign: "center", padding: 8 }}>Insufficient data for reliability analysis.</div>;
-
-  return (
-    <div>
-      <div style={{ fontSize: 10, fontWeight: 600, color: t.tx3, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 6 }}>Results ({passed.length} labels)</div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {passed.map(r => (
-          <div key={r.label} style={{ padding: 10, borderRadius: 6, background: t.surf3, border: `1px solid ${t.bdr}44` }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: t.tx, fontFamily: "'DM Mono',monospace", marginBottom: 6 }}>{r.label}</div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 12px", fontSize: 10, color: t.tx2 }}>
-              {r.icc !== undefined && r.icc !== null && (
-                <>
-                  <span>ICC ({r.iccType || "2"}):</span>
-                  <span style={{ fontFamily: "'DM Mono',monospace", color: iccColor(r.icc), fontWeight: 700 }}>{r.icc.toFixed(4)}</span>
-                </>
-              )}
-              {r.meanDiff !== undefined && (
-                <>
-                  <span>Mean diff:</span>
-                  <span style={{ fontFamily: "'DM Mono',monospace" }}>{r.meanDiff.toFixed(4)}</span>
-                  <span>SD diff:</span>
-                  <span style={{ fontFamily: "'DM Mono',monospace" }}>{r.sdDiff.toFixed(4)}</span>
-                  <span>LoA:</span>
-                  <span style={{ fontFamily: "'DM Mono',monospace" }}>[{r.loaLower?.toFixed(2)}, {r.loaUpper?.toFixed(2)}]</span>
-                </>
-              )}
-              {r.dahlberg !== undefined && (
-                <>
-                  <span>Dahlberg:</span>
-                  <span style={{ fontFamily: "'DM Mono',monospace" }}>{r.dahlberg.toFixed(4)}</span>
-                  <span>SEM:</span>
-                  <span style={{ fontFamily: "'DM Mono',monospace" }}>{r.sem?.toFixed(4)}</span>
-                  <span>CV:</span>
-                  <span style={{ fontFamily: "'DM Mono',monospace" }}>{r.cv?.toFixed(2)}%</span>
-                  <span>SDD:</span>
-                  <span style={{ fontFamily: "'DM Mono',monospace" }}>{r.sdd?.toFixed(4)}</span>
-                </>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function iccColor(val) {
-  if (val >= 0.9) return "#34d399";
-  if (val >= 0.75) return "#60a5fa";
-  if (val >= 0.5) return "#fb923c";
-  return "#f87171";
 }
