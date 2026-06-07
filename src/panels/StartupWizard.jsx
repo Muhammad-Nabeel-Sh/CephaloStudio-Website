@@ -358,7 +358,8 @@ function StepTemplate({ t, projection, onPick }) {
             try {
               const d = JSON.parse(ev.target.result);
               if (d.format === "cepht" || d.markups) onPick("upload", null, d);
-            } catch (e) { console.error(e); }
+              else alert("Invalid .cepht file");
+            } catch (e) { alert("Cannot parse file: "+e.message); }
           };
           reader.readAsText(file);
           e.target.value = "";

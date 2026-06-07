@@ -24,8 +24,7 @@ export const INITIAL_UI = {
   showExport: false,
   showAnon: false,
   showNormogram: false,
-  showAlign: false,
-  showTransform: false,
+
   pendingTextPos: null,
   showFormulaEditor: false,
   editFormulaId: null,
@@ -46,7 +45,7 @@ export const INITIAL_UI = {
   refLandmark1: "",
   refLandmark2: "",
   overlayBlend: 0.5,
-  showDatabaseImport: false,
+
 };
 
 // ─── Action Types ──────────────────────────────────────────────
@@ -141,6 +140,47 @@ export function useWorkspaceStore() {
     []
   );
 
+  const setPlacingQueue = useCallback(
+    (v) => dispatch({ type: Actions.UI_SET, payload: { placingQueue: typeof v === "function" ? v(ui.placingQueue) : v } }),
+    [ui.placingQueue]
+  );
+  const setShowMobilePanel = useCallback(
+    (v) => dispatch({ type: Actions.UI_SET, payload: { showMobilePanel: typeof v === "function" ? v(ui.showMobilePanel) : v } }),
+    [ui.showMobilePanel]
+  );
+  const setShowLUT = useCallback(
+    (v) => dispatch({ type: Actions.UI_SET, payload: { showLUT: typeof v === "function" ? v(ui.showLUT) : v } }),
+    [ui.showLUT]
+  );
+  const setShowScaleBar = useCallback(
+    (v) => dispatch({ type: Actions.UI_SET, payload: { showScaleBar: typeof v === "function" ? v(ui.showScaleBar) : v } }),
+    [ui.showScaleBar]
+  );
+  const setShowHistogram = useCallback(
+    (v) => dispatch({ type: Actions.UI_SET, payload: { showHistogram: typeof v === "function" ? v(ui.showHistogram) : v } }),
+    [ui.showHistogram]
+  );
+  const setShowDisplacement = useCallback(
+    (v) => dispatch({ type: Actions.UI_SET, payload: { showDisplacement: typeof v === "function" ? v(ui.showDisplacement) : v } }),
+    [ui.showDisplacement]
+  );
+  const setDisplacementOverlay = useCallback(
+    (v) => dispatch({ type: Actions.UI_SET, payload: { displacementOverlay: typeof v === "function" ? v(ui.displacementOverlay) : v } }),
+    [ui.displacementOverlay]
+  );
+  const setRefLandmark1 = useCallback(
+    (v) => dispatch({ type: Actions.UI_SET, payload: { refLandmark1: typeof v === "function" ? v(ui.refLandmark1) : v } }),
+    [ui.refLandmark1]
+  );
+  const setRefLandmark2 = useCallback(
+    (v) => dispatch({ type: Actions.UI_SET, payload: { refLandmark2: typeof v === "function" ? v(ui.refLandmark2) : v } }),
+    [ui.refLandmark2]
+  );
+  const setOverlayBlend = useCallback(
+    (v) => dispatch({ type: Actions.UI_SET, payload: { overlayBlend: typeof v === "function" ? v(ui.overlayBlend) : v } }),
+    [ui.overlayBlend]
+  );
+
   return {
     ui,
     dispatch,
@@ -154,5 +194,15 @@ export function useWorkspaceStore() {
     setPlacing,
     setShowCalib,
     uiSet,
+    setPlacingQueue,
+    setShowMobilePanel,
+    setShowLUT,
+    setShowScaleBar,
+    setShowHistogram,
+    setShowDisplacement,
+    setDisplacementOverlay,
+    setRefLandmark1,
+    setRefLandmark2,
+    setOverlayBlend,
   };
 }

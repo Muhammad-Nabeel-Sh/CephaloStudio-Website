@@ -1,35 +1,23 @@
-import { useState, useEffect, useRef, useCallback, useMemo, useReducer, useLayoutEffect } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from "react";
 import { THEMES, TOOLS, PREDEFINED, LUT_PRESETS } from "./constants.js";
 import { SILHOUETTES } from "./silhouettes.js";
-import { uid, clamp, dist, vpts, computeMeasurements, snapPoint, alignOnePoint, alignTwoPoints, buildScope, evalFormula, getMissingVars, mean, stdev, tTestPaired, calculateICC, calculateICC_CI, dahlbergError, blandAltman, median, iqr, coefficientOfVariation, standardError, minimalDetectableChange, spearmanCorrelation, pearsonCorrelation, correlationMatrix, computePerLandmarkError, detectSystematicBias, anovaAcrossSessions, computeNormsComparison, detectOutliers, confidenceInterval, linearRegression } from "./utils.js";
+import { uid, clamp, dist, vpts, computeMeasurements, snapPoint, alignTwoPoints, buildScope, evalFormula, getMissingVars } from "./utils.js";
 import { processImageToCanvas, computeHistogram, FloatingHistogram } from "./imageUtils.jsx";
 import { KatexSpan, LatexFloatingPanel } from "./hooks.jsx";
 import { Btn, Tag, Sld, PropRow, Inp } from "./ui.jsx";
 import ToolBtn from "./ToolBtn.jsx";
 import { drawMarkup, drawInProgress, drawScaleBar, drawLUTLegend, drawSnapIndicator, drawDisplacementVectors, drawAirwayOverlay, hitTest, getSilhouetteHandlesImage } from "./markups.jsx";
-import { MarkupsPanel, MeasurementsPanel, FormulasPanel, ImagePanel, LayersPanel, MarkupProps, TemplatesPanel, SilhouettesPanel } from "./panels.jsx";
+import { MarkupsPanel, MeasurementsPanel, FormulasPanel, ImagePanel, MarkupProps, TemplatesPanel, SilhouettesPanel } from "./panels.jsx";
 import { Modal } from "./panels/Modal.jsx";
 import HomePage from "./panels/HomePage.jsx";
-import VersionsPanel from "./panels/VersionsPanel.jsx";
+import SessionsPanel from "./panels/SessionsPanel.jsx";
 import AnonModal from "./panels/AnonModal.jsx";
-import ReproducibilityPanel from "./panels/ReproducibilityPanel.jsx";
+import ReproStudiesPanel from "./panels/ReproStudiesPanel.jsx";
 import InterpretationPanel from "./panels/InterpretationPanel.jsx";
 import NormogramPanel from "./panels/NormogramPanel.jsx";
+import { mkProject, updateSessionInProject } from "./model/project.js";
 
-// PROJECT MODEL
-// ═══════════════════════════════════════════════════════════════════════════════
-function mkVersion(label="T0",name="Initial"){
-  return{id:uid(),name,label,timestamp:Date.now(),calibration:{done:false,pxPerMm:1,knownMm:""},
-    images:[],markups:[],analysisTemplate:"blank",
-    processing:{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},
-    lutMode:"gray",lutInvert:false,formulas:[],norms:[]};
-}
-function mkProject(projection){
-  const v=mkVersion();
-  return{id:uid(),name:"New Case",projection,created:Date.now(),modified:Date.now(),
-    meta:{patientId:"",name:"",dob:"",age:"",gender:"",ethnicity:"",clinician:"",facility:"",referral:"",notes:"",anonymized:false},
-    activeVersionId:v.id,versions:[v]};
-}
+import { INITIAL_UI, Actions, useWorkspaceStore } from "./state/workspaceStore.js";
 
 function exportCephx(project){
   const cleaned=project.images?{...project,images:undefined}:project;
@@ -42,17 +30,30 @@ function importCephx(file,onLoad){
   reader.onload=e=>{try{const d=JSON.parse(e.target.result);if(d.format==="cephx"&&d.project)onLoad(d.project);else alert("Invalid .cephx file");}catch(err){console.error("Cephx import error:",err);alert("Cannot parse file");}};
   reader.readAsText(file);
 }
-function exportCepht(template){
-  const payload={format:"cepht",version:"1.0",exported:Date.now(),...template};
+function exportCepht(template,version="1.0"){
+  const payload={format:"cepht",version,exported:Date.now(),...template};
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}));
   a.download=`${template.name.replace(/\s+/g,"_")}.cepht`;a.click();
 }
-function exportTemplateAsCepht(project,name){
-  const excludedTypes=["polygon","arrow","text","curve"];
-  const allMarkups=project.versions[0]?.markups||[];
-  const markupsToExport=allMarkups.filter(m=>!excludedTypes.includes(m.type)).map(m=>({type:m.type,label:m.label,definition:m.definition,color:m.color,visible:m.visible}));
-  const template={name,projection:project.projection,markups:markupsToExport,formulas:project.versions[0]?.formulas||[],norms:project.versions[0]?.norms||[]};
-  exportCepht(template);
+function exportTemplateAsCepht(project,name,includeCoord){
+  const session=project.sessions?.find(s=>s.id===project.activeSessionId)||project.sessions?.[0];
+  const allMarkups=session?.markups||[];
+  const markupsToExport=allMarkups.map(m=>{
+    const base={type:m.type,label:m.label,definition:m.definition,color:m.color,visible:m.visible};
+    if(includeCoord&&m.points)return{...base,points:m.points,placed:m.placed!==false};
+    return base;
+  });
+  const template={name,projection:project.projection,markups:markupsToExport,formulas:session?.formulas||[],norms:session?.norms||[]};
+  exportCepht(template,includeCoord?"2.0":"1.0");
+}
+function hasPlacedCoords(markups){
+  return markups.some(m=>m.points&&m.points.length>0&&!m.points.every(p=>Math.abs((p.x||0)+99999)<1&&Math.abs((p.y||0)+99999)<1));
+}
+function validateCepht(data){
+  if(!data||typeof data!=="object")return "Invalid file format.";
+  if(data.format!=="cepht")return "Not a valid .cepht template file.";
+  if(!data.markups||!Array.isArray(data.markups))return "Template must contain a markups array.";
+  return null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -113,47 +114,6 @@ function TextModal({t,onConfirm,onCancel,defaultColor}){
       <PropRow label="Bold" t={t}><input type="checkbox" checked={bold} onChange={e=>setBold(e.target.checked)} style={{accentColor:t.acc}}/></PropRow>
       <PropRow label="Color" t={t}><input type="color" value={color} onChange={e=>setColor(e.target.value)} style={{width:40,height:28,border:"none",cursor:"pointer",borderRadius:4}}/></PropRow>
       <div style={{marginTop:16,display:"flex",gap:8}}><Btn t={t} onClick={()=>onConfirm(txt,{fontSize,bold,color})} style={{flex:1}}>Add</Btn><Btn t={t} onClick={onCancel} style={{flex:1}}>Cancel</Btn></div>
-    </div>
-  );
-}
-
-function PtSel({val,onChange,t,pts}){
-  return <select value={val} onChange={e=>onChange(e.target.value)} style={{width:"100%",background:t.surf3,border:`1px solid ${t.bdr}`,borderRadius:4,padding:"4px 8px",color:t.tx,fontSize:12,fontFamily:"inherit"}}><option value="">—</option>{pts.map(m=><option key={m.id} value={m.id}>{m.label}</option>)}</select>;
-}
-
-function AlignModal({t,markups,images,onUpdateImages,onClose}){
-  const pts=markups.filter(m=>m.type==="point"&&vpts(m)[0]?.x>-9000);
-  const[src1,setSrc1]=useState("");const[dst1,setDst1]=useState("");const[src2,setSrc2]=useState("");const[dst2,setDst2]=useState("");
-  const[tgtId,setTgtId]=useState(images[1]?.id||"");
-  const align=()=>{
-    const sp1=vpts(markups.find(m=>m.id===src1)||{})[0],dp1=vpts(markups.find(m=>m.id===dst1)||{})[0];if(!sp1||!dp1)return;
-    let tf;if(src2&&dst2){const sp2=vpts(markups.find(m=>m.id===src2)||{})[0],dp2=vpts(markups.find(m=>m.id===dst2)||{})[0];tf=sp2&&dp2?alignTwoPoints(sp1,sp2,dp1,dp2):alignOnePoint(sp1,dp1);}else tf=alignOnePoint(sp1,dp1);
-    onUpdateImages(images.map(i=>i.id===tgtId?{...i,transform:{tx:tf.tx,ty:tf.ty,rot:tf.rot,scale:tf.scale}}:i));onClose();
-  };
-  return(
-    <div>
-      <div style={{fontSize:12,color:t.tx2,marginBottom:14,lineHeight:1.6}}>1 pair = translation only · 2 pairs = translation + rotation</div>
-      <PropRow label="Target" t={t}><select value={tgtId} onChange={e=>setTgtId(e.target.value)} style={{width:"100%",background:t.surf3,border:`1px solid ${t.bdr}`,borderRadius:4,padding:"4px 8px",color:t.tx,fontSize:12,fontFamily:"inherit"}}>{images.map(i=><option key={i.id} value={i.id}>{i.name}</option>)}</select></PropRow>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
-        <div><div style={{fontSize:10,color:t.tx2,marginBottom:2}}>Src pt 1</div><PtSel val={src1} onChange={setSrc1} t={t} pts={pts}/></div>
-        <div><div style={{fontSize:10,color:t.tx2,marginBottom:2}}>Dst pt 1</div><PtSel val={dst1} onChange={setDst1} t={t} pts={pts}/></div>
-        <div><div style={{fontSize:10,color:t.tx2,marginBottom:2}}>Src pt 2</div><PtSel val={src2} onChange={setSrc2} t={t} pts={pts}/></div>
-        <div><div style={{fontSize:10,color:t.tx2,marginBottom:2}}>Dst pt 2</div><PtSel val={dst2} onChange={setDst2} t={t} pts={pts}/></div>
-      </div>
-      <div style={{display:"flex",gap:8}}><Btn t={t} onClick={align} style={{flex:1}} disabled={!src1||!dst1}>Apply</Btn><Btn t={t} onClick={onClose} style={{flex:1}}>Cancel</Btn></div>
-    </div>
-  );
-}
-
-function TransformModal({t,images,onUpdateImages,onClose}){
-  const[aid,setAid]=useState(images[0]?.id||"");
-  const img=images.find(i=>i.id===aid);const tf=img?.transform||{tx:0,ty:0,rot:0,scale:1};
-  const upd=p=>onUpdateImages(images.map(i=>i.id===aid?{...i,transform:{...tf,...p}}:i));
-  return(
-    <div>
-      <PropRow label="Image" t={t}><select value={aid} onChange={e=>setAid(e.target.value)} style={{width:"100%",background:t.surf3,border:`1px solid ${t.bdr}`,borderRadius:4,padding:"4px 8px",color:t.tx,fontSize:12,fontFamily:"inherit"}}>{images.map(i=><option key={i.id} value={i.id}>{i.name}</option>)}</select></PropRow>
-      {img&&<><Sld label="Translate X" value={tf.tx||0} min={-500} max={500} onChange={v=>upd({tx:v})} t={t} unit=" px"/><Sld label="Translate Y" value={tf.ty||0} min={-500} max={500} onChange={v=>upd({ty:v})} t={t} unit=" px"/><Sld label="Rotation" value={Math.round(((tf.rot||0)*180/Math.PI))} min={-180} max={180} onChange={v=>upd({rot:v*Math.PI/180})} t={t} unit="°"/><Sld label="Scale" value={tf.scale||1} min={0.1} max={3} step={0.01} onChange={v=>upd({scale:v})} t={t}/><Btn t={t} small onClick={()=>upd({tx:0,ty:0,rot:0,scale:1})} style={{marginTop:6}}>Reset</Btn></>}
-      <Btn t={t} onClick={onClose} style={{width:"100%",marginTop:12}}>Done</Btn>
     </div>
   );
 }
@@ -267,348 +227,47 @@ function FormulaEditor({t,formula,scope,onSave,onClose}){
   );
 }
 
-// DATABASE MODE MODAL
-// ═══════════════════════════════════════════════════════════════════════════════
-function DatabaseImportModal({t,onImport,onClose}){
-  const fileRef=useRef(null);
-  const[files,setFiles]=useState([]);
-
-  const handleFileChange=e=>{
-    const newFiles=Array.from(e.target.files);
-    setFiles(prev=>[...prev,...newFiles]);
-  };
-
-  const removeFile=idx=>{
-    setFiles(prev=>prev.filter((_,i)=>i!==idx));
-  };
-
-  const handleImport=()=>{
-    if(files.length===0)return;
-    onImport(files);
-    onClose();
-  };
-
-  return(
-    <div>
-      <div style={{fontSize:13,color:t.tx2,marginBottom:16,lineHeight:1.5}}>
-        Select multiple images to import for batch processing. Each image will have its own markups and calibration.
-      </div>
-      <input ref={fileRef} type="file" accept="image/*" multiple style={{display:"none"}} onChange={handleFileChange}/>
-      <div onClick={()=>fileRef.current?.click()} style={{border:`2px dashed ${t.bdr}`,borderRadius:10,padding:24,textAlign:"center",cursor:"pointer",marginBottom:16}}>
-        <div style={{fontSize:24,marginBottom:8}}>📁</div>
-        <div style={{fontSize:13,color:t.tx}}>Click to select images</div>
-        <div style={{fontSize:11,color:t.tx3}}>or drag and drop</div>
-      </div>
-      {files.length>0&&(
-        <div style={{marginBottom:16}}>
-          <div style={{fontSize:11,fontWeight:700,color:t.tx2,marginBottom:8}}>Selected files ({files.length})</div>
-          <div style={{maxHeight:180,overflowY:"auto"}}>
-            {files.map((f,idx)=>(
-              <div key={idx} style={{display:"flex",alignItems:"center",gap:8,padding:"6px 8px",background:t.surf2,borderRadius:6,marginBottom:4}}>
-                <span style={{flex:1,fontSize:11,color:t.tx,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{f.name}</span>
-                <span style={{fontSize:10,color:t.tx3}}>{(f.size/1024).toFixed(1)} KB</span>
-                <button onClick={()=>removeFile(idx)} title="Remove file" style={{background:"none",border:"none",color:t.tx3,cursor:"pointer",fontSize:14}}>×</button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      <div style={{display:"flex",gap:8}}>
-        <Btn t={t} onClick={handleImport} disabled={files.length===0} style={{flex:1}}>Import {files.length} Image{files.length!==1?"s":""}</Btn>
-        <Btn t={t} onClick={onClose} style={{flex:1}}>Cancel</Btn>
-      </div>
-    </div>
-  );
-}
+// PLACEHOLDER — research module code will go here
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MARKUP TABLES PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
-function MarkupTablesPanel({databaseImages,t}){
-  const[activeTable,setActiveTable]=useState("points");
-
-  const exportTableCSV=(type)=>{
-    const rows=[["Variable",...databaseImages.map((_,i)=>`Image ${i+1}`)]];
-    
-    if(type==="points"){
-      const maxPoints=Math.max(...databaseImages.map(img=>(img.markups||[]).filter(m=>m.type==="point").length));
-      for(let ptIdx=0;ptIdx<maxPoints;ptIdx++){
-        rows.push([`P${ptIdx+1}_X`]);
-        rows.push([`P${ptIdx+1}_Y`]);
-      }
-      databaseImages.forEach(img=>{
-        const points=(img.markups||[]).filter(m=>m.type==="point");
-        points.forEach((pt,ptIdx)=>{
-          const vp=vpts(pt);
-          if(vp.length>0){
-            rows[ptIdx+1].push(vp[0].x.toFixed(2));
-            rows[ptIdx+1+maxPoints].push(vp[0].y.toFixed(2));
-          }else{
-            rows[ptIdx+1].push("");
-            rows[ptIdx+1+maxPoints].push("");
-          }
-        });
-      });
-    }else if(type==="lines"){
-      const maxLines=Math.max(...databaseImages.map(img=>(img.markups||[]).filter(m=>m.type==="line"||m.type==="parallel").length));
-      for(let i=0;i<maxLines;i++)rows.push([`Line${i+1}_length`]);
-      databaseImages.forEach(img=>{
-        const lines=(img.markups||[]).filter(m=>m.type==="line"||m.type==="parallel");
-        lines.forEach((ln,lnIdx)=>{
-          const meas=computeMeasurements(ln,img.calibration);
-          rows[lnIdx+1].push(meas.length?.toFixed(2)||"");
-        });
-      });
-    }else if(type==="angles"){
-      const maxAngles=Math.max(...databaseImages.map(img=>[...(img.markups||[]).filter(m=>m.type==="angle3"),...(img.markups||[]).filter(m=>m.type==="angle4")].length));
-      for(let i=0;i<maxAngles;i++){
-        rows.push([`Angle${i+1}_deg`]);
-        rows.push([`Angle${i+1}_rad`]);
-      }
-      databaseImages.forEach(img=>{
-        const angles=[...(img.markups||[]).filter(m=>m.type==="angle3"),...(img.markups||[]).filter(m=>m.type==="angle4")];
-        angles.forEach((ang,angIdx)=>{
-          const meas=computeMeasurements(ang,img.calibration);
-          rows[angIdx*2+1].push(meas.angle?.toFixed(2)||"");
-          rows[angIdx*2+2].push(meas.angle?((meas.angle*Math.PI/180).toFixed(4)):"");
-        });
-      });
-    }else if(type==="curves"){
-      const maxCurves=Math.max(...databaseImages.map(img=>(img.markups||[]).filter(m=>m.type==="curve").length));
-      for(let i=0;i<maxCurves;i++)rows.push([`Curve${i+1}_length`]);
-      databaseImages.forEach(img=>{
-        const curves=(img.markups||[]).filter(m=>m.type==="curve");
-        curves.forEach((cv,cvIdx)=>{
-          const meas=computeMeasurements(cv,img.calibration);
-          rows[cvIdx+1].push(meas.length?.toFixed(2)||"");
-        });
-      });
-    }else if(type==="polygons"){
-      const maxPolys=Math.max(...databaseImages.map(img=>(img.markups||[]).filter(m=>m.type==="polygon").length));
-      for(let i=0;i<maxPolys;i++){
-        rows.push([`Polygon${i+1}_area`]);
-        rows.push([`Polygon${i+1}_perimeter`]);
-      }
-      databaseImages.forEach(img=>{
-        const polys=(img.markups||[]).filter(m=>m.type==="polygon");
-        polys.forEach((poly,polyIdx)=>{
-          const meas=computeMeasurements(poly,img.calibration);
-          rows[polyIdx*2+1].push(meas.area?.toFixed(2)||"");
-          rows[polyIdx*2+2].push(meas.perimeter?.toFixed(2)||"");
-        });
-      });
-    }
-
-    const csv=rows.map(r=>r.join(",")).join("\n");
-    const a=document.createElement("a");
-    a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));
-    a.download=`markups_${type}_table.csv`;
-    a.click();
-  };
-
-  const tableTypes=[
-    {id:"points",label:"Points",icon:"◉"},
-    {id:"lines",label:"Lines",icon:"⟋"},
-    {id:"angles",label:"Angles",icon:"∠"},
-    {id:"curves",label:"Curves",icon:"∿"},
-    {id:"polygons",label:"Polygons",icon:"⬡"},
-  ];
-
-  const getTableData=()=>{
-    if(activeTable==="points"){
-      const maxPoints=Math.max(...databaseImages.map(img=>(img.markups||[]).filter(m=>m.type==="point").length));
-      const allPoints=[];
-      for(let ptIdx=0;ptIdx<maxPoints;ptIdx++){
-        allPoints[ptIdx]={label:`P${ptIdx+1}`,values:[]};
-        databaseImages.forEach((img,imgIdx)=>{
-          const points=(img.markups||[]).filter(m=>m.type==="point");
-          const pt=points[ptIdx];
-          if(pt){
-            const vp=vpts(pt);
-            allPoints[ptIdx].values[imgIdx]=vp.length>0?{x:vp[0].x,y:vp[0].y}:null;
-          }
-        });
-      }
-      return allPoints;
-    }else if(activeTable==="lines"){
-      const maxLines=Math.max(...databaseImages.map(img=>(img.markups||[]).filter(m=>m.type==="line"||m.type==="parallel").length));
-      const allLines=[];
-      for(let lnIdx=0;lnIdx<maxLines;lnIdx++){
-        allLines[lnIdx]={label:`Line${lnIdx+1}`,values:[]};
-        databaseImages.forEach((img,imgIdx)=>{
-          const lines=[...(img.markups||[]).filter(m=>m.type==="line"),...(img.markups||[]).filter(m=>m.type==="parallel")];
-          const ln=lines[lnIdx];
-          if(ln){
-            const meas=computeMeasurements(ln,img.calibration);
-            allLines[lnIdx].values[imgIdx]=meas.length;
-          }
-        });
-      }
-      return allLines;
-    }else if(activeTable==="angles"){
-      const maxAngles=Math.max(...databaseImages.map(img=>[...(img.markups||[]).filter(m=>m.type==="angle3"),...(img.markups||[]).filter(m=>m.type==="angle4")].length));
-      const allAngles=[];
-      for(let angIdx=0;angIdx<maxAngles;angIdx++){
-        allAngles[angIdx]={label:`Angle${angIdx+1}`,values:[]};
-        databaseImages.forEach((img,imgIdx)=>{
-          const angles=[...(img.markups||[]).filter(m=>m.type==="angle3"),...(img.markups||[]).filter(m=>m.type==="angle4")];
-          const ang=angles[angIdx];
-          if(ang){
-            const meas=computeMeasurements(ang,img.calibration);
-            allAngles[angIdx].values[imgIdx]=meas.angle;
-          }
-        });
-      }
-      return allAngles;
-    }else if(activeTable==="curves"){
-      const maxCurves=Math.max(...databaseImages.map(img=>(img.markups||[]).filter(m=>m.type==="curve").length));
-      const allCurves=[];
-      for(let cvIdx=0;cvIdx<maxCurves;cvIdx++){
-        allCurves[cvIdx]={label:`Curve${cvIdx+1}`,values:[]};
-        databaseImages.forEach((img,imgIdx)=>{
-          const curves=(img.markups||[]).filter(m=>m.type==="curve");
-          const cv=curves[cvIdx];
-          if(cv){
-            const meas=computeMeasurements(cv,img.calibration);
-            allCurves[cvIdx].values[imgIdx]=meas.length;
-          }
-        });
-      }
-      return allCurves;
-    }else if(activeTable==="polygons"){
-      const maxPolys=Math.max(...databaseImages.map(img=>(img.markups||[]).filter(m=>m.type==="polygon").length));
-      const allPolys=[];
-      for(let polyIdx=0;polyIdx<maxPolys;polyIdx++){
-        allPolys[polyIdx]={label:`Polygon${polyIdx+1}`,values:[]};
-        databaseImages.forEach((img,imgIdx)=>{
-          const polys=(img.markups||[]).filter(m=>m.type==="polygon");
-          const poly=polys[polyIdx];
-          if(poly){
-            const meas=computeMeasurements(poly,img.calibration);
-            allPolys[polyIdx].values[imgIdx]={area:meas.area,perimeter:meas.perimeter};
-          }
-        });
-      }
-      return allPolys;
-    }
-    return[];
-  };
-
-  const tableData=getTableData();
-  const _numImages=databaseImages.length;
-
+function StatisticsPanel({t}){
   return(
-    <div>
-      <div style={{display:"flex",gap:4,marginBottom:8}}>
-        {tableTypes.map(tt=>(
-          <button key={tt.id} onClick={()=>setActiveTable(tt.id)} style={{padding:"6px 12px",borderRadius:6,border:`1px solid ${activeTable===tt.id?t.acc:t.bdr}`,background:activeTable===tt.id?t.acc+"22":"transparent",color:activeTable===tt.id?t.acc:t.tx,cursor:"pointer",fontSize:12}}>
-            {tt.icon} {tt.label}
-          </button>
-        ))}
+    <div style={{padding:12,fontSize:13,color:t.tx2,textAlign:"center"}}>
+      <div style={{fontSize:24,marginBottom:8,color:t.tx3}}>📊</div>
+      <div style={{fontWeight:700,color:t.tx,marginBottom:4}}>Statistics & Research Tools</div>
+      <div style={{fontSize:11,lineHeight:1.6}}>
+        Statistical analysis will be available in future research modules (Reliability, Normative, Comparative, etc.).
       </div>
-      <div style={{marginBottom:12}}>
-        <button onClick={()=>exportTableCSV(activeTable)} style={{width:"100%",padding:"8px 12px",borderRadius:6,border:`1px solid ${t.bdr}`,background:t.surf2,color:t.tx,cursor:"pointer",fontSize:12,textAlign:"center"}}>⬇ Export CSV</button>
-      </div>
-      {tableData.length===0?<div style={{color:t.tx2,textAlign:"center",padding:20}}>No {activeTable} data</div>:(
-        <div style={{overflowX:"auto"}}>
-          <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,fontFamily:"'DM Mono',monospace"}}>
-            <thead>
-              <tr>
-                <th style={{textAlign:"left",padding:"8px 12px",borderBottom:`1px solid ${t.bdr}`,background:t.surf2,color:t.tx2}}>{activeTable}</th>
-                {databaseImages.map((img,i)=>(
-                  <th key={i} style={{textAlign:"center",padding:"8px 12px",borderBottom:`1px solid ${t.bdr}`,background:t.surf2,color:t.acc}}>Img {i+1}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {tableData.map((row,rowIdx)=>(
-                <tr key={rowIdx}>
-                  <td style={{padding:"8px 12px",borderBottom:`1px solid ${t.bdr}`,color:t.tx,fontWeight:500}}>{row.label}</td>
-                  {row.values.map((v,colIdx)=>(
-                    <td key={colIdx} style={{padding:"8px 12px",borderBottom:`1px solid ${t.bdr}`,textAlign:"center",color:v!=null?t.tx:t.tx3}}>
-                      {v==null?"-":activeTable==="points"?`(${v.x?.toFixed(1)??'-'},${v.y?.toFixed(1)??'-'})`:activeTable==="polygons"?`A:${v.area?.toFixed(1)??'-'} P:${v.perimeter?.toFixed(1)??'-'}`:typeof v==="number"?v.toFixed(2):v}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </div>
   );
 }
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // WORKSPACE
 // ═══════════════════════════════════════════════════════════════════════════════
-const INITIAL_WORKSPACE={
-  zoom:1,pan:{x:40,y:40},
-  mousePos:null,snapPos:null,
-  selectedId:null,replacingId:null,currentDraw:null,
-  activeTool:"select",
-  snapEnabled:true,showScaleBar:false,showDefTooltips:true,
-  showLUT:false,showHistogram:false,
-  showAnnotations:true,annotationSize:1,showDisplacement:false,compareVersionId:null,
-  rightPanel:"markups",
-  showCalib:false,pendingRuler:null,
-  showExport:false,showAnon:false,showNormogram:false,
-  showAlign:false,showTransform:false,
-  pendingTextPos:null,
-  showFormulaEditor:false,editFormulaId:null,
-  placingMode:false,placingQueue:[],placingIdx:0,
-  loadingImages:false,
-  isMobile:window.innerWidth<768,showMobilePanel:false,
-  toolbarPos:{x:70,y:100},toolbarDragging:false,
-  rightPanelWidth:440,rightPanelResizing:false,
-  reproStudies:[],activeStudyId:null,reproCollecting:null,
-  spotlightMode:false,
-  databaseMode:false,databaseImages:[],currentImageIndex:0,showDatabaseImport:false,
-  displacementOverlay:false,refLandmark1:"",refLandmark2:"",overlayBlend:0.5,
-};
-function wsReducer(state,action){
-  if(action.type==="SET"){const n={...state};for(const[k,v]of Object.entries(action.payload))n[k]=typeof v==="function"?v(state[k]):v;return n;}
-  return state;
-}
-function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTheme,onSave,onImport}){
+function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImport}){
   const canvasRef=useRef(null);const containerRef=useRef(null);
   const procCache=useRef(new Map());const imgRefs=useRef({});const rafRef=useRef(null);
 
   // file input refs
   const openImgRef=useRef(null);const stackImgRef=useRef(null);const importRef=useRef(null);
 
-  const[ws,dispatch]=useReducer(wsReducer,INITIAL_WORKSPACE);
+  const{ui,dispatch,setSelectedId,setActiveTool,setRightPanel,
+    setPlacingQueue,setShowMobilePanel,
+    setShowLUT,setShowScaleBar,setShowHistogram,setShowDisplacement,setDisplacementOverlay,setRefLandmark1,setRefLandmark2,setOverlayBlend}=useWorkspaceStore();
   const{zoom,pan,mousePos,snapPos,selectedId,replacingId,currentDraw,
     activeTool,snapEnabled,showScaleBar,showDefTooltips,
-    showLUT,showHistogram,showAnnotations,annotationSize,showDisplacement,compareVersionId,
-    rightPanel,showCalib,pendingRuler,showExport,showAnon,showNormogram,showAlign,showTransform,
+    showLUT,showHistogram,showAnnotations,annotationSize,showDisplacement,rightPanel,showCalib,pendingRuler,
+    showExport,showAnon,showNormogram,
     pendingTextPos,showFormulaEditor,editFormulaId,
     placingMode,placingQueue,placingIdx,loadingImages,
     isMobile,showMobilePanel,
     toolbarPos,toolbarDragging,rightPanelWidth,rightPanelResizing,
-    reproStudies,activeStudyId,reproCollecting,spotlightMode,
-    databaseMode,databaseImages,currentImageIndex,showDatabaseImport,
-    displacementOverlay,refLandmark1,refLandmark2,overlayBlend}=ws;
+    spotlightMode,
+    displacementOverlay,refLandmark1,refLandmark2,overlayBlend}=ui;
   const rightPanelWidthRef=useRef(rightPanelWidth);rightPanelWidthRef.current=rightPanelWidth;
   const toolbarPosRef=useRef(toolbarPos);toolbarPosRef.current=toolbarPos;
-  const setSelectedId=v=>dispatch({type:"SET",payload:{selectedId:typeof v==="function"?v(selectedId):v}});
-  const setShowLUT=v=>dispatch({type:"SET",payload:{showLUT:typeof v==="function"?v(showLUT):v}});
-  const setShowScaleBar=v=>dispatch({type:"SET",payload:{showScaleBar:typeof v==="function"?v(showScaleBar):v}});
-  const setShowDisplacement=v=>dispatch({type:"SET",payload:{showDisplacement:typeof v==="function"?v(showDisplacement):v}});
-  const setCompareVersionId=v=>dispatch({type:"SET",payload:{compareVersionId:typeof v==="function"?v(compareVersionId):v}});
-  const setShowHistogram=v=>dispatch({type:"SET",payload:{showHistogram:typeof v==="function"?v(showHistogram):v}});
-  const setReproStudies=v=>dispatch({type:"SET",payload:{reproStudies:typeof v==="function"?v(reproStudies):v}});
-  const setActiveStudyId=v=>dispatch({type:"SET",payload:{activeStudyId:typeof v==="function"?v(activeStudyId):v}});
-  const setReproCollecting=v=>dispatch({type:"SET",payload:{reproCollecting:typeof v==="function"?v(reproCollecting):v}});
-  const setPlacingQueue=v=>dispatch({type:"SET",payload:{placingQueue:typeof v==="function"?v(placingQueue):v}});
-  const setShowMobilePanel=v=>dispatch({type:"SET",payload:{showMobilePanel:typeof v==="function"?v(showMobilePanel):v}});
-  const setActiveTool=v=>dispatch({type:"SET",payload:{activeTool:typeof v==="function"?v(activeTool):v}});
-  const setDatabaseImages=v=>dispatch({type:"SET",payload:{databaseImages:typeof v==="function"?v(databaseImages):v}});
-  const setRightPanel=v=>dispatch({type:"SET",payload:{rightPanel:typeof v==="function"?v(rightPanel):v}});
-  const setDisplacementOverlay=v=>dispatch({type:"SET",payload:{displacementOverlay:typeof v==="function"?v(displacementOverlay):v}});
-  const setRefLandmark1=v=>dispatch({type:"SET",payload:{refLandmark1:typeof v==="function"?v(refLandmark1):v}});
-  const setRefLandmark2=v=>dispatch({type:"SET",payload:{refLandmark2:typeof v==="function"?v(refLandmark2):v}});
-  const setOverlayBlend=v=>dispatch({type:"SET",payload:{overlayBlend:typeof v==="function"?v(overlayBlend):v}});
   // Panel collapse state — useRef + DOM manipulation to avoid canvas re-renders
   const collapsedRef=useRef(false);
   const panelRef=useRef(null);
@@ -662,13 +321,12 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     return()=>{window.removeEventListener("mousemove",onMove);window.removeEventListener("mouseup",onUp);};
   },[toolbarDragging]);
 
-  // Migration: project-level images -> active version's images
+  // Migration: project-level images -> active session's image
   useEffect(()=>{
-    if(!project.images||project.images.length===0)return;
-    if(!activeVersion)return;
-    if(activeVersion.images&&activeVersion.images.length>0)return;
-    onUpdateVersion(activeVersion.id,{images:[...project.images]});
-    onUpdateProject({images:[]});
+    if(!activeSession)return;
+    if(activeSession.image)return;
+    const imgData=project.images?.[0]||(project.sessions?.find(s=>s.image)?.image);
+    if(imgData)onUpdateProject(updateSessionInProject(project,activeSession.id,{image:imgData}));
   },[]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-start placing mode when project has unplaced markups (from wizard)
@@ -693,21 +351,21 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const undoStackRef=useRef([]);
   const redoStackRef=useRef([]);
 
-  const activeVersion=project.versions.find(v=>v.id===project.activeVersionId)||project.versions[0];
-  const markups=useMemo(()=>activeVersion?.markups||[],[activeVersion?.markups]);
-  const verImages=useMemo(()=>activeVersion?.images||[],[activeVersion?.images]);
+  const activeSession=project.sessions?.find(s=>s.id===project.activeSessionId)||project.sessions?.[0];
+  const markups=useMemo(()=>activeSession?.markups||[],[activeSession?.markups]);
+  const sessionImage=activeSession?.image?[activeSession.image]:[];
 
-  const calibration=useMemo(()=>activeVersion?.calibration||{done:false,pxPerMm:1},[activeVersion?.calibration]);
-  const processing=useMemo(()=>activeVersion?.processing||{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},[activeVersion?.processing]);
-  const lutMode=activeVersion?.lutMode||"gray";const lutInvert=activeVersion?.lutInvert||false;
-  const formulas=activeVersion?.formulas||[];const norms=activeVersion?.norms||[];
-  const analysisTemplate=activeVersion?.analysisTemplate||"blank";
+  const calibration=useMemo(()=>activeSession?.calibration||{done:false,pxPerMm:1},[activeSession?.calibration]);
+  const processing=useMemo(()=>activeSession?.processing||{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},[activeSession?.processing]);
+  const lutMode=activeSession?.lutMode||"gray";const lutInvert=activeSession?.lutInvert||false;
+  const formulas=activeSession?.formulas||[];const norms=activeSession?.norms||[];
+  const analysisTemplate=activeSession?.analysisTemplate||"blank";
   const selectedMarkup=markups.find(m=>m.id===selectedId);
-  const compareVersion=project.versions.find(v=>v.id===compareVersionId);
+  const compareSession=null; // TODO: implement session comparison
 
-  const updVer=patch=>onUpdateVersion(activeVersion.id,patch);
-  const angleMode=activeVersion?.angleMode||"signed-deg";
-  const setAngleMode=m=>updVer({angleMode:m});
+  const updSession=patch=>onUpdateProject(updateSessionInProject(project,activeSession.id,patch));
+  const angleMode=activeSession?.angleMode||"signed-deg";
+  const setAngleMode=m=>updSession({angleMode:m});
   const formatAngle=(v)=>{
     const[sign,unit]=angleMode.split("-");
     let val=v;
@@ -722,122 +380,51 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     if(undoStackRef.current.length>50)undoStackRef.current.shift();
     redoStackRef.current=[];
   };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const undo=()=>{
     if(undoStackRef.current.length===0)return;
     const prev=undoStackRef.current.pop();
     if(!prev)return;
     const parsed=JSON.parse(prev);
     if(Array.isArray(parsed)){
-      updVer({markups:parsed});
+      updSession({markups:parsed});
     }else{
-      updVer({markups:parsed.markups,norms:parsed.norms});
+      updSession({markups:parsed.markups,norms:parsed.norms});
       dispatch({type:"SET",payload:{placingMode:parsed.placingMode,placingIdx:parsed.placingIdx,placingQueue:parsed.placingQueue}});
     }
   };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const redo=()=>{
     if(redoStackRef.current.length===0)return;
     undoStackRef.current.push(JSON.stringify(markups));
     const next=redoStackRef.current.pop();
-    if(next)updVer({markups:JSON.parse(next)});
+    if(next)updSession({markups:JSON.parse(next)});
   };
   const refreshAutoMeas=(ms)=>{const placed={};const markupMap={};for(const m of ms){if(m.placed&&m.label)placed[m.label]=m;if(m.label)markupMap[m.label]=m;}return ms.map(m=>{if(!m.autoCreated||!m.refLabels||m.refLabels.length===0)return m;if(m.type==="ratio"||m.type==="sum"||m.type==="difference"||m.type==="percentage"){const allRefsExist=m.refLabels.every(rl=>markupMap[rl]);if(!allRefsExist)return m;let nv=0;if(m.type==="ratio"){const v0=getMeasValue(markupMap[m.refLabels[0]]);const v1=getMeasValue(markupMap[m.refLabels[1]]);nv=v1!==0?v0/v1:0;}else if(m.type==="difference"){nv=getMeasValue(markupMap[m.refLabels[0]])-getMeasValue(markupMap[m.refLabels[1]]);}else if(m.type==="percentage"){const v0=getMeasValue(markupMap[m.refLabels[0]]);const v1=getMeasValue(markupMap[m.refLabels[1]]);nv=v1!==0?(v0/v1)*100:0;}else{nv=m.refLabels.reduce((s,rl)=>s+getMeasValue(markupMap[rl]),0);}if(m.computedValue!==nv)return{...m,computedValue:nv};return m;}const allPlaced=m.refLabels.every(rl=>placed[rl]);if(!allPlaced)return m;const np=m.refLabels.map(rl=>placed[rl].points[0]);if(np.some((p,i)=>p.x!==m.points[i]?.x||p.y!==m.points[i]?.y))return{...m,points:np};return m;});};
-  const updMarkups=fn=>{pushUndo();updVer({markups:refreshAutoMeas(fn(markups))});};
-  const syncReproStudyCoords=(repro,x,y)=>{
-    if(!repro?.measurementId)return;
-    dispatch({type:"SET",payload:{reproStudies:reproStudies.map(s=>{
-      if(s.id!==repro.studyId)return s;
-      return{...s,operators:s.operators.map(o=>{
-        if(o.id!==repro.opId)return o;
-        const trials=(o.trials||[]).map((tr,ti)=>{
-          if(ti!==repro.trialIdx)return tr;
-          return{...tr,measurements:(tr.measurements||[]).map(me=>me.id===repro.measurementId?{...me,x,y}:me)};
-        });
-        return{...o,trials};
-      })};
-    })}});
-  };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const updMarkups=fn=>{pushUndo();updSession({markups:refreshAutoMeas(fn(markups))});};
   const updMarkup=(id,patch)=>{
-    const useDb=databaseMode&&databaseImages.length>0&&!reproCollecting;
-    if(useDb){
-      const currentDbImg=databaseImages[currentImageIndex];
-      const currentMarkups=currentDbImg?.markups||[];
-      const prevM=currentMarkups.find(m=>m.id===id);
-      const merged=prevM?{...prevM,...patch}:null;
-      const newMarkups=currentMarkups.map(m=>m.id===id?{...m,...patch}:m);
-      updateDatabaseImage(currentImageIndex,{markups:newMarkups});
-      if(merged?.repro?.measurementId&&patch.points){
-        const pt=vpts(merged)[0];
-        if(pt&&pt.x>-9000)syncReproStudyCoords(merged.repro,pt.x,pt.y);
-      }
-      return;
-    }
-    const prevM=markups.find(m=>m.id===id);
-    const merged=prevM?{...prevM,...patch}:null;
     updMarkups(ms=>ms.map(m=>m.id===id?{...m,...patch}:m));
-    if(merged?.repro?.measurementId&&patch.points){
-      const pt=vpts(merged)[0];
-      if(pt&&pt.x>-9000)syncReproStudyCoords(merged.repro,pt.x,pt.y);
-    }
   };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const delMarkup=id=>{
-    const useDb=databaseMode&&databaseImages.length>0&&!reproCollecting;
-    if(useDb){
-      const newMarkups=(databaseImages[currentImageIndex]?.markups||[]).filter(mm=>mm.id!==id);
-      updateDatabaseImage(currentImageIndex,{markups:newMarkups});
-      if(selectedId===id)dispatch({type:"SET",payload:{selectedId:null}});
-      return;
-    }
-    const m=markups.find(x=>x.id===id);
     updMarkups(ms=>ms.filter(mm=>mm.id!==id));
     if(selectedId===id)dispatch({type:"SET",payload:{selectedId:null}});
-    if(m?.repro?.measurementId){
-      dispatch({type:"SET",payload:{reproStudies:reproStudies.map(s=>{
-        if(s.id!==m.repro.studyId)return s;
-        return{...s,operators:s.operators.map(o=>{
-          if(o.id!==m.repro.opId)return o;
-          const trials=(o.trials||[]).map((tr,ti)=>{
-            if(ti!==m.repro.trialIdx)return tr;
-            return{...tr,measurements:(tr.measurements||[]).filter(me=>me.id!==m.repro.measurementId)};
-          });
-          return{...o,trials};
-        })};
-      })}});
-    }
   };
   const addMarkup=partial=>{
-    const useDb=databaseMode&&databaseImages.length>0&&!reproCollecting;
-    const currentDbImg=useDb?databaseImages[currentImageIndex]:null;
-    const existingMarkups=useDb?(currentDbImg?.markups||[]):markups;
-    const typeCount=(type)=>existingMarkups.filter(m=>m.type===type).length;
+    const typeCount=(type)=>markups.filter(m=>m.type===type).length;
     const m={id:uid(),color:t.acc,width:1.5,style:"solid",size:6,label:"",definition:"",showLength:true,strokeColor:t.acc,fillColor:t.acc+"22",strokeWidth:1.5,visible:true,...partial};
     if(partial.type==="point")m.label=`P${typeCount("point")+1}`;
     if(partial.type==="line"||partial.type==="parallel")m.label=partial.label||`Line ${typeCount("line")+typeCount("parallel")+1}`;
     if(partial.type==="curve")m.label=partial.label||`Trace ${typeCount("curve")+1}`;
     if(partial.type==="angle3")m.label=partial.label||`Angle ${typeCount("angle3")+1}`;
     if(partial.type==="angle4")m.label=partial.label||`Inc_Angle ${typeCount("angle4")+1}`;
-    if(useDb){
-      const newMarkups=[...currentDbImg?.markups||[],m];
-      updateDatabaseImage(currentImageIndex,{markups:newMarkups});
-      dispatch({type:"SET",payload:{selectedId:m.id}});
-      return m;
-    }
     updMarkups(ms=>[...ms,m]);dispatch({type:"SET",payload:{selectedId:m.id}});return m;
   };
   const finalizeMarkup=draw=>{
-    const useDb=databaseMode&&databaseImages.length>0&&!reproCollecting;
-    const currentDbImg=useDb?databaseImages[currentImageIndex]:null;
-    const existingMarkups=useDb?(currentDbImg?.markups||[]):markups;
     const D={
-      line:{color:t.acc,width:1.5,style:"solid",mode:"segment",label:`Line ${existingMarkups.filter(m=>m.type==="line").length+1}`,showLength:true},
-      angle3:{color:"#f472b6",width:1.5,label:`Angle ${existingMarkups.filter(m=>m.type==="angle3").length+1}`},
-      angle4:{color:"#c084fc",width:1.5,label:`Inc_Angle ${existingMarkups.filter(m=>m.type==="angle4").length+1}`},
-      polygon:{strokeColor:t.acc,fillColor:t.acc+"22",strokeWidth:1.5,label:`Polygon ${existingMarkups.filter(m=>m.type==="polygon").length+1}`},
-      curve:{color:"#fb923c",width:1.5,label:`Trace ${existingMarkups.filter(m=>m.type==="curve").length+1}`},
-      perp:{color:"#a78bfa",width:1.5,label:`Perp ${existingMarkups.filter(m=>m.type==="perp").length+1}`}
+      line:{color:t.acc,width:1.5,style:"solid",mode:"segment",label:`Line ${markups.filter(m=>m.type==="line").length+1}`,showLength:true},
+      angle3:{color:"#f472b6",width:1.5,label:`Angle ${markups.filter(m=>m.type==="angle3").length+1}`},
+      angle4:{color:"#c084fc",width:1.5,label:`Inc_Angle ${markups.filter(m=>m.type==="angle4").length+1}`},
+      polygon:{strokeColor:t.acc,fillColor:t.acc+"22",strokeWidth:1.5,label:`Polygon ${markups.filter(m=>m.type==="polygon").length+1}`},
+      curve:{color:"#fb923c",width:1.5,label:`Trace ${markups.filter(m=>m.type==="curve").length+1}`},
+      perp:{color:"#a78bfa",width:1.5,label:`Perp ${markups.filter(m=>m.type==="perp").length+1}`}
     };
     const newMarkup={...D[draw.type]||{},...draw};
     if(draw.replacingId){
@@ -850,12 +437,12 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
 
   // load images
   useEffect(()=>{
-    const pending=verImages.filter(imgE=>!imgRefs.current[imgE.id]&&imgE.dataUrl);
+    const pending=sessionImage.filter(imgE=>!imgRefs.current[imgE.id]&&imgE.dataUrl);
     if(!pending.length)return;
     dispatch({type:"SET",payload:{loadingImages:true}});
     let loaded=0;
     pending.forEach(imgE=>{const img=new Image();img.onload=()=>{imgRefs.current[imgE.id]=img;loaded++;if(loaded===pending.length)dispatch({type:"SET",payload:{loadingImages:false}});scheduleRedraw();};img.src=imgE.dataUrl;});
-  },[verImages]); // eslint-disable-line react-hooks/exhaustive-deps
+  },[sessionImage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const getProcessed=useCallback(imgEntry=>{
     const key=`${imgEntry.id}-${JSON.stringify(processing)}-${lutMode}-${lutInvert}`;
@@ -864,7 +451,6 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   },[processing,lutMode,lutInvert]);
 
   const toImage=useCallback((sx,sy)=>({x:(sx-pan.x)/zoom,y:(sy-pan.y)/zoom}),[pan,zoom]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const getCanvasPos=e=>{const r=canvasRef.current.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};};
 
   useEffect(()=>{
@@ -877,29 +463,11 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     const ctx=canvas.getContext("2d");ctx.clearRect(0,0,canvas.width,canvas.height);
     ctx.fillStyle=t.bg;ctx.fillRect(0,0,canvas.width,canvas.height);
     
-    const currentDbImg=databaseMode&&databaseImages.length>0?databaseImages[currentImageIndex]:null;
-    const activeMarkups=currentDbImg?.markups||[];
-    const activeCalibration=currentDbImg?.calibration||{done:false,pxPerMm:1};
-    const _activeProcessing=currentDbImg?.processing||{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0};
-    const activeLutMode=currentDbImg?.lutMode||"gray";
-    const activeLutInvert=currentDbImg?.lutInvert||false;
-    
-    if(databaseMode&&currentDbImg){
-      const src=imgRefs.current[currentDbImg.id];
-      if(src){
-        const nw=src.naturalWidth||src.width||600,nh=src.naturalHeight||src.height||500;
-        ctx.save();
-        ctx.globalAlpha=currentDbImg.opacity??1;
-        ctx.translate(pan.x,pan.y);
-        ctx.scale(zoom,zoom);
-        ctx.drawImage(src,0,0,nw,nh);
-        ctx.restore();
-      }
-    }else if(verImages.length===0){
+    if(sessionImage.length===0){
       ctx.fillStyle=t.surf;ctx.fillRect(pan.x,pan.y,600*zoom,500*zoom);ctx.strokeStyle=t.bdr;ctx.lineWidth=1;ctx.strokeRect(pan.x,pan.y,600*zoom,500*zoom);
       ctx.fillStyle=t.tx3;ctx.font=`15px "DM Sans",sans-serif`;ctx.textAlign="center";ctx.fillText("Drop or open a cephalogram image",pan.x+300*zoom,pan.y+240*zoom);ctx.fillText("Open Image  •  drag & drop",pan.x+300*zoom,pan.y+265*zoom);ctx.textAlign="left";
     } else {
-      verImages.forEach(imgE=>{
+      sessionImage.forEach(imgE=>{
         if(!imgE.visible)return;const src=getProcessed(imgE)||imgRefs.current[imgE.id];if(!src)return;
         const tf=imgE.transform||{tx:0,ty:0,rot:0,scale:1};const nw=src.naturalWidth||src.width||600,nh=src.naturalHeight||src.height||500;
         ctx.save();ctx.globalAlpha=imgE.opacity??1;ctx.globalCompositeOperation=imgE.blendMode||"normal";
@@ -910,13 +478,13 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         ctx.restore();
       });
     }
-    const drawMarkups=databaseMode&&databaseImages.length>0&&!reproCollecting?activeMarkups:markups;
-    const drawCalibration=databaseMode&&databaseImages.length>0&&!reproCollecting?activeCalibration:calibration;
+    const drawMarkups=markups;
+    const drawCalibration=calibration;
     // Overlay mode: draw compare version's markups first with reduced opacity
-    if(displacementOverlay && compareVersion){
+    if(displacementOverlay && compareSession){
       ctx.save();
       ctx.globalAlpha = overlayBlend;
-      const compMarkups = compareVersion.markups || [];
+      const compMarkups = compareSession.markups || [];
       // Structural reference alignment
       if(refLandmark1 && refLandmark2){
         const p1a = vpts(markups.find(m => m.type === "point" && m.label === refLandmark1)||{});
@@ -939,14 +507,14 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       }
       ctx.restore();
     }
-    drawMarkups.forEach(m=>drawMarkup(ctx,m,zoom,pan,drawCalibration,selectedId,t,reproCollecting,canvasSize.current,angleMode,showAnnotations,annotationSize,hoveredPtRef.current));
+    drawMarkups.forEach(m=>drawMarkup(ctx,m,zoom,pan,drawCalibration,selectedId,t,false,canvasSize.current,angleMode,showAnnotations,annotationSize,hoveredPtRef.current));
     if(showDisplacement){
-      if(!compareVersion){
+      if(!compareSession){
         ctx.fillStyle="rgba(0,0,0,0.6)";ctx.fillRect(8,8,220,36);
         ctx.fillStyle="#ffd700";ctx.font="bold 12px 'DM Sans',sans-serif";
         ctx.fillText("⇝ Select a compare version in Versions panel",16,28);
       } else {
-        drawDisplacementVectors(ctx,drawMarkups,compareVersion.markups||[],zoom,pan,drawCalibration);
+        drawDisplacementVectors(ctx,drawMarkups,compareSession.markups||[],zoom,pan,drawCalibration);
       }
     }
     drawAirwayOverlay(ctx,drawMarkups,zoom,pan,drawCalibration);
@@ -985,7 +553,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     if(currentDraw)drawInProgress(ctx,currentDraw,mousePos,zoom,pan,t);
     if(snapEnabled&&snapPos)drawSnapIndicator(ctx,snapPos,zoom,pan);
     if(showScaleBar)drawScaleBar(ctx,zoom,drawCalibration,canvas.width,canvas.height);
-    if(showLUT&&activeLutMode!=="gray")drawLUTLegend(ctx,activeLutMode,activeLutInvert,canvas.width,canvas.height,t);
+    if(showLUT&&lutMode!=="gray")drawLUTLegend(ctx,lutMode,lutInvert,canvas.width,canvas.height,t);
     if(placingMode&&placingQueue.length>0&&placingIdx<placingQueue.length){
       const m=drawMarkups.find(x=>x.id===placingQueue[placingIdx]);
       if(m){
@@ -1023,7 +591,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         ctx.restore();
       }
     }
-  },[markups,selectedId,zoom,pan,verImages,calibration,t,currentDraw,mousePos,snapEnabled,snapPos,showScaleBar,showDefTooltips,showLUT,showAnnotations,annotationSize,placingMode,placingQueue,placingIdx,showDisplacement,compareVersion,getProcessed,reproCollecting,angleMode,databaseMode,databaseImages,currentImageIndex,activeTool,displacementOverlay,overlayBlend,refLandmark1,refLandmark2]);
+  },[markups,selectedId,zoom,pan,sessionImage,calibration,t,currentDraw,mousePos,snapEnabled,snapPos,showScaleBar,showDefTooltips,showLUT,showAnnotations,annotationSize,placingMode,placingQueue,placingIdx,showDisplacement,compareSession,getProcessed,angleMode,lutMode,lutInvert,activeTool,displacementOverlay,overlayBlend,refLandmark1,refLandmark2]);
 
   useEffect(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});});
   const scheduleRedraw=useCallback(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});},[redraw]);
@@ -1037,66 +605,12 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       img.onload=()=>{
         const id=uid();imgRefs.current[id]=img;
         const entry={id,name:file.name,dataUrl,dx:0,dy:0,opacity:1,blendMode:"normal",visible:true,color:"none",transform:{tx:0,ty:0,rot:0,scale:1}};
-        const newImages=addToStack?[...verImages,entry]:[entry];
-        updVer({images:newImages});
+        updSession({image:entry});
         dispatch({type:"SET",payload:{loadingImages:false}});
         if(!addToStack){const cw=canvasSize.current.w-80,ch=canvasSize.current.h-80;const sc=Math.min(cw/(img.naturalWidth||600),ch/(img.naturalHeight||500),1);dispatch({type:"SET",payload:{zoom:sc}});dispatch({type:"SET",payload:{pan:{x:40,y:40}}});}
       };img.src=dataUrl;
     };reader.readAsDataURL(file);
   };
-
-  const loadDatabaseImages=async (files)=>{
-    dispatch({type:"SET",payload:{loadingImages:true}});
-    const loaded=await Promise.all(files.map(file=>{
-      return new Promise((resolve)=>{
-        if(!file.type.startsWith("image/")){resolve(null);return;}
-        const reader=new FileReader();
-        reader.onload=e=>{
-          const dataUrl=e.target.result;const img=new Image();
-          img.onload=()=>{
-            resolve({id:uid(),name:file.name,dataUrl,markups:[],calibration:{done:false,pxPerMm:1,knownMm:""},processing:{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},lutMode:"gray",lutInvert:false});
-          };img.src=dataUrl;
-        };reader.readAsDataURL(file);
-      });
-    }));
-    const validImages=loaded.filter(Boolean);
-    if(validImages.length>0){
-      dispatch({type:"SET",payload:{databaseImages:validImages}});
-      dispatch({type:"SET",payload:{currentImageIndex:0}});
-      dispatch({type:"SET",payload:{databaseMode:true}});
-      const firstImg=validImages[0];
-      imgRefs.current[firstImg.id]=await new Promise(r=>{const i=new Image();i.onload=()=>r(i);i.src=firstImg.dataUrl;});
-      const cw=canvasSize.current.w-80,ch=canvasSize.current.h-80;
-      const img=new Image();img.onload=()=>{const sc=Math.min(cw/(img.naturalWidth||600),ch/(img.naturalHeight||500),1);dispatch({type:"SET",payload:{zoom:sc}});dispatch({type:"SET",payload:{pan:{x:40,y:40}}});dispatch({type:"SET",payload:{loadingImages:false}});};img.src=firstImg.dataUrl;
-    }else{
-      dispatch({type:"SET",payload:{loadingImages:false}});
-    }
-  };
-
-  const updateDatabaseImage=(index,patch)=>{
-    dispatch({type:"SET",payload:{databaseImages:databaseImages.map((img,i)=>i===index?{...img,...patch}:img)}});
-  };
-
-  const navigateImage=(direction)=>{
-    if(direction==="next"&&currentImageIndex<databaseImages.length-1){
-      dispatch({type:"SET",payload:{currentImageIndex:currentImageIndex+1}});
-    }else if(direction==="prev"&&currentImageIndex>0){
-      dispatch({type:"SET",payload:{currentImageIndex:currentImageIndex-1}});
-    }
-  };
-
-  useEffect(()=>{
-    if(!databaseMode||databaseImages.length===0)return;
-    const currentDbImg=databaseImages[currentImageIndex];
-    if(!currentDbImg)return;
-    if(!imgRefs.current[currentDbImg.id]){
-      const img=new Image();
-      img.onload=()=>{imgRefs.current[currentDbImg.id]=img;scheduleRedraw();};
-      img.src=currentDbImg.dataUrl;
-    }else{
-      scheduleRedraw();
-    }
-  },[currentImageIndex,databaseMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDrop=e=>{e.preventDefault();loadImage(e.dataTransfer.files[0]);};
 
@@ -1120,11 +634,8 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
 
   const handleMouseDown=useCallback(e=>{
     if(e.button!==0)return;
-    const currentDbImg=databaseMode&&!reproCollecting&&databaseImages.length>0?databaseImages[currentImageIndex]:null;
-    const dbMarkups=currentDbImg?.markups||[];
-    const activeMarkupsList=databaseMode&&!reproCollecting?dbMarkups:markups;
     const sp=getCanvasPos(e);let ip=toImage(sp.x,sp.y);
-    ip=snapPoint(ip,activeMarkupsList,12/zoom,snapEnabled);
+    ip=snapPoint(ip,markups,12/zoom,snapEnabled);
      if(placingMode&&placingQueue.length>0&&placingIdx<placingQueue.length){
        const qid=placingQueue[placingIdx];
        const updatedMarkups=markups.map(m=>m.id===qid?{...m,points:[ip],placed:true}:m);
@@ -1139,16 +650,16 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
          }
        }
         pushUndo();
-        updVer({markups:refreshAutoMeas([...updatedMarkups,...newAuto]),norms:[...norms,...newNorms]});
+        updSession({markups:refreshAutoMeas([...updatedMarkups,...newAuto]),norms:[...norms,...newNorms]});
        if(placingIdx<placingQueue.length-1)dispatch({type:"SET",payload:{placingIdx:placingIdx+1}});else{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}
        return;
      }
     if(activeTool==="pan"){isPanning.current=true;panStart.current={mx:e.clientX,my:e.clientY,px:pan.x,py:pan.y};return;}
     if(activeTool==="select"){
-      const hit=hitTest(activeMarkupsList,ip,zoom,reproCollecting);
+      const hit=hitTest(markups,ip,zoom);
       setSelectedId(hit);
       if(hit){
-        const m=activeMarkupsList.find(x=>x.id===hit);
+        const m=markups.find(x=>x.id===hit);
         if(m?.locked){isDragging.current=false;return;}
         if(m?.type==="silhouette"){
           try {
@@ -1160,10 +671,9 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
                 initialRotation: m.rotation || 0,
                 center: { x: (handles.bbox.minX + handles.bbox.maxX) / 2, y: (handles.bbox.minY + handles.bbox.maxY) / 2 },
               };
-              dragStartState.current=JSON.stringify(activeMarkupsList);
+              dragStartState.current=JSON.stringify(markups);
               return;
             }
-            // Point-level drag on editable silhouettes (before corner handles)
             if (m.paths) {
               const ptThr = 8 / zoom;
               const rot = m.rotation || 0;
@@ -1186,7 +696,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
               if (bestDist < ptThr) {
                 isDragging.current = true;
                 dragMid.current = hit;
-                dragStartState.current = JSON.stringify(activeMarkupsList);
+                dragStartState.current = JSON.stringify(markups);
                 dragPtIdx.current = { pathIdx: bestPathIdx, ptIdx: bestPtIdx };
                 dragStart.current = ip;
                 return;
@@ -1248,7 +758,6 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
               }
               return;
             }
-            // Corner resize handles (reduced threshold)
             const cornerThr = Math.max(6, 10 * Math.sqrt(zoom)) / zoom;
             for (let hi = 0; hi < handles.corners.length; hi++) {
               const c = handles.corners[hi];
@@ -1261,12 +770,12 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
                   center: { x: cx, y: cy },
                   initialDist: dist(ip, { x: cx, y: cy }),
                 };
-                dragStartState.current=JSON.stringify(activeMarkupsList);
+                dragStartState.current=JSON.stringify(markups);
                 return;
               }
             }
           } catch(e) { console.error("Silhouette handle error", e); }
-          isDragging.current=true;dragMid.current=hit;dragStartState.current=JSON.stringify(activeMarkupsList);
+          isDragging.current=true;dragMid.current=hit;dragStartState.current=JSON.stringify(markups);
           dragPtIdx.current=-1;dragStart.current=ip;
           return;
         }
@@ -1286,7 +795,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
           if(bestIdx>=0&&vp.length>2){const newPoints=m.points.filter((_,i)=>i!==bestIdx);updMarkup(hit,{points:newPoints});}
           return;
         }
-        isDragging.current=true;dragMid.current=hit;dragStartState.current=JSON.stringify(activeMarkupsList);
+        isDragging.current=true;dragMid.current=hit;dragStartState.current=JSON.stringify(markups);
         let bi=0,bd=Infinity;(m.points||[]).forEach((p,i)=>{const d=dist(p,ip);if(d<bd){bd=d;bi=i;}});
         if(bd>8/zoom)bi=-1;
         dragPtIdx.current=bi;dragStart.current=ip;
@@ -1296,56 +805,30 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
     if(activeTool==="text"){dispatch({type:"SET",payload:{pendingTextPos:ip}});return;}
     if(activeTool==="point"){
       if(replacingId){updMarkup(replacingId,{points:[ip],placed:true});dispatch({type:"SET",payload:{replacingId:null}});return;}
-      if(reproCollecting){
-        const{studyId,opId,trialIdx}=reproCollecting;
-        const study=reproStudies.find(s=>s.id===studyId);
-        if(study){
-          const n=activeMarkupsList.filter(m=>m.type==="point"&&m.repro&&m.repro.studyId===studyId&&m.repro.opId===opId&&m.repro.trialIdx===trialIdx).length;
-          const label=`L${n+1}`;
-          const measurementId=uid();
-          addMarkup({type:"point",points:[ip],label,color:t.acc,size:6,definition:"",repro:{studyId,opId,trialIdx,measurementId}});
-          dispatch({type:"SET",payload:{reproStudies:reproStudies.map(s=>{
-            if(s.id!==studyId)return s;
-            return{...s,operators:s.operators.map(o=>{
-              if(o.id!==opId)return o;
-              const trials=[...(o.trials||[])];
-              while(trials.length<=trialIdx)trials.push({id:uid(),measurements:[]});
-              const tr=trials[trialIdx]||{id:uid(),measurements:[]};
-              trials[trialIdx]={...tr,measurements:[...(tr.measurements||[]),{id:measurementId,label,x:ip.x,y:ip.y,timestamp:Date.now()}]};
-              return{...o,trials};
-            })};
-          })}});
-        }
-        return;
-      }
-      const nNon=activeMarkupsList.filter(m=>m.type==="point"&&!m.repro).length;
+      const nNon=markups.filter(m=>m.type==="point"&&!m.repro).length;
       addMarkup({type:"point",points:[ip],label:`P${nNon+1}`,color:t.acc,size:6,definition:""});
       return;
     }
     if(activeTool==="ruler"){if(!currentDraw)dispatch({type:"SET",payload:{currentDraw:{type:"ruler",points:[ip]}}});else{const ruler={...currentDraw,type:"ruler",points:[...currentDraw.points,ip],label:"Ruler"};dispatch({type:"SET",payload:{pendingRuler:ruler}});addMarkup(ruler);dispatch({type:"SET",payload:{currentDraw:null}});dispatch({type:"SET",payload:{showCalib:true}});}return;}
     if(activeTool==="parallel"){if(selectedMarkup&&(selectedMarkup.type==="line"||selectedMarkup.type==="parallel")){const vp=vpts(selectedMarkup);if(vp.length>=2){const dx=vp[1].x-vp[0].x,dy=vp[1].y-vp[0].y,len=Math.sqrt(dx*dx+dy*dy)||1,half=len/2;addMarkup({type:"parallel",points:[{x:ip.x-dx/len*half,y:ip.y-dy/len*half},{x:ip.x+dx/len*half,y:ip.y+dy/len*half}],color:"#34d399",width:1.5,style:"solid",label:`∥`,showLength:true});return;}}if(!currentDraw)dispatch({type:"SET",payload:{currentDraw:{type:"line",points:[ip]}}});else{finalizeMarkup({...currentDraw,points:[...currentDraw.points,ip]});dispatch({type:"SET",payload:{currentDraw:null}});}return;}
-    if(activeTool==="midpoint"){if(!currentDraw)dispatch({type:"SET",payload:{currentDraw:{type:"midpoint",points:[ip]}}});else{const p1=currentDraw.points[0],p2=ip;if(p1.x>-9000&&p2.x>-9000){const mid={x:(p1.x+p2.x)/2,y:(p1.y+p2.y)/2};const n=activeMarkupsList.filter(m=>m.type==="point").length;addMarkup({type:"point",points:[mid],label:`M${n+1}`,color:"#fbbf24",size:6,definition:"Midpoint"});}dispatch({type:"SET",payload:{currentDraw:null}});}return;}
-    if(activeTool==="perppoint"){if(!currentDraw)dispatch({type:"SET",payload:{currentDraw:{type:"perppoint",points:[ip]}}});else if(currentDraw.points.length===1)dispatch({type:"SET",payload:{currentDraw:{type:"perppoint",points:[currentDraw.points[0],ip]}}});else{const p1=currentDraw.points[0],p2=currentDraw.points[1],p3=ip;if(p1.x>-9000&&p2.x>-9000&&p3.x>-9000){const lx1=p2.x-p1.x,ly1=p2.y-p1.y;const lx2=-ly1,ly2=lx1;const perpPt={x:p3.x+lx2,y:p3.y+ly2};const n=activeMarkupsList.filter(m=>m.type==="line"||m.type==="perp").length+1;addMarkup({type:"line",mode:"segment",points:[perpPt,p3],color:"#f472b6",width:1.5,style:"solid",label:`⊥${n}`,showLength:true});}dispatch({type:"SET",payload:{currentDraw:null}});}return;}
+    if(activeTool==="midpoint"){if(!currentDraw)dispatch({type:"SET",payload:{currentDraw:{type:"midpoint",points:[ip]}}});else{const p1=currentDraw.points[0],p2=ip;if(p1.x>-9000&&p2.x>-9000){const mid={x:(p1.x+p2.x)/2,y:(p1.y+p2.y)/2};const n=markups.filter(m=>m.type==="point").length;addMarkup({type:"point",points:[mid],label:`M${n+1}`,color:"#fbbf24",size:6,definition:"Midpoint"});}dispatch({type:"SET",payload:{currentDraw:null}});}return;}
+    if(activeTool==="perppoint"){if(!currentDraw)dispatch({type:"SET",payload:{currentDraw:{type:"perppoint",points:[ip]}}});else if(currentDraw.points.length===1)dispatch({type:"SET",payload:{currentDraw:{type:"perppoint",points:[currentDraw.points[0],ip]}}});else{const p1=currentDraw.points[0],p2=currentDraw.points[1],p3=ip;if(p1.x>-9000&&p2.x>-9000&&p3.x>-9000){const lx1=p2.x-p1.x,ly1=p2.y-p1.y;const lx2=-ly1,ly2=lx1;const perpPt={x:p3.x+lx2,y:p3.y+ly2};const n=markups.filter(m=>m.type==="line"||m.type==="perp").length+1;addMarkup({type:"line",mode:"segment",points:[perpPt,p3],color:"#f472b6",width:1.5,style:"solid",label:`⊥${n}`,showLength:true});}dispatch({type:"SET",payload:{currentDraw:null}});}return;}
     if(activeTool==="arrow"){if(!currentDraw)dispatch({type:"SET",payload:{currentDraw:{type:"arrow",points:[ip]}}});else{const p1=currentDraw.points[0],p2=ip;if(p1.x>-9000&&p2.x>-9000){addMarkup({type:"arrow",points:[p1,p2],color:"#34d399",width:2});}dispatch({type:"SET",payload:{currentDraw:null}});}return;}
     if(["line","angle3","angle4","polygon","curve","perp"].includes(activeTool)){
       if(!currentDraw)dispatch({type:"SET",payload:{currentDraw:{type:activeTool,points:[ip],curveStyle:"linear",replacingId}}});
       else{const nps=[...currentDraw.points,ip];const need={line:2,angle3:3,angle4:4,perp:3}[activeTool];if(need&&nps.length>=need){finalizeMarkup({...currentDraw,points:nps});dispatch({type:"SET",payload:{currentDraw:null}});}else dispatch({type:"SET",payload:{currentDraw:{...currentDraw,points:nps}}});}return;}
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[activeTool,markups,zoom,pan,snapEnabled,currentDraw,selectedMarkup,placingMode,placingQueue,placingIdx,reproCollecting,reproStudies,databaseMode,databaseImages,currentImageIndex,replacingId,setSelectedId,updMarkup,addMarkup,finalizeMarkup,toImage,getCanvasPos,t,analysisTemplate,calibration,project]);
+  },[activeTool,markups,zoom,pan,snapEnabled,currentDraw,selectedMarkup,placingMode,placingQueue,placingIdx,replacingId,setSelectedId,updMarkup,addMarkup,finalizeMarkup,toImage,getCanvasPos,t,analysisTemplate,calibration,project]);
 
   const handleMouseMove=useCallback(e=>{
-    const currentDbImg=databaseMode&&!reproCollecting&&databaseImages.length>0?databaseImages[currentImageIndex]:null;
-    const dbMarkups=currentDbImg?.markups||[];
-    const activeMarkupsList=databaseMode&&!reproCollecting?dbMarkups:markups;
     const sp=getCanvasPos(e);dispatch({type:"SET",payload:{mousePos:sp}});
-    if(snapEnabled&&activeTool!=="select"&&activeTool!=="pan"){const ip=toImage(sp.x,sp.y);const sn=snapPoint(ip,activeMarkupsList,12/zoom,snapEnabled);dispatch({type:"SET",payload:{snapPos:(Math.abs(sn.x-ip.x)>0.1||Math.abs(sn.y-ip.y)>0.1)?sn:null}});}else dispatch({type:"SET",payload:{snapPos:null}});
-    if(activeTool==="select"&&!isDragging.current&&!silhouetteAction.current){const ip=toImage(sp.x,sp.y);let best=null,bd=Infinity;const ptThr=8/zoom;for(const m2 of activeMarkupsList){if(m2.locked||m2.visible===false)continue;if(m2.type==="point"){const vp=vpts(m2);if(vp.length){const d=dist(ip,vp[0]);if(d<bd&&d<ptThr){bd=d;best={type:"point",mid:m2.id};}}}if(m2.type==="silhouette"){const paths=m2.paths||SILHOUETTES[m2.silhouetteType]?.paths;if(!paths)continue;const rot=m2.rotation||0;const sc=m2.scale||1;const pos=m2.position||{x:0,y:0};const cosR=Math.cos(rot);const sinR=Math.sin(rot);paths.forEach((path,pi)=>{path.points.forEach((p,ptI)=>{const sx=p.x*sc*100;const sy=p.y*sc*100;const rx=sx*cosR-sy*sinR;const ry=sx*sinR+sy*cosR;const d=dist(ip,{x:rx+pos.x,y:ry+pos.y});if(d<bd&&d<ptThr){bd=d;best={type:"silhouette",mid:m2.id,pathIdx:pi,ptIdx:ptI};}});});if(m2.id===selectedId){try{const h=getSilhouetteHandlesImage(m2,zoom);const rotThr=Math.max(10,22*Math.sqrt(zoom))/zoom;if(h.rotCenter&&isFinite(h.rotCenter.x)){const d=dist(ip,h.rotCenter);if(d<rotThr&&d<bd){bd=d;best={type:"rotate",mid:m2.id};}}const cornerThr=Math.max(8,12*Math.sqrt(zoom))/zoom;h.corners.forEach((c,ci)=>{if(isFinite(c.x)){const d=dist(ip,c);if(d<cornerThr&&d<bd){bd=d;best={type:"corner",mid:m2.id,cornerIdx:ci};}}});}catch{/*silent*/}}}else if(m2.type==="curve"||m2.type==="polygon"){(m2.points||[]).forEach((p,i)=>{const d=dist(ip,p);if(d<bd&&d<ptThr){bd=d;best={type:"path",mid:m2.id,ptIdx:i};}});}}hoveredPtRef.current=best;}else{hoveredPtRef.current=null;}
+    if(snapEnabled&&activeTool!=="select"&&activeTool!=="pan"){const ip=toImage(sp.x,sp.y);const sn=snapPoint(ip,markups,12/zoom,snapEnabled);dispatch({type:"SET",payload:{snapPos:(Math.abs(sn.x-ip.x)>0.1||Math.abs(sn.y-ip.y)>0.1)?sn:null}});}else dispatch({type:"SET",payload:{snapPos:null}});
+    if(activeTool==="select"&&!isDragging.current&&!silhouetteAction.current){const ip=toImage(sp.x,sp.y);let best=null,bd=Infinity;const ptThr=8/zoom;for(const m2 of markups){if(m2.locked||m2.visible===false)continue;if(m2.type==="point"){const vp=vpts(m2);if(vp.length){const d=dist(ip,vp[0]);if(d<bd&&d<ptThr){bd=d;best={type:"point",mid:m2.id};}}}if(m2.type==="silhouette"){const paths=m2.paths||SILHOUETTES[m2.silhouetteType]?.paths;if(!paths)continue;const rot=m2.rotation||0;const sc=m2.scale||1;const pos=m2.position||{x:0,y:0};const cosR=Math.cos(rot);const sinR=Math.sin(rot);paths.forEach((path,pi)=>{path.points.forEach((p,ptI)=>{const sx=p.x*sc*100;const sy=p.y*sc*100;const rx=sx*cosR-sy*sinR;const ry=sx*sinR+sy*cosR;const d=dist(ip,{x:rx+pos.x,y:ry+pos.y});if(d<bd&&d<ptThr){bd=d;best={type:"silhouette",mid:m2.id,pathIdx:pi,ptIdx:ptI};}});});if(m2.id===selectedId){try{const h=getSilhouetteHandlesImage(m2,zoom);const rotThr=Math.max(10,22*Math.sqrt(zoom))/zoom;if(h.rotCenter&&isFinite(h.rotCenter.x)){const d=dist(ip,h.rotCenter);if(d<rotThr&&d<bd){bd=d;best={type:"rotate",mid:m2.id};}}const cornerThr=Math.max(8,12*Math.sqrt(zoom))/zoom;h.corners.forEach((c,ci)=>{if(isFinite(c.x)){const d=dist(ip,c);if(d<cornerThr&&d<bd){bd=d;best={type:"corner",mid:m2.id,cornerIdx:ci};}}});}catch{/*silent*/}}}else if(m2.type==="curve"||m2.type==="polygon"){(m2.points||[]).forEach((p,i)=>{const d=dist(ip,p);if(d<bd&&d<ptThr){bd=d;best={type:"path",mid:m2.id,ptIdx:i};}});}}hoveredPtRef.current=best;}else{hoveredPtRef.current=null;}
     if(isPanning.current&&panStart.current)dispatch({type:"SET",payload:{pan:{x:panStart.current.px+(e.clientX-panStart.current.mx),y:panStart.current.py+(e.clientY-panStart.current.my)}}});
-    if(isDragging.current&&dragMid.current){const ip=toImage(sp.x,sp.y);const dx=ip.x-dragStart.current.x,dy=ip.y-dragStart.current.y;const m=activeMarkupsList.find(x=>x.id===dragMid.current);if(!m)return;if(m.type==="silhouette"){if(typeof dragPtIdx.current==="object"&&dragPtIdx.current!==null){const sc=m.scale||1;const rot=m.rotation||0;const cosR=Math.cos(rot);const sinR=Math.sin(rot);const baseSize=100;const dnx=(cosR*dx+sinR*dy)/(sc*baseSize);const dny=(-sinR*dx+cosR*dy)/(sc*baseSize);const{pathIdx,ptIdx}=dragPtIdx.current;updMarkup(dragMid.current,{paths:(m.paths||[]).map((path,pi)=>({...path,points:path.points.map((p,ptI)=>pi===pathIdx&&ptI===ptIdx?{x:p.x+dnx,y:p.y+dny}:p)}))});}else{updMarkup(dragMid.current,{position:{x:(m.position?.x||0)+dx,y:(m.position?.y||0)+dy}});}}else{updMarkup(dragMid.current,{points:(m.points||[]).map((p,i)=>i===dragPtIdx.current?{x:p.x+dx,y:p.y+dy}:p)});}dragStart.current=ip;}
+    if(isDragging.current&&dragMid.current){const ip=toImage(sp.x,sp.y);const dx=ip.x-dragStart.current.x,dy=ip.y-dragStart.current.y;const m=markups.find(x=>x.id===dragMid.current);if(!m)return;if(m.type==="silhouette"){if(typeof dragPtIdx.current==="object"&&dragPtIdx.current!==null){const sc=m.scale||1;const rot=m.rotation||0;const cosR=Math.cos(rot);const sinR=Math.sin(rot);const baseSize=100;const dnx=(cosR*dx+sinR*dy)/(sc*baseSize);const dny=(-sinR*dx+cosR*dy)/(sc*baseSize);const{pathIdx,ptIdx}=dragPtIdx.current;updMarkup(dragMid.current,{paths:(m.paths||[]).map((path,pi)=>({...path,points:path.points.map((p,ptI)=>pi===pathIdx&&ptI===ptIdx?{x:p.x+dnx,y:p.y+dny}:p)}))});}else{updMarkup(dragMid.current,{position:{x:(m.position?.x||0)+dx,y:(m.position?.y||0)+dy}});}}else{updMarkup(dragMid.current,{points:(m.points||[]).map((p,i)=>i===dragPtIdx.current?{x:p.x+dx,y:p.y+dy}:p)});}dragStart.current=ip;}
     if(silhouetteAction.current){
       try {
         const ip=toImage(sp.x,sp.y);const sa=silhouetteAction.current;
-        const m=activeMarkupsList.find(x=>x.id===sa.markupId);
+        const m=markups.find(x=>x.id===sa.markupId);
         if(!m||!isFinite(sa.center.x)||!isFinite(sa.center.y)){silhouetteAction.current=null;return;}
         if(sa.type==="resize"&&isFinite(sa.initialDist)&&sa.initialDist>0){
           const d=dist(ip,sa.center);
@@ -1359,13 +842,11 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         }
       } catch { silhouetteAction.current=null; /*silent*/ }
     }
-  },[activeTool,markups,zoom,snapEnabled,selectedId,databaseMode,databaseImages,currentImageIndex,reproCollecting,updMarkup,toImage,getCanvasPos]);
+  },[activeTool,markups,zoom,snapEnabled,selectedId,updMarkup,toImage,getCanvasPos]);
 
   const handleMouseUp=()=>{
-    const currentDbImg=databaseMode&&!reproCollecting&&databaseImages.length>0?databaseImages[currentImageIndex]:null;
-    const activeMarkupsList=databaseMode&&!reproCollecting?(currentDbImg?.markups||[]):markups;
     if((isDragging.current||silhouetteAction.current)&&dragStartState.current){
-      const currentState=JSON.stringify(activeMarkupsList);
+      const currentState=JSON.stringify(markups);
       if(dragStartState.current!==currentState){
         undoStackRef.current.push(dragStartState.current);
         if(undoStackRef.current.length>50)undoStackRef.current.shift();
@@ -1382,23 +863,9 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
   const handleTouchEnd=()=>{handleMouseUp();lastTouchDist.current=null;};
 
   const finalizeCalib=(mm,manualPpm)=>{
-    const useDb=databaseMode&&databaseImages.length>0&&!reproCollecting;
-    if(useDb){
-      const currentDbImg=databaseImages[currentImageIndex];
-      const currentMarkups=currentDbImg?.markups||[];
-      if(manualPpm){
-        updateDatabaseImage(currentImageIndex,{calibration:{done:true,pxPerMm:manualPpm,knownMm:mm}});
-        dispatch({type:"SET",payload:{showCalib:false}});
-        return;
-      }
-      const ruler=pendingRuler||currentMarkups.find(m=>m.type==="ruler");if(!ruler)return;const vp=vpts(ruler);if(vp.length<2)return;
-      updateDatabaseImage(currentImageIndex,{calibration:{done:true,pxPerMm:dist(vp[0],vp[1])/mm,knownMm:mm}});
-      dispatch({type:"SET",payload:{showCalib:false}});
-      return;
-    }
-    if(manualPpm){updVer({calibration:{done:true,pxPerMm:manualPpm,knownMm:mm}});dispatch({type:"SET",payload:{showCalib:false}});return;}
+    if(manualPpm){updSession({calibration:{done:true,pxPerMm:manualPpm,knownMm:mm}});dispatch({type:"SET",payload:{showCalib:false}});return;}
     const ruler=pendingRuler||markups.find(m=>m.type==="ruler");if(!ruler)return;const vp=vpts(ruler);if(vp.length<2)return;
-    updVer({calibration:{done:true,pxPerMm:dist(vp[0],vp[1])/mm,knownMm:mm}});dispatch({type:"SET",payload:{showCalib:false}});
+    updSession({calibration:{done:true,pxPerMm:dist(vp[0],vp[1])/mm,knownMm:mm}});dispatch({type:"SET",payload:{showCalib:false}});
   };
 
   const loadTemplate=(analysis)=>{
@@ -1409,7 +876,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       pointIds[pt.l]=id;
       newMarkups.push({id,type:"point",points:[{x:-99999,y:-99999}],label:pt.l,definition:pt.def,color:pt.color,size:6,visible:true,placed:false});
     });
-    updVer({markups:[...markups,...newMarkups],analysisTemplate:analysis.name});
+    updSession({markups:[...markups,...newMarkups],analysisTemplate:analysis.name});
     setPlacingQueue(newMarkups.map(m=>m.id));dispatch({type:"SET",payload:{placingIdx:0}});dispatch({type:"SET",payload:{placingMode:true}});dispatch({type:"SET",payload:{rightPanel:"markups"}});
   };
 
@@ -1551,12 +1018,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
         <div style={{width:1,height:20,background:t.bdr,flexShrink:0}}/>
         <Tag color={t.acc}>{project.projection?.toUpperCase()}</Tag>
         {project.meta?.anonymized&&<Tag color={t.ok}>🔒 Anon</Tag>}
-        {calibration.done&&!databaseMode&&<Tag color={t.ok}>⟺ {calibration.pxPerMm.toFixed(2)}px/mm</Tag>}
-        {databaseMode&&<div style={{display:"flex",alignItems:"center",gap:4}}>
-          <button onClick={()=>navigateImage("prev")} disabled={currentImageIndex===0} title="Previous image" style={{background:"none",border:`1px solid ${t.bdr}`,borderRadius:4,padding:"2px 8px",cursor:currentImageIndex===0?"not-allowed":"pointer",color:currentImageIndex===0?t.tx3:t.tx}}>◀</button>
-          <span style={{fontSize:11,fontFamily:"'DM Mono',monospace",color:t.acc}}>{currentImageIndex+1} / {databaseImages.length}</span>
-          <button onClick={()=>navigateImage("next")} disabled={currentImageIndex>=databaseImages.length-1} title="Next image" style={{background:"none",border:`1px solid ${t.bdr}`,borderRadius:4,padding:"2px 8px",cursor:currentImageIndex>=databaseImages.length-1?"not-allowed":"pointer",color:currentImageIndex>=databaseImages.length-1?t.tx3:t.tx}}>▶</button>
-        </div>}
+        {calibration.done&&<Tag color={t.ok}>⟺ {calibration.pxPerMm.toFixed(2)}px/mm</Tag>}
         {placingMode&&<Tag color={t.warn}>📍 {placingIdx+1}/{placingQueue.length}</Tag>}
         <div style={{flex:1}}/>
         {!isMobile&&<>
@@ -1573,7 +1035,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
             <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M338-241q16 0 23-10.5t9-24.5q2-10 3.5-20t3.5-22q2-11 4.5-24t5.5-30q23-5 45-8.5t43-5.5q23-3 45.5-4.5T564-394q5 24 10.5 43t11.5 36q8 23 17.5 38t23.5 26q14 11 30.5 12t28.5-9q9-7 9-21t-8-35q-5-11-8.5-22.5T670-350q-5-14-9-25.5t-7-22.5q13-1 23.5-4.5T695-412q7-6 10.5-14.5T709-445q0-11-4.5-18.5T691-476q-9-5-22.5-6.5t-30.5.5q-2-18-4-35.5t-5-35.5q-3-17-5.5-35t-7.5-35q-6-26-17-44.5T574-698q-13-11-28.5-16.5T511-720q-22 0-42 9t-40 27q-11 11-22 23.5T386-631q-8-6-14.5-8t-14.5-2q-11 0-18.5 6t-7.5 20q0 18-2 36t-6 36q-5 26-11 51.5T301-440q-11 2-19.5 5.5T267-427q-8 5-11.5 12.5T252-399q0 7 2 13t7 11q5 5 12 7.5t16 3.5q-1 12-1.5 22.5T287-321q0 21 3 36t9 25q6 10 15.5 14.5T338-241Zm71-223q6-23 14-44.5t18-44.5q16-37 34-59t32-22q11 0 19 17t13 51q3 20 5 43t4 43q-17 1-35 2.5t-35 3.5q-17 2-34.5 4.5T409-464ZM160-80q-33 0-56.5-23.5T80-160v-640q0-33 23.5-56.5T160-880h640q33 0 56.5 23.5T880-800v640q0 33-23.5 56.5T800-80H160Zm0-80h640v-640H160v640Zm0 0v-640 640Z"/></svg>
           </Btn>
           {showAnnotations&&<input type="range" min="0.5" max="2" step="0.1" value={annotationSize} onChange={e=>dispatch({type:"SET",payload:{annotationSize:+e.target.value}})} style={{width:60,marginLeft:4,accentColor:t.acc}} title={`Annotation size: ${annotationSize.toFixed(1)}`}/>}
-          {verImages.length>1&&<Btn ghost t={t} small active={showDisplacement} title="Toggle displacement vectors" onClick={()=>dispatch({type:"SET",payload:{showDisplacement:!showDisplacement}})}>⇝ Vec</Btn>}
+          {sessionImage.length>1&&<Btn ghost t={t} small active={showDisplacement} title="Toggle displacement vectors" onClick={()=>dispatch({type:"SET",payload:{showDisplacement:!showDisplacement}})}>⇝ Vec</Btn>}
           <div style={{width:1,height:20,background:t.bdr}}/>
         </>}
         <Btn ghost t={t} small title="Open image" onClick={()=>openImgRef.current?.click()}>
@@ -1591,17 +1053,10 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
             <path d="M840-680v480q0 33-23.5 56.5T760-120H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h480l160 160Zm-80 34L646-760H200v560h560v-446ZM565-275q35-35 35-85t-35-85q-35-35-85-35t-85 35q-35 35-35 85t35 85q35 35 85 35t85-35ZM240-560h360v-160H240v160Zm-40-86v446-560 114Z"/>
           </svg>
         </Btn>
-        {!isMobile&&<div style={{display:"flex",alignItems:"center",gap:6}}>
-          <Btn ghost t={t} small title="Database" onClick={()=>dispatch({type:"SET",payload:{showDatabaseImport:true}})}>
+        {!isMobile&&<Btn ghost t={t} small title="Session Manager" onClick={()=>dispatch({type:"SET",payload:{rightPanel:"versions"}})}>
             <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}>
             <path d="M480-120q-151 0-255.5-46.5T120-280v-400q0-66 105.5-113T480-840q149 0 254.5 47T840-680v400q0 67-104.5 113.5T480-120Zm0-479q89 0 179-25.5T760-679q-11-29-100.5-55T480-760q-91 0-178.5 25.5T200-679q14 30 101.5 55T480-599Zm0 199q42 0 81-4t74.5-11.5q35.5-7.5 67-18.5t57.5-25v-120q-26 14-57.5 25t-67 18.5Q600-528 561-524t-81 4q-42 0-82-4t-75.5-11.5Q287-543 256-554t-56-25v120q25 14 56 25t66.5 18.5Q358-408 398-404t82 4Zm0 200q46 0 93.5-7t87.5-18.5q40-11.5 67-26t32-29.5v-98q-26 14-57.5 25t-67 18.5Q600-328 561-324t-81 4q-42 0-82-4t-75.5-11.5Q287-343 256-354t-56-25v99q5 15 31.5 29t66.5 25.5q40 11.5 88 18.5t94 7Z"/></svg>
-          </Btn>
-          <button onClick={()=>{if(!databaseMode&&databaseImages.length===0)dispatch({type:"SET",payload:{showDatabaseImport:true}});else if(databaseMode){if(!window.confirm("Turn off Database Mode? This will clear all imported database images."))return;dispatch({type:"SET",payload:{databaseMode:false}});dispatch({type:"SET",payload:{databaseImages:[]}});dispatch({type:"SET",payload:{currentImageIndex:0}});}}} title={databaseImages.length===0?"Import images first":"Toggle Database Mode"} style={{background:"none",border:"none",cursor:databaseImages.length===0?"not-allowed":"pointer",padding:4,display:"flex",alignItems:"center",opacity:databaseImages.length===0?0.5:1}}>
-            <div style={{width:36,height:20,borderRadius:10,background:databaseMode?t.acc:t.surf3,border:`1px solid ${databaseMode?t.acc:t.bdr}`,position:"relative",transition:"all 0.2s"}}>
-              <div style={{width:16,height:16,borderRadius:8,background:databaseMode?(t.id==="light"?"#fff":t.bg):t.tx,position:"absolute",top:1,left:databaseMode?18:2,transition:"all 0.2s",boxShadow:"0 1px 3px rgba(0,0,0,3)"}}/>
-            </div>
-          </button>
-        </div>}
+          </Btn>}
         {!isMobile&&<Btn ghost t={t} small title="Export" onClick={()=>dispatch({type:"SET",payload:{showExport:true}})}>
           <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M160-80v-80h640v80H160Zm320-160L200-600h160v-280h240v280h160L480-240Zm0-130 116-150h-76v-280h-80v280h-76l116 150Zm0-150Z"/></svg>
           </Btn>}
@@ -1668,7 +1123,7 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
               </div>
               {/* Row 8b: Spotlight mode */}
               <div style={{display:"flex",justifyContent:"center"}}>
-                <button onClick={()=>{const next=!spotlightMode;dispatch({type:"SET",payload:{spotlightMode:next}});if(databaseMode){setDatabaseImages(prev=>prev.map(img=>{if(next){return{...img,opacityBeforeSpotlight:img.opacity||1,opacity:0.5};}return{...img,opacity:img.opacityBeforeSpotlight||1};}));}else if(verImages.length>0){const imgs=verImages.map(img=>{if(next){return{...img,opacityBeforeSpotlight:img.opacity||1,opacity:0.5};}return{...img,opacity:img.opacityBeforeSpotlight||1};});updVer({images:imgs});}}} title="Spotlight (reduce image opacity)" style={{width:42,height:42,borderRadius:8,border:"none",background:spotlightMode?t.acc:t.surf2,color:spotlightMode?(theme==="light"?"#fff":t.bg):t.tx,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:spotlightMode?`0 0 0 2px ${t.acc}`:"none"}}>💡</button>
+                <button onClick={()=>{const next=!spotlightMode;dispatch({type:"SET",payload:{spotlightMode:next}});if(sessionImage.length>0){const img=sessionImage[0];const upd=next?{...img,opacityBeforeSpotlight:img.opacity||1,opacity:0.5}:{...img,opacity:img.opacityBeforeSpotlight||1};updSession({image:upd});}}} title="Spotlight (reduce image opacity)" style={{width:42,height:42,borderRadius:8,border:"none",background:spotlightMode?t.acc:t.surf2,color:spotlightMode?(theme==="light"?"#fff":t.bg):t.tx,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:spotlightMode?`0 0 0 2px ${t.acc}`:"none"}}>💡</button>
               </div>
               {/* Separator */}
               <div style={{width:"100%",height:1,background:t.bdr,margin:"4px 0"}}/>
@@ -1774,45 +1229,14 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
               <div style={{flex:1,overflowY:"auto",scrollbarWidth:"none"}}>
                 <style>{`.panel-scroll::-webkit-scrollbar{display:none}`}</style>
                 <div className="panel-scroll">
-                  {rightPanel==="markups"&&(databaseMode?
-                    <MarkupsPanel 
-                      markups={databaseImages[currentImageIndex]?.markups||[]} 
-                      t={t} 
-                      theme={theme} 
-                      selectedId={selectedId} 
-                      onSelect={setSelectedId} 
-                      onDelete={(id)=>{const newMarkups=(databaseImages[currentImageIndex]?.markups||[]).filter(m=>m.id!==id);updateDatabaseImage(currentImageIndex,{markups:newMarkups});if(selectedId===id)dispatch({type:"SET",payload:{selectedId:null}});}} 
-                      onToggleVisible={(id)=>{const m=(databaseImages[currentImageIndex]?.markups||[]).find(m=>m.id===id);if(m)updateDatabaseImage(currentImageIndex,{markups:(databaseImages[currentImageIndex]?.markups||[]).map(mm=>mm.id===id?{...mm,visible:mm.visible===false}:mm)});}} 
-                      onToggleLock={(id)=>{const m=(databaseImages[currentImageIndex]?.markups||[]).find(m=>m.id===id);if(m)updateDatabaseImage(currentImageIndex,{markups:(databaseImages[currentImageIndex]?.markups||[]).map(mm=>mm.id===id?{...mm,locked:!m.locked}:mm)});}} 
-                      calibration={databaseImages[currentImageIndex]?.calibration||{done:false,pxPerMm:1}} 
-                      placingMode={false} placingQueue={[]} placingIdx={0} 
-                      onStopPlacing={()=>{}} onPausePlacing={()=>{}} onResumePlacing={()=>{}} 
-                      onClear={()=>updateDatabaseImage(currentImageIndex,{markups:[]})} 
-                      onAddPoint={()=>{dispatch({type:"SET",payload:{activeTool:"point"}});dispatch({type:"SET",payload:{currentDraw:null}});}} 
-                      norms={[]} 
-                      formatAngle={formatAngle} 
-                      angleMode={angleMode} 
-                      setAngleMode={setAngleMode}
-                    />
-                    :<MarkupsPanel markups={markups} t={t} theme={theme} selectedId={selectedId} onSelect={setSelectedId} onDelete={delMarkup} onToggleVisible={id=>updMarkup(id,{visible:markups.find(m=>m.id===id)?.visible===false})} onToggleLock={id=>updMarkup(id,{locked:!markups.find(m=>m.id===id)?.locked})} onToggleLabel={id=>updMarkup(id,{noLabel:!markups.find(m=>m.id===id)?.noLabel})} calibration={calibration} placingMode={placingMode} placingQueue={placingQueue} placingIdx={placingIdx} onStopPlacing={()=>{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}} onPausePlacing={()=>{dispatch({type:"SET",payload:{placingMode:false}});}} onResumePlacing={()=>{dispatch({type:"SET",payload:{placingMode:true}});}} onClear={()=>updVer({markups:[]})} onAddPoint={()=>{dispatch({type:"SET",payload:{activeTool:"point"}});dispatch({type:"SET",payload:{currentDraw:null}});}} norms={norms} formatAngle={formatAngle} angleMode={angleMode} setAngleMode={setAngleMode} onReplace={(type,id)=>{if(replacingId===id){dispatch({type:"SET",payload:{replacingId:null}});dispatch({type:"SET",payload:{activeTool:"select"}});}else{dispatch({type:"SET",payload:{replacingId:id}});dispatch({type:"SET",payload:{activeTool:type}});}dispatch({type:"SET",payload:{currentDraw:null}});}} replacingId={replacingId}/>)}
-                  {rightPanel==="measurements"&&(databaseMode?
-                    <MeasurementsPanel 
-                      allMeas={(databaseImages[currentImageIndex]?.markups||[]).map(m=>({m,meas:computeMeasurements(m,databaseImages[currentImageIndex]?.calibration||{done:false,pxPerMm:1})})).filter(x=>Object.keys(x.meas).length>0)} 
-                      t={t} 
-                      calibration={databaseImages[currentImageIndex]?.calibration||{done:false,pxPerMm:1}} 
-                      norms={[]} 
-                      onUpdateNorms={()=>{}} 
-                      onExportCSV={()=>{}} 
-                      onOpenCalib={()=>dispatch({type:"SET",payload:{showCalib:true}})} 
-                      formatAngle={formatAngle}
-                    />
-                    :<MeasurementsPanel allMeas={allMeas} t={t} calibration={calibration} norms={norms} onUpdateNorms={ns=>updVer({norms:ns})} onExportCSV={exportCSV} onOpenCalib={()=>dispatch({type:"SET",payload:{showCalib:true}})} formatAngle={formatAngle}/>)}
-                  {rightPanel==="formulas"&&<FormulasPanel formulas={formulas} t={t} scope={measScope} onAdd={()=>{dispatch({type:"SET",payload:{editFormulaId:null}});dispatch({type:"SET",payload:{showFormulaEditor:true}});}} onEdit={id=>{dispatch({type:"SET",payload:{editFormulaId:id}});dispatch({type:"SET",payload:{showFormulaEditor:true}});}} onDelete={id=>updVer({formulas:formulas.filter(f=>f.id!==id)})}/>}
-                  {rightPanel==="image"&&<ImagePanel t={t} processing={processing} setProcessing={p=>updVer({processing:p})} lutMode={lutMode} setLutMode={m=>updVer({lutMode:m})} lutInvert={lutInvert} setLutInvert={v=>updVer({lutInvert:v})} showLUT={showLUT} setShowLUT={setShowLUT} showScaleBar={showScaleBar} setShowScaleBar={setShowScaleBar} calibration={calibration} onOpenCalib={()=>dispatch({type:"SET",payload:{showCalib:true}})} onReset={()=>updVer({processing:{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},lutMode:"gray",lutInvert:false})} onShowHist={()=>setShowHistogram(v=>!v)} showHistogram={showHistogram}/>}
-                  {rightPanel==="layers"&&<LayersPanel t={t} images={verImages} onUpdateImages={imgs=>updVer({images:imgs})} onAddImage={e=>{if(e.target.files[0])loadImage(e.target.files[0],true);}} onShowAlign={()=>dispatch({type:"SET",payload:{showAlign:true}})} onShowTransform={()=>dispatch({type:"SET",payload:{showTransform:true}})}/>}
-                  {rightPanel==="versions"&&<VersionsPanel project={project} t={t} onUpdateProject={onUpdateProject} onUpdateVersion={onUpdateVersion} onExportTemplate={v=>exportCepht({name:`${project.name}`,projection:project.projection,markups:v.markups||[],formulas:v.formulas||[],norms:v.norms||[]})} showDisplacement={showDisplacement} setShowDisplacement={setShowDisplacement} compareVersionId={compareVersionId} setCompareVersionId={setCompareVersionId} displacementOverlay={displacementOverlay} setDisplacementOverlay={setDisplacementOverlay} refLandmark1={refLandmark1} setRefLandmark1={setRefLandmark1} refLandmark2={refLandmark2} setRefLandmark2={setRefLandmark2} overlayBlend={overlayBlend} setOverlayBlend={setOverlayBlend} calibration={calibration} formatAngle={formatAngle} onShowAlign={()=>dispatch({type:"SET",payload:{showAlign:true}})}/>}
-                  {rightPanel==="reproducibility"&&<ReproducibilityPanel t={t} markups={markups} studies={reproStudies} onUpdateStudies={setReproStudies} activeStudyId={activeStudyId} setActiveStudyId={setActiveStudyId} reproCollecting={reproCollecting} setReproCollecting={setReproCollecting}/>}
-                  {rightPanel==="statistics"&&<StatisticsPanel t={t} studies={reproStudies} databaseMode={databaseMode} databaseImages={databaseImages} formatAngle={formatAngle}/>}
+                  {rightPanel==="markups"&&<MarkupsPanel markups={markups} t={t} theme={theme} selectedId={selectedId} onSelect={setSelectedId} onDelete={delMarkup} onToggleVisible={id=>updMarkup(id,{visible:markups.find(m=>m.id===id)?.visible===false})} onToggleLock={id=>updMarkup(id,{locked:!markups.find(m=>m.id===id)?.locked})} onToggleLabel={id=>updMarkup(id,{noLabel:!markups.find(m=>m.id===id)?.noLabel})} calibration={calibration} placingMode={placingMode} placingQueue={placingQueue} placingIdx={placingIdx} onStopPlacing={()=>{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}} onPausePlacing={()=>{dispatch({type:"SET",payload:{placingMode:false}});}} onResumePlacing={()=>{dispatch({type:"SET",payload:{placingMode:true}});}} onClear={()=>updSession({markups:[]})} onAddPoint={()=>{dispatch({type:"SET",payload:{activeTool:"point"}});dispatch({type:"SET",payload:{currentDraw:null}});}} norms={norms} formatAngle={formatAngle} angleMode={angleMode} setAngleMode={setAngleMode} onReplace={(type,id)=>{if(replacingId===id){dispatch({type:"SET",payload:{replacingId:null}});dispatch({type:"SET",payload:{activeTool:"select"}});}else{dispatch({type:"SET",payload:{replacingId:id}});dispatch({type:"SET",payload:{activeTool:type}});}dispatch({type:"SET",payload:{currentDraw:null}});}} replacingId={replacingId}/>}
+                  {rightPanel==="measurements"&&<MeasurementsPanel allMeas={allMeas} t={t} calibration={calibration} norms={norms} onUpdateNorms={ns=>updSession({norms:ns})} onExportCSV={exportCSV} onOpenCalib={()=>dispatch({type:"SET",payload:{showCalib:true}})} formatAngle={formatAngle}/>}
+                  {rightPanel==="formulas"&&<FormulasPanel formulas={formulas} t={t} scope={measScope} onAdd={()=>{dispatch({type:"SET",payload:{editFormulaId:null}});dispatch({type:"SET",payload:{showFormulaEditor:true}});}} onEdit={id=>{dispatch({type:"SET",payload:{editFormulaId:id}});dispatch({type:"SET",payload:{showFormulaEditor:true}});}} onDelete={id=>updSession({formulas:formulas.filter(f=>f.id!==id)})}/>}
+                  {rightPanel==="image"&&<ImagePanel t={t} processing={processing} setProcessing={p=>updSession({processing:p})} lutMode={lutMode} setLutMode={m=>updSession({lutMode:m})} lutInvert={lutInvert} setLutInvert={v=>updSession({lutInvert:v})} showLUT={showLUT} setShowLUT={setShowLUT} showScaleBar={showScaleBar} setShowScaleBar={setShowScaleBar} calibration={calibration} onOpenCalib={()=>dispatch({type:"SET",payload:{showCalib:true}})} onReset={()=>updSession({processing:{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},lutMode:"gray",lutInvert:false})} onShowHist={()=>setShowHistogram(v=>!v)} showHistogram={showHistogram}/>}
+                  {rightPanel==="layers"&&<ImagePanel t={t} processing={processing} setProcessing={p=>updSession({processing:p})} lutMode={lutMode} setLutMode={m=>updSession({lutMode:m})} lutInvert={lutInvert} setLutInvert={v=>updSession({lutInvert:v})} showLUT={showLUT} setShowLUT={setShowLUT} showScaleBar={showScaleBar} setShowScaleBar={setShowScaleBar} calibration={calibration} onOpenCalib={()=>dispatch({type:"SET",payload:{showCalib:true}})} onReset={()=>updSession({processing:{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},lutMode:"gray",lutInvert:false})} onShowHist={()=>setShowHistogram(v=>!v)} showHistogram={showHistogram}/>}
+                  {rightPanel==="versions"&&<SessionsPanel project={project} t={t} onUpdateProject={onUpdateProject} activeSession={activeSession} setActiveSession={id=>onUpdateProject({...project,activeSessionId:id})} onExportTemplate={v=>exportCepht({name:`${project.name}`,projection:project.projection,markups:v.markups||[],formulas:v.formulas||[],norms:v.norms||[]})} showDisplacement={showDisplacement} setShowDisplacement={setShowDisplacement} displacementOverlay={displacementOverlay} setDisplacementOverlay={setDisplacementOverlay} refLandmark1={refLandmark1} setRefLandmark1={setRefLandmark1} refLandmark2={refLandmark2} setRefLandmark2={setRefLandmark2} overlayBlend={overlayBlend} setOverlayBlend={setOverlayBlend} calibration={calibration} formatAngle={formatAngle}/>}
+                  {rightPanel==="reproducibility"&&<ReproStudiesPanel t={t} project={project} onUpdateProject={onUpdateProject} activeSession={activeSession}/>}
+                  {rightPanel==="statistics"&&<StatisticsPanel t={t}/>}
                   {rightPanel==="interpretation"&&<InterpretationPanel allMeas={allMeas} norms={norms} t={t} formatAngle={formatAngle}/>}
                   {rightPanel==="silhouettes"&&<SilhouettesPanel t={t} onInsert={(silhouetteType) => {
                     try {
@@ -1838,16 +1262,20 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
                     } catch(e) { console.error("Silhouette insert error:", e); }
                   }}/>}
                   {rightPanel==="templates"&&<TemplatesPanel t={t} projection={project.projection} onLoadTemplate={loadTemplate} onImportCepht={data=>{
-          if(data.markups){
-            const newMarkups=data.markups.map(m=>({...m,id:uid(),placed:false,points:m.type==="silhouette"?m.points:[{x:-99999,y:-99999}]}));
-            updVer({markups:[...markups,...newMarkups],formulas:[...formulas,...(data.formulas||[])],norms:[...(project.versions[0]?.norms||[]),...(data.norms||[])],analysisTemplate:data.name||"Imported"});
-            setPlacingQueue(newMarkups.map(m=>m.id));dispatch({type:"SET",payload:{placingIdx:0}});dispatch({type:"SET",payload:{placingMode:true}});dispatch({type:"SET",payload:{rightPanel:"markups"}});
-          }
+          const err=validateCepht(data);if(err){alert(err);return;}
+          const hasCoords=data.version==="2.0"&&hasPlacedCoords(data.markups);
+          const newMarkups=data.markups.map(m=>{
+            const base={...m,id:uid(),definition:m.definition||m.def||"",visible:m.visible!==false};
+            if(hasCoords)return{...base,placed:m.placed!==false,points:m.points||[{x:-99999,y:-99999}]};
+            return{...base,placed:false,points:m.type==="silhouette"?m.points:[{x:-99999,y:-99999}]};
+          });
+          updSession({markups:[...markups,...newMarkups],formulas:[...formulas,...(data.formulas||[])],norms:[...norms,...(data.norms||[])],analysisTemplate:data.name||"Imported"});
+          if(!hasCoords){setPlacingQueue(newMarkups.filter(m=>!m.placed).map(m=>m.id));dispatch({type:"SET",payload:{placingIdx:0,placingMode:true,rightPanel:"markups"}});}
         }        }/>}
                 </div>
               </div>
               {selectedMarkup&&<div style={{borderTop:`1px solid ${t.bdr}`,padding:12,flexShrink:0,maxHeight:isMobile?180:260,overflowY:"auto",scrollbarWidth:"none"}}>
-                <MarkupProps m={selectedMarkup} t={t} theme={theme} onUpdate={p=>updMarkup(selectedMarkup.id,p)} onDelete={()=>delMarkup(selectedMarkup.id)} calibration={calibration} onParallel={()=>dispatch({type:"SET",payload:{activeTool:"parallel"}})} formatAngle={formatAngle} norms={norms} onUpdateNorms={ns=>updVer({norms:ns})}/>
+                <MarkupProps m={selectedMarkup} t={t} theme={theme} onUpdate={p=>updMarkup(selectedMarkup.id,p)} onDelete={()=>delMarkup(selectedMarkup.id)} calibration={calibration} onParallel={()=>dispatch({type:"SET",payload:{activeTool:"parallel"}})} formatAngle={formatAngle} norms={norms} onUpdateNorms={ns=>updSession({norms:ns})}/>
               </div>}
             </div>
             {/* Resize handle */}
@@ -1857,16 +1285,14 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
       </div>
 
       {/* MODALS */}
-      {showDatabaseImport&&<Modal t={t} title="Database Mode - Import Images" onClose={()=>dispatch({type:"SET",payload:{showDatabaseImport:false}})}><DatabaseImportModal t={t} onImport={loadDatabaseImages} onClose={()=>dispatch({type:"SET",payload:{showDatabaseImport:false}})}/></Modal>}
       {showCalib&&<Modal t={t} title="Calibration" onClose={()=>dispatch({type:"SET",payload:{showCalib:false}})}><CalibModal t={t} calibration={calibration} onFinish={finalizeCalib}/></Modal>}
-      {showExport&&<Modal t={t} title="Export" onClose={()=>dispatch({type:"SET",payload:{showExport:false}})}><div style={{display:"flex",flexDirection:"column",gap:10}}><Btn t={t} onClick={()=>{exportCSV();dispatch({type:"SET",payload:{showExport:false}});}}>Measurements CSV</Btn><Btn t={t} onClick={()=>{onSave?.(project);dispatch({type:"SET",payload:{showExport:false}});}}>Full Project .cephx</Btn><Btn t={t} onClick={()=>{const name=window.prompt("Template name:",project.name+" Template");if(name){exportTemplateAsCepht(project,name);dispatch({type:"SET",payload:{showExport:false}});}}}>Template .cepht</Btn></div></Modal>}
+      {showExport&&<Modal t={t} title="Export" onClose={()=>dispatch({type:"SET",payload:{showExport:false}})}><div style={{display:"flex",flexDirection:"column",gap:10}}><Btn t={t} onClick={()=>{exportCSV();dispatch({type:"SET",payload:{showExport:false}});}}>Measurements CSV</Btn><Btn t={t} onClick={()=>{onSave?.(project);dispatch({type:"SET",payload:{showExport:false}});}}>Full Project .cephx</Btn><Btn t={t} onClick={()=>{const name=window.prompt("Template name:",project.name);if(name){exportTemplateAsCepht(project,name);dispatch({type:"SET",payload:{showExport:false}});}}}>Template .cepht (definitions only)</Btn><Btn t={t} onClick={()=>{const name=window.prompt("Template name:",project.name+" (placed)");if(name){exportTemplateAsCepht(project,name,true);dispatch({type:"SET",payload:{showExport:false}});}}}>Template .cepht (with placements)</Btn></div></Modal>}
       {pendingTextPos&&<Modal t={t} title="Text Annotation" onClose={()=>dispatch({type:"SET",payload:{pendingTextPos:null}})}><TextModal t={t} defaultColor="#fbbf24" onConfirm={(txt,opts)=>{addMarkup({type:"text",points:[pendingTextPos],text:txt,...opts});dispatch({type:"SET",payload:{pendingTextPos:null}});}} onCancel={()=>dispatch({type:"SET",payload:{pendingTextPos:null}})}/></Modal>}
       {showAnon&&<Modal t={t} title="Anonymization" onClose={()=>dispatch({type:"SET",payload:{showAnon:false}})}><AnonModal t={t} project={project} onUpdateProject={onUpdateProject} onClose={()=>dispatch({type:"SET",payload:{showAnon:false}})}/></Modal>}
       {showNormogram&&<Modal t={t} title="Cephalometric Normogram" wide onClose={()=>dispatch({type:"SET",payload:{showNormogram:false}})}><NormogramPanel allMeas={allMeas} norms={norms} t={t} formatAngle={formatAngle}/></Modal>}
-      {showAlign&&<Modal t={t} title="Point-Based Alignment" onClose={()=>dispatch({type:"SET",payload:{showAlign:false}})}><AlignModal t={t} markups={markups} images={verImages} onUpdateImages={imgs=>updVer({images:imgs})} onClose={()=>dispatch({type:"SET",payload:{showAlign:false}})}/></Modal>}
-      {showTransform&&<Modal t={t} title="Image Transform" onClose={()=>dispatch({type:"SET",payload:{showTransform:false}})}><TransformModal t={t} images={verImages} onUpdateImages={imgs=>updVer({images:imgs})} onClose={()=>dispatch({type:"SET",payload:{showTransform:false}})}/></Modal>}
-      {showFormulaEditor&&<Modal t={t} title={editFormulaId?"Edit Formula":"New Formula"} onClose={()=>dispatch({type:"SET",payload:{showFormulaEditor:false}})}><FormulaEditor t={t} formula={editFormulaId?formulas.find(f=>f.id===editFormulaId):null} scope={measScope} onSave={f=>{const newFs=editFormulaId?formulas.map(x=>x.id===editFormulaId?f:x):[...formulas,f];updVer({formulas:newFs});dispatch({type:"SET",payload:{showFormulaEditor:false}});}} onClose={()=>dispatch({type:"SET",payload:{showFormulaEditor:false}})}/></Modal>}
-      {showHistogram&&<FloatingHistogram hist={computeHistogram(verImages[0]?imgRefs.current[verImages[0].id]:null)} t={t} lutMode={lutMode} lutInvert={lutInvert} processing={processing} onProcessingChange={p=>updVer({processing:p})} onClose={()=>dispatch({type:"SET",payload:{showHistogram:false}})}/>}
+
+      {showFormulaEditor&&<Modal t={t} title={editFormulaId?"Edit Formula":"New Formula"} onClose={()=>dispatch({type:"SET",payload:{showFormulaEditor:false}})}><FormulaEditor t={t} formula={editFormulaId?formulas.find(f=>f.id===editFormulaId):null} scope={measScope} onSave={f=>{const newFs=editFormulaId?formulas.map(x=>x.id===editFormulaId?f:x):[...formulas,f];updSession({formulas:newFs});dispatch({type:"SET",payload:{showFormulaEditor:false}});}} onClose={()=>dispatch({type:"SET",payload:{showFormulaEditor:false}})}/></Modal>}
+      {showHistogram&&<FloatingHistogram hist={computeHistogram(sessionImage[0]?imgRefs.current[sessionImage[0].id]:null)} t={t} lutMode={lutMode} lutInvert={lutInvert} processing={processing} onProcessingChange={p=>updSession({processing:p})} onClose={()=>dispatch({type:"SET",payload:{showHistogram:false}})}/>}
     </div>
   );
 }
@@ -1874,1191 +1300,6 @@ function Workspace({project,onUpdateProject,onUpdateVersion,onHome,t,theme,setTh
 
 
 
-
-function reproAllLabels(study){
-  const labels=new Set();
-  study.operators.forEach(op=>{(op.trials||[]).forEach(tr=>{(tr.measurements||[]).forEach(m=>{if(m.label)labels.add(m.label);});});});
-  return[...labels].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
-}
-
-function reproIccMatrix(study,metric){
-  if(study.type==="intra"){
-    const op=study.operators[0];
-    if(!op)return null;
-    const trials=(op.trials||[]).filter(tr=>tr.measurements?.length);
-    const labels=reproAllLabels(study);
-    if(trials.length<2||labels.length<1)return null;
-    const rows=trials.map(tr=>labels.map(lab=>{
-      const m=(tr.measurements||[]).find(x=>x.label===lab);
-      return m?metric==="x"?m.x:m.y:NaN;
-    }));
-    if(rows.some(r=>r.some(Number.isNaN)))return null;
-    return rows;
-  }
-  const labels=reproAllLabels(study);
-  if(labels.length<1)return null;
-  const rows=study.operators.map(op=>{
-    const tr=op.trials?.[0];
-    return labels.map(lab=>{
-      const m=(tr?.measurements||[]).find(x=>x.label===lab);
-      return m?metric==="x"?m.x:m.y:NaN;
-    });
-  });
-  if(rows.length<2||rows.some(r=>r.some(Number.isNaN)))return null;
-  return rows;
-}
-
-function reproPairedVectors(study,metric,sessionA,sessionB){
-  const labels=reproAllLabels(study);
-  if(labels.length<1)return{vals1:[],vals2:[]};
-  const pick=(op,trialIdx,lab)=>{
-    const tr=op.trials?.[trialIdx];
-    const m=(tr?.measurements||[]).find(x=>x.label===lab);
-    return m?metric==="x"?m.x:m.y:null;
-  };
-  if(study.type==="intra"){
-    const op=study.operators[0];
-    const vals1=[],vals2=[];
-    labels.forEach(lab=>{
-      const a=pick(op,sessionA,lab),b=pick(op,sessionB,lab);
-      if(a!==null&&b!==null){vals1.push(a);vals2.push(b);}
-    });
-    return{vals1,vals2};
-  }
-  const opA=study.operators[sessionA],opB=study.operators[sessionB];
-  const vals1=[],vals2=[];
-  labels.forEach(lab=>{
-    const a=pick(opA,0,lab),b=pick(opB,0,lab);
-    if(a!==null&&b!==null){vals1.push(a);vals2.push(b);}
-  });
-  return{vals1,vals2};
-}
-
-function exportCsv(type, opts){
-  const {study,metric,descriptive,perLandmark,biases,icc,iccCI,dahl,bland,tTest,anovaRes,sem,mdc} = opts||{};
-  let rows=[], filename="export.csv";
-  if(type==="reproTables"){
-    rows=[["study","design","operator","session_index","landmark","x_px","y_px","timestamp"]];
-    study.operators.forEach((op,oi)=>{
-      (op.trials||[]).forEach((tr,ti)=>{
-        (tr.measurements||[]).forEach(m=>{
-          rows.push([study.name,study.type,op.name||`Operator_${oi+1}`,ti+1,m.label,m.x,m.y,m.timestamp||""]);
-        });
-      });
-    });
-    filename=`${String(study.name).replace(/\s+/g,"_")}_reproducibility.csv`;
-  }else if(type==="descriptive"){
-    rows=[["Landmark","n","Mean","SD","Median","CV%","Min","Max"]];
-    descriptive.forEach(r=>{rows.push([r.lab,r.n,r.mean!==null?r.mean.toFixed(4):"",r.sd!==null?r.sd.toFixed(4):"",r.median!==null?r.median.toFixed(4):"",r.cv!==null?r.cv.toFixed(4):"",r.min!==null?r.min.toFixed(2):"",r.max!==null?r.max.toFixed(2):""]);});
-    filename=`${String(study.name).replace(/\s+/g,"_")}_descriptive.csv`;
-  }else if(type==="errorMetrics"){
-    rows=[["Landmark","n","Mean_Diff","SD_Diff","Dahlberg","Abs_Mean","CV%"]];
-    perLandmark.forEach(r=>{rows.push([r.lab,r.n,r.meanDiff.toFixed(4),r.sdDiff.toFixed(4),r.dahlberg.toFixed(4),r.absMean.toFixed(4),r.cv!==null?r.cv.toFixed(4):""]);});
-    filename="error_metrics.csv";
-  }else if(type==="fullReport"){
-    rows.push(["CephaloStudio Statistical Report"]);
-    rows.push(["Study",study.name]);
-    rows.push(["Design",study.type==="intra"?"Intra-operator":"Inter-operator"]);
-    rows.push(["Metric",metric.toUpperCase()]);
-    rows.push(["Date",new Date().toISOString()]);
-    rows.push([]);
-    rows.push(["=== DESCRIPTIVE STATISTICS ==="]);
-    rows.push(["Landmark","n","Mean","SD","Median","CV%","Min","Max"]);
-    descriptive.forEach(r=>{rows.push([r.lab,r.n,r.mean?.toFixed(4),r.sd?.toFixed(4),r.median?.toFixed(4),r.cv?.toFixed(4),r.min?.toFixed(4),r.max?.toFixed(4)]);});
-    rows.push([]);
-    rows.push(["=== RELIABILITY ==="]);
-    rows.push(["ICC (Absolute)",icc?.ICC_Absolute?.toFixed(4)]);
-    rows.push(["ICC (Consistency)",icc?.ICC_Consistency?.toFixed(4)]);
-    rows.push(["ICC 95% CI lower",iccCI?.lower?.toFixed(4)]);
-    rows.push(["ICC 95% CI upper",iccCI?.upper?.toFixed(4)]);
-    rows.push(["Interpretation",icc?.interpretation]);
-    rows.push(["SEM",sem?.toFixed(4)]);
-    rows.push(["MDC (95%)",mdc?.toFixed(4)]);
-    rows.push([]);
-    rows.push(["=== ERROR METRICS ==="]);
-    rows.push(["Dahlberg Error",dahl?.error?.toFixed(4)]);
-    rows.push(["Bland-Altman Mean Diff",bland?.meanDiff?.toFixed(4)]);
-    rows.push(["Bland-Altman SD",bland?.stdDiff?.toFixed(4)]);
-    rows.push(["Bland-Altman Lower LoA",bland?.lowerLOA?.toFixed(4)]);
-    rows.push(["Bland-Altman Upper LoA",bland?.upperLOA?.toFixed(4)]);
-    rows.push([]);
-    rows.push(["=== PAIRED T-TEST ==="]);
-    rows.push(["t",tTest?.t?.toFixed(4)]);
-    rows.push(["df",tTest?.df]);
-    rows.push(["p-value",tTest?.pValue?.toFixed(6)]);
-    rows.push(["Significant",tTest?.significant?"Yes":"No"]);
-    rows.push([]);
-    rows.push(["=== ANOVA ==="]);
-    rows.push(["F",anovaRes?.F?.toFixed(4)]);
-    rows.push(["p-value",anovaRes?.pValue?.toFixed(6)]);
-    rows.push(["Significant",anovaRes?.significant?"Yes":"No"]);
-    rows.push([]);
-    rows.push(["=== PER-LANDMARK ERRORS ==="]);
-    rows.push(["Landmark","n","Mean Diff","SD Diff","Dahlberg","Abs Mean","CV%"]);
-    perLandmark.forEach(r=>{rows.push([r.lab,r.n,r.meanDiff.toFixed(4),r.sdDiff.toFixed(4),r.dahlberg.toFixed(4),r.absMean.toFixed(4),r.cv?.toFixed(4)]);});
-    rows.push([]);
-    rows.push(["=== SYSTEMATIC BIAS ==="]);
-    rows.push(["Comparison","t","p-value","Significant"]);
-    biases.forEach(b=>{rows.push([b.pair,b.t.toFixed(4),b.pValue.toFixed(6),b.significant?"Yes":"No"]);});
-    filename=`${String(study.name).replace(/\s+/g,"_")}_full_report.csv`;
-  }
-  const csv=rows.map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(",")).join("\n");
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
-  a.download=filename;a.click();
-}
-
-function StatisticsPanel({t,studies,databaseImages,formatAngle}){
-  const[source,setSource]=useState(studies?.length>0?"study":"database");
-  const[mainTab,setMainTab]=useState("tables");
-
-  const showDatabase=source==="database"&&databaseImages?.length>0;
-  const showStudy=source==="study";
-
-  return(
-    <div style={{padding:12,maxWidth:"100%",overflow:"hidden"}}>
-      <div style={{display:"flex",gap:6,marginBottom:12,alignItems:"center",flexWrap:"wrap"}}>
-        <button onClick={()=>setSource(showStudy?"database":"study")} style={{padding:"5px 10px",borderRadius:6,border:`1px solid ${t.bdr}`,background:showStudy?"transparent":t.acc+"18",color:showStudy?t.tx2:t.acc,cursor:"pointer",fontSize:10,fontWeight:600}}>{showStudy?"Database Mode →":"← Study Mode"}</button>
-        <span style={{fontSize:10,color:t.tx3}}>{showStudy?"Study Mode":"Database Mode"} — {showStudy?(studies?.length||0)+" studies":(databaseImages?.length||0)+" images"}</span>
-      </div>
-      <div style={{display:"flex",gap:4,marginBottom:16}}>
-        <button onClick={()=>setMainTab("tables")} style={{padding:"6px 14px",borderRadius:6,border:`1px solid ${mainTab==="tables"?t.acc:t.bdr}`,background:mainTab==="tables"?t.acc+"18":"transparent",color:mainTab==="tables"?t.acc:t.tx2,cursor:"pointer",fontSize:11,fontWeight:600}}>Registered Markups</button>
-        <button onClick={()=>setMainTab("dashboard")} style={{padding:"6px 14px",borderRadius:6,border:`1px solid ${mainTab==="dashboard"?t.acc:t.bdr}`,background:mainTab==="dashboard"?t.acc+"18":"transparent",color:mainTab==="dashboard"?t.acc:t.tx2,cursor:"pointer",fontSize:11,fontWeight:600}}>Statistics Dashboard</button>
-      </div>
-      {mainTab==="tables"&&(
-        showDatabase?
-          <MarkupTablesPanel databaseImages={databaseImages} t={t} formatAngle={formatAngle}/>:
-          <StudyMarkupTables t={t} studies={studies||[]}/>
-      )}
-      {mainTab==="dashboard"&&(
-        showDatabase?
-          <DatabaseDashboard t={t} databaseImages={databaseImages}/>:
-          <StudyDashboard t={t} studies={studies||[]}/>
-      )}
-    </div>
-  );
-}
-
-function StudyMarkupTables({t,studies}){
-  const[selectedId,setSelectedId]=useState(null);
-  const study=studies.find(s=>s.id===selectedId);
-  const labels=reproAllLabels(study||{operators:[]});
-  if(!studies.length)return(<div style={{color:t.tx3,fontSize:12,textAlign:"center",padding:20}}>No studies yet.</div>);
-  return(
-    <div>
-      <div style={{marginBottom:12}}>
-        <div style={{fontSize:10,color:t.tx2,marginBottom:4}}>Study</div>
-        <select value={selectedId||""} onChange={e=>setSelectedId(e.target.value||null)} style={{width:"100%",padding:"6px 8px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:12}}>
-          <option value="">— Select —</option>
-          {studies.map(s=><option key={s.id} value={s.id}>{s.name}{s.status==="completed"?" ✓":""}</option>)}
-        </select>
-      </div>
-      {!study&&<div style={{color:t.tx3,fontSize:12,textAlign:"center",padding:20}}>Select a study to view registered markups.</div>}
-      {study&&(
-        <div>
-          <div style={{marginBottom:8,display:"flex",gap:6}}>
-            <Tag color={t.acc}>{study.type==="intra"?"Intra":"Inter"}</Tag>
-            <Tag color={study.status==="completed"?t.ok:t.warn}>{study.status}</Tag>
-            <Tag color={t.tx2}>{labels.length} landmarks</Tag>
-          </div>
-          <div style={{overflowX:"auto"}}>
-            <table style={{width:"100%",borderCollapse:"collapse",fontSize:11,fontFamily:"'DM Mono',monospace"}}>
-              <thead>
-                <tr style={{borderBottom:`1px solid ${t.bdr}`}}>
-                  <th style={{textAlign:"left",padding:6,color:t.tx2,background:t.surf2}}>Landmark</th>
-                  {study.type==="intra"&&(study.operators[0]?.trials||[]).map((tr,i)=><th key={i} style={{textAlign:"center",padding:6,color:t.acc,background:t.surf2}}>Trial {i+1}</th>)}
-                  {study.type==="inter"&&study.operators.map((op,i)=><th key={op.id} style={{textAlign:"center",padding:6,color:t.acc,background:t.surf2}}>{op.name||`Op ${i+1}`}</th>)}
-                </tr>
-              </thead>
-              <tbody>
-                {labels.map(lab=>{
-                  const cells=[];
-                  if(study.type==="intra"){
-                    (study.operators[0]?.trials||[]).forEach(tr=>{
-                      const m=(tr.measurements||[]).find(x=>x.label===lab);
-                      cells.push(m?`(${m.x?.toFixed(1)}, ${m.y?.toFixed(1)})`:"—");
-                    });
-                  }else{
-                    study.operators.forEach(op=>{
-                      const m=(op.trials?.[0]?.measurements||[]).find(x=>x.label===lab);
-                      cells.push(m?`(${m.x?.toFixed(1)}, ${m.y?.toFixed(1)})`:"—");
-                    });
-                  }
-                  return(<tr key={lab} style={{borderBottom:`1px solid ${t.bdr}44`}}><td style={{padding:6,color:t.tx,fontWeight:600}}>{lab}</td>{cells.map((c,i)=><td key={i} style={{padding:6,textAlign:"center",color:c==="—"?t.tx3:t.tx}}>{c}</td>)}</tr>);
-                })}
-              </tbody>
-            </table>
-          </div>
-          <div style={{marginTop:10}}>
-            <Btn t={t} small onClick={()=>exportCsv("reproTables",{study})}>⬇ Download raw data (.csv)</Btn>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function StudyDashboard({t,studies}){
-  const[selectedId,setSelectedId]=useState(null);
-  const[metric,setMetric]=useState("x");
-  const[pairA,setPairA]=useState(0);
-  const[pairB,setPairB]=useState(1);
-  const[tab,setTab]=useState("overview");
-  const[usePx,setUsePx]=useState(true);
-  const[ppm,setPpm]=useState(1);
-  const blandCanvasRef=useRef(null);
-  const errorChartRef=useRef(null);
-
-  const unit=usePx?"px":"mm";
-
-  const study=studies.find(s=>s.id===selectedId);
-  const labels=reproAllLabels(study||{operators:[]});
-  const iccMat=reproIccMatrix(study||{operators:[],type:"intra"},metric);
-  const icc=iccMat&&iccMat.length>=2?calculateICC(iccMat):null;
-
-  const maxP=study?(study.type==="intra"?Math.max(0,(study.operators[0]?.trials||[]).length-1):Math.max(0,study.operators.length-1)):0;
-  const pa=Math.min(Math.max(0,pairA),maxP);
-  const pb=Math.min(Math.max(0,pairB),maxP);
-
-  const{vals1,vals2}=study?reproPairedVectors(study,metric,pa,pb):{vals1:[],vals2:[]};
-  const dahl=vals1.length>=2&&vals1.length===vals2.length?dahlbergError(vals1,vals2):null;
-  const bland=vals1.length>=2&&vals1.length===vals2.length?blandAltman(vals1,vals2):null;
-  const tTest=vals1.length>=2&&vals1.length===vals2.length?tTestPaired(vals1,vals2):null;
-  const spearman=spearmanCorrelation(vals1,vals2);
-
-  const descriptive=!study||!labels.length?[]:labels.map(lab=>{
-    const vals=[];
-    if(study.type==="intra"){
-      (study.operators[0]?.trials||[]).forEach(tr=>{const m=(tr.measurements||[]).find(x=>x.label===lab);if(m)vals.push(metric==="x"?m.x:m.y);});
-    }else{
-      study.operators.forEach(op=>{const m=(op.trials?.[0]?.measurements||[]).find(x=>x.label===lab);if(m)vals.push(metric==="x"?m.x:m.y);});
-    }
-    if(!vals.length)return{lab,n:0,mean:null,sd:null,min:null,max:null,median:null,iqrVal:null,cv:null};
-    const m0=mean(vals),s=stdev(vals,m0),md=median(vals),iq=iqr(vals);
-    const cv=coefficientOfVariation(vals);
-    return{lab,n:vals.length,mean:m0,sd:s,min:Math.min(...vals),max:Math.max(...vals),median:md,iqrVal:iq.iqr,cv};
-  });
-
-  const perLandmark=study?computePerLandmarkError(study,metric,labels):[];
-  const biases=study?detectSystematicBias(study,metric,labels):[];
-  const anovaRes=study?anovaAcrossSessions(study,metric,labels):null;
-  const sem=icc?standardError(vals1,icc.ICC_Absolute):null;
-  const mdc=sem?minimalDetectableChange(sem):null;
-  const iccCI=icc?calculateICC_CI(icc.ICC_Absolute,iccMat[0]?.length||0,iccMat.length):null;
-  const normsComp=computeNormsComparison(descriptive,study?.norms||[],{pxPerMm:1});
-
-  const tabs=[["overview","Overview"],["descriptive","Descriptive"],["errors","Per-Landmark"],["inferential","Inferential"],["norms","Norms"],["export","Export"]];
-
-  useEffect(()=>{
-    if(!bland||!blandCanvasRef.current)return;
-    const canvas=blandCanvasRef.current;
-    const W=400,H=280,padL=50,padR=30,padT=30,padB=50;
-    const cw=W-padL-padR,ch=H-padT-padB;
-    const dpr=window.devicePixelRatio||1;
-    canvas.width=W*dpr;canvas.height=H*dpr;
-    canvas.style.width=W+"px";canvas.style.height=H+"px";
-    const ctx=canvas.getContext("2d");
-    ctx.scale(dpr,dpr);
-    ctx.fillStyle=t.bg;ctx.fillRect(0,0,W,H);
-    const pts=bland.means.map((m,i)=>({x:m,y:bland.meanDiff+(vals1[i]-vals2[i]-bland.meanDiff)}));
-    const minM=bland.minMean,maxM=bland.maxMean,padM=(maxM-minM)*0.1||1;
-    const mnM=minM-padM,mxM=maxM+padM;
-    const dMax=Math.max(Math.abs(bland.upperLOA),Math.abs(bland.lowerLOA),Math.max(...pts.map(p=>Math.abs(p.y))))*1.15;
-    const xScale=cw/(mxM-mnM||1),yScale=ch/(2*dMax||1);
-    const tx=x=>padL+(x-mnM)*xScale,ty=y=>padT+ch/2-y*yScale;
-    ctx.strokeStyle=t.bdr;ctx.lineWidth=0.5;
-    for(let i=0;i<=4;i++){const y=padT+(i/4)*ch;ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(padL+cw,y);ctx.stroke();}
-    for(let i=0;i<=4;i++){const x=padL+(i/4)*cw;ctx.beginPath();ctx.moveTo(x,padT);ctx.lineTo(x,padT+ch);ctx.stroke();}
-    ctx.fillStyle=t.tx2;ctx.font="9px 'DM Mono',monospace";ctx.textAlign="center";
-    ctx.fillText("Mean of paired values",padL+cw/2,H-4);
-    ctx.save();ctx.translate(12,padT+ch/2);ctx.rotate(-Math.PI/2);ctx.textAlign="center";ctx.fillText("Difference",0,0);ctx.restore();
-    pts.forEach(p=>{ctx.fillStyle=p.y>bland.upperLOA||p.y<bland.lowerLOA?t.err:t.acc;ctx.beginPath();ctx.arc(tx(p.x),ty(p.y),3,0,Math.PI*2);ctx.fill();});
-    ctx.strokeStyle=t.tx;ctx.lineWidth=1.5;ctx.setLineDash([]);
-    ctx.beginPath();ctx.moveTo(padL,ty(bland.meanDiff));ctx.lineTo(padL+cw,ty(bland.meanDiff));ctx.stroke();
-    ctx.fillStyle=t.tx;ctx.font="bold 9px 'DM Sans',sans-serif";ctx.textAlign="left";
-    ctx.fillText(`Bias: ${bland.meanDiff.toFixed(2)}`,padL+4,padT+12);
-    ctx.strokeStyle=t.warn;ctx.lineWidth=1;ctx.setLineDash([4,4]);
-    ctx.beginPath();ctx.moveTo(padL,ty(bland.upperLOA));ctx.lineTo(padL+cw,ty(bland.upperLOA));ctx.stroke();
-    ctx.beginPath();ctx.moveTo(padL,ty(bland.lowerLOA));ctx.lineTo(padL+cw,ty(bland.lowerLOA));ctx.stroke();
-    ctx.fillStyle=t.warn;ctx.font="8px 'DM Mono',monospace";ctx.textAlign="left";
-    ctx.fillText(`+1.96 SD: ${bland.upperLOA.toFixed(2)}`,padL+4,ty(bland.upperLOA)-4);
-    ctx.fillText(`-1.96 SD: ${bland.lowerLOA.toFixed(2)}`,padL+4,ty(bland.lowerLOA)+12);
-  },[bland,t,vals1,vals2]);
-
-  useEffect(()=>{
-    if(!perLandmark.length||!errorChartRef.current)return;
-    const canvas=errorChartRef.current;
-    const W=500,H=220,padL=50,padR=20,padT=25,padB=60;
-    const cw=W-padL-padR,ch=H-padT-padB;
-    const dpr=window.devicePixelRatio||1;
-    canvas.width=W*dpr;canvas.height=H*dpr;
-    canvas.style.width=W+"px";canvas.style.height=H+"px";
-    const ctx=canvas.getContext("2d");
-    ctx.scale(dpr,dpr);
-    ctx.fillStyle=t.bg;ctx.fillRect(0,0,W,H);
-    const labs=perLandmark.map(r=>r.lab);
-    const allDiffs=perLandmark.flatMap(r=>[r.meanDiff+r.sdDiff,r.meanDiff-r.sdDiff,0]);
-    const yMax=Math.max(...allDiffs.map(Math.abs))*1.2||1;
-    const yScale=ch/(2*yMax);
-    const gap=cw/labs.length;
-    const ty2=y=>padT+ch/2-y*yScale;
-    ctx.strokeStyle=t.bdr;ctx.lineWidth=0.5;
-    for(let i=0;i<=4;i++){const y=padT+(i/4)*ch;ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(padL+cw,y);ctx.stroke();ctx.fillStyle=t.tx2;ctx.font="8px 'DM Mono',monospace";ctx.textAlign="right";ctx.textBaseline="middle";ctx.fillText((yMax*(1-i/2)).toFixed(1),padL-4,y);}
-    ctx.strokeStyle=t.tx;ctx.lineWidth=1;ctx.setLineDash([]);
-    ctx.beginPath();ctx.moveTo(padL,ty2(0));ctx.lineTo(padL+cw,ty2(0));ctx.stroke();
-    ctx.fillStyle=t.tx2;ctx.font="9px 'DM Sans',sans-serif";ctx.textAlign="center";ctx.textBaseline="top";
-    labs.forEach((lab,i)=>{
-      const r=perLandmark[i],cx=padL+i*gap+gap/2;
-      ctx.fillStyle=t.tx;ctx.font="8px 'DM Mono',monospace";ctx.textAlign="center";ctx.textBaseline="top";
-      ctx.save();ctx.translate(cx,padT+ch+4);ctx.rotate(Math.PI/4);ctx.fillText(lab,0,0);ctx.restore();
-      ctx.strokeStyle=t.acc;ctx.lineWidth=2;
-      ctx.beginPath();ctx.moveTo(cx,ty2(r.meanDiff-r.sdDiff));ctx.lineTo(cx,ty2(r.meanDiff+r.sdDiff));ctx.stroke();
-      ctx.fillStyle=t.acc;ctx.beginPath();ctx.arc(cx,ty2(r.meanDiff),4,0,Math.PI*2);ctx.fill();
-      ctx.strokeStyle=t.acc;ctx.lineWidth=1;
-      ctx.beginPath();ctx.moveTo(cx-4,ty2(r.meanDiff-r.sdDiff));ctx.lineTo(cx+4,ty2(r.meanDiff-r.sdDiff));ctx.stroke();
-      ctx.beginPath();ctx.moveTo(cx-4,ty2(r.meanDiff+r.sdDiff));ctx.lineTo(cx+4,ty2(r.meanDiff+r.sdDiff));ctx.stroke();
-    });
-    ctx.fillStyle=t.tx;ctx.font="bold 9px 'DM Sans',sans-serif";ctx.textAlign="center";ctx.textBaseline="bottom";
-    ctx.fillText(`Mean difference ± SD by landmark`,padL+cw/2,padT-4);
-  },[perLandmark,t]);
-
-  if(!studies.length)return(<div style={{color:t.tx3,fontSize:12,textAlign:"center",padding:20}}>No studies yet. Create and complete a study in Reproducibility first.</div>);
-
-  return(
-    <div style={{maxWidth:"100%",overflow:"hidden"}}>
-      <div style={{marginBottom:12}}>
-        <div style={{fontSize:10,color:t.tx2,marginBottom:4}}>Study</div>
-        <select value={selectedId||""} onChange={e=>setSelectedId(e.target.value||null)} style={{width:"100%",padding:"6px 8px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:12}}>
-          <option value="">— Select —</option>
-          {studies.map(s=><option key={s.id} value={s.id}>{s.name}{s.status==="completed"?" ✓":""}</option>)}
-        </select>
-      </div>
-      {!study&&<div style={{color:t.tx3,fontSize:12,textAlign:"center",padding:20}}>Select a study to view statistics.</div>}
-      {study&&(
-        <>
-          <div style={{display:"flex",gap:6,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
-            <button type="button" onClick={()=>setMetric("x")} style={{padding:"4px 10px",border:`1px solid ${metric==="x"?t.acc:t.bdr}`,borderRadius:6,background:metric==="x"?t.accMuted:t.surf3,color:metric==="x"?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}}>X ({unit})</button>
-            <button type="button" onClick={()=>setMetric("y")} style={{padding:"4px 10px",border:`1px solid ${metric==="y"?t.acc:t.bdr}`,borderRadius:6,background:metric==="y"?t.accMuted:t.surf3,color:metric==="y"?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}}>Y ({unit})</button>
-            <span style={{width:1,height:20,background:t.bdr,margin:"0 4px"}}/>
-            <button type="button" onClick={()=>setUsePx(p=>!p)} style={{padding:"4px 10px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:usePx?t.tx2:t.acc,cursor:"pointer",fontSize:10,fontWeight:600}}>mm</button>
-            {!usePx&&<input value={ppm} onChange={e=>{const v=parseFloat(e.target.value);if(v>0)setPpm(v);}} type="number" step="0.01" min="0.01" placeholder="px/mm" style={{width:60,padding:"4px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:10}}/>}
-          </div>
-          <div style={{display:"flex",gap:4,marginBottom:12,flexWrap:"wrap"}}>
-            {tabs.map(([id,label])=>(<button key={id} onClick={()=>setTab(id)} style={{padding:"5px 10px",borderRadius:6,border:`1px solid ${tab===id?t.acc:t.bdr}`,background:tab===id?t.acc+"18":"transparent",color:tab===id?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{label}</button>))}
-          </div>
-
-          {tab==="overview"&&(
-            <div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(150px,1fr))",gap:10,marginBottom:16}}>
-                <div style={{padding:12,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
-                  <div style={{fontSize:9,color:t.tx2,marginBottom:2}}>Design</div>
-                  <div style={{fontSize:13,fontWeight:700,color:t.tx}}>{study.type==="intra"?"Intra-operator":"Inter-operator"}</div>
-                </div>
-                <div style={{padding:12,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
-                  <div style={{fontSize:9,color:t.tx2,marginBottom:2}}>Status</div>
-                  <div style={{fontSize:13,fontWeight:700,color:study.status==="completed"?t.ok:t.warn}}>{study.status||"—"}</div>
-                </div>
-                <div style={{padding:12,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
-                  <div style={{fontSize:9,color:t.tx2,marginBottom:2}}>Landmarks</div>
-                  <div style={{fontSize:18,fontWeight:700,color:t.acc}}>{labels.length}</div>
-                </div>
-                <div style={{padding:12,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
-                  <div style={{fontSize:9,color:t.tx2,marginBottom:2}}>Sessions</div>
-                  <div style={{fontSize:18,fontWeight:700,color:t.tx}}>{study.type==="intra"?(study.operators[0]?.trials||[]).length:study.operators.length}</div>
-                </div>
-                {icc&&<div style={{padding:12,borderRadius:8,background:t.accMuted,border:`1px solid ${t.acc}44`}}>
-                  <div style={{fontSize:9,color:t.tx2,marginBottom:2}}>ICC (absolute)</div>
-                  <div style={{fontSize:18,fontWeight:700,color:t.acc}}>{icc.ICC_Absolute?.toFixed(4)}</div>
-                  <div style={{fontSize:9,fontWeight:600,color:icc.ICC_Absolute>=0.9?t.ok:icc.ICC_Absolute>=0.75?t.warn:t.err}}>{icc.interpretation}</div>
-                  {iccCI&&<div style={{fontSize:8,color:t.tx3,marginTop:2}}>95% CI: [{iccCI.lower.toFixed(4)}, {iccCI.upper.toFixed(4)}]</div>}
-                </div>}
-                {sem!==null&&<div style={{padding:12,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
-                  <div style={{fontSize:9,color:t.tx2,marginBottom:2}}>SEM</div>
-                  <div style={{fontSize:15,fontWeight:700,color:t.tx}}>{(usePx?sem:sem/ppm).toFixed(4)} {unit}</div>
-                </div>}
-                {mdc!==null&&<div style={{padding:12,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
-                  <div style={{fontSize:9,color:t.tx2,marginBottom:2}}>MDC (95%)</div>
-                  <div style={{fontSize:15,fontWeight:700,color:t.warn}}>{(usePx?mdc:mdc/ppm).toFixed(4)} {unit}</div>
-                </div>}
-                {dahl&&<div style={{padding:12,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
-                  <div style={{fontSize:9,color:t.tx2,marginBottom:2}}>Dahlberg error</div>
-                  <div style={{fontSize:15,fontWeight:700,color:t.acc}}>{(usePx?dahl.error:dahl.error/ppm).toFixed(4)} {unit}</div>
-                </div>}
-                {vals1.length>0&&<div style={{padding:12,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
-                  <div style={{fontSize:9,color:t.tx2,marginBottom:2}}>Paired pairs</div>
-                  <div style={{fontSize:15,fontWeight:700,color:t.tx}}>{vals1.length}</div>
-                </div>}
-                {anovaRes&&<div style={{padding:12,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
-                  <div style={{fontSize:9,color:t.tx2,marginBottom:2}}>ANOVA</div>
-                  <div style={{fontSize:13,fontWeight:700,color:t.tx}}>F={anovaRes.F.toFixed(2)}</div>
-                  <div style={{fontSize:9,color:anovaRes.significant?t.err:t.ok}}>p={anovaRes.pValue.toFixed(4)} {anovaRes.significant?"(bias)":"(ok)"}</div>
-                </div>}
-              </div>
-              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                <Btn t={t} small onClick={()=>exportCsv("reproTables",{study})}>⬇ Download tables (.csv)</Btn>
-                <Btn t={t} small onClick={()=>exportCsv("fullReport",{study,metric,labels,descriptive,perLandmark,biases,icc,iccCI,dahl,bland,tTest,anovaRes,sem,mdc})}>⬇ Full report</Btn>
-              </div>
-            </div>
-          )}
-
-          {tab==="descriptive"&&(
-            <div>
-              <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:6}}>Descriptive Statistics ({metric.toUpperCase()}, {unit})</div>
-              <div style={{overflowX:"auto",marginBottom:12}}>
-                <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
-                  <thead><tr style={{borderBottom:`1px solid ${t.bdr}`}}><th style={{textAlign:"left",padding:4,color:t.tx2}}>Landmark</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>n</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Mean</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>SD</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Median</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>CV%</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Min</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Max</th></tr></thead>
-                  <tbody>{descriptive.map(row=>(<tr key={row.lab} style={{borderBottom:`1px solid ${t.bdr}44`}}><td style={{padding:4,color:t.tx,fontWeight:600}}>{row.lab}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.n}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:t.acc}}>{row.mean!==null?row.mean.toFixed(3):"—"}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.sd!==null?row.sd.toFixed(3):"—"}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.median!==null?row.median.toFixed(3):"—"}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.cv!==null?row.cv.toFixed(2):"—"}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.min!==null?row.min.toFixed(2):"—"}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.max!==null?row.max.toFixed(2):"—"}</td></tr>))}</tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {tab==="errors"&&(
-            <div>
-              <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:6}}>Per-Landmark Error Metrics</div>
-              {perLandmark.length===0?<div style={{color:t.tx3,fontSize:11,textAlign:"center",padding:12}}>Need at least two sessions for per-landmark errors.</div>:(
-                <div>
-                  <div style={{display:"flex",justifyContent:"center",marginBottom:12}}>
-                    <canvas ref={errorChartRef} style={{borderRadius:6,border:`1px solid ${t.bdr}`,maxWidth:"100%"}}/>
-                  </div>
-                  <div style={{overflowX:"auto",marginBottom:12}}>
-                    <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
-                      <thead><tr style={{borderBottom:`1px solid ${t.bdr}`}}><th style={{textAlign:"left",padding:4,color:t.tx2}}>Landmark</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>n</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Mean Diff</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>SD Diff</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Dahlberg</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Abs Mean</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>CV%</th></tr></thead>
-                      <tbody>{perLandmark.map(row=>(<tr key={row.lab} style={{borderBottom:`1px solid ${t.bdr}44`}}><td style={{padding:4,color:t.tx,fontWeight:600}}>{row.lab}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.n}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.meanDiff.toFixed(4)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.sdDiff.toFixed(4)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:600}}>{row.dahlberg.toFixed(4)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.absMean.toFixed(4)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.cv!==null?row.cv.toFixed(2):"—"}</td></tr>))}</tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-              <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:6}}>Systematic Bias Detection</div>
-              {biases.length===0?<div style={{color:t.tx3,fontSize:11,textAlign:"center",padding:12}}>Insufficient data for bias detection.</div>:(
-                <div style={{overflowX:"auto"}}>
-                  <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
-                    <thead><tr style={{borderBottom:`1px solid ${t.bdr}`}}><th style={{textAlign:"left",padding:4,color:t.tx2}}>Comparison</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>t</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>p-value</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Significant?</th></tr></thead>
-                    <tbody>{biases.map((b,i)=>(<tr key={i} style={{borderBottom:`1px solid ${t.bdr}44`}}><td style={{padding:4,color:t.tx,fontWeight:600}}>{b.pair}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{b.t.toFixed(4)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:b.significant?t.err:t.ok}}>{b.pValue.toFixed(6)}</td><td style={{padding:4,textAlign:"right",color:b.significant?t.err:t.ok,fontWeight:600}}>{b.significant?"Yes (bias)":"No"}</td></tr>))}</tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-
-          {tab==="inferential"&&(
-            <div>
-              <div style={{marginBottom:12}}>
-                <div style={{fontSize:10,color:t.tx2,marginBottom:4}}>Pairwise comparison</div>
-                {study.type==="intra"&&(
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8}}>
-                    <div><div style={{fontSize:9,color:t.tx3,marginBottom:2}}>Trial A</div><select value={pa} onChange={e=>setPairA(+e.target.value)} style={{width:"100%",padding:"6px 8px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>{(study.operators[0]?.trials||[]).map((tr,i)=>(<option key={i} value={i}>Trial {i+1}</option>))}</select></div>
-                    <div><div style={{fontSize:9,color:t.tx3,marginBottom:2}}>Trial B</div><select value={pb} onChange={e=>setPairB(+e.target.value)} style={{width:"100%",padding:"6px 8px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>{(study.operators[0]?.trials||[]).map((tr,i)=>(<option key={i} value={i}>Trial {i+1}</option>))}</select></div>
-                  </div>
-                )}
-                {study.type==="inter"&&(
-                  <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8}}>
-                    <div><div style={{fontSize:9,color:t.tx3,marginBottom:2}}>Operator A</div><select value={pa} onChange={e=>setPairA(+e.target.value)} style={{width:"100%",padding:"6px 8px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>{study.operators.map((op,i)=>(<option key={op.id} value={i}>{op.name||`Operator ${i+1}`}</option>))}</select></div>
-                    <div><div style={{fontSize:9,color:t.tx3,marginBottom:2}}>Operator B</div><select value={pb} onChange={e=>setPairB(+e.target.value)} style={{width:"100%",padding:"6px 8px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>{study.operators.map((op,i)=>(<option key={op.id} value={i}>{op.name||`Operator ${i+1}`}</option>))}</select></div>
-                  </div>
-                )}
-                <div style={{fontSize:9,color:t.tx3,marginTop:6}}>Paired rows: {vals1.length} landmarks with both values</div>
-              </div>
-              <div style={{border:`1px solid ${t.bdr}`,borderRadius:8,background:t.surf2,padding:12}}>
-                <div style={{fontSize:11,fontWeight:700,color:t.acc,marginBottom:10}}>Inferential tests</div>
-                <div style={{marginBottom:12}}>
-                  <div style={{fontSize:10,fontWeight:700,color:t.tx2,marginBottom:6}}>Intraclass correlation (ICC)</div>
-                  {icc?(<div style={{fontSize:11}}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>ICC (absolute agreement)</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700}}>{icc.ICC_Absolute?.toFixed(4)??"—"}</span></div>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>ICC (consistency)</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700}}>{icc.ICC_Consistency?.toFixed(4)??"—"}</span></div>
-                    {iccCI&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>95% CI (absolute)</span><span style={{fontFamily:"'DM Mono',monospace",color:t.tx2,fontSize:10}}>[{iccCI.lower.toFixed(4)}, {iccCI.upper.toFixed(4)}]</span></div>}
-                    {sem!==null&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>SEM</span><span style={{fontFamily:"'DM Mono',monospace",color:t.tx}}>{(usePx?sem:sem/ppm).toFixed(4)} {unit}</span></div>}
-                    {mdc!==null&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>MDC (95%)</span><span style={{fontFamily:"'DM Mono',monospace",color:t.tx}}>{(usePx?mdc:mdc/ppm).toFixed(4)} {unit}</span></div>}
-                    <div style={{padding:"6px 8px",borderRadius:4,background:t.accMuted,color:t.acc,fontWeight:600,textAlign:"center",fontSize:10}}>{icc.interpretation}</div>
-                  </div>):<div style={{color:t.tx3,fontSize:11}}>Need at least two complete sessions and matching landmarks on every session for ICC.</div>}
-                </div>
-                <div style={{marginBottom:12}}>
-                  <div style={{fontSize:10,fontWeight:700,color:t.tx2,marginBottom:6}}>Dahlberg error</div>
-                  {dahl?<div style={{display:"flex",justifyContent:"space-between",fontSize:11}}><span>Random error (paired)</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700}}>{(usePx?dahl.error:dahl.error/ppm).toFixed(4)} {unit}</span></div>:<div style={{color:t.tx3,fontSize:11}}>Need two sessions with the same landmarks.</div>}
-                </div>
-                <div style={{marginBottom:12}}>
-                  <div style={{fontSize:10,fontWeight:700,color:t.tx2,marginBottom:6}}>Paired t-test</div>
-                  {tTest?(<div style={{fontSize:11}}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>t</span><span style={{fontFamily:"'DM Mono',monospace",color:t.tx}}>{tTest.t.toFixed(4)}</span></div>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>df</span><span style={{fontFamily:"'DM Mono',monospace",color:t.tx}}>{tTest.df}</span></div>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>p-value</span><span style={{fontFamily:"'DM Mono',monospace",color:tTest.significant?t.err:t.ok,fontWeight:700}}>{tTest.pValue.toFixed(6)}</span></div>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>Spearman ρ</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc}}>{spearman!==null?spearman.toFixed(4):"—"}</span></div>
-                    <div style={{padding:"6px 8px",borderRadius:4,background:tTest.significant?t.err+"22":t.ok+"22",color:tTest.significant?t.err:t.ok,fontWeight:600,textAlign:"center"}}>{tTest.significant?"Significant (p < 0.05)":"Not significant"}</div>
-                  </div>):<div style={{color:t.tx3,fontSize:11}}>Cannot compute (need paired observations).</div>}
-                </div>
-                <div>
-                  <div style={{fontSize:10,fontWeight:700,color:t.tx2,marginBottom:6}}>Bland–Altman</div>
-                  {bland?(<div style={{fontSize:11}}>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>Mean difference</span><span style={{fontFamily:"'DM Mono',monospace",color:t.tx}}>{(usePx?bland.meanDiff:bland.meanDiff/ppm).toFixed(4)} {unit}</span></div>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>SD of differences</span><span style={{fontFamily:"'DM Mono',monospace",color:t.tx}}>{(usePx?bland.stdDiff:bland.stdDiff/ppm).toFixed(4)} {unit}</span></div>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>Lower LoA</span><span style={{fontFamily:"'DM Mono',monospace",color:t.warn}}>{(usePx?bland.lowerLOA:bland.lowerLOA/ppm).toFixed(4)} {unit}</span></div>
-                    <div style={{display:"flex",justifyContent:"space-between",marginBottom:4}}><span>Upper LoA</span><span style={{fontFamily:"'DM Mono',monospace",color:t.warn}}>{(usePx?bland.upperLOA:bland.upperLOA/ppm).toFixed(4)} {unit}</span></div>
-                    <div style={{display:"flex",justifyContent:"center",marginTop:8}}>
-                      <canvas ref={blandCanvasRef} style={{borderRadius:6,border:`1px solid ${t.bdr}`,maxWidth:"100%"}}/>
-                    </div>
-                  </div>):<div style={{color:t.tx3,fontSize:11}}>Cannot compute.</div>}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {tab==="norms"&&(
-            <div>
-              <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:6}}>Clinical Norms Comparison</div>
-              {(!study?.norms||study.norms.length===0)?(<div style={{color:t.tx3,fontSize:11,textAlign:"center",padding:20}}>No norms defined for this study. Add norms in the Markups panel first.</div>):(
-                <div style={{overflowX:"auto"}}>
-                  <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
-                    <thead><tr style={{borderBottom:`1px solid ${t.bdr}`}}><th style={{textAlign:"left",padding:4,color:t.tx2}}>Landmark</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Mean (mm)</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Norm (mm)</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Deviation</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Z-score</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Within ±2SD?</th></tr></thead>
-                    <tbody>{normsComp.filter(r=>r.normMean!==null).map(row=>(<tr key={row.lab} style={{borderBottom:`1px solid ${t.bdr}44`}}><td style={{padding:4,color:t.tx,fontWeight:600}}>{row.lab}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.statMm?.toFixed(2)??(row.mean?(row.mean.toFixed(2)):"—")}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:t.acc}}>{row.normMean?.toFixed(2)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:row.deviation!==null&&(Math.abs(row.deviation)>row.normSD*2)?t.err:t.tx}}>{row.deviation!==null?row.deviation.toFixed(2):"—"}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:row.normZ!==null?(Math.abs(row.normZ)>2?t.err:Math.abs(row.normZ)>1?t.warn:t.ok):t.tx3}}>{row.normZ!==null?row.normZ.toFixed(2):"—"}</td><td style={{padding:4,textAlign:"right",color:row.withinNorm?t.ok:t.err,fontWeight:600}}>{row.withinNorm!==null?(row.withinNorm?"Yes":"No"):"—"}</td></tr>))}</tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-
-          {tab==="export"&&(
-            <div style={{display:"flex",flexDirection:"column",gap:8}}>
-              <Btn t={t} onClick={()=>exportCsv("reproTables",{study})}>⬇ Raw data tables (.csv)</Btn>
-              <Btn t={t} onClick={()=>exportCsv("descriptive",{study,metric,descriptive})}>⬇ Descriptive statistics (.csv)</Btn>
-              <Btn t={t} onClick={()=>exportCsv("errorMetrics",{perLandmark})}>⬇ Per-landmark error metrics (.csv)</Btn>
-              <Btn t={t} onClick={()=>exportCsv("fullReport",{study,metric,labels,descriptive,perLandmark,biases,icc,iccCI,dahl,bland,tTest,anovaRes,sem,mdc})}>⬇ Full statistical report (.csv)</Btn>
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
-function DatabaseDashboard({t,databaseImages}){
-  const[tab,setTab]=useState("overview");
-  const[corrModalOpen,setCorrModalOpen]=useState(false);
-  const corrCanvasRef=useRef(null);
-
-  const dataset=useMemo(()=>{
-    const ds=[];
-    databaseImages.forEach((img,idx)=>{
-      const entry={id:`img_${idx}`,measurements:{},group:"default",timepoint:`T${idx+1}`,operator:"default"};
-      const angle3Count={current:0};const angle4Count={current:0};
-      (img.markups||[]).forEach(m=>{
-        if(m.type==="ruler")return;
-        const meas=computeMeasurements(m,img.calibration);
-        let label;
-        if(m.type==="angle3"){angle3Count.current++;label=`Angle_${angle3Count.current}`;}
-        else if(m.type==="angle4"){angle4Count.current++;label=`Inc_Angle_${angle4Count.current}`;}
-        else{label=m.label||m.type;}
-        Object.entries(meas).forEach(([k,v])=>{entry.measurements[`${label}_${k}`]=v;});
-        const pts=m.points||[];
-        if(m.type==="point"&&pts.length===1){
-          entry.measurements[`${label}_x`]=pts[0].x;
-          entry.measurements[`${label}_y`]=pts[0].y;
-        }else if(pts.length>0){
-          pts.forEach((p,i)=>{
-            entry.measurements[`${label}_P${i+1}_x`]=p.x;
-            entry.measurements[`${label}_P${i+1}_y`]=p.y;
-          });
-        }
-      });
-      ds.push(entry);
-    });
-    return ds;
-  },[databaseImages]);
-
-  const variables=useMemo(()=>{
-    if(!dataset.length)return[];
-    return[...new Set(dataset.flatMap(c=>Object.keys(c.measurements||{})))];
-  },[dataset]);
-
-  const extractVar=useCallback((v)=>dataset.map(c=>c.measurements?.[v]).filter(x=>typeof x==="number"),[dataset]);
-
-  const descriptive=useMemo(()=>{
-    if(!variables.length)return[];
-    return variables.map(v=>{
-      const vals=extractVar(v);
-      if(!vals.length)return{var:v,n:0,mean:null,sd:null,min:null,max:null,median:null,iqrVal:null,skew:null,kurt:null,cv:null};
-      const m0=mean(vals),s=stdev(vals,m0),md=median(vals),iq=iqr(vals);
-      const cv=coefficientOfVariation(vals);
-      return{var:v,n:vals.length,mean:m0,sd:s,min:Math.min(...vals),max:Math.max(...vals),median:md,iqrVal:iq.iqr,cv};
-    });
-  },[variables,extractVar]);
-
-  const grouped=useMemo(()=>{
-    const g={};
-    dataset.forEach(c=>{const k=c.timepoint||c.group||"all";if(!g[k])g[k]=[];g[k].push(c);});
-    const result={};
-    Object.entries(g).forEach(([k,cases])=>{
-      result[k]={};
-      variables.forEach(v=>{
-        const vals=cases.map(c=>c.measurements?.[v]).filter(x=>typeof x==="number");
-        if(vals.length){const m=mean(vals);result[k][v]={n:vals.length,mean:m,sd:stdev(vals,m),min:Math.min(...vals),max:Math.max(...vals)};}
-      });
-    });
-    return result;
-  },[dataset,variables]);
-
-  const corrVarsAll=useMemo(()=>{
-    return variables.filter(v=>{let c=0;dataset.forEach(d=>{if(typeof d.measurements?.[v]==="number")c++;});return c>=3;});
-  },[dataset,variables]);
-  const[corrSelected,setCorrSelected]=useState([]);
-  const corrVars=useMemo(()=>{
-    const selected=corrSelected.filter(v=>corrVarsAll.includes(v));
-    return selected.length>=2?selected:corrVarsAll.slice(0,8);
-  },[corrVarsAll,corrSelected]);
-  const corrMatrix=useMemo(()=>{
-    if(corrVars.length<2)return null;
-    const paired=dataset.filter(c=>corrVars.every(v=>typeof c.measurements?.[v]==="number"));
-    if(paired.length<2)return null;
-    return correlationMatrix(corrVars.map(v=>paired.map(c=>c.measurements[v])));
-  },[corrVars,dataset]);
-
-  const selectAll=()=>setCorrSelected([...corrVarsAll]);
-  const clearAll=()=>setCorrSelected([]);
-
-  const[analyticsTab,setAnalyticsTab]=useState("outliers");
-  const[outlierVar,setOutlierVar]=useState("");
-  const[outlierMethod,setOutlierMethod]=useState("iqr");
-  const[ciVar,setCiVar]=useState("");
-  const[ciConf,setCiConf]=useState(0.95);
-  const[regX,setRegX]=useState("");
-  const[regY,setRegY]=useState("");
-  const[histVar,setHistVar]=useState("");
-  const[histModalOpen,setHistModalOpen]=useState(false);
-  const histCanvasRef=useRef(null);
-  const[norms,setNorms]=useState([]);
-  const[newNorm,setNewNorm]=useState({label:"",mean:"",sd:""});
-
-  const outlierResult=useMemo(()=>{
-    if(!outlierVar)return null;
-    const vals=extractVar(outlierVar);
-    if(vals.length<4)return null;
-    return detectOutliers(vals,outlierMethod);
-  },[outlierVar,outlierMethod,extractVar]);
-
-  const ciResult=useMemo(()=>{
-    if(!ciVar)return null;
-    const vals=extractVar(ciVar);
-    if(vals.length<2)return null;
-    return confidenceInterval(vals,ciConf);
-  },[ciVar,ciConf,extractVar]);
-
-  const regResult=useMemo(()=>{
-    if(!regX||!regY)return null;
-    const xVals=[],yVals=[];
-    dataset.forEach(c=>{const xv=c.measurements?.[regX],yv=c.measurements?.[regY];if(typeof xv==="number"&&typeof yv==="number"){xVals.push(xv);yVals.push(yv);}});
-    if(xVals.length<3)return null;
-    return linearRegression(xVals,yVals);
-  },[regX,regY,dataset]);
-
-  useEffect(()=>{
-    if(!histModalOpen||!histCanvasRef.current||!histVar)return;
-    const canvas=histCanvasRef.current;
-    const vals=extractVar(histVar);
-    if(!vals.length||vals.length<3)return;
-    const W=560,H=360,padL=60,padR=20,padT=30,padB=50;
-    const cw=W-padL-padR,ch=H-padT-padB;
-    const dpr=window.devicePixelRatio||1;
-    canvas.width=W*dpr;canvas.height=H*dpr;
-    canvas.style.width=W+"px";canvas.style.height=H+"px";
-    const ctx=canvas.getContext("2d");
-    ctx.scale(dpr,dpr);
-    ctx.fillStyle=t.bg;ctx.fillRect(0,0,W,H);
-    const mn=Math.min(...vals),mx=Math.max(...vals);
-    const numBins=Math.max(5,Math.min(20,Math.ceil(Math.sqrt(vals.length))));
-    const binW=(mx-mn)/numBins||1;
-    const bins=Array(numBins).fill(0);
-    vals.forEach(v=>{let b=Math.floor((v-mn)/binW);if(b>=numBins)b=numBins-1;if(b<0)b=0;bins[b]++;});
-    const maxBin=Math.max(...bins);
-    ctx.strokeStyle=t.bdr;ctx.lineWidth=0.5;
-    for(let i=0;i<=4;i++){
-      const y=padT+ch-(i/4)*ch;
-      ctx.beginPath();ctx.moveTo(padL,y);ctx.lineTo(padL+cw,y);ctx.stroke();
-      ctx.fillStyle=t.tx2;ctx.font="9px 'DM Mono',monospace";ctx.textAlign="right";ctx.textBaseline="middle";
-      ctx.fillText(Math.round(maxBin*i/4),padL-6,y);
-    }
-    const barW=cw/numBins;
-    bins.forEach((count,i)=>{
-      const x=padL+i*barW,h=maxBin>0?(count/maxBin)*ch:0;
-      const ratio=count/maxBin;
-      ctx.fillStyle=`rgba(59,130,246,${(0.3+ratio*0.5).toFixed(2)})`;
-      ctx.fillRect(x+1,padT+ch-h,barW-2,h);
-      ctx.strokeStyle=t.bdr;ctx.lineWidth=0.5;ctx.strokeRect(x+1,padT+ch-h,barW-2,h);
-      const binStart=mn+i*binW;
-      ctx.fillStyle=t.tx2;ctx.font="7px 'DM Mono',monospace";ctx.textAlign="center";ctx.textBaseline="top";
-      if(numBins<=12||i%2===0)ctx.fillText(binStart.toFixed(1),x+barW/2,padT+ch+4);
-    });
-    ctx.fillStyle=t.tx;ctx.font="bold 9px 'DM Sans',sans-serif";ctx.textAlign="center";ctx.textBaseline="bottom";
-    ctx.fillText(`${histVar} — n=${vals.length}, ${numBins} bins`,padL+cw/2,padT-6);
-    const m=mean(vals),s=stdev(vals,m);
-    ctx.fillStyle=t.acc;ctx.font="8px 'DM Mono',monospace";ctx.textAlign="left";
-    ctx.fillText(`μ=${m.toFixed(2)} σ=${s.toFixed(2)}`,padL+4,padT+10);
-  },[histModalOpen,histVar,t,extractVar]);
-
-  const downloadHistPNG=()=>{
-    if(!histCanvasRef.current)return;
-    const link=document.createElement("a");
-    link.download=`histogram_${histVar}.png`;
-    link.href=histCanvasRef.current.toDataURL("image/png");
-    link.click();
-  };
-
-  const addNorm=()=>{
-    if(!newNorm.label||!newNorm.mean||!newNorm.sd)return;
-    setNorms(prev=>[...prev,{...newNorm,mean:parseFloat(newNorm.mean),sd:parseFloat(newNorm.sd)}]);
-    setNewNorm({label:"",mean:"",sd:""});
-  };
-  const removeNorm=(idx)=>setNorms(prev=>prev.filter((_,i)=>i!==idx));
-
-  useEffect(()=>{
-    if(!corrModalOpen||!corrCanvasRef.current||!corrMatrix)return;
-    const canvas=corrCanvasRef.current;
-    const n=corrVars.length;
-    const cellSize=58,labelW=130,topPad=40,bottomPad=30,rightPad=20,legendW=20;
-    const W=labelW+n*cellSize+rightPad+legendW+30;
-    const H=topPad+n*cellSize+bottomPad;
-    const dpr=window.devicePixelRatio||1;
-    canvas.width=W*dpr;canvas.height=H*dpr;
-    canvas.style.width=W+"px";canvas.style.height=H+"px";
-    const ctx=canvas.getContext("2d");
-    ctx.scale(dpr,dpr);
-    ctx.fillStyle=t.bg;ctx.fillRect(0,0,W,H);
-    for(let i=0;i<n;i++){
-      for(let j=0;j<n;j++){
-        const v=corrMatrix[i]?.[j]??0;
-        const x=labelW+j*cellSize,y=topPad+i*cellSize;
-        if(v>0){ctx.fillStyle=`rgba(59,130,246,${(Math.abs(v)*0.8).toFixed(2)})`;}
-        else{ctx.fillStyle=`rgba(239,68,68,${(Math.abs(v)*0.8).toFixed(2)})`;}
-        ctx.fillRect(x+1,y+1,cellSize-2,cellSize-2);
-        ctx.fillStyle=Math.abs(v)>0.5?"#fff":t.tx;
-        ctx.font="10px 'DM Mono',monospace";ctx.textAlign="center";ctx.textBaseline="middle";
-        ctx.fillText(v.toFixed(2),x+cellSize/2,y+cellSize/2);
-      }
-    }
-    ctx.fillStyle=t.tx;ctx.font="bold 10px 'DM Mono',monospace";
-    for(let i=0;i<n;i++){
-      ctx.save();
-      const x=labelW+i*cellSize+cellSize/2,y=topPad+n*cellSize+8;
-      ctx.translate(x,y);ctx.rotate(Math.PI/4);ctx.textAlign="left";ctx.textBaseline="top";
-      ctx.fillStyle=t.tx;ctx.fillText(corrVars[i],0,0);ctx.restore();
-      ctx.fillStyle=t.tx;ctx.font="10px 'DM Mono',monospace";
-      ctx.textAlign="right";ctx.textBaseline="middle";
-      ctx.fillText(corrVars[i],labelW-6,topPad+i*cellSize+cellSize/2);
-    }
-    const lx=labelW+n*cellSize+10;
-    ctx.font="bold 9px 'DM Sans',sans-serif";ctx.fillStyle=t.tx;ctx.textAlign="left";
-    ctx.fillText("Legend",lx,topPad);
-    for(let k=0;k<=8;k++){
-      const val=-1+k*0.25;
-      const ly=topPad+18+k*12;
-      if(val>0){ctx.fillStyle=`rgba(59,130,246,${(Math.abs(val)*0.8).toFixed(2)})`;}
-      else{ctx.fillStyle=`rgba(239,68,68,${(Math.abs(val)*0.8).toFixed(2)})`;}
-      ctx.fillRect(lx,ly,14,10);
-      ctx.fillStyle=t.tx2;ctx.font="8px 'DM Mono',monospace";ctx.textAlign="left";ctx.textBaseline="middle";
-      ctx.fillText(val.toFixed(2),lx+18,ly+5);
-    }
-  },[corrModalOpen,corrMatrix,corrVars,t]);
-
-  const downloadCorrPNG=()=>{
-    if(!corrCanvasRef.current)return;
-    const link=document.createElement("a");
-    link.download="correlation_matrix.png";
-    link.href=corrCanvasRef.current.toDataURL("image/png");
-    link.click();
-  };
-
-  const tabs=[["overview","Overview"],["descriptive","Descriptive"],["grouping","Grouping"],["correlation","Correlation"],["analytics","Analytics"],["export","Export"]];
-
-  const landmarkVars=useMemo(()=>variables.filter(v=>/_x$/.test(v)),[variables]);
-  const measVars=useMemo(()=>variables.filter(v=>!/_x$/.test(v)&&!/_y$/.test(v)),[variables]);
-
-  if(!databaseImages.length)return(<div style={{color:t.tx3,fontSize:12,textAlign:"center",padding:20}}>No images in database mode.</div>);
-
-  return(
-    <div style={{maxWidth:"100%",overflow:"hidden"}}>
-      <div style={{display:"flex",gap:4,marginBottom:12,flexWrap:"wrap"}}>
-        {tabs.map(([id,label])=>(<button key={id} onClick={()=>setTab(id)} style={{padding:"5px 10px",borderRadius:6,border:`1px solid ${tab===id?t.acc:t.bdr}`,background:tab===id?t.acc+"18":"transparent",color:tab===id?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{label}</button>))}
-      </div>
-
-      {tab==="overview"&&(
-        <div>
-          <table style={{width:"100%",fontSize:10,borderCollapse:"collapse"}}>
-            <tbody>
-              <tr><td style={{padding:"5px 6px",color:t.tx2,width:160}}>Images</td><td style={{padding:"5px 6px",fontFamily:"'DM Mono',monospace",color:t.acc}}>{databaseImages.length}</td></tr>
-              <tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2}}>Total variables</td><td style={{padding:"5px 6px",fontFamily:"'DM Mono',monospace"}}>{variables.length}</td></tr>
-              <tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2}}>Landmark coords</td><td style={{padding:"5px 6px",fontFamily:"'DM Mono',monospace"}}>{landmarkVars.length} pts</td></tr>
-              <tr style={{borderTop:`1px solid ${t.bdr}66`}}><td style={{padding:"5px 6px",color:t.tx2}}>Measurements</td><td style={{padding:"5px 6px",fontFamily:"'DM Mono',monospace"}}>{measVars.length}</td></tr>
-            </tbody>
-          </table>
-          {descriptive.length>0&&(
-            <div style={{marginTop:14,paddingTop:10,borderTop:`1px solid ${t.bdr}`}}>
-              <div style={{fontSize:10,fontWeight:700,color:t.tx,marginBottom:6}}>Quick Summary</div>
-              <div style={{overflowX:"auto"}}>
-                <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
-                  <thead><tr style={{borderBottom:`1px solid ${t.bdr}`}}><th style={{textAlign:"left",padding:4,color:t.tx2}}>Variable</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>N</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Mean</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>SD</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Range</th></tr></thead>
-                  <tbody>{descriptive.filter(d=>d.n>0).map(row=>(<tr key={row.var} style={{borderBottom:`1px solid ${t.bdr}44`}}><td style={{padding:4,color:t.tx,fontWeight:600}}>{row.var}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.n}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:t.acc}}>{row.mean?.toFixed(2)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.sd?.toFixed(2)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.min?.toFixed(2)} – {row.max?.toFixed(2)}</td></tr>))}</tbody>
-                </table>
-              </div>
-            </div>
-          )}
-          {landmarkVars.length>0&&(
-            <div style={{marginTop:14,paddingTop:10,borderTop:`1px solid ${t.bdr}`}}>
-              <div style={{fontSize:10,fontWeight:700,color:t.tx,marginBottom:6}}>Registered Landmark Coordinates</div>
-              <div style={{overflowX:"auto"}}>
-                <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
-                  <thead><tr style={{borderBottom:`1px solid ${t.bdr}`}}><th style={{textAlign:"left",padding:4,color:t.tx2}}>Landmark</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>X mean±SD</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Y mean±SD</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>X range</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Y range</th></tr></thead>
-                  <tbody>{landmarkVars.map(lx=>{
-                    const ly=lx.replace(/_x$/,"_y");
-                    const xr=descriptive.find(d=>d.var===lx);
-                    const yr=descriptive.find(d=>d.var===ly);
-                    if(!xr||!yr||!xr.n||!yr.n)return null;
-                    return(<tr key={lx} style={{borderBottom:`1px solid ${t.bdr}44`}}><td style={{padding:4,color:t.tx,fontWeight:600}}>{lx.replace(/_x$/,"")}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:t.acc}}>{xr.mean?.toFixed(1)} ± {xr.sd?.toFixed(1)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{yr.mean?.toFixed(1)} ± {yr.sd?.toFixed(1)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",fontSize:8}}>{xr.min?.toFixed(1)}–{xr.max?.toFixed(1)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",fontSize:8}}>{yr.min?.toFixed(1)}–{yr.max?.toFixed(1)}</td></tr>);
-                  }).filter(Boolean)}</tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {tab==="descriptive"&&(
-        <div>
-          <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:6}}>Landmark Coordinate Statistics</div>
-          {landmarkVars.length===0?<div style={{color:t.tx3,fontSize:11,padding:8,textAlign:"center"}}>No landmark coordinates registered.</div>:(
-            <div style={{overflowX:"auto",marginBottom:16}}>
-              <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
-                <thead><tr style={{borderBottom:`1px solid ${t.bdr}`}}><th style={{textAlign:"left",padding:4,color:t.tx2}}>Landmark</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Coord</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>N</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Mean</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>SD</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Median</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Min</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Max</th></tr></thead>
-                <tbody>{descriptive.filter(d=>d.n>0&&/_x$|_y$/.test(d.var)).map(row=>(<tr key={row.var} style={{borderBottom:`1px solid ${t.bdr}44`}}><td style={{padding:4,color:t.tx,fontWeight:600}}>{row.var.replace(/_x$/,"").replace(/_y$/,"")}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:t.acc}}>{row.var.match(/_x$/)?'X':'Y'}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.n}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.mean?.toFixed(3)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.sd?.toFixed(3)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.median?.toFixed(3)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.min?.toFixed(2)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.max?.toFixed(2)}</td></tr>))}</tbody>
-              </table>
-            </div>
-          )}
-          <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:6}}>Measurement Statistics</div>
-          {measVars.length===0?<div style={{color:t.tx3,fontSize:11,padding:8,textAlign:"center"}}>No measurements found.</div>:(
-            <>
-              <div style={{overflowX:"auto",marginBottom:12}}>
-                <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
-                  <thead><tr style={{borderBottom:`1px solid ${t.bdr}`}}><th style={{textAlign:"left",padding:4,color:t.tx2}}>Variable</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>N</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Mean</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>SD</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Median</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>CV%</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Min</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Max</th></tr></thead>
-                  <tbody>{descriptive.filter(d=>d.n>0&&!/_x$|_y$/.test(d.var)).map(row=>(<tr key={row.var} style={{borderBottom:`1px solid ${t.bdr}44`}}><td style={{padding:4,color:t.tx,fontWeight:600}}>{row.var}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.n}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:t.acc}}>{row.mean?.toFixed(3)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.sd?.toFixed(3)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.median?.toFixed(3)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.cv?.toFixed(2)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.min?.toFixed(2)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{row.max?.toFixed(2)}</td></tr>))}</tbody>
-                </table>
-              </div>
-
-            </>
-          )}
-        </div>
-      )}
-
-      {tab==="grouping"&&(
-        <div>
-          <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:6}}>Grouped Statistics (by Image)</div>
-          {Object.entries(grouped).map(([g,data])=>(
-            <div key={g} style={{marginBottom:12,padding:10,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
-              <div style={{fontSize:10,fontWeight:700,color:t.tx,marginBottom:6}}>{g}</div>
-              <div style={{overflowX:"auto"}}>
-                <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
-                  <thead><tr style={{borderBottom:`1px solid ${t.bdr}`}}><th style={{textAlign:"left",padding:4,color:t.tx2}}>Variable</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>N</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Mean</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>SD</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Min</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Max</th></tr></thead>
-                  <tbody>{Object.entries(data).map(([v,s])=>(<tr key={v} style={{borderBottom:`1px solid ${t.bdr}44`}}><td style={{padding:4,color:t.tx,fontWeight:600}}>{v}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{s.n}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:t.acc}}>{s.mean?.toFixed(2)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{s.sd?.toFixed(2)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{s.min?.toFixed(2)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{s.max?.toFixed(2)}</td></tr>))}</tbody>
-                </table>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {tab==="correlation"&&(
-        <div>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-            <div style={{fontSize:11,fontWeight:700,color:t.tx}}>Correlation Matrix</div>
-            {corrMatrix&&<button onClick={()=>setCorrModalOpen(true)} style={{padding:"4px 8px",borderRadius:6,border:`1px solid ${t.bdr}`,background:"transparent",color:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}} title="Enlarge">⛶ Enlarge</button>}
-          </div>
-          <div style={{marginBottom:10,padding:10,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-              <div style={{fontSize:10,fontWeight:600,color:t.tx2}}>Select Variables ({corrSelected.length}/{corrVarsAll.length})</div>
-              <div style={{display:"flex",gap:4}}>
-                <button onClick={selectAll} style={{padding:"2px 6px",borderRadius:4,border:`1px solid ${t.bdr}`,background:"transparent",color:t.tx2,cursor:"pointer",fontSize:9}}>All</button>
-                <button onClick={clearAll} style={{padding:"2px 6px",borderRadius:4,border:`1px solid ${t.bdr}`,background:"transparent",color:t.tx2,cursor:"pointer",fontSize:9}}>None</button>
-              </div>
-            </div>
-            <div style={{maxHeight:140,overflowY:"auto",display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:"2px 10px"}}>
-              {corrVarsAll.map(v=>(
-                <label key={v} style={{display:"flex",alignItems:"center",gap:5,cursor:"pointer",padding:"2px 4px",borderRadius:4,fontSize:9,color:corrSelected.includes(v)?t.tx:t.tx3,transition:"color .15s"}}>
-                  <input type="checkbox" checked={corrSelected.includes(v)} onChange={e=>setCorrSelected(prev=>e.target.checked?[...new Set([...prev,v])]:prev.filter(x=>x!==v))} style={{accentColor:t.acc,width:12,height:12}}/>
-                  <span style={{fontFamily:"'DM Mono',monospace",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{v}</span>
-                </label>
-              ))}
-              {corrVarsAll.length===0&&<div style={{color:t.tx3,fontSize:9,padding:6}}>No variables with 3+ data points.</div>}
-            </div>
-          </div>
-          {!corrMatrix?<div style={{color:t.tx3,fontSize:11,textAlign:"center",padding:12}}>Need at least 2 selected variables with 3+ values each.</div>:(
-            <div style={{overflowX:"auto"}}>
-              <table style={{width:"100%",fontSize:8,borderCollapse:"collapse"}}>
-                <thead><tr><th style={{padding:3,color:t.tx2}}></th>{corrVars.map(v=><th key={v} style={{padding:3,color:t.acc,fontFamily:"'DM Mono',monospace",writingMode:"vertical-lr",textAlign:"left"}}>{v}</th>)}</tr></thead>
-                <tbody>{corrMatrix.map((row,i)=>(<tr key={i}><td style={{padding:3,color:t.tx,fontWeight:600}}>{corrVars[i]}</td>{row.map((v,j)=>{
-                  const abs=v!=null?Math.abs(v):0;
-                  let bg="transparent",clr=t.tx3;
-                  if(v!=null){if(v>0){clr=t.acc;bg=`rgba(59,130,246,${(abs*0.3).toFixed(2)})`;}else{clr=t.err;bg=`rgba(239,68,68,${(abs*0.3).toFixed(2)})`;}}
-                  return<td key={j} style={{padding:3,textAlign:"center",fontFamily:"'DM Mono',monospace",background:bg,color:clr}}>{v!=null?v.toFixed(2):"-"}</td>;
-                })}</tr>))}</tbody>
-              </table>
-            </div>
-          )}
-          <div style={{marginTop:16}}>
-            <div style={{fontSize:10,fontWeight:700,color:t.tx2,marginBottom:6}}>Quick Correlations</div>
-            {corrVars.slice(0,6).map((v,i)=>{
-              if(i===0)return null;
-              const a1=[],a2=[];
-              dataset.forEach(c=>{const xv=c.measurements?.[corrVars[0]],yv=c.measurements?.[v];if(typeof xv==="number"&&typeof yv==="number"){a1.push(xv);a2.push(yv);}});
-              const r=pearsonCorrelation(a1,a2);
-              const sp=spearmanCorrelation(a1,a2);
-              return(<div key={v} style={{fontSize:10,color:t.tx2,display:"flex",justifyContent:"space-between"}}><span>{corrVars[0]||"—"} vs {v}</span><span>r={r?r.toFixed(2):"-"} | ρ={sp!=null?sp.toFixed(2):"-"}</span></div>);
-            })}
-          </div>
-        </div>
-      )}
-
-      {tab==="analytics"&&(
-        <div>
-          <div style={{display:"flex",gap:4,marginBottom:12,flexWrap:"wrap"}}>
-            {[["outliers","Outliers"],["ci","Confidence Intervals"],["regression","Linear Regression"],["histogram","Histogram"],["norms","Normative Comparison"]].map(([id,label])=>(<button key={id} onClick={()=>setAnalyticsTab(id)} style={{padding:"5px 10px",borderRadius:6,border:`1px solid ${analyticsTab===id?t.acc:t.bdr}`,background:analyticsTab===id?t.acc+"18":"transparent",color:analyticsTab===id?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{label}</button>))}
-          </div>
-
-          {analyticsTab==="outliers"&&(
-            <div>
-              <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:8}}>Outlier Detection</div>
-              <div style={{display:"flex",gap:8,marginBottom:10,alignItems:"flex-end",flexWrap:"wrap"}}>
-                <div style={{flex:"1 1 180px",minWidth:140}}><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Variable</div>
-                  <select value={outlierVar} onChange={e=>setOutlierVar(e.target.value)} style={{width:"100%",padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
-                    <option value="">— Select —</option>
-                    {corrVarsAll.map(v=><option key={v} value={v}>{v}</option>)}
-                  </select>
-                </div>
-                <div style={{flex:"1 1 140px",minWidth:100}}><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Method</div>
-                  <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                    <button onClick={()=>setOutlierMethod("iqr")} style={{padding:"5px 8px",borderRadius:6,border:`1px solid ${outlierMethod==="iqr"?t.acc:t.bdr}`,background:outlierMethod==="iqr"?t.acc+"18":"transparent",color:outlierMethod==="iqr"?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}}>IQR</button>
-                    <button onClick={()=>setOutlierMethod("zscore")} style={{padding:"5px 8px",borderRadius:6,border:`1px solid ${outlierMethod==="zscore"?t.acc:t.bdr}`,background:outlierMethod==="zscore"?t.acc+"18":"transparent",color:outlierMethod==="zscore"?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}}>Z-Score</button>
-                  </div>
-                </div>
-              </div>
-              {outlierResult?(
-                <div>
-                  <div style={{padding:10,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`,marginBottom:8}}>
-                    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(100px,1fr))",gap:6,fontSize:10}}>
-                      <span style={{color:t.tx2}}>Total values</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc}}>{outlierResult.values.length}</span>
-                      <span style={{color:t.tx2}}>Outliers found</span><span style={{fontFamily:"'DM Mono',monospace",color:outlierResult.outliers.length>0?t.err:t.ok}}>{outlierResult.outliers.length}</span>
-                      {outlierMethod==="zscore"?(<>
-                        <span style={{color:t.tx2}}>Mean ± SD</span><span style={{fontFamily:"'DM Mono',monospace"}}>{outlierResult.mean?.toFixed(3)} ± {outlierResult.sd?.toFixed(3)}</span>
-                      </>):(<>
-                        <span style={{color:t.tx2}}>Q1 / Q3</span><span style={{fontFamily:"'DM Mono',monospace"}}>{outlierResult.q1?.toFixed(2)} / {outlierResult.q3?.toFixed(2)}</span>
-                        <span style={{color:t.tx2}}>IQR</span><span style={{fontFamily:"'DM Mono',monospace"}}>{outlierResult.iqr?.toFixed(3)}</span>
-                        <span style={{color:t.tx2}}>Bounds</span><span style={{fontFamily:"'DM Mono',monospace"}}>{outlierResult.bounds?.[0]?.toFixed(2)} – {outlierResult.bounds?.[1]?.toFixed(2)}</span>
-                      </>)}
-                    </div>
-                  </div>
-                  {outlierResult.outliers.length>0&&(
-                    <div style={{padding:10,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
-                      <div style={{fontSize:10,fontWeight:700,color:t.err,marginBottom:6}}>Flagged Outliers</div>
-                      <div style={{overflowX:"auto"}}>
-                        <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
-                          <thead><tr style={{borderBottom:`1px solid ${t.bdr}`}}><th style={{textAlign:"left",padding:4,color:t.tx2}}>Image</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Value</th>{outlierMethod==="zscore"&&<th style={{textAlign:"right",padding:4,color:t.tx2}}>Z-Score</th>}<th style={{textAlign:"right",padding:4,color:t.tx2}}>Deviation</th></tr></thead>
-                          <tbody>{outlierResult.outliers.map(o=>{
-                            const img=databaseImages[o.i];
-                            const dev=mean&&outlierResult.values?((o.v-mean(outlierResult.values))/stdev(outlierResult.values,mean(outlierResult.values))*100):null;
-                            return(<tr key={o.i} style={{borderBottom:`1px solid ${t.bdr}44`}}><td style={{padding:4,color:t.tx}}>{img?img.name||`Image ${o.i+1}`:`#${o.i}`}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:t.err}}>{o.v.toFixed(3)}</td>{outlierMethod==="zscore"&&<td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:t.err}}>{o.zScore?.toFixed(2)}</td>}<td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{dev!=null?`${dev>0?"+":""}${dev.toFixed(1)}%`:"—"}</td></tr>);
-                          })}</tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ):<div style={{color:t.tx3,fontSize:11,textAlign:"center",padding:12}}>{!outlierVar?"Select a variable.":"Need 4+ data points."}</div>}
-            </div>
-          )}
-
-          {analyticsTab==="ci"&&(
-            <div>
-              <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:8}}>Confidence Intervals</div>
-              <div style={{display:"flex",gap:8,marginBottom:10,alignItems:"flex-end",flexWrap:"wrap"}}>
-                <div style={{flex:"1 1 180px",minWidth:140}}><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Variable</div>
-                  <select value={ciVar} onChange={e=>setCiVar(e.target.value)} style={{width:"100%",padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
-                    <option value="">— Select —</option>
-                    {corrVarsAll.map(v=><option key={v} value={v}>{v}</option>)}
-                  </select>
-                </div>
-                <div style={{flex:"1 1 180px",minWidth:140}}><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Confidence</div>
-                  <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
-                    {[0.90,0.95,0.99].map(c=>(<button key={c} onClick={()=>setCiConf(c)} style={{padding:"5px 8px",borderRadius:6,border:`1px solid ${ciConf===c?t.acc:t.bdr}`,background:ciConf===c?t.acc+"18":"transparent",color:ciConf===c?t.acc:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}}>{(c*100).toFixed(0)}%</button>))}
-                  </div>
-                </div>
-              </div>
-              {ciResult?(
-                <div style={{padding:12,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`}}>
-                    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(120px,1fr))",gap:8,fontSize:10}}>
-                    <span style={{color:t.tx2}}>Sample mean</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:600}}>{ciResult.mean.toFixed(4)}</span>
-                    <span style={{color:t.tx2}}>Standard deviation</span><span style={{fontFamily:"'DM Mono',monospace"}}>{ciResult.sd.toFixed(4)}</span>
-                    <span style={{color:t.tx2}}>Standard error</span><span style={{fontFamily:"'DM Mono',monospace"}}>{ciResult.se.toFixed(4)}</span>
-                    <span style={{color:t.tx2}}>Sample size</span><span style={{fontFamily:"'DM Mono',monospace"}}>{ciResult.n}</span>
-                    <div style={{gridColumn:"1/-1",marginTop:8,paddingTop:8,borderTop:`1px solid ${t.bdr}`}}><span style={{color:t.tx2,fontWeight:600}}>{(ciConf*100).toFixed(0)}% CI: </span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700,fontSize:12}}>[{ciResult.lower.toFixed(4)}, {ciResult.upper.toFixed(4)}]</span><span style={{color:t.tx3,fontSize:9,marginLeft:8}}>±{ciResult.margin.toFixed(4)}</span></div>
-                  </div>
-                </div>
-              ):<div style={{color:t.tx3,fontSize:11,textAlign:"center",padding:12}}>{!ciVar?"Select a variable.":"Need 2+ data points."}</div>}
-            </div>
-          )}
-
-          {analyticsTab==="regression"&&(
-            <div>
-              <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:8}}>Linear Regression</div>
-              <div style={{display:"flex",gap:8,marginBottom:10,alignItems:"flex-end",flexWrap:"wrap"}}>
-                <div style={{flex:"1 1 180px",minWidth:140}}><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>X Variable (Predictor)</div>
-                  <select value={regX} onChange={e=>setRegX(e.target.value)} style={{width:"100%",padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
-                    <option value="">— Select —</option>
-                    {corrVarsAll.map(v=><option key={v} value={v}>{v}</option>)}
-                  </select>
-                </div>
-                <div style={{flex:"1 1 180px",minWidth:140}}><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Y Variable (Outcome)</div>
-                  <select value={regY} onChange={e=>setRegY(e.target.value)} style={{width:"100%",padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
-                    <option value="">— Select —</option>
-                    {corrVarsAll.map(v=><option key={v} value={v}>{v}</option>)}
-                  </select>
-                </div>
-              </div>
-              {regResult?(
-                <div>
-                  <div style={{padding:12,borderRadius:8,background:t.surf2,border:`1px solid ${t.bdr}`,marginBottom:10}}>
-                    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(110px,1fr))",gap:6,fontSize:10}}>
-                      <span style={{color:t.tx2}}>Equation</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc,fontWeight:700,gridColumn:"1/-1"}}>{regResult.equation}</span>
-                      <span style={{color:t.tx2}}>R²</span><span style={{fontFamily:"'DM Mono',monospace",color:regResult.r2>0.7?t.ok:regResult.r2>0.4?t.warn:t.err,fontWeight:600}}>{regResult.r2.toFixed(4)}</span>
-                      <span style={{color:t.tx2}}>Pearson r</span><span style={{fontFamily:"'DM Mono',monospace"}}>{regResult.r.toFixed(4)}</span>
-                      <span style={{color:t.tx2}}>Slope</span><span style={{fontFamily:"'DM Mono',monospace"}}>{regResult.slope.toFixed(4)} ± {regResult.seSlope?.toFixed(4)}</span>
-                      <span style={{color:t.tx2}}>Intercept</span><span style={{fontFamily:"'DM Mono',monospace"}}>{regResult.intercept.toFixed(4)} ± {regResult.seIntercept?.toFixed(4)}</span>
-                      <span style={{color:t.tx2}}>p-value</span><span style={{fontFamily:"'DM Mono',monospace",color:regResult.significant?t.ok:t.err,fontWeight:600}}>{regResult.pValue.toFixed(6)}</span>
-                      <span style={{color:t.tx2}}>Significant?</span><span style={{fontWeight:600,color:regResult.significant?t.ok:t.err}}>{regResult.significant?"Yes (p<0.05)":"No"}</span>
-                      <span style={{color:t.tx2}}>Residual SE</span><span style={{fontFamily:"'DM Mono',monospace"}}>{regResult.seResidual?.toFixed(4)}</span>
-                      <span style={{color:t.tx2}}>Sample size</span><span style={{fontFamily:"'DM Mono',monospace"}}>{regResult.n}</span>
-                    </div>
-                  </div>
-                </div>
-              ):<div style={{color:t.tx3,fontSize:11,textAlign:"center",padding:12}}>{!regX||!regY?"Select X and Y variables.":"Need 3+ paired data points."}</div>}
-            </div>
-          )}
-
-          {analyticsTab==="histogram"&&(
-            <div>
-              <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:8}}>Distribution Histogram</div>
-              <div style={{display:"flex",gap:8,marginBottom:10,alignItems:"flex-end",flexWrap:"wrap"}}>
-                <div style={{flex:"1 1 180px",minWidth:140}}><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Variable</div>
-                  <select value={histVar} onChange={e=>setHistVar(e.target.value)} style={{width:"100%",padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}>
-                    <option value="">— Select —</option>
-                    {corrVarsAll.map(v=><option key={v} value={v}>{v}</option>)}
-                  </select>
-                </div>
-                {histVar&&<button onClick={()=>setHistModalOpen(true)} style={{padding:"5px 10px",borderRadius:6,border:`1px solid ${t.bdr}`,background:"transparent",color:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}}>⛶ Enlarge</button>}
-                {histVar&&<button onClick={downloadHistPNG} style={{padding:"5px 10px",borderRadius:6,border:`1px solid ${t.bdr}`,background:"transparent",color:t.tx2,cursor:"pointer",fontSize:10,fontWeight:600}}>⬇ PNG</button>}
-              </div>
-              {histVar&&(
-                <div style={{display:"flex",justifyContent:"center"}}>
-                  <canvas ref={histCanvasRef} style={{borderRadius:8,border:`1px solid ${t.bdr}`,maxWidth:"100%"}} width={560} height={360}/>
-                </div>
-              )}
-              {!histVar&&<div style={{color:t.tx3,fontSize:11,textAlign:"center",padding:12}}>Select a variable to see its distribution.</div>}
-            </div>
-          )}
-
-          {analyticsTab==="norms"&&(
-            <div>
-              <div style={{fontSize:11,fontWeight:700,color:t.tx,marginBottom:6}}>Normative Comparison</div>
-              <div style={{fontSize:10,color:t.tx3,marginBottom:10}}>Add published cephalometric norms (mean ± SD in mm). The system will compare your sample mean against each norm.</div>
-              <div style={{display:"flex",gap:6,marginBottom:10,alignItems:"flex-end",flexWrap:"wrap"}}>
-                <div style={{flex:"1 1 70px",minWidth:60}}><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Label</div>
-                  <input value={newNorm.label} onChange={e=>setNewNorm(p=>({...p,label:e.target.value}))} placeholder="e.g. SNA" style={{width:"100%",padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}/>
-                </div>
-                <div style={{flex:"1 1 70px",minWidth:60}}><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>Mean (mm)</div>
-                  <input value={newNorm.mean} onChange={e=>setNewNorm(p=>({...p,mean:e.target.value}))} placeholder="82.0" style={{width:"100%",padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}/>
-                </div>
-                <div style={{flex:"1 1 70px",minWidth:60}}><div style={{fontSize:9,color:t.tx2,marginBottom:3}}>SD (mm)</div>
-                  <input value={newNorm.sd} onChange={e=>setNewNorm(p=>({...p,sd:e.target.value}))} placeholder="3.0" style={{width:"100%",padding:"5px 6px",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx,fontSize:11}}/>
-                </div>
-                <button onClick={addNorm} style={{padding:"5px 12px",borderRadius:6,border:"none",background:t.acc,color:"#fff",cursor:"pointer",fontSize:11,fontWeight:600}}>+ Add</button>
-              </div>
-              {norms.length>0&&(
-                <div style={{marginBottom:12}}>
-                  <div style={{overflowX:"auto"}}>
-                    <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
-                      <thead><tr style={{borderBottom:`1px solid ${t.bdr}`}}><th style={{textAlign:"left",padding:4,color:t.tx2}}>Label</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Norm Mean</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Norm SD</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Action</th></tr></thead>
-                      <tbody>{norms.map((n,i)=>(<tr key={i} style={{borderBottom:`1px solid ${t.bdr}44`}}><td style={{padding:4,color:t.tx,fontWeight:600}}>{n.label}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{n.mean.toFixed(1)} mm</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{n.sd.toFixed(1)} mm</td><td style={{padding:4,textAlign:"right"}}>                <button onClick={()=>removeNorm(i)} title="Remove norm" style={{padding:"2px 6px",borderRadius:4,border:"none",background:t.err+"22",color:t.err,cursor:"pointer",fontSize:9}}>✕</button></td></tr>))}</tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-              {norms.length>0&&(
-                <div>
-                  <div style={{fontSize:10,fontWeight:700,color:t.tx,marginBottom:6}}>Comparison Results</div>
-                  <div style={{overflowX:"auto"}}>
-                    <table style={{width:"100%",fontSize:9,borderCollapse:"collapse"}}>
-                      <thead><tr style={{borderBottom:`1px solid ${t.bdr}`}}><th style={{textAlign:"left",padding:4,color:t.tx2}}>Norm</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Sample Mean</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Norm Mean</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Deviation</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Z-Score</th><th style={{textAlign:"right",padding:4,color:t.tx2}}>Within ±2SD?</th></tr></thead>
-                      <tbody>{norms.map((n,i)=>{
-                        const match=descriptive.find(d=>d.var.toLowerCase().includes(n.label.toLowerCase()));
-                        if(!match||!match.mean)return(<tr key={i} style={{borderBottom:`1px solid ${t.bdr}44`}}><td style={{padding:4,color:t.tx,fontWeight:600}}>{n.label}</td><td colSpan={5} style={{padding:4,textAlign:"center",color:t.tx3}}>No matching measurement in sample</td></tr>);
-                        const ppm=1;
-                        const z=n.sd>0?(match.mean/ppm-n.mean)/n.sd:null;
-                        const within=z!==null&&Math.abs(z)<=2;
-                        return(<tr key={i} style={{borderBottom:`1px solid ${t.bdr}44`}}><td style={{padding:4,color:t.tx,fontWeight:600}}>{n.label}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{match.mean?.toFixed(2)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{n.mean.toFixed(1)}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace"}}>{z!==null?(match.mean/ppm-n.mean).toFixed(2):"-"}</td><td style={{padding:4,textAlign:"right",fontFamily:"'DM Mono',monospace",color:z!=null?z>0?t.acc:t.err:t.tx3}}>{z!=null?z.toFixed(2):"-"}</td><td style={{padding:4,textAlign:"right",fontWeight:600,color:within?t.ok:t.err}}>{within?"Yes":"No"}</td></tr>);
-                      })}</tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {corrModalOpen&&corrMatrix&&(
-        <div style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,0.7)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:9999,backdropFilter:"blur(4px)"}} onClick={()=>setCorrModalOpen(false)}>
-          <div style={{background:t.bg,borderRadius:12,border:`1px solid ${t.bdr}`,padding:20,maxWidth:"95vw",maxHeight:"95vh",overflow:"auto",boxShadow:`0 24px 64px ${t.shadow}40`}} onClick={e=>e.stopPropagation()}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
-              <div style={{fontSize:13,fontWeight:700,color:t.tx}}>Correlation Matrix — Heatmap</div>
-              <div style={{display:"flex",gap:6}}>
-                <button onClick={downloadCorrPNG} style={{padding:"4px 10px",borderRadius:6,border:`1px solid ${t.bdr}`,background:t.acc+"18",color:t.acc,cursor:"pointer",fontSize:10,fontWeight:600}} title="Download as PNG">⬇ PNG</button>
-                <button onClick={()=>setCorrModalOpen(false)} title="Close" style={{padding:"4px 8px",borderRadius:6,border:`1px solid ${t.bdr}`,background:"transparent",color:t.tx2,cursor:"pointer",fontSize:12}}>✕</button>
-              </div>
-            </div>
-            <canvas ref={corrCanvasRef} style={{borderRadius:8,border:`1px solid ${t.bdr}`}}/>
-          </div>
-        </div>
-      )}
-
-      {tab==="export"&&(
-        <div style={{display:"flex",flexDirection:"column",gap:8}}>
-          <Btn t={t} onClick={()=>{
-            const rows=[["Variable","N","Mean","SD","Median","CV%","Min","Max"]];
-            descriptive.filter(d=>d.n>0).forEach(r=>{rows.push([r.var,r.n,r.mean?.toFixed(4),r.sd?.toFixed(4),r.median?.toFixed(4),r.cv?.toFixed(4),r.min?.toFixed(4),r.max?.toFixed(4)]);});
-            const csv=rows.map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(",")).join("\n");
-            const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="database_descriptive.csv";a.click();
-          }}>⬇ Descriptive statistics (.csv)</Btn>
-          <Btn t={t} onClick={()=>{
-            const rows=[["Image","Landmark","X","Y"]];
-            databaseImages.forEach((img,idx)=>{
-              (img.markups||[]).forEach(m=>{
-                const label=m.label||m.type;
-                (m.points||[]).forEach((p,i)=>{
-                  const ptLabel=m.type==="point"?label:`${label}_P${i+1}`;
-                  rows.push([`img_${idx}`,ptLabel,p.x,p.y]);
-                });
-              });
-            });
-            const csv=rows.map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(",")).join("\n");
-            const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="database_landmark_coordinates.csv";a.click();
-          }}>⬇ Landmark coordinates (.csv)</Btn>
-          <Btn t={t} onClick={()=>{
-            const rows=[["Image","Variable","Value"]];
-            dataset.forEach(entry=>{
-              Object.entries(entry.measurements||{}).forEach(([k,v])=>{rows.push([entry.id,k,v.toFixed(4)]);});
-            });
-            const csv=rows.map(r=>r.map(c=>`"${String(c??'').replace(/"/g,'""')}"`).join(",")).join("\n");
-            const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="database_all_measurements.csv";a.click();
-          }}>⬇ All measurements + coords (.csv)</Btn>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ROOT
@@ -3077,28 +1318,34 @@ export default function CephalometryStudio(){
   const activeProject=projects.find(p=>p.id===activeId);
 
   const updateProject=(id,patch)=>{dirtyRef.current=true;setProjects(prev=>prev.map(p=>p.id===id?{...p,...patch,modified:Date.now()}:p));};
-  const updateVersion=(projectId,versionId,patch)=>{dirtyRef.current=true;setProjects(prev=>prev.map(p=>{if(p.id!==projectId)return p;return{...p,modified:Date.now(),versions:p.versions.map(v=>v.id===versionId?{...v,...patch}:v)};}));};
 
   const createProject=(projection,result)=>{
     const p={...mkProject(projection),name:result.name};
-    const v=p.versions.find(v=>v.id===p.activeVersionId);
-    if(result.image)v.images=[result.image];
-    v.calibration=result.calibration||{done:false,pxPerMm:1,knownMm:""};
+    const session=p.sessions.find(s=>s.id===p.activeSessionId);
+    if(result.image)session.image=result.image;
+    session.calibration=result.calibration||{done:false,pxPerMm:1,knownMm:""};
     if(result.templateType==="analysis"||result.templateType==="complete"){
       const analysis=result.analysis;
       if(analysis){
-        v.markups=analysis.pts.map(pt=>({
+        session.markups=analysis.pts.map(pt=>({
           id:uid(),type:"point",points:[{x:-99999,y:-99999}],
           label:pt.l,definition:pt.def,color:pt.color,
           size:6,visible:true,placed:false,
         }));
-        v.analysisTemplate=analysis.name;
+        session.analysisTemplate=analysis.name;
       }
     }else if(result.templateType==="upload"&&result.templateData){
       const d=result.templateData;
-      if(d.markups){
-        v.markups=d.markups.map(m=>({...m,id:uid(),points:[{x:-99999,y:-99999}],placed:false}));
-        v.analysisTemplate=d.name||"Imported";
+      const err=validateCepht(d);if(!err&&d.markups){
+        const hasCoords=d.version==="2.0"&&hasPlacedCoords(d.markups);
+        session.markups=d.markups.map(m=>{
+          const base={...m,id:uid(),definition:m.definition||m.def||"",visible:m.visible!==false};
+          if(hasCoords)return{...base,placed:m.placed!==false,points:m.points||[{x:-99999,y:-99999}]};
+          return{...base,placed:false,points:[{x:-99999,y:-99999}]};
+        });
+        if(d.formulas)session.formulas=d.formulas;
+        if(d.norms)session.norms=d.norms;
+        session.analysisTemplate=d.name||"Imported";
       }
     }
     setProjects(prev=>[...prev,p]);setActiveId(p.id);
@@ -3106,12 +1353,6 @@ export default function CephalometryStudio(){
 
   const importCephxFile=(file)=>{
     importCephx(file,proj=>{
-      // Migration: project-level images -> version-level
-      if(proj.images&&proj.images.length>0&&proj.versions.length>0){
-        if(!proj.versions[0].images||proj.versions[0].images.length===0)
-          proj.versions[0].images=[...proj.images];
-        delete proj.images;
-      }
       const existing=projects.find(p=>p.id===proj.id);
       if(existing&&!window.confirm("A case with this ID already exists. Overwrite?"))return;
       setProjects(prev=>[...prev.filter(p=>p.id!==proj.id),proj]);setActiveId(proj.id);
@@ -3125,7 +1366,6 @@ export default function CephalometryStudio(){
       {activeId&&activeProject&&(
         <Workspace key={activeId} project={activeProject}
           onUpdateProject={patch=>updateProject(activeId,patch)}
-          onUpdateVersion={(versionId,patch)=>updateVersion(activeId,versionId,patch)}
           onHome={()=>setActiveId(null)} t={t} theme={theme} setTheme={setTheme}
           onSave={proj=>{exportCephx(proj);dirtyRef.current=false;}}
           onImport={importCephxFile}/>
