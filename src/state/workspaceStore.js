@@ -88,8 +88,20 @@ export function uiReducer(state, action) {
       };
     case Actions.SET_CALIB:
       return { ...state, showCalib: action.payload };
-    case Actions.UI_SET:
-      return { ...state, ...action.payload };
+    case "SET": {
+      const next = {};
+      for (const [k, v] of Object.entries(action.payload)) {
+        next[k] = typeof v === "function" ? v(state[k]) : v;
+      }
+      return { ...state, ...next };
+    }
+    case Actions.UI_SET: {
+      const next = {};
+      for (const [k, v] of Object.entries(action.payload)) {
+        next[k] = typeof v === "function" ? v(state[k]) : v;
+      }
+      return { ...state, ...next };
+    }
     default:
       return state;
   }

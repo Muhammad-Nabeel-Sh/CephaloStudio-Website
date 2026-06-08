@@ -2,11 +2,13 @@ import { useState } from "react";
 import { mkSession } from "../model/session.js";
 import { addSession, removeSession, duplicateSessionInProject } from "../model/project.js";
 import { Btn, Tag } from "../ui.jsx";
+import BatchImportModal from "./BatchImportModal.jsx";
 
 export default function SessionsPanel({
   project, t, onUpdateProject,
 }) {
   const [newName, setNewName] = useState("");
+  const [showBatchImport, setShowBatchImport] = useState(false);
   const sessionList = project?.sessions || [];
   const activeId = project?.activeSessionId;
 
@@ -54,7 +56,11 @@ export default function SessionsPanel({
           onKeyDown={e => { if (e.key === "Enter") handleAdd(); }}
         />
         <Btn t={t} small onClick={handleAdd}>+ Add</Btn>
+        <Btn t={t} small ghost onClick={() => setShowBatchImport(true)} title="Batch import images with CSV metadata">📦 Import</Btn>
       </div>
+      {showBatchImport && (
+        <BatchImportModal t={t} project={project} onUpdateProject={onUpdateProject} onClose={() => setShowBatchImport(false)} />
+      )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         {sessionList.map((s, i) => (

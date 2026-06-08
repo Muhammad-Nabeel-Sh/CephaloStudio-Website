@@ -1,6 +1,7 @@
 import { runReliabilityAll } from "./reliability.js";
+import { runDescriptiveAll } from "./descriptive.js";
 
-export function runStudy(study, sessions, calibration, angleMode) {
+export function runStudy(study, sessions, calibration) {
   if (study.status === "running") return study;
   const config = study.config;
 
@@ -9,9 +10,11 @@ export function runStudy(study, sessions, calibration, angleMode) {
   try {
     switch (study.type) {
       case "reliability":
-        results = runReliabilityAll(sessions, config, calibration, angleMode);
+        results = runReliabilityAll(sessions, config, calibration);
         break;
       case "descriptive":
+        results = runDescriptiveAll(sessions, config, calibration);
+        break;
       case "comparative":
       case "longitudinal":
       case "correlation":

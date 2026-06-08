@@ -43,5 +43,10 @@ export function mkStudy(type, opts = {}) {
     };
   }
 
+  if (type === "descriptive") {
+    base.config.groupBy = opts.config?.groupBy || "none";
+    base.config.referenceNorms = opts.config?.referenceNorms || [];
+  }
+
   return base;
 }

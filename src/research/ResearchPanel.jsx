@@ -2,8 +2,9 @@ import { useState } from "react";
 import { STUDY_TYPES, mkStudy } from "./studyModel.js";
 import { runStudy } from "./engine.js";
 import { ReliabilityConfig, ReliabilityResults } from "./ReliabilityPanel.jsx";
+import { DescriptiveConfig, DescriptiveResults } from "./DescriptivePanel.jsx";
 
-export default function ResearchPanel({ t, project, onUpdateProject, calibration, angleMode }) {
+export default function ResearchPanel({ t, project, onUpdateProject, calibration }) {
   const studies = project?.researchStudies || [];
   const sessions = project?.sessions || [];
   const [tab, setTab] = useState("list");
@@ -26,7 +27,7 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
   const handleRun = (studyId) => {
     const study = studies.find(s => s.id === studyId);
     if (!study) return;
-    const updated = runStudy(study, sessions, calibration, angleMode);
+    const updated = runStudy(study, sessions, calibration);
     onUpdateProject({
       ...project,
       researchStudies: studies.map(s => s.id === studyId ? updated : s),
@@ -145,7 +146,11 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
                       <ReliabilityConfig study={s} sessions={sessions} onUpdateStudy={handleUpdateStudy} t={t} />
                     )}
 
-                    {s.status !== "reliability" && sessions.length > 0 && (
+                    {s.status === "configured" && s.type === "descriptive" && (
+                      <DescriptiveConfig study={s} sessions={sessions} onUpdateStudy={handleUpdateStudy} t={t} />
+                    )}
+
+                    {s.status === "configured" && s.type !== "reliability" && s.type !== "descriptive" && sessions.length > 0 && (
                       <div style={{ marginBottom: 8 }}>
                         <div style={{ fontSize: 9, fontWeight: 600, color: t.tx3, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 4 }}>Measurements</div>
                         <LabelSelector sessions={sessions} selected={s.config.labelIds || []} onToggle={l => handleToggleLabel(s.id, l)} t={t} />
@@ -153,9 +158,9 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
                     )}
 
                     {s.status === "completed" && s.results && (
-                      s.type === "reliability"
-                        ? <ReliabilityResults results={s.results} t={t} />
-                        : <StudyResults study={s} t={t} />
+                      s.type === "reliability" ? <ReliabilityResults results={s.results} t={t} /> :
+                      s.type === "descriptive" ? <DescriptiveResults results={s.results} t={t} /> :
+                      <StudyResults study={s} t={t} />
                     )}
 
                     {s.status === "error" && (
@@ -164,16 +169,9 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
                       </div>
                     )}
 
-                    {s.status === "configured" && s.type !== "reliability" && (
+                    {(s.status === "configured") && (
                       <button onClick={() => handleRun(s.id)}
-                        style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "none", background: t.acc, color: t.bg, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-                        Run Analysis
-                      </button>
-                    )}
-
-                    {s.status === "configured" && s.type === "reliability" && (
-                      <button onClick={() => handleRun(s.id)}
-                        style={{ width: "100%", marginTop: 8, padding: "8px 12px", borderRadius: 6, border: "none", background: t.acc, color: t.bg, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                        style={{ width: "100%", marginTop: s.type === "reliability" || s.type === "descriptive" ? 8 : 0, padding: "8px 12px", borderRadius: 6, border: "none", background: t.acc, color: t.bg, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                         Run Analysis
                       </button>
                     )}

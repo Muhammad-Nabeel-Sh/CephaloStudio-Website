@@ -22,6 +22,8 @@ export function mkSession(opts = {}) {
       operatorId: opts.meta?.operatorId || "",
       group: opts.meta?.group || "",
       timepoint: opts.meta?.timepoint || "",
+      age: opts.meta?.age || "",
+      sex: opts.meta?.sex || "",
       trialNumber: opts.meta?.trialNumber ?? null,
       tags: opts.meta?.tags || [],
     },
