@@ -48,5 +48,28 @@ export function mkStudy(type, opts = {}) {
     base.config.referenceNorms = opts.config?.referenceNorms || [];
   }
 
+  if (type === "comparative") {
+    base.config.design = opts.config?.design || "independent";
+    base.config.alpha = opts.config?.alpha ?? 0.05;
+    base.config.mcCorrection = opts.config?.mcCorrection || "bonferroni";
+    base.config.groups = opts.config?.groups || [
+      { id: uid(), label: "Group 1", caseIds: [] },
+      { id: uid(), label: "Group 2", caseIds: [] },
+    ];
+  }
+
+  if (type === "longitudinal") {
+    base.config.timepoints = opts.config?.timepoints || [
+      { id: uid(), label: "Pre", targetAge: null, window: 90 },
+      { id: uid(), label: "Post", targetAge: null, window: 90 },
+    ];
+    base.config.subjects = opts.config?.subjects || [
+      { id: uid(), label: "Subject 1", records: {} },
+      { id: uid(), label: "Subject 2", records: {} },
+    ];
+    base.config.sphericityCorrection = opts.config?.sphericityCorrection || "greenhouse-geisser";
+    base.config.modelType = opts.config?.modelType || "rm_anova";
+  }
+
   return base;
 }

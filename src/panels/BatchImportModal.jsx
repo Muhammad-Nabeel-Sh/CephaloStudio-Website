@@ -2,7 +2,7 @@ import { useState, useRef, useMemo, useCallback } from "react";
 import { Modal } from "./Modal.jsx";
 import { Btn } from "../ui.jsx";
 import { mkSession } from "../model/session.js";
-import { addSession } from "../model/project.js";
+import { mkSubject, addSubject, addSession } from "../model/project.js";
 import { parseCsv } from "../model/csv.js";
 import { uid } from "../utils.js";
 
@@ -87,8 +87,20 @@ export default function BatchImportModal({ t, project, onUpdateProject, onClose 
     setBusy(true);
     try {
       let proj = project;
+      const subjectMap = {}; // label -> subjectId
       merged.forEach(item => {
-        const session = mkSession({ name: item.name, image: item.imageEntry, meta: item.meta });
+        const subjectLabel = item.meta.subject || item.meta.patientId || "";
+        if (subjectLabel && !subjectMap[subjectLabel]) {
+          const sub = mkSubject({ label: subjectLabel });
+          subjectMap[subjectLabel] = sub.id;
+          proj = addSubject(proj, sub);
+        }
+        const session = mkSession({
+          name: item.name,
+          image: item.imageEntry,
+          meta: item.meta,
+          subjectId: subjectMap[subjectLabel] || "",
+        });
         proj = addSession(proj, session);
       });
       onUpdateProject(proj);

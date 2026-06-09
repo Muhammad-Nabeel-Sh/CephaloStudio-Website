@@ -118,3 +118,12 @@ export function PanelHeader({ t, children }) {
     </div>
   );
 }
+
+export function InfoBox({ t, children }) {
+  return (
+    <div style={{ fontSize: 10, color: t.tx2, lineHeight: 1.5, padding: "8px 10px", background: t.surf3, borderRadius: 4, border: `1px solid ${t.acc}22`, marginBottom: 10 }}>
+      <style>{`[data-ib] b{color:${t.acc}}`}</style>
+      <div data-ib>{children}</div>
+    </div>
+  );
+}

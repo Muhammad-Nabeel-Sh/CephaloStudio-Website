@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { useState } from "react";
+import { InfoBox } from "../ui.jsx";
 
 function uid() {
   return Math.random().toString(36).slice(2, 10);
@@ -41,7 +42,7 @@ function LabelSelector({ sessions, selected, onToggle, t }) {
 }
 
 // ─── Config Panel ────────────────────────────────────────────────────────
-export function ReliabilityConfig({ study, sessions, onUpdateStudy, t }) {
+export function ReliabilityConfig({ study, sessions, onUpdateStudy, t, project }) {
   const config = study.config;
   const operators = config.operators || [];
   const cases = config.cases || [];
@@ -106,6 +107,12 @@ export function ReliabilityConfig({ study, sessions, onUpdateStudy, t }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, fontSize: 11 }}>
+
+      <InfoBox t={t}>
+        Each <b>case</b> represents one subject at one timepoint. Assign sessions to cases,
+        then match each session to an <b>operator</b> and <b>occasion</b>.
+        Use <b>"From Subjects"</b> to auto-populate from your project subjects.
+      </InfoBox>
 
       {/* Design selector */}
       <div>
@@ -198,10 +205,30 @@ export function ReliabilityConfig({ study, sessions, onUpdateStudy, t }) {
       <div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
           <span style={{ fontSize: 9, fontWeight: 600, color: t.tx3, textTransform: "uppercase", letterSpacing: 0.3 }}>Cases</span>
-          <button onClick={addCase}
-            style={{ fontSize: 9, padding: "2px 8px", borderRadius: 3, border: `1px solid ${t.acc}`, background: "transparent", color: t.acc, cursor: "pointer" }}>
-            + Add Case
-          </button>
+          <div style={{ display: "flex", gap: 4 }}>
+            <button onClick={() => {
+              const subjects = project?.subjects || [];
+              if (subjects.length === 0) return;
+              const op = operators[0] || { id: uid(), name: "Operator 1", role: isMethod ? "test" : "primary" };
+              const newOps = operators.length === 0 ? [op] : operators;
+              const newCases = subjects.map(sub => {
+                const subSessions = sessions.filter(s => s.subjectId === sub.id);
+                return {
+                  id: uid(),
+                  name: sub.label,
+                  sessions: subSessions.map((s, i) => ({ sessionId: s.id, operatorId: op.id, occasion: i + 1 })),
+                };
+              });
+              update({ operators: newOps, cases: newCases });
+            }}
+              style={{ fontSize: 9, padding: "2px 8px", borderRadius: 3, border: `1px solid ${t.acc}`, background: "transparent", color: t.acc, cursor: "pointer" }}>
+              From Subjects
+            </button>
+            <button onClick={addCase}
+              style={{ fontSize: 9, padding: "2px 8px", borderRadius: 3, border: `1px solid ${t.bdr}`, background: "transparent", color: t.tx2, cursor: "pointer" }}>
+              + Add Case
+            </button>
+          </div>
         </div>
         {cases.length === 0 && (
           <div style={{ fontSize: 10, color: t.tx3, padding: "6px 0" }}>No cases defined. Add a case and assign sessions to it.</div>

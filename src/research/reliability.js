@@ -317,14 +317,18 @@ export function runReliabilityAll(sessions, config, calibration) {
   for (const label of labelList) {
     const samples = byLabel[label];
 
-    // ICC data
-    const iccData = samples.map(s => ({ subject: s.caseId, rater: s.operatorId, value: s.value }));
+    // ICC data — intra-operator uses occasion as rater
+    const iccData = samples.map(s => ({
+      subject: s.caseId,
+      rater: config.design === "intra" ? `occ${s.occasion}` : s.operatorId,
+      value: s.value,
+    }));
     const uniqueSubjects = [...new Set(iccData.map(d => d.subject))];
     const uniqueRaters = [...new Set(iccData.map(d => d.rater))];
     const k = uniqueRaters.length;
 
     if (uniqueSubjects.length < 2 || k < 2) {
-      details.push({ label, n: samples.length, skip: true, reason: `Need ≥2 cases and ≥2 raters (have ${uniqueSubjects.length} cases, ${k} raters)` });
+      details.push({ label, n: samples.length, skip: true, reason: `Need ≥2 cases and ≥2 raters/occasions (have ${uniqueSubjects.length} cases, ${k} raters)` });
       continue;
     }
 

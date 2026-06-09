@@ -503,7 +503,7 @@ export function oneWayAnova(...groups) {
   return { F, dfBetween, dfWithin, msBetween, msWithin, ssBetween, ssWithin, pValue, significant: pValue < 0.05 };
 }
 
-function fCDF(f, d1, d2) {
+export function fCDF(f, d1, d2) {
   if (f <= 0) return 0;
   const x = d2 / (d2 + d1 * f);
   return 1 - betaIncomplete(d1 / 2, d2 / 2, x);

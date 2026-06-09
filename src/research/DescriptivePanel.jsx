@@ -4,6 +4,7 @@
 
 import { useState } from "react";
 import { PREDEFINED_NORMS } from "./descriptive.js";
+import { InfoBox } from "../ui.jsx";
 
 function sid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -85,6 +86,11 @@ export function DescriptiveConfig({ study, sessions, onUpdateStudy, t }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 12, fontSize: 11 }}>
+
+      <InfoBox t={t}>
+        Compute descriptive statistics, reference intervals and z-scores
+        from your session measurements. Optionally group by a metadata field.
+      </InfoBox>
 
       {/* Grouping */}
       <div>

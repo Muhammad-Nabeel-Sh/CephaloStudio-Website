@@ -1,5 +1,7 @@
 import { runReliabilityAll } from "./reliability.js";
 import { runDescriptiveAll } from "./descriptive.js";
+import { runComparativeAll } from "./comparative.js";
+import { runLongitudinalAll } from "./longitudinal.js";
 
 export function runStudy(study, sessions, calibration) {
   if (study.status === "running") return study;
@@ -16,7 +18,11 @@ export function runStudy(study, sessions, calibration) {
         results = runDescriptiveAll(sessions, config, calibration);
         break;
       case "comparative":
+        results = runComparativeAll(sessions, config, calibration);
+        break;
       case "longitudinal":
+        results = runLongitudinalAll(sessions, config, calibration);
+        break;
       case "correlation":
       case "diagnostic":
       case "morphometrics":

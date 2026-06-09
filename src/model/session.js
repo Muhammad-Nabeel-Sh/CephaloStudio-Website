@@ -17,6 +17,7 @@ export function mkSession(opts = {}) {
     analysisTemplate: opts.analysisTemplate || "blank",
     formulas: opts.formulas || [],
     norms: opts.norms || [],
+    subjectId: opts.subjectId || opts.meta?.subjectId || "",
     meta: {
       patientId: opts.meta?.patientId || "",
       operatorId: opts.meta?.operatorId || "",
@@ -31,7 +32,7 @@ export function mkSession(opts = {}) {
 }
 
 export function updateSession(session, patch) {
-  return { ...session, ...patch };
+  return { ...session, ...patch, meta: { ...session.meta, ...(patch.meta || {}) } };
 }
 
 export function duplicateSession(session) {
@@ -43,6 +44,8 @@ export function duplicateSession(session) {
     markups: (session.markups || []).map(m => ({ ...m, id: uid() })),
     formulas: (session.formulas || []).map(f => ({ ...f, id: uid() })),
     norms: (session.norms || []).map(n => ({ ...n, id: uid() })),
+    subjectId: session.subjectId,
+    meta: { ...session.meta },
   });
 }
 
@@ -54,4 +57,32 @@ export function getActiveMarkups(sessions, activeId) {
 export function getActiveCalibration(sessions, activeId) {
   const s = sessions.find(s => s.id === activeId);
   return s?.calibration || { done: false, pxPerMm: 1 };
+}
+
+export function getSessionsBySubject(sessions, subjectId) {
+  return sessions.filter(s => s.subjectId === subjectId);
+}
+
+export function getUniqueSubjects(sessions) {
+  return [...new Set(sessions.map(s => s.subjectId).filter(Boolean))];
+}
+
+export function getUniqueGroups(sessions) {
+  return [...new Set(sessions.map(s => s.meta?.group).filter(Boolean))];
+}
+
+export function getUniqueTimepoints(sessions) {
+  return [...new Set(sessions.map(s => s.meta?.timepoint).filter(Boolean))];
+}
+
+export function getSessionMatrix(sessions, subjects, timepoints) {
+  const matrix = {};
+  for (const subj of subjects) {
+    matrix[subj.id] = {};
+    for (const tp of timepoints) {
+      const match = sessions.find(s => s.subjectId === subj.id && s.meta?.timepoint === tp);
+      matrix[subj.id][tp] = match || null;
+    }
+  }
+  return matrix;
 }

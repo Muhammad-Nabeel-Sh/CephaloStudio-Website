@@ -215,3 +215,26 @@ Recommended settings for `.vscode/settings.json`:
   }
 }
 ```
+
+---
+
+## Progress Summary
+
+### Done
+- **Phase 4 — Research Module Framework**: Created `src/research/` with `studyModel.js`, `engine.js`
+- **Reliability module**: ICC(2,1) with 95% CI, Bland-Altman, Dahlberg/SEM/MDC, landmark error mapping via 2×2 eigendecomposition — config + results UI (`ReliabilityPanel.jsx`)
+- **Descriptive/Normative module**: descriptive stats, reference intervals, z-scores, predefined norms — config + results UI (`DescriptivePanel.jsx`)
+- **Comparative module**: test selection (normality+Levene's → route), parametric/non-parametric tests, post-hoc (Tukey HSD/Bonferroni), effect sizes auto-selected, MANOVA — config + results UI (`ComparativePanel.jsx`)
+- **Longitudinal module**: RM-ANOVA with Mauchly's sphericity test, GG/HF/LB epsilons, LMM (two-level REML), pairwise Bonferroni — config + results UI (`LongitudinalPanel.jsx`)
+- **ResultsDialog**: Floating modal (normogram pattern) with Tables/Charts tabs for all 4 modules
+- **Charts module** (`moduleCharts.jsx`): ICC forest plot, Bland-Altman plot, Error map, Distribution+normal curve, Box plots, Group means bar, Effect size forest, P-value dot chart, Longitudinal trajectories, Change score chart
+- **`addMarkup()` auto-links refLabels** by detecting matching point labels within 0.5px tolerance; `refreshAutoMeas()` applies to any `refLabels` bearer regardless of `autoCreated`
+- **Sessions model** (`session.js`, `project.js`) replacing versions and repro trials
+- **Templates**: `.cepht` v2.0 export with point coords, validation, measurement preview, subset editing, localStorage library
+- **Session Filmstrip**: floating bottom-center horizontal thumbnail bar
+- **Batch Import**: multi-image + CSV sidecar parsing
+- **App.jsx refactored**: removed dead database mode code, simplified to ~1362 lines
+
+### Build Status
+- `npm run build` — OK (chunk size warning is pre-existing, mathjs is large)
+- `npm run lint` — 9 errors in `scripts/svg-to-silhouette.js` only (build script, not app); 9 warnings in App.jsx only (`react-hooks/exhaustive-deps`, pre-existing)

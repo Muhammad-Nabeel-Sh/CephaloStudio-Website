@@ -1,6 +1,10 @@
 import { uid } from "../utils.js";
 import { mkSession, duplicateSession } from "./session.js";
 
+export function mkSubject(opts = {}) {
+  return { id: uid(), label: opts.label || "Subject", age: opts.age || "", sex: opts.sex || "" };
+}
+
 export function mkProject(projection) {
   const session = mkSession({ label: "T0", name: "Initial" });
   return {
@@ -18,6 +22,7 @@ export function mkProject(projection) {
     activeSessionId: session.id,
     reproStudies: [],
     researchStudies: [],
+    subjects: [],
   };
 }
 
@@ -67,4 +72,28 @@ export function duplicateSessionInProject(project, sessionId) {
     modified: Date.now(),
     sessions: [...project.sessions, dup],
   };
+}
+
+// ─── Subject CRUD ────────────────────────────────────────────────────────
+export function addSubject(project, subject) {
+  return { ...project, modified: Date.now(), subjects: [...project.subjects, subject] };
+}
+
+export function removeSubject(project, subjectId) {
+  return { ...project, modified: Date.now(), subjects: project.subjects.filter(s => s.id !== subjectId) };
+}
+
+export function updateSubject(project, subjectId, patch) {
+  return {
+    ...project, modified: Date.now(),
+    subjects: project.subjects.map(s => s.id === subjectId ? { ...s, ...patch } : s),
+  };
+}
+
+export function getSessionsBySubject(project, subjectId) {
+  return project.sessions.filter(s => s.subjectId === subjectId);
+}
+
+export function getSubjectOptions(project) {
+  return project.subjects.map(s => ({ value: s.id, label: s.label }));
 }

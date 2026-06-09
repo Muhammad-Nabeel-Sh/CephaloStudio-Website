@@ -3,6 +3,9 @@ import { STUDY_TYPES, mkStudy } from "./studyModel.js";
 import { runStudy } from "./engine.js";
 import { ReliabilityConfig, ReliabilityResults } from "./ReliabilityPanel.jsx";
 import { DescriptiveConfig, DescriptiveResults } from "./DescriptivePanel.jsx";
+import { ComparativeConfig, ComparativeResults } from "./ComparativePanel.jsx";
+import { LongitudinalConfig, LongitudinalResults } from "./LongitudinalPanel.jsx";
+import ResultsDialog from "./ResultsDialog.jsx";
 
 export default function ResearchPanel({ t, project, onUpdateProject, calibration }) {
   const studies = project?.researchStudies || [];
@@ -10,6 +13,7 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
   const [tab, setTab] = useState("list");
   const [selectedType, setSelectedType] = useState("reliability");
   const [selectedId, setSelectedId] = useState(null);
+  const [dialogStudy, setDialogStudy] = useState(null);
 
   const handleCreate = () => {
     const study = mkStudy(selectedType, {
@@ -32,6 +36,7 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
       ...project,
       researchStudies: studies.map(s => s.id === studyId ? updated : s),
     });
+    setDialogStudy(updated);
   };
 
   const handleRemove = (studyId) => {
@@ -144,14 +149,22 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
                   <div onClick={e => e.stopPropagation()} style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${t.bdr}44` }}>
                     {/* Config — always editable */}
                     {s.type === "reliability" && (
-                      <ReliabilityConfig study={s} sessions={sessions} onUpdateStudy={handleUpdateStudy} t={t} />
+                      <ReliabilityConfig study={s} sessions={sessions} onUpdateStudy={handleUpdateStudy} t={t} project={project} />
                     )}
 
                     {s.type === "descriptive" && (
                       <DescriptiveConfig study={s} sessions={sessions} onUpdateStudy={handleUpdateStudy} t={t} />
                     )}
 
-                    {s.type !== "reliability" && s.type !== "descriptive" && sessions.length > 0 && (
+                    {s.type === "comparative" && (
+                      <ComparativeConfig study={s} sessions={sessions} onUpdateStudy={handleUpdateStudy} t={t} />
+                    )}
+
+                    {s.type === "longitudinal" && (
+                      <LongitudinalConfig study={s} sessions={sessions} onUpdateStudy={handleUpdateStudy} t={t} project={project} />
+                    )}
+
+                    {s.type !== "reliability" && s.type !== "descriptive" && s.type !== "comparative" && s.type !== "longitudinal" && sessions.length > 0 && (
                       <div style={{ marginBottom: 8 }}>
                         <div style={{ fontSize: 9, fontWeight: 600, color: t.tx3, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 4 }}>Measurements</div>
                         <LabelSelector sessions={sessions} selected={s.config.labelIds || []} onToggle={l => handleToggleLabel(s.id, l)} t={t} />
@@ -160,9 +173,15 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
 
                     {/* Results — when completed */}
                     {s.status === "completed" && s.results && (
-                      s.type === "reliability" ? <ReliabilityResults results={s.results} t={t} /> :
-                      s.type === "descriptive" ? <DescriptiveResults results={s.results} t={t} /> :
-                      <StudyResults study={s} t={t} />
+                      <div style={{ marginBottom: s.status === "completed" ? 8 : 0 }}>
+                        <div style={{ fontSize: 10, fontWeight: 600, color: t.ok, marginBottom: 4 }}>
+                          ✓ Analysis complete
+                        </div>
+                        <button onClick={() => setDialogStudy(s)}
+                          style={{ padding: "6px 12px", borderRadius: 6, border: `1px solid ${t.acc}`, background: t.acc + "12", color: t.acc, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                          View Results
+                        </button>
+                      </div>
                     )}
 
                     {/* Error message */}
@@ -185,6 +204,10 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
             );
           })}
         </div>
+      )}
+
+      {dialogStudy?.status === "completed" && (
+        <ResultsDialog study={dialogStudy} t={t} onClose={() => setDialogStudy(null)} />
       )}
     </div>
   );
