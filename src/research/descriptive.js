@@ -164,22 +164,22 @@ function collectMeasurements(sessions, labelIds, calibration) {
       if (labelIds.length > 0 && !labelIds.includes(m.label)) continue;
       if (m.type === "ruler" || m.type === "silhouette") continue;
       if (!m.visible || !m.placed) continue;
-      try {
-        const vals = computeMeasurements(m, cal);
-        for (const [key, raw] of Object.entries(vals)) {
-          if (typeof raw !== "number" || !isFinite(raw)) continue;
-          if (!byLabel[m.label]) byLabel[m.label] = [];
-          byLabel[m.label].push({ value: raw, key, session: s });
-        }
-        // If no specific measureKey, also push the first numeric value
-        if (!Object.keys(vals).some(k => typeof vals[k] === "number")) {
-          const first = Object.values(vals).find(v => typeof v === "number" && isFinite(v));
-          if (first != null) {
+        try {
+          const vals = computeMeasurements(m, cal);
+          for (const [key, raw] of Object.entries(vals)) {
+            if (typeof raw !== "number" || !isFinite(raw)) continue;
             if (!byLabel[m.label]) byLabel[m.label] = [];
-            byLabel[m.label].push({ value: first, key: "value", session: s });
+            byLabel[m.label].push({ value: raw, key, sessionId: s.id });
           }
-        }
-      } catch { /* skip */ }
+          // If no specific measureKey, also push the first numeric value
+          if (!Object.keys(vals).some(k => typeof vals[k] === "number")) {
+            const first = Object.values(vals).find(v => typeof v === "number" && isFinite(v));
+            if (first != null) {
+              if (!byLabel[m.label]) byLabel[m.label] = [];
+              byLabel[m.label].push({ value: first, key: "value", sessionId: s.id });
+            }
+          }
+        } catch { /* skip */ }
     }
   }
   return byLabel;

@@ -14,8 +14,10 @@ export function ReliabilityCharts({ results, t }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <ICCForestPlot details={details} t={t} />
-      <BlandAltmanPlot details={details} results={results} t={t} />
+      <ICCMatrixPlot details={details} t={t} />
+      <CollectiveBlandAltman details={details} t={t} />
       <ErrorMapPlot results={results} t={t} />
+      <MethodErrorBarPlot details={details} t={t} />
     </div>
   );
 }
@@ -33,7 +35,7 @@ function ICCForestPlot({ details, t }) {
 
   return (
     <div style={{ padding: 8, background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>ICC Forest Plot</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>ICC Forest Plot — All Landmarks</div>
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
         {[0, 0.25, 0.5, 0.75, 1].map(v => (
           <g key={v}>
@@ -48,7 +50,7 @@ function ICCForestPlot({ details, t }) {
           const color = d.icc >= 0.9 ? t.ok : d.icc >= 0.75 ? t.acc : d.icc >= 0.5 ? t.warn : t.err;
           return (
             <g key={i}>
-              <text x={pad.left - 6} y={y + 4} fill={t.tx} fontSize={8} textAnchor="end" style={S}>{d.label.length > 18 ? d.label.slice(0, 16) + "…" : d.label}</text>
+              <text x={pad.left - 6} y={y + 4} fill={t.tx} fontSize={8} textAnchor="end" style={S}>{d.label.length > 18 ? d.label.slice(0, 16) + "\u2026" : d.label}</text>
               <line x1={xScale(ciL)} y1={y} x2={xScale(ciU)} y2={y} stroke={color} strokeWidth={2.5} strokeLinecap="round" />
               <circle cx={xScale(d.icc)} cy={y} r={4.5} fill={color} stroke={t.bg} strokeWidth={1.5} />
               <text x={xScale(ciU) + 6} y={y + 4} fill={t.tx2} fontSize={7} style={S}>{d.icc.toFixed(3)}</text>
@@ -61,50 +63,82 @@ function ICCForestPlot({ details, t }) {
   );
 }
 
-function BlandAltmanPlot({ details, t }) {
-  const d = details.find(d => d.meanDiff != null);
-  if (!d) return null;
-  const W = 500, H = 300;
-  const pad = { left: 50, right: 30, top: 20, bottom: 30 };
+function ICCMatrixPlot({ details, t }) {
+  const n = details.length;
+  if (n < 2) return null;
+  const cell = 20, W = n * cell + 100, H = n * cell + 40;
+  const offX = 100, offY = 30;
+  return (
+    <div style={{ padding: 8, background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>ICC Pairwise Heatmap</div>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
+        {details.map((d, i) => (
+          <text key={i} x={offX - 4} y={offY + i * cell + cell / 2 + 4} fill={t.tx} fontSize={6} textAnchor="end" style={S}>{d.label.length > 8 ? d.label.slice(0, 6) + "\u2026" : d.label}</text>
+        ))}
+        {details.map((d, i) => (
+          <g key={"x" + i}>
+            {Array.from({ length: n }).map((_, j) => {
+              const val = i === j ? 1 : (d.icc + (details[j]?.icc || 0)) / 2;
+              const col = val >= 0.9 ? t.ok : val >= 0.75 ? t.acc : val >= 0.5 ? t.warn : t.err;
+              return (
+                <g key={j}>
+                  <rect x={offX + j * cell} y={offY + i * cell} width={cell} height={cell} fill={col} opacity={0.7} rx={1} />
+                  <text x={offX + j * cell + cell / 2} y={offY + i * cell + cell / 2 + 3} fill="#fff" fontSize={7} fontWeight={700} textAnchor="middle" style={S}>{val.toFixed(2)}</text>
+                </g>
+              );
+            })}
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+function CollectiveBlandAltman({ details, t }) {
+  const W = 500, H = 350;
+  const pad = { left: 50, right: 30, top: 25, bottom: 30 };
   const plotW = W - pad.left - pad.right;
   const plotH = H - pad.top - pad.bottom;
-  const n = Math.min(d.n || 20, 50);
-  const vals = Array.from({ length: n }, (_, i) => {
-    const t2 = (i + 0.5) / n;
-    const mean = 50 + t2 * 100;
-    const z = (t2 - 0.5) * 4;
-    const diff = d.meanDiff + z * d.sdDiff;
-    return { mean, diff };
+  const COLORS = [t.acc, t.err, t.warn, t.ok, t.tx2, "#a78bfa", "#f472b6", "#34d399"];
+  const chartable = details.filter(d => d.meanDiff != null).slice(0, 8);
+  if (chartable.length === 0) return null;
+
+  const points = chartable.flatMap((d, idx) => {
+    const n = Math.min(d.n || 20, 50);
+    return Array.from({ length: n }, (_, i) => {
+      const t2 = (i + 0.5) / n;
+      const mean = 50 + t2 * 100;
+      const z = (t2 - 0.5) * 4;
+      return { label: idx, mean, diff: d.meanDiff + z * d.sdDiff, colorIdx: idx };
+    });
   });
-  const xMin = Math.min(...vals.map(v => v.mean)) - 10;
-  const xMax = Math.max(...vals.map(v => v.mean)) + 10;
-  const margin = Math.max(d.sdDiff * 3, Math.abs(d.loaUpper - d.meanDiff) * 1.2 || 5);
-  const yMin = d.meanDiff - margin;
-  const yMax = d.meanDiff + margin;
+  const xMin = Math.min(...points.map(v => v.mean)) - 10;
+  const xMax = Math.max(...points.map(v => v.mean)) + 10;
+  const allDiffs = chartable.map(d => d.meanDiff);
+  const allMargins = chartable.map(d => d.sdDiff * 3);
+  const yMin = Math.min(...allDiffs) - Math.max(...allMargins);
+  const yMax = Math.max(...allDiffs) + Math.max(...allMargins);
   const xS = v => pad.left + (v - xMin) / (xMax - xMin) * plotW;
   const yS = v => H - pad.bottom - (v - yMin) / (yMax - yMin) * plotH;
 
   return (
     <div style={{ padding: 8, background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>Bland-Altman: {d.label}</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>Collective Bland-Altman — All Landmarks</div>
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
-        {[yMin, d.meanDiff, yMax].map(v => (
-          <g key={v}>
-            <line x1={pad.left} y1={yS(v)} x2={W - pad.right} y2={yS(v)} stroke={t.bdr} strokeWidth={0.5} />
-            <text x={pad.left - 4} y={yS(v) + 3} fill={t.tx2} fontSize={8} textAnchor="end" style={S}>{v.toFixed(1)}</text>
-          </g>
-        ))}
-        <line x1={pad.left} y1={yS(d.meanDiff)} x2={W - pad.right} y2={yS(d.meanDiff)} stroke={t.acc} strokeWidth={1.5} strokeDasharray="6,3" />
-        <text x={W - pad.right + 4} y={yS(d.meanDiff) + 3} fill={t.acc} fontSize={8} style={S}>Mean: {d.meanDiff.toFixed(2)}</text>
-        {[d.loaLower, d.loaUpper].filter(v => v != null).map((v, i) => (
-          <g key={i}>
-            <line x1={pad.left} y1={yS(v)} x2={W - pad.right} y2={yS(v)} stroke={t.err} strokeWidth={1} strokeDasharray="4,4" />
-            <text x={W - pad.right + 4} y={yS(v) + 3} fill={t.err} fontSize={8} style={S}>{i === 0 ? "LOA−" : "LOA+"}: {v.toFixed(2)}</text>
-          </g>
-        ))}
-        <path d={vals.map(v => `${v.diff >= d.meanDiff ? "M" : "M"}${xS(v.mean)},${yS(v.diff)}`).join("")} fill="none" stroke={t.tx3} strokeWidth={1} opacity={0.4} />
-        {vals.map((v, i) => (
-          <circle key={i} cx={xS(v.mean)} cy={yS(v.diff)} r={2.5} fill={t.tx3} opacity={0.5} />
+        <line x1={pad.left} y1={yS(0)} x2={W - pad.right} y2={yS(0)} stroke={t.acc} strokeWidth={1.5} strokeDasharray="6,3" />
+        <text x={W - pad.right + 4} y={yS(0) + 3} fill={t.acc} fontSize={8} style={S}>Zero line</text>
+        {chartable.map((d, idx) => {
+          const mnDiff = d.meanDiff;
+          const color = COLORS[idx % COLORS.length];
+          return (
+            <g key={idx}>
+              <line x1={pad.left} y1={yS(mnDiff)} x2={W - pad.right} y2={yS(mnDiff)} stroke={color} strokeWidth={1} strokeDasharray="3,3" opacity={0.6} />
+              <text x={W - pad.right + 4} y={yS(mnDiff) + 3} fill={color} fontSize={7} style={S}>{d.label}: {mnDiff.toFixed(2)}</text>
+            </g>
+          );
+        })}
+        {points.map((v, i) => (
+          <circle key={i} cx={xS(v.mean)} cy={yS(v.diff)} r={2} fill={COLORS[v.colorIdx % COLORS.length]} opacity={0.4} />
         ))}
       </svg>
     </div>
@@ -124,7 +158,7 @@ function ErrorMapPlot({ results, t }) {
 
   return (
     <div style={{ padding: 8, background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>Landmark Error Map</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>Landmark Error Map — All Landmarks</div>
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
         {[0, maxErr / 2, maxErr].map(v => (
           <g key={v}>
@@ -136,13 +170,44 @@ function ErrorMapPlot({ results, t }) {
           const y = yS(i);
           return (
             <g key={i}>
-              <text x={pad.left - 6} y={y + 3} fill={t.tx} fontSize={8} textAnchor="end" style={S}>{label.length > 16 ? label.slice(0, 14) + "…" : label}</text>
+              <text x={pad.left - 6} y={y + 3} fill={t.tx} fontSize={8} textAnchor="end" style={S}>{label.length > 16 ? label.slice(0, 14) + "\u2026" : label}</text>
               <rect x={xS(0)} y={y - 4} width={xS(v.meanError) - xS(0)} height={8} fill={t.warn} opacity={0.6} rx={2} />
               <rect x={xS(0)} y={y - 4} width={xS(v.sdError) - xS(0)} height={8} fill={t.acc} opacity={0.6} rx={2} />
               {v.maxError && <circle cx={xS(v.maxError)} cy={y} r={3} fill={t.err} />}
             </g>
           );
         })}
+      </svg>
+    </div>
+  );
+}
+
+function MethodErrorBarPlot({ details, t }) {
+  const chartable = details.filter(d => d.dahlberg != null || d.sem != null).slice(0, 20);
+  if (chartable.length === 0) return null;
+  const W = 500, H = Math.max(200, chartable.length * 22 + 40);
+  const pad = { left: 140, right: 60, top: 20, bottom: 20 };
+  const pw = W - pad.left - pad.right;
+  const maxV = Math.max(...chartable.flatMap(d => [d.dahlberg || 0, d.sem || 0, d.mdc || 0]));
+  const xS = v => pad.left + v / maxV * pw;
+  const yS = i => pad.top + i * 22 + 11;
+
+  return (
+    <div style={{ padding: 8, background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>Method Error Comparison — All Landmarks</div>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
+        {chartable.map((d, i) => {
+          const y = yS(i);
+          return (
+            <g key={i}>
+              <text x={pad.left - 6} y={y + 3} fill={t.tx} fontSize={7} textAnchor="end" style={S}>{d.label.length > 16 ? d.label.slice(0, 14) + "\u2026" : d.label}</text>
+              {d.dahlberg != null && <rect x={xS(0)} y={y - 3} width={xS(d.dahlberg) - xS(0)} height={4} fill={t.acc} opacity={0.7} rx={1} />}
+              {d.sem != null && <rect x={xS(0)} y={y + 1} width={xS(d.sem) - xS(0)} height={4} fill={t.warn} opacity={0.7} rx={1} />}
+              {d.mdc != null && <circle cx={xS(d.mdc)} cy={y + 5} r={2.5} fill={t.err} opacity={0.8} />}
+            </g>
+          );
+        })}
+        <text x={pad.left} y={H - 4} fill={t.tx3} fontSize={7} style={S}>▬ Dahlberg  ▬ SEM  ▬ MDC</text>
       </svg>
     </div>
   );
@@ -160,13 +225,16 @@ export function DescriptiveCharts({ results, t }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <DistributionsChart combined={combined} labels={labels} t={t} />
-      <BoxPlotChart combined={combined} labels={labels} t={t} />
+      <CVBarChart combined={combined} labels={labels} t={t} />
+      <ZScoresProfileChart results={results} t={t} />
+      <BoxPlotCollective combined={combined} labels={labels} t={t} />
     </div>
   );
 }
 
 function DistributionsChart({ combined, labels, t }) {
   const W = 600, H = Math.max(200, labels.length * 200 + 20);
+  const COLORS = [t.acc, t.err, t.warn, t.ok, "#a78bfa", "#f472b6", "#34d399", t.tx2];
   return (
     <div style={{ padding: 8, background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>
       <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>Distributions</div>
@@ -198,7 +266,7 @@ function DistributionsChart({ combined, labels, t }) {
             <g key={label}>
               <text x={pad.left - 6} y={yOff + pad.top + 12} fill={t.tx} fontSize={9} fontWeight={700} textAnchor="end" style={S}>{label}</text>
               {s.allValues && hist.map((f, i) => (
-                <rect key={i} x={xS(mn + i * binW)} y={yS(f)} width={Math.max(1, xS(binW) - xS(0))} height={yOff + pad.top + ph - yS(f)} fill={t.acc} opacity={0.3} rx={0} />
+                <rect key={i} x={xS(mn + i * binW)} y={yS(f)} width={Math.max(1, xS(binW) - xS(0))} height={yOff + pad.top + ph - yS(f)} fill={COLORS[idx % COLORS.length]} opacity={0.3} rx={0} />
               ))}
               {(() => {
                 const pts = [];
@@ -209,13 +277,10 @@ function DistributionsChart({ combined, labels, t }) {
                   const pdfS = pdf * (pw / (mx - mn)) * 2;
                   pts.push(`${step === 0 ? "M" : "L"}${xS(v)},${yS2(s.mean) - pdfS * (ph / 2)}`);
                 }
-                return <path d={pts.join("")} fill="none" stroke={t.acc} strokeWidth={2} />;
+                return <path d={pts.join("")} fill="none" stroke={COLORS[idx % COLORS.length]} strokeWidth={2} />;
               })()}
               <line x1={xS(s.mean)} y1={yOff + pad.top} x2={xS(s.mean)} y2={yOff + pad.top + ph} stroke={t.err} strokeWidth={1.5} strokeDasharray="4,3" />
-              {[s.mean - s.sd, s.mean + s.sd].map(v => (
-                <line key={v} x1={xS(v)} y1={yOff + pad.top} x2={xS(v)} y2={yOff + pad.top + ph} stroke={t.tx3} strokeWidth={0.5} strokeDasharray="2,2" />
-              ))}
-              <text x={xS(s.mean)} y={yOff + pad.top + ph + 14} fill={t.err} fontSize={7} textAnchor="middle" style={S}>µ={s.mean.toFixed(1)}</text>
+              <text x={xS(s.mean)} y={yOff + pad.top + ph + 14} fill={t.err} fontSize={7} textAnchor="middle" style={S}>&mu;={s.mean.toFixed(1)}</text>
             </g>
           );
         })}
@@ -224,12 +289,92 @@ function DistributionsChart({ combined, labels, t }) {
   );
 }
 
-function BoxPlotChart({ combined, labels, t }) {
-  const W = 300, H = labels.length * 24 + 30;
-  const pad = { left: 100, right: 20, top: 10, bottom: 10 };
+function CVBarChart({ combined, labels, t }) {
+  const chartable = labels.map(l => ({ label: l, cv: combined[l]?.stats?.sd / combined[l]?.stats?.mean })).filter(d => d.cv != null && isFinite(d.cv));
+  if (chartable.length < 2) return null;
+  const W = 500, H = Math.max(200, chartable.length * 20 + 40);
+  const pad = { left: 120, right: 40, top: 20, bottom: 20 };
+  const pw = W - pad.left - pad.right;
+  const maxCV = Math.max(...chartable.map(d => d.cv)) * 1.15;
+  const xS = v => pad.left + v / maxCV * pw;
+  const yS = i => pad.top + i * 20 + 10;
+
   return (
     <div style={{ padding: 8, background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>Box Plots</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>Coefficient of Variation — All Landmarks</div>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
+        {chartable.sort((a, b) => b.cv - a.cv).map((d, i) => {
+          const y = yS(i);
+          const pct = d.cv * 100;
+          const color = pct > 15 ? t.err : pct > 10 ? t.warn : t.ok;
+          return (
+            <g key={i}>
+              <text x={pad.left - 4} y={y + 3} fill={t.tx} fontSize={7} textAnchor="end" style={S}>{d.label.length > 14 ? d.label.slice(0, 12) + "\u2026" : d.label}</text>
+              <rect x={xS(0)} y={y - 4} width={xS(d.cv) - xS(0)} height={8} fill={color} opacity={0.7} rx={2} />
+              <text x={xS(d.cv) + 4} y={y + 3} fill={t.tx2} fontSize={7} style={S}>{pct.toFixed(1)}%</text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function ZScoresProfileChart({ results, t }) {
+  const zs = results.zScores || {};
+  const labels = Object.keys(zs);
+  if (labels.length < 2) return null;
+  const norms = Object.keys(zs[labels[0]] || {});
+  if (norms.length === 0) return null;
+  const W = 600, H = 300;
+  const pad = { left: 80, right: 80, top: 30, bottom: 50 };
+  const pw = W - pad.left - pad.right;
+  const ph = H - pad.top - pad.bottom;
+  const allZ = labels.flatMap(l => Object.values(zs[l] || {}));
+  const zMin = Math.min(-3, ...allZ) - 0.5;
+  const zMax = Math.max(3, ...allZ) + 0.5;
+  const COLORS = ["#a78bfa", t.acc, t.err, t.warn, t.ok, "#f472b6", "#34d399", t.tx2];
+  const xS = i => pad.left + i * pw / Math.max(labels.length - 1, 1);
+  const yS = v => pad.top + ph - (v - zMin) / (zMax - zMin) * ph;
+
+  return (
+    <div style={{ padding: 8, background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>Z-Score Profile — Across Norm References</div>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
+        <line x1={pad.left} y1={yS(0)} x2={W - pad.right} y2={yS(0)} stroke={t.tx3} strokeWidth={0.5} strokeDasharray="3,3" />
+        <text x={W - pad.right + 4} y={yS(0) + 3} fill={t.tx3} fontSize={7} style={S}>z=0</text>
+        {labels.map((l, i) => (
+          <text key={i} x={xS(i)} y={H - pad.bottom + 16} fill={t.tx2} fontSize={6} textAnchor="middle" style={S}>{l.length > 8 ? l.slice(0, 6) + "\u2026" : l}</text>
+        ))}
+        {norms.map((norm, ni) => (
+          <g key={ni}>
+            {labels.map((l, i) => {
+              const z = zs[l]?.[norm];
+              if (z == null) return null;
+              const nextZ = i + 1 < labels.length ? zs[labels[i + 1]]?.[norm] : null;
+              return (
+                <g key={i}>
+                  {nextZ != null && <line x1={xS(i)} y1={yS(z)} x2={xS(i + 1)} y2={yS(nextZ)} stroke={COLORS[ni % COLORS.length]} strokeWidth={1.5} opacity={0.6} />}
+                  <circle cx={xS(i)} cy={yS(z)} r={3} fill={COLORS[ni % COLORS.length]} opacity={0.8} />
+                </g>
+              );
+            })}
+            <text x={W - pad.right + 4} y={pad.top + ni * 14 + 10} fill={COLORS[ni % COLORS.length]} fontSize={7} style={S}>{norm}</text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+function BoxPlotCollective({ combined, labels, t }) {
+  const W = 600, H = labels.length * 24 + 30;
+  const pad = { left: 100, right: 20, top: 10, bottom: 10 };
+  const allMn = labels.map(l => combined[l]?.stats?.mean).filter(v => v != null);
+  if (allMn.length < 2) return null;
+  return (
+    <div style={{ padding: 8, background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>Box Plots — All Landmarks</div>
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
         {labels.map((label, i) => {
           const s = combined[label]?.stats;
@@ -242,7 +387,7 @@ function BoxPlotChart({ combined, labels, t }) {
           const xS = v => pl + (v - mn) / (mx - mn) * pw;
           return (
             <g key={label}>
-              <text x={pl - 6} y={y + 3} fill={t.tx} fontSize={8} textAnchor="end" style={S}>{label.length > 14 ? label.slice(0, 12) + "…" : label}</text>
+              <text x={pl - 6} y={y + 3} fill={t.tx} fontSize={8} textAnchor="end" style={S}>{label.length > 14 ? label.slice(0, 12) + "\u2026" : label}</text>
               <line x1={xS(mn)} y1={y} x2={xS(mx)} y2={y} stroke={t.tx3} strokeWidth={1} />
               <rect x={xS(s.q1 || s.mean - s.sd)} y={y - 5} width={xS(s.q3 || s.mean + s.sd) - xS(s.q1 || s.mean - s.sd)} height={10} fill={t.acc} opacity={0.4} rx={1} stroke={t.acc} strokeWidth={1} />
               <line x1={xS(s.median || s.mean)} y1={y - 6} x2={xS(s.median || s.mean)} y2={y + 6} stroke={t.err} strokeWidth={2} />
@@ -267,6 +412,8 @@ export function ComparativeCharts({ results, t }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <GroupMeansChart labels={labels} t={t} />
       <EffectSizeForest labels={labels} t={t} />
+      <VolcanoPlot labels={labels} results={results} t={t} />
+      <PValueHeatmap labels={labels} results={results} t={t} />
       <PValueDotChart labels={labels} results={results} t={t} />
     </div>
   );
@@ -275,10 +422,11 @@ export function ComparativeCharts({ results, t }) {
 function GroupMeansChart({ labels, t }) {
   const W = 600, H = Math.max(250, labels.length * 120 + 30);
   const pad = { left: 80, right: 20, top: 10, bottom: 20 };
+  const COLORS = [t.acc, t.err, t.warn, t.ok, "#a78bfa", "#f472b6"];
 
   return (
     <div style={{ padding: 8, background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>Group Means</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>Group Means — All Landmarks</div>
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
         {labels.map(([label, lr], idx) => {
           const rawData = lr.rawData || {};
@@ -302,7 +450,7 @@ function GroupMeansChart({ labels, t }) {
                 const m = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
                 const sd = vals.length > 1 ? Math.sqrt(vals.reduce((s, v) => s + (v - m) ** 2, 0) / (vals.length - 1)) : 0;
                 const se = sd / Math.sqrt(vals.length);
-                const color = t.acc;
+                const color = COLORS[gi % COLORS.length];
                 return (
                   <g key={gi}>
                     <line x1={cx} y1={yS(m - se)} x2={cx} y2={yS(m + se)} stroke={color} strokeWidth={2} />
@@ -342,7 +490,7 @@ function EffectSizeForest({ labels, t }) {
 
   return (
     <div style={{ padding: 8, background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>Effect Size Forest Plot</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>Effect Size Forest Plot — All Landmarks</div>
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
         <line x1={xS(0)} y1={pad.top} x2={xS(0)} y2={H - pad.bottom} stroke={t.tx3} strokeWidth={0.5} strokeDasharray="4,4" />
         {esLabels.map(([label, lr], i) => {
@@ -353,13 +501,95 @@ function EffectSizeForest({ labels, t }) {
           const color = es.interpretation === "Negligible" ? t.tx3 : es.interpretation === "Small" ? t.acc : es.interpretation === "Medium" ? t.warn : t.err;
           return (
             <g key={i}>
-              <text x={pad.left - 6} y={y + 4} fill={t.tx} fontSize={8} textAnchor="end" style={S}>{label.length > 16 ? label.slice(0, 14) + "…" : label}</text>
+              <text x={pad.left - 6} y={y + 4} fill={t.tx} fontSize={8} textAnchor="end" style={S}>{label.length > 16 ? label.slice(0, 14) + "\u2026" : label}</text>
               {ci && <line x1={xS(ci[0])} y1={y} x2={xS(ci[1])} y2={y} stroke={color} strokeWidth={2} strokeLinecap="round" />}
               <rect x={xS(val) - 5} y={y - 5} width={10} height={10} fill={color} rx={2} />
               <text x={xS(val) + 12} y={y + 4} fill={t.tx2} fontSize={7} style={S}>{val.toFixed(3)}</text>
             </g>
           );
         })}
+      </svg>
+    </div>
+  );
+}
+
+function VolcanoPlot({ labels, results, t }) {
+  const pLabels = labels.filter(([, lr]) => lr.result?.pValue != null && lr.effectSize?.measure);
+  if (pLabels.length < 3) return null;
+  const W = 400, H = 350;
+  const pad = { left: 55, right: 25, top: 30, bottom: 40 };
+  const pw = W - pad.left - pad.right;
+  const ph = H - pad.top - pad.bottom;
+  const alpha = results.alpha || 0.05;
+  const esValues = pLabels.map(([, lr]) => {
+    const es = lr.effectSize;
+    return es.cohensD ?? es.cohensDz ?? es.rankBiserial ?? es.matchedPairsR ?? es.etaSq ?? es.partialEtaSq ?? es.epsilonSq ?? es.kendallW ?? 0;
+  });
+  const pValues = pLabels.map(([, lr]) => lr.result.pValue);
+  const logP = pValues.map(p => -Math.log10(Math.max(p, 1e-10)));
+  const xMin = Math.min(-0.5, ...esValues) - 0.3;
+  const xMax = Math.max(0.5, ...esValues) + 0.3;
+  const yMax = Math.max(3, ...logP) * 1.15;
+  const xS = v => pad.left + (v - xMin) / (xMax - xMin) * pw;
+  const yS = v => pad.top + ph - v / yMax * ph;
+
+  return (
+    <div style={{ padding: 8, background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>Volcano Plot — Effect Size vs. Significance</div>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
+        <line x1={xS(0)} y1={pad.top} x2={xS(0)} y2={H - pad.bottom} stroke={t.tx3} strokeWidth={0.5} strokeDasharray="3,3" />
+        <line x1={pad.left} y1={yS(-Math.log10(alpha))} x2={W - pad.right} y2={yS(-Math.log10(alpha))} stroke={t.err} strokeWidth={1} strokeDasharray="4,3" />
+        <text x={pad.left + 4} y={yS(-Math.log10(alpha)) - 2} fill={t.err} fontSize={7} style={S}>&alpha;={alpha}</text>
+        {pLabels.map((entry, i) => {
+          const x = xS(esValues[i]);
+          const y = yS(logP[i]);
+          const sig = pValues[i] < alpha;
+          return (
+            <g key={i}>
+              <circle cx={x} cy={y} r={sig ? 5 : 3} fill={sig ? t.err : t.tx3} opacity={sig ? 0.85 : 0.5} />
+              {sig && (
+                <text x={x + 6} y={y + 3} fill={t.tx2} fontSize={6} style={S}>{entry[0].length > 8 ? entry[0].slice(0, 6) + "\u2026" : entry[0]}</text>
+              )}
+            </g>
+          );
+        })}
+        <text x={pad.left} y={H - 4} fill={t.tx3} fontSize={7} style={S}>Effect Size ({pLabels[0][1].effectSize.measure})</text>
+        <text x={W - pad.right} y={pad.top - 8} fill={t.tx3} fontSize={7} textAnchor="end" style={S}>-log&uarr;(p)</text>
+      </svg>
+    </div>
+  );
+}
+
+function PValueHeatmap({ labels, results, t }) {
+  const pLabels = labels.filter(([, lr]) => lr.result?.pValue != null);
+  if (pLabels.length < 2) return null;
+  const n = pLabels.length;
+  const cell = 24, W = n * cell + 100, H = n * cell + 40;
+  const offX = 100, offY = 30;
+  const alpha = results.alpha || 0.05;
+  return (
+    <div style={{ padding: 8, background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>P-Value Pairwise Matrix</div>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
+        {pLabels.map(([label], i) => (
+          <text key={i} x={offX - 4} y={offY + i * cell + cell / 2 + 4} fill={t.tx} fontSize={6} textAnchor="end" style={S}>{label.length > 8 ? label.slice(0, 6) + "\u2026" : label}</text>
+        ))}
+        {pLabels.map(([, lr], i) => (
+          <g key={"x" + i}>
+            {Array.from({ length: n }).map((_, j) => {
+              const p = lr.result.pValue;
+              const val = i === j ? 1 : j < i ? (p + (pLabels[j]?.[1]?.result?.pValue || 0)) / 2 : p;
+              const sig = val < alpha;
+              const col = sig ? t.err : t.ok;
+              return (
+                <g key={j}>
+                  <rect x={offX + j * cell} y={offY + i * cell} width={cell} height={cell} fill={col} opacity={sig ? 0.6 : 0.2} rx={1} />
+                  <text x={offX + j * cell + cell / 2} y={offY + i * cell + cell / 2 + 3} fill="#fff" fontSize={6} textAnchor="middle" style={S}>{fmtP(val)}</text>
+                </g>
+              );
+            })}
+          </g>
+        ))}
       </svg>
     </div>
   );
@@ -377,17 +607,17 @@ function PValueDotChart({ labels, results, t }) {
 
   return (
     <div style={{ padding: 8, background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>P-Values (α = {alpha})</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>P-Values (&alpha; = {alpha})</div>
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
         <line x1={xS(alpha)} y1={pad.top} x2={xS(alpha)} y2={H - pad.bottom} stroke={t.err} strokeWidth={1} strokeDasharray="4,3" />
-        <text x={xS(alpha)} y={pad.top - 4} fill={t.err} fontSize={7} textAnchor="middle" style={S}>α={alpha}</text>
+        <text x={xS(alpha)} y={pad.top - 4} fill={t.err} fontSize={7} textAnchor="middle" style={S}>&alpha;={alpha}</text>
         {pLabels.map(([label, lr], i) => {
           const p = lr.result.pValue;
           const y = pad.top + i * 24 + 12;
           const sig = p < alpha;
           return (
             <g key={i}>
-              <text x={pad.left - 6} y={y + 3} fill={t.tx} fontSize={8} textAnchor="end" style={S}>{label.length > 16 ? label.slice(0, 14) + "…" : label}</text>
+              <text x={pad.left - 6} y={y + 3} fill={t.tx} fontSize={8} textAnchor="end" style={S}>{label.length > 16 ? label.slice(0, 14) + "\u2026" : label}</text>
               <circle cx={xS(p)} cy={y} r={sig ? 5 : 3.5} fill={sig ? t.err : t.ok} opacity={0.8} />
               <text x={xS(p) + (sig ? 8 : 6)} y={y + 3} fill={t.tx2} fontSize={7} style={S}>{fmtP(p)}</text>
             </g>
@@ -409,6 +639,8 @@ export function LongitudinalCharts({ results, t }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <LongitudinalTrajectories labels={labels} t={t} />
+      <MeanTrajectoryOverlay labels={labels} t={t} />
+      <ChangeScoreHeatmap labels={labels} t={t} />
       <ChangeScoreChart labels={labels} t={t} />
     </div>
   );
@@ -416,6 +648,7 @@ export function LongitudinalCharts({ results, t }) {
 
 function LongitudinalTrajectories({ labels, t }) {
   const W = 600, H = Math.max(250, labels.length * 260 + 20);
+  const COLORS = [t.acc, t.err, t.warn, t.ok, "#a78bfa", "#f472b6", "#34d399", t.tx2];
 
   return (
     <div style={{ padding: 8, background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>
@@ -466,12 +699,12 @@ function LongitudinalTrajectories({ labels, t }) {
                 if (meanPts.length < 2) return null;
                 return (
                   <g>
-                    <path d={`M${meanPts.join("L")}`} fill="none" stroke={t.acc} strokeWidth={2.5} />
+                    <path d={`M${meanPts.join("L")}`} fill="none" stroke={COLORS[idx % COLORS.length]} strokeWidth={2.5} />
                     {tpNames.map((tp, i) => {
                       const vals = rawData[tp]?.values || [];
                       const m = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
                       if (m == null) return null;
-                      return <circle key={tp} cx={xS(i)} cy={yS(m)} r={4} fill={t.acc} stroke={t.bg} strokeWidth={1} />;
+                      return <circle key={tp} cx={xS(i)} cy={yS(m)} r={4} fill={COLORS[idx % COLORS.length]} stroke={t.bg} strokeWidth={1} />;
                     })}
                   </g>
                 );
@@ -479,6 +712,111 @@ function LongitudinalTrajectories({ labels, t }) {
             </g>
           );
         })}
+      </svg>
+    </div>
+  );
+}
+
+function MeanTrajectoryOverlay({ labels, t }) {
+  const W = 500, H = 350;
+  const pad = { left: 55, right: 25, top: 25, bottom: 45 };
+  const pw = W - pad.left - pad.right;
+  const ph = H - pad.top - pad.bottom;
+  const COLORS = [t.acc, t.err, t.warn, t.ok, "#a78bfa", "#f472b6", "#34d399", t.tx2];
+
+  const allTps = [...new Set(labels.flatMap(([, lr]) => Object.keys(lr.rawData || {})))].sort();
+  if (allTps.length < 2) return null;
+
+  const allMeans = labels.flatMap(([, lr]) => {
+    const rd = lr.rawData || {};
+    return allTps.flatMap(tp => { const v = rd[tp]?.values || []; return v.length ? [v.reduce((a, b) => a + b, 0) / v.length] : []; });
+  });
+  const yMin = Math.min(...allMeans) - 3;
+  const yMax = Math.max(...allMeans) + 3;
+  const xS = i => pad.left + i * pw / Math.max(allTps.length - 1, 1);
+  const yS = v => pad.top + ph - (v - yMin) / (yMax - yMin) * ph;
+
+  return (
+    <div style={{ padding: 8, background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>Mean Trajectory Overlay — All Landmarks</div>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
+        {allTps.map((tp, i) => (
+          <text key={tp} x={xS(i)} y={H - pad.bottom + 16} fill={t.tx2} fontSize={8} textAnchor="middle" style={S}>{tp}</text>
+        ))}
+        {[0, (yMin + yMax) / 2, yMax].map(v => (
+          <g key={v}>
+            <line x1={pad.left} y1={yS(v)} x2={W - pad.right} y2={yS(v)} stroke={t.bdr} strokeWidth={0.5} strokeDasharray="3,3" />
+            <text x={pad.left - 4} y={yS(v) + 3} fill={t.tx3} fontSize={7} textAnchor="end" style={S}>{v.toFixed(1)}</text>
+          </g>
+        ))}
+        {labels.map((entry, li) => {
+          const rd = entry[1].rawData || {};
+          const pts = allTps.map((tp, i) => {
+            const vals = rd[tp]?.values || [];
+            const m = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+            return m != null ? { x: xS(i), y: yS(m) } : null;
+          }).filter(Boolean);
+          if (pts.length < 2) return null;
+          const color = COLORS[li % COLORS.length];
+          const d = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join("");
+          return (
+            <g key={li}>
+              <path d={d} fill="none" stroke={color} strokeWidth={2} opacity={0.8} />
+              {pts.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={3.5} fill={color} stroke={t.bg} strokeWidth={1} />)}
+            </g>
+          );
+        })}
+        {labels.map(([label], li) => (
+          <text key={"l" + li} x={W - pad.right + 4} y={pad.top + li * 14 + 10} fill={COLORS[li % COLORS.length]} fontSize={7} style={S}>{label}</text>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+function ChangeScoreHeatmap({ labels, t }) {
+  const hasChanges = labels.filter(([, lr]) => (lr.changeScores || []).length > 0);
+  if (hasChanges.length < 2) return null;
+  const allChanges = hasChanges.flatMap(([label, lr]) =>
+    (lr.changeScores || []).map(c => ({ label, ...c })));
+  const fromTo = [...new Set(allChanges.map(c => `${c.from}→${c.to}`))];
+  const nLabels = hasChanges.length;
+  const nPairs = fromTo.length;
+  const cell = Math.max(18, Math.min(30, 400 / Math.max(nPairs, 1)));
+  const W = nPairs * cell + 100, H = nLabels * cell + 40;
+  const offX = 100, offY = 30;
+  const maxAbs = Math.max(...allChanges.map(c => Math.abs(c.meanChange)), 0.1);
+
+  return (
+    <div style={{ padding: 8, background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>Change Score Heatmap</div>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
+        {hasChanges.map(([label], i) => (
+          <text key={i} x={offX - 4} y={offY + i * cell + cell / 2 + 4} fill={t.tx} fontSize={6} textAnchor="end" style={S}>{label.length > 8 ? label.slice(0, 6) + "\u2026" : label}</text>
+        ))}
+        {fromTo.map((ft, fi) => (
+          <text key={fi} x={offX + fi * cell + cell / 2} y={offY - 6} fill={t.tx2} fontSize={6} textAnchor="middle" style={S}>{ft}</text>
+        ))}
+        {hasChanges.map((entry, li) => (
+          <g key={"r" + li}>
+            {fromTo.map((ft, fi) => {
+              const c = (entry[1].changeScores || []).find(c => `${c.from}→${c.to}` === ft);
+              if (!c) return null;
+              const ratio = c.meanChange / maxAbs;
+              const isPos = c.meanChange > 0;
+              const intensity = Math.abs(ratio);
+              const r = isPos ? Math.round(255) : Math.round(255 * (1 - intensity));
+              const g = isPos ? Math.round(255 * (1 - intensity)) : Math.round(255);
+              const b = Math.round(255 * (1 - intensity));
+              return (
+                <g key={fi}>
+                  <rect x={offX + fi * cell} y={offY + li * cell} width={cell} height={cell} fill={`rgb(${r},${g},${b})`} opacity={0.6} rx={1} />
+                  <text x={offX + fi * cell + cell / 2} y={offY + li * cell + cell / 2 + 3} fill="#000" fontSize={6} fontWeight={700} textAnchor="middle" style={S}>{c.meanChange.toFixed(1)}</text>
+                </g>
+              );
+            })}
+          </g>
+        ))}
       </svg>
     </div>
   );
@@ -496,7 +834,7 @@ function ChangeScoreChart({ labels, t }) {
 
   return (
     <div style={{ padding: 8, background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>
-      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>Change Scores</div>
+      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>Change Scores — All Landmarks</div>
       <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
         <line x1={xS(0)} y1={pad.top} x2={xS(0)} y2={H - pad.bottom} stroke={t.tx3} strokeWidth={0.5} />
         {allChanges.map((c, i) => {
@@ -511,7 +849,7 @@ function ChangeScoreChart({ labels, t }) {
               <text x={xS(c.meanChange) + (isIncrease ? 4 : -4)} y={y + 3}
                 fill={t.tx2} fontSize={7}
                 textAnchor={isIncrease ? "start" : "end"} style={S}>
-                {c.from}→{c.to}: {c.meanChange.toFixed(2)}
+                {c.from}&rarr;{c.to}: {c.meanChange.toFixed(2)}
               </text>
             </g>
           );

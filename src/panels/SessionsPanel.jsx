@@ -6,15 +6,26 @@ import BatchImportModal from "./BatchImportModal.jsx";
 
 export default function SessionsPanel({
   project, t, onUpdateProject,
+  compareSession, setCompareSession,
+  showDisplacement, setShowDisplacement,
+  displacementOverlay, setDisplacementOverlay,
+  refLandmark1, setRefLandmark1,
+  refLandmark2, setRefLandmark2,
+  overlayBlend, setOverlayBlend,
 }) {
   const [newName, setNewName] = useState("");
   const [showBatchImport, setShowBatchImport] = useState(false);
   const [tab, setTab] = useState("sessions");
   const [newSubjectLabel, setNewSubjectLabel] = useState("");
   const [newSubInput, setNewSubInput] = useState("");
+  const [showCompare, setShowCompare] = useState(false);
   const sessionList = project?.sessions || [];
   const subjects = project?.subjects || [];
   const activeId = project?.activeSessionId;
+  const activeSession = sessionList.find(s => s.id === activeId);
+  const otherSessions = sessionList.filter(s => s.id !== activeId);
+  const pointLabels = (activeSession?.markups || []).filter(m => m.type === "point" && m.label).map(m => m.label);
+  const uniquePointLabels = [...new Set(pointLabels)];
 
   const handleAdd = () => {
     const session = mkSession({ name: newName || `Session ${sessionList.length + 1}` });
@@ -127,7 +138,7 @@ export default function SessionsPanel({
                       onClick={e => e.stopPropagation()} style={{ width: 60, fontSize: 9, padding: "1px 4px", borderRadius: 3, border: `1px solid ${t.bdr}`, background: t.surf2, color: t.tx }} />
                   </div>
                   <div style={{ fontSize: 10, color: t.tx3, marginTop: 2 }}>
-                    {s.image ? (s.image.name || "Image loaded") : "No image"}
+                    {(s.images && s.images.length > 0) ? (s.images[0].name || "Image loaded") : "No image"}{(s.images && s.images.length > 1) ? ` +${s.images.length - 1} layers` : ""}
                     {s.calibration?.done ? ` · ${s.calibration.pxPerMm.toFixed(1)}px/mm` : ""}
                     {s.markups?.length ? ` · ${s.markups.length} marks` : ""}
                   </div>
@@ -139,6 +150,71 @@ export default function SessionsPanel({
                   style={{ background: "none", border: "none", cursor: sessionList.length <= 1 ? "not-allowed" : "pointer", color: sessionList.length <= 1 ? t.tx3 : t.err, padding: 2, fontSize: 14 }}>✕</button>
               </div>
             ))}
+          </div>
+
+          {/* ─── Session Comparison ─── */}
+          <div style={{ marginTop: 16, borderTop: `1px solid ${t.bdr}44`, paddingTop: 12 }}>
+            <div onClick={() => setShowCompare(v => !v)} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", marginBottom: showCompare ? 10 : 0 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: t.tx, textTransform: "uppercase", letterSpacing: 0.5 }}>Comparison</span>
+              <span style={{ fontSize: 9, color: t.tx3 }}>{compareSession ? `active` : `off`}</span>
+              <span style={{ marginLeft: "auto", color: t.tx3, fontSize: 10 }}>{showCompare ? "▾" : "▸"}</span>
+            </div>
+            {showCompare && (
+              <div>
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ fontSize: 10, color: t.tx2, marginBottom: 3 }}>Compare to</div>
+                  <select value={compareSession?.id || ""} onChange={e => { const sel = e.target.value; setCompareSession(sel ? sessionList.find(s => s.id === sel) : null); }}
+                    style={{ width: "100%", fontSize: 11, padding: "4px 6px", borderRadius: 4, border: `1px solid ${t.bdr}`, background: t.surf3, color: t.tx, fontFamily: "inherit" }}>
+                    <option value="">None</option>
+                    {otherSessions.map(s => (
+                      <option key={s.id} value={s.id}>{s.name || s.id.slice(0, 6)}{s.meta?.timepoint ? ` (${s.meta.timepoint})` : ""}{s.meta?.group ? ` [${s.meta.group}]` : ""}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {compareSession && (
+                  <>
+                    <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+                      <Btn t={t} small active={showDisplacement} onClick={() => setShowDisplacement(v => !v)}>⇝ Vec</Btn>
+                      <Btn t={t} small active={displacementOverlay} onClick={() => setDisplacementOverlay(v => !v)}>Overlay</Btn>
+                    </div>
+
+                    {displacementOverlay && (
+                      <div style={{ marginBottom: 8, padding: 8, borderRadius: 6, background: t.surf3, border: `1px solid ${t.bdr}44` }}>
+                        <div style={{ fontSize: 10, color: t.tx2, marginBottom: 6 }}>Alignment</div>
+                        <div style={{ marginBottom: 6 }}>
+                          <div style={{ fontSize: 9, color: t.tx3, marginBottom: 2 }}>Anchor pt 1</div>
+                          <select value={refLandmark1 || ""} onChange={e => setRefLandmark1(e.target.value || null)}
+                            style={{ width: "100%", fontSize: 10, padding: "3px 5px", borderRadius: 4, border: `1px solid ${t.bdr}`, background: t.surf2, color: t.tx, fontFamily: "inherit" }}>
+                            <option value="">Auto</option>
+                            {uniquePointLabels.map(l => <option key={l} value={l}>{l}</option>)}
+                          </select>
+                        </div>
+                        <div style={{ marginBottom: 6 }}>
+                          <div style={{ fontSize: 9, color: t.tx3, marginBottom: 2 }}>Anchor pt 2</div>
+                          <select value={refLandmark2 || ""} onChange={e => setRefLandmark2(e.target.value || null)}
+                            style={{ width: "100%", fontSize: 10, padding: "3px 5px", borderRadius: 4, border: `1px solid ${t.bdr}`, background: t.surf2, color: t.tx, fontFamily: "inherit" }}>
+                            <option value="">Auto</option>
+                            {uniquePointLabels.map(l => <option key={l} value={l}>{l}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 9, color: t.tx3, marginBottom: 2 }}>Blend</div>
+                          <input type="range" min="0.1" max="1" step="0.05" value={overlayBlend} onChange={e => setOverlayBlend(+e.target.value)}
+                            style={{ width: "100%", accentColor: t.acc }} />
+                          <div style={{ fontSize: 9, color: t.tx2, textAlign: "right" }}>{Math.round(overlayBlend * 100)}%</div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div style={{ fontSize: 9, color: t.tx3, lineHeight: 1.5 }}>
+                      <b style={{ color: t.tx2 }}>⇝ Vec</b> draws displacement lines between matching landmarks.
+                      <br /><b style={{ color: t.tx2 }}>Overlay</b> renders the compared session's markups with structural alignment using two anchor points.
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </>
       )}

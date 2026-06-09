@@ -114,11 +114,59 @@ export function DescriptiveConfig({ study, sessions, onUpdateStudy, t }) {
       <div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
           <span style={{ fontSize: 9, fontWeight: 600, color: t.tx3, textTransform: "uppercase", letterSpacing: 0.3 }}>Reference Norms</span>
-          <button onClick={addNorm}
-            style={{ fontSize: 9, padding: "2px 8px", borderRadius: 3, border: `1px solid ${t.acc}`, background: "transparent", color: t.acc, cursor: "pointer" }}>
-            + Custom
-          </button>
+          <div style={{ display: "flex", gap: 4 }}>
+            <button onClick={() => {
+              // Collect norms from all sessions, group by source
+              const sessionNorms = sessions.flatMap(s => s.norms || []);
+              if (sessionNorms.length === 0) return;
+              const groups = {};
+              sessionNorms.forEach(n => {
+                const key = n.source || "Imported";
+                if (!groups[key]) groups[key] = { id: sid(), label: key, values: {} };
+                groups[key].values[n.markupLabel] = { mean: n.mean, sd: n.sd };
+              });
+              const existing = config.referenceNorms || [];
+              update({ referenceNorms: [...existing, ...Object.values(groups)] });
+            }}
+              style={{ fontSize: 9, padding: "2px 8px", borderRadius: 3, border: `1px solid ${t.acc}`, background: "transparent", color: t.acc, cursor: "pointer" }}>
+              From Norms
+            </button>
+            <button onClick={addNorm}
+              style={{ fontSize: 9, padding: "2px 8px", borderRadius: 3, border: `1px solid ${t.bdr}`, background: "transparent", color: t.tx2, cursor: "pointer" }}>
+              + Custom
+            </button>
+          </div>
         </div>
+
+        {/* Norms from session norms panel */}
+        {(() => {
+          const sessionNorms = sessions.flatMap(s => s.norms || []);
+          if (sessionNorms.length === 0) return null;
+          // Build unique sources
+          const sources = [...new Set(sessionNorms.map(n => n.source || "Imported"))];
+          return (
+            <div style={{ marginBottom: 6, padding: "6px 8px", borderRadius: 4, background: t.surf2, border: `1px solid ${t.bdr}44` }}>
+              <div style={{ fontSize: 9, color: t.tx3, marginBottom: 4 }}>Norms defined in workspace:</div>
+              {sources.map(src => {
+                const norms = sessionNorms.filter(n => (n.source || "Imported") === src);
+                const alreadyImported = (config.referenceNorms || []).some(r => r.label === src);
+                return (
+                  <div key={src} style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 2, fontSize: 9 }}>
+                    <span style={{ flex: 1, color: t.tx2, fontFamily: "'DM Mono',monospace" }}>{src} ({norms.length})</span>
+                    <button onClick={() => {
+                      const vals = {};
+                      norms.forEach(n => { vals[n.markupLabel] = { mean: n.mean, sd: n.sd }; });
+                      update({ referenceNorms: [...(config.referenceNorms || []), { id: sid(), label: src, values: vals }] });
+                    }} disabled={alreadyImported}
+                      style={{ fontSize: 8, padding: "1px 6px", borderRadius: 3, border: `1px solid ${t.acc}`, background: "transparent", color: alreadyImported ? t.tx3 : t.acc, cursor: alreadyImported ? "default" : "pointer", opacity: alreadyImported ? 0.5 : 1 }}>
+                      {alreadyImported ? "Imported" : "Import"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
 
         {/* Predefined norms */}
         <div style={{ marginBottom: 6 }}>

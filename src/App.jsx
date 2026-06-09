@@ -7,7 +7,7 @@ import { KatexSpan, LatexFloatingPanel } from "./hooks.jsx";
 import { Btn, Tag, Sld, PropRow, Inp } from "./ui.jsx";
 import ToolBtn from "./ToolBtn.jsx";
 import { drawMarkup, drawInProgress, drawScaleBar, drawLUTLegend, drawSnapIndicator, drawDisplacementVectors, drawAirwayOverlay, hitTest, getSilhouetteHandlesImage } from "./markups.jsx";
-import { MarkupsPanel, MeasurementsPanel, FormulasPanel, ImagePanel, MarkupProps, TemplatesPanel, SilhouettesPanel } from "./panels.jsx";
+import { MarkupsPanel, MeasurementsPanel, FormulasPanel, ImagePanel, LayersPanel, MarkupProps, TemplatesPanel, SilhouettesPanel } from "./panels.jsx";
 import { Modal } from "./panels/Modal.jsx";
 import HomePage from "./panels/HomePage.jsx";
 import SessionsPanel from "./panels/SessionsPanel.jsx";
@@ -20,11 +20,108 @@ import { mkProject, updateSessionInProject } from "./model/project.js";
 
 import { INITIAL_UI, Actions, useWorkspaceStore } from "./state/workspaceStore.js";
 
-function exportCephx(project){
-  const cleaned=project.images?{...project,images:undefined}:project;
-  const payload={format:"cephx",version:"2.1",exported:Date.now(),project:cleaned};
-  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}));
-  a.download=`${project.name.replace(/\s+/g,"_")}.cephx`;a.click();
+function profileProject(project) {
+  const rows = [];
+  const sessions = project.sessions || [];
+  
+  // Image totals
+  let totalImgBytes = 0;
+  sessions.forEach(s => {
+    const imgs = s.images || [];
+    imgs.forEach(imgEntry => {
+      const du = imgEntry.dataUrl || "";
+      if (du.length > 0) {
+        totalImgBytes += du.length;
+        rows.push({ name: `${s.name || s.id} / ${imgEntry.name || imgEntry.id}`, what: "image.dataUrl", mb: (du.length / 1024 / 1024).toFixed(1) });
+      }
+    });
+    const mu = s.markups ? JSON.stringify(s.markups).length : 0;
+    if (mu > 1000) rows.push({ name: s.name || s.id, what: "markups", mb: (mu / 1024 / 1024).toFixed(1) });
+    const nu = s.norms ? JSON.stringify(s.norms).length : 0;
+    if (nu > 1000) rows.push({ name: s.name || s.id, what: "norms", mb: (nu / 1024 / 1024).toFixed(1) });
+    const fu = s.formulas ? JSON.stringify(s.formulas).length : 0;
+    if (fu > 1000) rows.push({ name: s.name || s.id, what: "formulas", mb: (fu / 1024 / 1024).toFixed(1) });
+    const mu2 = s.meta ? JSON.stringify(s.meta).length : 0;
+    if (mu2 > 1000) rows.push({ name: s.name || s.id, what: "meta", mb: (mu2 / 1024 / 1024).toFixed(1) });
+  });
+  
+  // Research studies
+  const rs = project.researchStudies || [];
+  rs.forEach((r, i) => {
+    const ru = JSON.stringify(r).length;
+    if (ru > 10000) rows.push({ name: r.name || "study[" + i + "]", what: "researchStudy", mb: (ru / 1024 / 1024).toFixed(1) });
+  });
+  
+  // Everything else
+  const subs = project.subjects || [];
+  const rest = { subjects: subs, meta: project.meta || {} };
+  const restBytes = JSON.stringify(rest).length;
+  
+  const imgMB = (totalImgBytes / 1024 / 1024).toFixed(1);
+  const rsMB = rows.filter(r => r.what === "researchStudy").reduce((s, r) => s + parseFloat(r.mb), 0).toFixed(1);
+  const otherMB = (restBytes / 1024 / 1024).toFixed(1);
+  
+  rows.sort((a, b) => parseFloat(b.mb) - parseFloat(a.mb));
+  console.log("=== Project Size Profile ===");
+  console.table(rows);
+  console.log(`Images total: ${imgMB}MB | Research studies: ${rsMB}MB | Meta/subjects: ${otherMB}MB`);
+  const grandTotal = totalImgBytes + rs.reduce((s, r) => s + JSON.stringify(r).length, 0) + restBytes;
+  console.log(`Grand total (approx chars): ${(grandTotal / 1024 / 1024).toFixed(1)}MB`);
+  return { rows, imgMB, rsMB, otherMB, grandTotalMB: (grandTotal / 1024 / 1024).toFixed(1) };
+}
+
+// Strip session image data from any objects nested in research study results
+function sanitizeResults(obj, depth = 0) {
+  if (depth > 20 || !obj || typeof obj !== "object") return obj;
+  if (Array.isArray(obj)) return obj.map(v => sanitizeResults(v, depth + 1));
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v && typeof v === "object") {
+      // If it looks like a session object (has image.dataUrl), strip the image data
+      if (v.image?.dataUrl) {
+        out[k] = { ...v, image: { ...v.image, dataUrl: "[stripped]" } };
+      } else if (v.session && typeof v.session === "object" && v.session.image?.dataUrl) {
+        out[k] = { ...v, session: { ...v.session, image: { ...v.session.image, dataUrl: "[stripped]" } } };
+      } else if (k === "sessions" && Array.isArray(v)) {
+        // Array of session objects — strip image data
+        out[k] = v.map(s => s?.image?.dataUrl ? { ...s, image: { ...s.image, dataUrl: "[stripped]" } } : s);
+      } else {
+        out[k] = sanitizeResults(v, depth + 1);
+      }
+    } else {
+      out[k] = v;
+    }
+  }
+  return out;
+}
+
+function exportCephx(project) {
+  console.log("[cephx] Profiling project before export...");
+  profileProject(project);
+  
+  let cleaned = { ...project };
+  if (cleaned.images) cleaned.images = undefined;
+  
+  // Sanitize research study results (strip any session objects with image data)
+  if (cleaned.researchStudies) {
+    cleaned = {
+      ...cleaned,
+      researchStudies: cleaned.researchStudies.map(rs => ({
+        ...rs,
+        results: rs.results ? sanitizeResults(rs.results) : rs.results,
+      })),
+    };
+  }
+  
+  const payload = { format: "cephx", version: "2.1", exported: Date.now(), project: cleaned };
+  const json = JSON.stringify(payload);
+  console.log(`[cephx] Final export: ${(json.length / 1024 / 1024).toFixed(1)}MB`);
+  
+  const blob = new Blob([json], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${project.name.replace(/\s+/g, "_")}.cephx`;
+  a.click();
 }
 function importCephx(file,onLoad){
   const reader=new FileReader();
@@ -250,6 +347,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     toolbarPos,toolbarDragging,rightPanelWidth,rightPanelResizing,
     spotlightMode,
     displacementOverlay,refLandmark1,refLandmark2,overlayBlend}=ui;
+  const [compareSession, setCompareSession] = useState(null);
   const rightPanelWidthRef=useRef(rightPanelWidth);rightPanelWidthRef.current=rightPanelWidth;
   const toolbarPosRef=useRef(toolbarPos);toolbarPosRef.current=toolbarPos;
   // Panel collapse state — useRef + DOM manipulation to avoid canvas re-renders
@@ -305,12 +403,15 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     return()=>{window.removeEventListener("mousemove",onMove);window.removeEventListener("mouseup",onUp);};
   },[toolbarDragging]);
 
-  // Migration: project-level images -> active session's image
+  // Migration: legacy session.image -> session.images[]
   useEffect(()=>{
     if(!activeSession)return;
-    if(activeSession.image)return;
-    const imgData=project.images?.[0]||(project.sessions?.find(s=>s.image)?.image);
-    if(imgData)onUpdateProject(updateSessionInProject(project,activeSession.id,{image:imgData}));
+    if(activeSession.images?.length)return;
+    const oldImg = activeSession.image || project.images?.[0] || project.sessions?.find(s=>s.image)?.image;
+    if(oldImg){
+      const entry = oldImg.id ? oldImg : {id:uid(),name:"Imported",dataUrl:oldImg.dataUrl||oldImg,dx:0,dy:0,opacity:1,blendMode:"normal",visible:true,color:"none",transform:{tx:0,ty:0,rot:0,scale:1}};
+      onUpdateProject(updateSessionInProject(project,activeSession.id,{images:[entry],image:undefined}));
+    }
   },[]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-start placing mode when project has unplaced markups (from wizard)
@@ -337,7 +438,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
 
   const activeSession=project.sessions?.find(s=>s.id===project.activeSessionId)||project.sessions?.[0];
   const markups=useMemo(()=>activeSession?.markups||[],[activeSession?.markups]);
-  const sessionImage=activeSession?.image?[activeSession.image]:[];
+  const sessionImage=useMemo(()=>activeSession?.images||[],[activeSession?.images]);
 
   const calibration=useMemo(()=>activeSession?.calibration||{done:false,pxPerMm:1},[activeSession?.calibration]);
   const processing=useMemo(()=>activeSession?.processing||{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},[activeSession?.processing]);
@@ -345,7 +446,6 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const formulas=activeSession?.formulas||[];const norms=activeSession?.norms||[];
   const analysisTemplate=activeSession?.analysisTemplate||"blank";
   const selectedMarkup=markups.find(m=>m.id===selectedId);
-  const compareSession=null; // TODO: implement session comparison
 
   const updSession=patch=>onUpdateProject(updateSessionInProject(project,activeSession.id,patch));
   const angleMode=activeSession?.angleMode||"signed-deg";
@@ -593,14 +693,19 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       img.onload=()=>{
         const id=uid();imgRefs.current[id]=img;
         const entry={id,name:file.name,dataUrl,dx:0,dy:0,opacity:1,blendMode:"normal",visible:true,color:"none",transform:{tx:0,ty:0,rot:0,scale:1}};
-        updSession({image:entry});
+        const currentImages = activeSession?.images || [];
+        if(addToStack){
+          updSession({images: [...currentImages, entry]});
+        } else {
+          updSession({images: [entry]});
+        }
         dispatch({type:"SET",payload:{loadingImages:false}});
         if(!addToStack){const cw=canvasSize.current.w-80,ch=canvasSize.current.h-80;const sc=Math.min(cw/(img.naturalWidth||600),ch/(img.naturalHeight||500),1);dispatch({type:"SET",payload:{zoom:sc}});dispatch({type:"SET",payload:{pan:{x:40,y:40}}});}
       };img.src=dataUrl;
     };reader.readAsDataURL(file);
   };
 
-  const handleDrop=e=>{e.preventDefault();loadImage(e.dataTransfer.files[0]);};
+  const handleDrop=e=>{e.preventDefault();const files=Array.from(e.dataTransfer.files).filter(f=>f.type.startsWith("image/"));files.forEach((f,i)=>loadImage(f,i>0));};
 
   useEffect(()=>{
     const fn=e=>{
@@ -1022,7 +1127,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
             <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M338-241q16 0 23-10.5t9-24.5q2-10 3.5-20t3.5-22q2-11 4.5-24t5.5-30q23-5 45-8.5t43-5.5q23-3 45.5-4.5T564-394q5 24 10.5 43t11.5 36q8 23 17.5 38t23.5 26q14 11 30.5 12t28.5-9q9-7 9-21t-8-35q-5-11-8.5-22.5T670-350q-5-14-9-25.5t-7-22.5q13-1 23.5-4.5T695-412q7-6 10.5-14.5T709-445q0-11-4.5-18.5T691-476q-9-5-22.5-6.5t-30.5.5q-2-18-4-35.5t-5-35.5q-3-17-5.5-35t-7.5-35q-6-26-17-44.5T574-698q-13-11-28.5-16.5T511-720q-22 0-42 9t-40 27q-11 11-22 23.5T386-631q-8-6-14.5-8t-14.5-2q-11 0-18.5 6t-7.5 20q0 18-2 36t-6 36q-5 26-11 51.5T301-440q-11 2-19.5 5.5T267-427q-8 5-11.5 12.5T252-399q0 7 2 13t7 11q5 5 12 7.5t16 3.5q-1 12-1.5 22.5T287-321q0 21 3 36t9 25q6 10 15.5 14.5T338-241Zm71-223q6-23 14-44.5t18-44.5q16-37 34-59t32-22q11 0 19 17t13 51q3 20 5 43t4 43q-17 1-35 2.5t-35 3.5q-17 2-34.5 4.5T409-464ZM160-80q-33 0-56.5-23.5T80-160v-640q0-33 23.5-56.5T160-880h640q33 0 56.5 23.5T880-800v640q0 33-23.5 56.5T800-80H160Zm0-80h640v-640H160v640Zm0 0v-640 640Z"/></svg>
           </Btn>
           {showAnnotations&&<input type="range" min="0.5" max="2" step="0.1" value={annotationSize} onChange={e=>dispatch({type:"SET",payload:{annotationSize:+e.target.value}})} style={{width:60,marginLeft:4,accentColor:t.acc}} title={`Annotation size: ${annotationSize.toFixed(1)}`}/>}
-          {sessionImage.length>1&&<Btn ghost t={t} small active={showDisplacement} title="Toggle displacement vectors" onClick={()=>dispatch({type:"SET",payload:{showDisplacement:!showDisplacement}})}>⇝ Vec</Btn>}
+          {compareSession&&<Btn ghost t={t} small active={showDisplacement} title="Toggle displacement vectors" onClick={()=>dispatch({type:"SET",payload:{showDisplacement:!showDisplacement}})}>⇝ Vec</Btn>}
           <div style={{width:1,height:20,background:t.bdr}}/>
         </>}
         <Btn ghost t={t} small title="Open image" onClick={()=>openImgRef.current?.click()}>
@@ -1110,7 +1215,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
               </div>
               {/* Row 8b: Spotlight mode */}
               <div style={{display:"flex",justifyContent:"center"}}>
-                <button onClick={()=>{const next=!spotlightMode;dispatch({type:"SET",payload:{spotlightMode:next}});if(sessionImage.length>0){const img=sessionImage[0];const upd=next?{...img,opacityBeforeSpotlight:img.opacity||1,opacity:0.5}:{...img,opacity:img.opacityBeforeSpotlight||1};updSession({image:upd});}}} title="Spotlight (reduce image opacity)" style={{width:42,height:42,borderRadius:8,border:"none",background:spotlightMode?t.acc:t.surf2,color:spotlightMode?(theme==="light"?"#fff":t.bg):t.tx,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:spotlightMode?`0 0 0 2px ${t.acc}`:"none"}}>💡</button>
+                <button onClick={()=>{const next=!spotlightMode;dispatch({type:"SET",payload:{spotlightMode:next}});if(sessionImage.length>0){const img=sessionImage[0];const upd=next?{...img,opacityBeforeSpotlight:img.opacity||1,opacity:0.5}:{...img,opacity:img.opacityBeforeSpotlight||1};updSession({images:sessionImage.map((x,i)=>i===0?upd:x)});}}} title="Spotlight (reduce image opacity)" style={{width:42,height:42,borderRadius:8,border:"none",background:spotlightMode?t.acc:t.surf2,color:spotlightMode?(theme==="light"?"#fff":t.bg):t.tx,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:spotlightMode?`0 0 0 2px ${t.acc}`:"none"}}>💡</button>
               </div>
               {/* Separator */}
               <div style={{width:"100%",height:1,background:t.bdr,margin:"4px 0"}}/>
@@ -1223,8 +1328,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
                   {rightPanel==="measurements"&&<MeasurementsPanel allMeas={allMeas} t={t} calibration={calibration} norms={norms} onUpdateNorms={ns=>updSession({norms:ns})} onExportCSV={exportCSV} onOpenCalib={()=>dispatch({type:"SET",payload:{showCalib:true}})} formatAngle={formatAngle}/>}
                   {rightPanel==="formulas"&&<FormulasPanel formulas={formulas} t={t} scope={measScope} onAdd={()=>{dispatch({type:"SET",payload:{editFormulaId:null}});dispatch({type:"SET",payload:{showFormulaEditor:true}});}} onEdit={id=>{dispatch({type:"SET",payload:{editFormulaId:id}});dispatch({type:"SET",payload:{showFormulaEditor:true}});}} onDelete={id=>updSession({formulas:formulas.filter(f=>f.id!==id)})}/>}
                   {rightPanel==="image"&&<ImagePanel t={t} processing={processing} setProcessing={p=>updSession({processing:p})} lutMode={lutMode} setLutMode={m=>updSession({lutMode:m})} lutInvert={lutInvert} setLutInvert={v=>updSession({lutInvert:v})} showLUT={showLUT} setShowLUT={setShowLUT} showScaleBar={showScaleBar} setShowScaleBar={setShowScaleBar} calibration={calibration} onOpenCalib={()=>dispatch({type:"SET",payload:{showCalib:true}})} onReset={()=>updSession({processing:{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},lutMode:"gray",lutInvert:false})} onShowHist={()=>setShowHistogram(v=>!v)} showHistogram={showHistogram}/>}
-                  {rightPanel==="layers"&&<ImagePanel t={t} processing={processing} setProcessing={p=>updSession({processing:p})} lutMode={lutMode} setLutMode={m=>updSession({lutMode:m})} lutInvert={lutInvert} setLutInvert={v=>updSession({lutInvert:v})} showLUT={showLUT} setShowLUT={setShowLUT} showScaleBar={showScaleBar} setShowScaleBar={setShowScaleBar} calibration={calibration} onOpenCalib={()=>dispatch({type:"SET",payload:{showCalib:true}})} onReset={()=>updSession({processing:{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},lutMode:"gray",lutInvert:false})} onShowHist={()=>setShowHistogram(v=>!v)} showHistogram={showHistogram}/>}
-                  {rightPanel==="sessions"&&<SessionsPanel project={project} t={t} onUpdateProject={onUpdateProject} activeSession={activeSession} setActiveSession={id=>onUpdateProject({...project,activeSessionId:id})} onExportTemplate={v=>exportCepht({name:`${project.name}`,projection:project.projection,markups:v.markups||[],formulas:v.formulas||[],norms:v.norms||[]})} showDisplacement={showDisplacement} setShowDisplacement={setShowDisplacement} displacementOverlay={displacementOverlay} setDisplacementOverlay={setDisplacementOverlay} refLandmark1={refLandmark1} setRefLandmark1={setRefLandmark1} refLandmark2={refLandmark2} setRefLandmark2={setRefLandmark2} overlayBlend={overlayBlend} setOverlayBlend={setOverlayBlend} calibration={calibration} formatAngle={formatAngle}/>}
+                  {rightPanel==="layers"&&<LayersPanel t={t} images={sessionImage} onUpdateImages={imgs=>updSession({images:imgs})} onAddImage={()=>stackImgRef.current?.click()} onShowAlign={()=>{}} onShowTransform={()=>{}}/>}
+                  {rightPanel==="sessions"&&<SessionsPanel project={project} t={t} onUpdateProject={onUpdateProject} activeSession={activeSession} setActiveSession={id=>onUpdateProject({...project,activeSessionId:id})} onExportTemplate={v=>exportCepht({name:`${project.name}`,projection:project.projection,markups:v.markups||[],formulas:v.formulas||[],norms:v.norms||[]})} compareSession={compareSession} setCompareSession={setCompareSession} showDisplacement={showDisplacement} setShowDisplacement={setShowDisplacement} displacementOverlay={displacementOverlay} setDisplacementOverlay={setDisplacementOverlay} refLandmark1={refLandmark1} setRefLandmark1={setRefLandmark1} refLandmark2={refLandmark2} setRefLandmark2={setRefLandmark2} overlayBlend={overlayBlend} setOverlayBlend={setOverlayBlend} calibration={calibration} formatAngle={formatAngle}/>}
                   {rightPanel==="research"&&<ResearchPanel t={t} project={project} onUpdateProject={onUpdateProject} calibration={calibration}/>}
                   {rightPanel==="interpretation"&&<InterpretationPanel allMeas={allMeas} norms={norms} t={t} formatAngle={formatAngle}/>}
                   {rightPanel==="silhouettes"&&<SilhouettesPanel t={t} onInsert={(silhouetteType) => {
@@ -1275,7 +1380,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
 
       {/* MODALS */}
       {showCalib&&<Modal t={t} title="Calibration" onClose={()=>dispatch({type:"SET",payload:{showCalib:false}})}><CalibModal t={t} calibration={calibration} onFinish={finalizeCalib}/></Modal>}
-      {showExport&&<Modal t={t} title="Export" onClose={()=>dispatch({type:"SET",payload:{showExport:false}})}><div style={{display:"flex",flexDirection:"column",gap:10}}><Btn t={t} onClick={()=>{exportCSV();dispatch({type:"SET",payload:{showExport:false}});}}>Measurements CSV</Btn><Btn t={t} onClick={()=>{onSave?.(project);dispatch({type:"SET",payload:{showExport:false}});}}>Full Project .cephx</Btn><Btn t={t} onClick={()=>{const name=window.prompt("Template name:",project.name);if(name){exportTemplateAsCepht(project,name);dispatch({type:"SET",payload:{showExport:false}});}}}>Template .cepht (definitions only)</Btn><Btn t={t} onClick={()=>{const name=window.prompt("Template name:",project.name+" (placed)");if(name){exportTemplateAsCepht(project,name,true);dispatch({type:"SET",payload:{showExport:false}});}}}>Template .cepht (with placements)</Btn></div></Modal>}
+      {showExport&&<Modal t={t} title="Export" onClose={()=>dispatch({type:"SET",payload:{showExport:false}})}><div style={{display:"flex",flexDirection:"column",gap:10}}><Btn t={t} onClick={()=>{exportCSV();dispatch({type:"SET",payload:{showExport:false}});}}>Measurements CSV</Btn><Btn t={t} onClick={()=>{onSave?.(project);dispatch({type:"SET",payload:{showExport:false}});}}>Full Project .cephx</Btn><Btn t={t} onClick={()=>{const name=window.prompt("Template name:",project.name);if(name){exportTemplateAsCepht(project,name);dispatch({type:"SET",payload:{showExport:false}});}}}>Template .cepht (definitions only)</Btn><Btn t={t} onClick={()=>{const name=window.prompt("Template name:",project.name+" (placed)");if(name){exportTemplateAsCepht(project,name,true);dispatch({type:"SET",payload:{showExport:false}});}}}>Template .cepht (with placements)</Btn><Btn t={t} ghost onClick={()=>{const p=profileProject(project);alert(`Images: ${p.imgMB}MB\nResearch: ${p.rsMB}MB\nMeta/subjects: ${p.otherMB}MB\nTotal: ${p.grandTotalMB}MB\n(See console for full breakdown)`);}}>Check Size</Btn></div></Modal>}
       {pendingTextPos&&<Modal t={t} title="Text Annotation" onClose={()=>dispatch({type:"SET",payload:{pendingTextPos:null}})}><TextModal t={t} defaultColor="#fbbf24" onConfirm={(txt,opts)=>{addMarkup({type:"text",points:[pendingTextPos],text:txt,...opts});dispatch({type:"SET",payload:{pendingTextPos:null}});}} onCancel={()=>dispatch({type:"SET",payload:{pendingTextPos:null}})}/></Modal>}
       {showAnon&&<Modal t={t} title="Anonymization" onClose={()=>dispatch({type:"SET",payload:{showAnon:false}})}><AnonModal t={t} project={project} onUpdateProject={onUpdateProject} onClose={()=>dispatch({type:"SET",payload:{showAnon:false}})}/></Modal>}
       {showNormogram&&<Modal t={t} title="Cephalometric Normogram" wide onClose={()=>dispatch({type:"SET",payload:{showNormogram:false}})}><NormogramPanel allMeas={allMeas} norms={norms} t={t} formatAngle={formatAngle}/></Modal>}
@@ -1311,7 +1416,7 @@ export default function CephalometryStudio(){
   const createProject=(projection,result)=>{
     const p={...mkProject(projection),name:result.name};
     const session=p.sessions.find(s=>s.id===p.activeSessionId);
-    if(result.image)session.image=result.image;
+    if(result.image)session.images = [{id:uid(),name:"Imported",dataUrl:result.image.dataUrl||result.image,dx:0,dy:0,opacity:1,blendMode:"normal",visible:true,color:"none",transform:{tx:0,ty:0,rot:0,scale:1}}];
     session.calibration=result.calibration||{done:false,pxPerMm:1,knownMm:""};
     if(result.templateType==="analysis"||result.templateType==="complete"){
       const analysis=result.analysis;

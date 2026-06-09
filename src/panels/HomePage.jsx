@@ -135,7 +135,7 @@ export default function HomePage({t,theme,setTheme,projects,onOpen,onCreate,onIm
                 <div style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:13,color:t.tx}}>{p.name}</div>
                 <div style={{display:"flex",gap:3}}><Tag color={t.acc}>{p.projection}</Tag>{p.meta?.anonymized&&<Tag color={t.ok}>🔒</Tag>}</div>
               </div>
-              <div style={{fontSize:11,color:t.tx2}}>{p.versions.length} version{p.versions.length!==1?"s":""}  ·  {(p.versions.find(v=>v.id===p.activeVersionId)?.markups||[]).length} markups</div>
+              <div style={{fontSize:11,color:t.tx2}}>{(p.sessions||[]).length} session{(p.sessions||[]).length!==1?"s":""}  ·  {((p.sessions||[]).find(s=>s.id===p.activeSessionId)?.markups||[]).length} markups</div>
               <div style={{fontSize:10,color:t.tx3,marginTop:4}}>{new Date(p.modified).toLocaleString()}</div>
             </div>
           ))}

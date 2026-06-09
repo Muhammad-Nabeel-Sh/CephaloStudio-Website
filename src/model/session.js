@@ -6,7 +6,7 @@ export function mkSession(opts = {}) {
     label: opts.label || "",
     name: opts.name || "Untitled",
     timestamp: Date.now(),
-    image: opts.image || null,
+    images: opts.images || [],
     markups: opts.markups || [],
     calibration: opts.calibration || { done: false, pxPerMm: 1, knownMm: "" },
     processing: opts.processing || {
@@ -40,7 +40,7 @@ export function duplicateSession(session) {
     ...session,
     label: session.label ? session.label + "c" : "",
     name: "Copy of " + session.name,
-    image: session.image ? { ...session.image, id: uid() } : null,
+    images: (session.images || []).map(img => ({ ...img, id: uid() })),
     markups: (session.markups || []).map(m => ({ ...m, id: uid() })),
     formulas: (session.formulas || []).map(f => ({ ...f, id: uid() })),
     norms: (session.norms || []).map(n => ({ ...n, id: uid() })),

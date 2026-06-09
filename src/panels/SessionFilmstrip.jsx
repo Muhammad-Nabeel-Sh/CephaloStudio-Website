@@ -56,8 +56,8 @@ export default function SessionFilmstrip({ project, t, onUpdateProject }) {
                 background: t.surf3, display: "flex", alignItems: "center",
                 justifyContent: "center", flexShrink: 0,
               }}>
-                {s.image?.dataUrl ? (
-                  <img src={s.image.dataUrl} alt="" draggable={false}
+                {(s.images && s.images[0]?.dataUrl) ? (
+                  <img src={s.images[0].dataUrl} alt="" draggable={false}
                     style={{ width: "100%", height: "100%", objectFit: "cover" }}
                   />
                 ) : (

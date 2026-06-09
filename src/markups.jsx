@@ -1,5 +1,6 @@
 import { clamp, dist, angle3pt, angle4pt, perpDist, polyArea, polyLen, vpts, catmullRom, splineArea, splineLen, getInfiniteLinePoints, projectedDistance } from "./utils.js";
 import { SILHOUETTES } from "./silhouettes.js";
+import { LUT_PRESETS } from "./constants.js";
 
 function isReproPointVisible(m, reproCollecting){
   if(!reproCollecting || !m.repro) return true;
@@ -838,7 +839,7 @@ export function drawScaleBar(ctx, zoom, cal, cw, ch){
   ctx.restore();
 }
 
-export function drawLUTLegend(ctx, lutMode, lutInvert, cw, ch, t, LUT_PRESETS){
+export function drawLUTLegend(ctx, lutMode, lutInvert, cw, ch, t){
   const preset = LUT_PRESETS.find(l => l.id === lutMode);
   if(!preset || lutMode === "gray") return;
   
