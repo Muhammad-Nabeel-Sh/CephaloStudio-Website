@@ -7,7 +7,6 @@ export const STUDY_TYPES = [
   { id: "longitudinal", name: "Longitudinal",                  icon: SI + "M120-200v-80h220v80H120Zm0-160v-80h360v80H120Zm0-160v-80h480v80H120Zm0-160v-80h600v80H120Zm600 480-56-56 104-104H520v-80h248L664-504l56-56 200 200-200 200Z\"/></svg>",  desc: "Growth tracking, change scores",                 color: "#fb923c", needsGroups: false },
   { id: "correlation",  name: "Correlation",                   icon: SI + "M440-280H280q-83 0-141.5-58.5T80-480q0-83 58.5-141.5T280-680h160v80H280q-50 0-85 35t-35 85q0 50 35 85t85 35h160v80ZM320-440v-80h320v80H320Zm200 160v-80h160q50 0 85-35t35-85q0-50-35-85t-85-35H520v-80h160q83 0 141.5 58.5T880-480q0 83-58.5 141.5T680-280H520Z\"/></svg>",  desc: "Pearson/Spearman, regression",                   color: "#a78bfa", needsGroups: false },
   { id: "diagnostic",   name: "Diagnostic",                    icon: SI + "M420-120v-300H120v-120h300v-300h120v300h300v120H540v300H420Z\"/></svg>",  desc: "Sensitivity, specificity, ROC",                  color: "#f59e0b", needsGroups: true  },
-  { id: "morphometrics",name: "Morphometrics",                 icon: SI + "M480-80 80-280v-400l400-200 400 200v400L480-80Zm0-112 280-150v-276L480-768 200-618v276l280 150Z\"/></svg>",  desc: "Procrustes, PCA, shape analysis",                color: "#22d3ee", needsGroups: false },
 ];
 
 function uid() {

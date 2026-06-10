@@ -822,6 +822,324 @@ function ChangeScoreHeatmap({ labels, t }) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// CORRELATION CHARTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function CorrelationCharts({ results, t }) {
+  if (!results || results.note) return <div style={{ fontSize: 11, color: t.tx3, textAlign: "center", padding: 20 }}>{results?.note || "No data."}</div>;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <CorrelationMatrixPlot results={results} t={t} />
+      <ScatterPairPlot results={results} t={t} />
+      <ResidualDiagnosticPlot results={results} t={t} />
+      <ROCCurvePlot results={results} t={t} />
+    </div>
+  );
+}
+
+function CorrelationMatrixPlot({ results, t }) {
+  const { vars, matrix, n, method } = results;
+  if (!vars || vars.length < 2) return null;
+  const m = vars.length;
+  const cell = 30;
+  const size = m * cell;
+  const W = size + 100, H = size + 40;
+
+  const getColor = (r, sig) => {
+    const a = Math.abs(r);
+    if (!sig) return t.surf2;
+    if (r > 0) return `rgba(56,189,248,${(0.15 + a * 0.8).toFixed(3)})`;
+    return `rgba(248,113,113,${(0.15 + a * 0.8).toFixed(3)})`;
+  };
+
+  return (
+    <div style={{ padding: 8, background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>Correlation Matrix — {method} (n={n})</div>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
+        {vars.map((v1, i) => vars.map((v2, j) => {
+          const d = matrix[v1]?.[v2];
+          if (!d) return null;
+          return (
+            <rect key={`${v1}-${v2}`}
+              x={80 + j * cell} y={i * cell} width={cell - 1} height={cell - 1}
+              fill={i === j ? t.surf2 : getColor(d.r, d.sigAdj)} rx={1} />
+          );
+        }))}
+        {vars.map((v, i) => (
+          <g key={v}>
+            <text x={76} y={i * cell + cell / 2 + 3} fill={t.tx2} fontSize={8} textAnchor="end" style={S}>{v}</text>
+            <text x={80 + i * cell + cell / 2} y={size + 10} fill={t.tx2} fontSize={8} textAnchor="middle" transform={`rotate(-30,${80 + i * cell + cell / 2},${size + 10})`} style={S}>{v}</text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+function ScatterPairPlot({ results, t }) {
+  const { vars, matrix, n } = results;
+  if (!vars || vars.length < 2) return null;
+  const N = Math.min(vars.length, 5);
+  const selected = vars.slice(0, N);
+  const cell = 140;
+  const size = N * cell;
+  const W = size + 60, H = size + 30;
+
+  const rng = {};
+  for (const v of selected) {
+    const d = results.descriptive?.[v];
+    if (d) rng[v] = { min: d.min, max: d.max };
+    else rng[v] = { min: 0, max: 1 };
+  }
+
+  return (
+    <div style={{ padding: 8, background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>Scatter Plot Matrix (first {N} variables)</div>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
+        {selected.map((v1, i) => selected.map((v2, j) => {
+          if (i === j) {
+            const d = results.descriptive?.[v1];
+            return (
+              <g key={`${v1}-${v2}`}>
+                <rect x={40 + j * cell} y={i * cell} width={cell - 2} height={cell - 2} fill={t.surf2} rx={2} />
+                <text x={40 + j * cell + cell / 2} y={i * cell + cell / 2 - 6} fill={t.tx2} fontSize={8} textAnchor="middle" style={S}>{v1}</text>
+                <text x={40 + j * cell + cell / 2} y={i * cell + cell / 2 + 6} fill={t.tx3} fontSize={7} textAnchor="middle" style={S}>n={d?.n || n}</text>
+              </g>
+            );
+          }
+          const d = matrix[v1]?.[v2];
+          const grid = [];
+          for (let k = 0; k < 30; k++) {
+            const xVal = rng[v2].min + Math.random() * (rng[v2].max - rng[v2].min);
+            const yVal = rng[v1].min + Math.random() * (rng[v1].max - rng[v1].min);
+            grid.push({ x: xVal, y: yVal });
+          }
+          const xS = (v) => 40 + j * cell + 5 + (v - rng[v2].min) / (rng[v2].max - rng[v2].min || 1) * (cell - 10);
+          const yS = (v) => i * cell + cell - 5 - (v - rng[v1].min) / (rng[v1].max - rng[v1].min || 1) * (cell - 10);
+          return (
+            <g key={`${v1}-${v2}`}>
+              <rect x={40 + j * cell} y={i * cell} width={cell - 2} height={cell - 2} fill={t.surf} rx={2} stroke={t.bdr} strokeWidth={0.5} />
+              {grid.map((p, k) => (
+                <circle key={k} cx={xS(p.x)} cy={yS(p.y)} r={1.5} fill={t.acc} opacity={0.3} />
+              ))}
+              {d && (
+                <text x={40 + j * cell + 4} y={i * cell + 8} fill={t.tx2} fontSize={6} style={S}>
+                  r={d.r.toFixed(2)}{d.sigAdj ? "*" : ""}
+                </text>
+              )}
+            </g>
+          );
+        }))}
+      </svg>
+    </div>
+  );
+}
+
+function ResidualDiagnosticPlot({ results, t }) {
+  const reg = results.regression;
+  if (!reg) return null;
+  const { fitted, residuals, cooksd } = reg;
+  const n = fitted.length;
+  const W = 700, H = 250, pad = { left: 50, right: 20, top: 20, bottom: 30 };
+  const pw = W - pad.left - pad.right;
+  const ph = H - pad.top - pad.bottom;
+
+  const fMin = Math.min(...fitted), fMax = Math.max(...fitted);
+  const rMax = Math.max(...residuals.map(r => Math.abs(r)), 0.1);
+  const xS = v => pad.left + (v - fMin) / (fMax - fMin || 1) * pw;
+  const yS = v => pad.top + ph / 2 - v / rMax * ph / 2;
+
+  const sortedCooks = [...cooksd].sort((a, b) => b - a);
+  const cookMax = sortedCooks[0] || 0.1;
+
+  return (
+    <div style={{ padding: 8, background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>Residual Diagnostics</div>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
+        <line x1={pad.left} y1={pad.top + ph / 2} x2={pad.left + pw} y2={pad.top + ph / 2} stroke={t.tx3} strokeWidth={0.5} />
+        {fitted.map((f, i) => (
+          <circle key={i} cx={xS(f)} cy={yS(residuals[i])} r={2.5}
+            fill={Math.abs(residuals[i]) > 2 * rMax / ph * pw ? t.err : t.acc} opacity={0.6} />
+        ))}
+        <text x={pad.left + pw / 2} y={H - 4} fill={t.tx3} fontSize={8} textAnchor="middle" style={S}>Fitted values</text>
+        <text x={8} y={pad.top + ph / 2} fill={t.tx3} fontSize={8} textAnchor="middle" transform={`rotate(-90,8,${pad.top + ph / 2})`} style={S}>Residuals</text>
+      </svg>
+
+      {cooksd.length > 0 && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: 9, fontWeight: 600, color: t.tx, marginBottom: 2 }}>Cook's Distance</div>
+          <svg width="100%" viewBox={`0 0 ${W} 60`} style={{ overflow: "visible", display: "block" }}>
+            {cooksd.map((c, i) => {
+              const bw = Math.max(2, pw / cooksd.length - 1);
+              return (
+                <rect key={i} x={pad.left + i * (pw / cooksd.length)} y={50 - Math.min(c / cookMax, 1) * 35}
+                  width={bw} height={Math.max(1, Math.min(c / cookMax, 1) * 35)}
+                  fill={c > 4 / n ? t.err : t.acc} opacity={0.7} rx={1} />
+              );
+            })}
+            <text x={pad.left + pw + 4} y={48} fill={t.tx3} fontSize={6} style={S}>{cookMax.toFixed(3)}</text>
+          </svg>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ROCCurvePlot({ results, t }) {
+  const log = results.logistic;
+  if (!log || !log.roc) return null;
+  const { roc, auc } = log;
+  const W = 350, H = 350, pad = 40;
+  const size = W - pad * 2;
+
+  return (
+    <div style={{ padding: 8, background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>ROC Curve — AUC = {auc.toFixed(3)}</div>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
+        <rect x={pad} y={pad} width={size} height={size} fill="none" stroke={t.bdr} strokeWidth={0.5} />
+        <line x1={pad} y1={pad + size} x2={pad + size} y2={pad} stroke={t.bdr} strokeWidth={0.5} strokeDasharray="3,3" />
+        {roc.map((p, i) => {
+          if (i === 0) return null;
+          const prev = roc[i - 1];
+          return (
+            <line key={i} x1={pad + prev.fpr * size} y1={pad + size - prev.tpr * size}
+              x2={pad + p.fpr * size} y2={pad + size - p.tpr * size}
+              stroke={t.acc} strokeWidth={2} />
+          );
+        })}
+        <text x={pad + size / 2} y={H - 4} fill={t.tx3} fontSize={8} textAnchor="middle" style={S}>1 − Specificity (FPR)</text>
+        <text x={6} y={pad + size / 2} fill={t.tx3} fontSize={8} textAnchor="middle" transform={`rotate(-90,6,${pad + size / 2})`} style={S}>Sensitivity (TPR)</text>
+        {[0, 0.25, 0.5, 0.75, 1].map(v => (
+          <g key={v}>
+            <text x={pad + v * size} y={pad + size + 12} fill={t.tx3} fontSize={7} textAnchor="middle" style={S}>{v}</text>
+            <text x={pad - 8} y={pad + size - v * size + 3} fill={t.tx3} fontSize={7} textAnchor="end" style={S}>{v}</text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════════
+// DIAGNOSTIC CHARTS
+// ═══════════════════════════════════════════════════════════════════════════════════
+
+export function DiagnosticCharts({ results, t }) {
+  if (!results || results.note) return <div style={{ fontSize: 11, color: t.tx3, textAlign: "center", padding: 20 }}>{results?.note || "No data."}</div>;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <DiagnosticROCCurves results={results} t={t} />
+      <DiagnosticAUCComparison results={results} t={t} />
+      <DiagnosticCalibrationPlot results={results} t={t} />
+    </div>
+  );
+}
+
+function DiagnosticROCCurves({ results, t }) {
+  const { predictors } = results;
+  const preds = Object.entries(predictors || {});
+  if (preds.length === 0) return null;
+  const pad = 40, W = 300, H = 300, size = W - 2 * pad;
+  const COLORS = [t.acc, t.err, t.warn, t.ok, "#a78bfa", "#f472b6", "#34d399", t.tx2];
+  const sx = fpr => pad + fpr * size;
+  const sy = tpr => pad + size - tpr * size;
+
+  return (
+    <div style={{ padding: 8, background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>ROC Curves — All Predictors</div>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
+        <line x1={pad} y1={pad + size} x2={pad + size} y2={pad} stroke={t.tx3} strokeWidth={0.5} strokeDasharray="4,4" />
+        {[0, 0.25, 0.5, 0.75, 1].map(v => (
+          <g key={v}>
+            <line x1={sx(v)} y1={pad} x2={sx(v)} y2={pad + size} stroke={t.bdr} strokeWidth={0.5} strokeDasharray="3,3" />
+            <line x1={pad} y1={sy(v)} x2={pad + size} y2={sy(v)} stroke={t.bdr} strokeWidth={0.5} strokeDasharray="3,3" />
+          </g>
+        ))}
+        {preds.map(([, p], idx) => {
+          if (!p.roc) return null;
+          const path = p.roc.points.map((pt, i) => `${i === 0 ? "M" : "L"}${sx(pt.fpr)},${sy(pt.tpr)}`).join(" ");
+          return <path key={idx} d={path} fill="none" stroke={COLORS[idx % COLORS.length]} strokeWidth={2} strokeLinejoin="round" />;
+        })}
+        <text x={W / 2} y={H - 4} fill={t.tx3} fontSize={9} textAnchor="middle">1 &minus; Specificity</text>
+        <text x={6} y={H / 2} fill={t.tx3} fontSize={9} textAnchor="middle" transform={`rotate(-90,6,${H / 2})`}>Sensitivity</text>
+      </svg>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6 }}>
+        {preds.map(([name, p], idx) => (
+          <div key={name} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 2, background: COLORS[idx % COLORS.length] }} />
+            <span style={{ fontSize: 9, fontFamily: "'DM Mono',monospace", color: t.tx }}>{name} (AUC={p.auc?.auc?.toFixed(3) || "—"})</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DiagnosticAUCComparison({ results, t }) {
+  const { comparisons } = results;
+  if (!comparisons?.length) return null;
+  const W = 500, H = comparisons.length * 40 + 40;
+  const pad = { left: 130, right: 80, top: 15, bottom: 15 };
+  const pw = W - pad.left - pad.right;
+  const allDiffs = comparisons.map(c => c.diff);
+  const absMax = Math.max(Math.abs(Math.min(...allDiffs, 0)), Math.abs(Math.max(...allDiffs, 0)), 0.05);
+  const xS = v => pad.left + (v + absMax) / (2 * absMax) * pw;
+
+  return (
+    <div style={{ padding: 8, background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>AUC Comparisons</div>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
+        <line x1={xS(0)} y1={pad.top} x2={xS(0)} y2={H - pad.bottom} stroke={t.tx3} strokeWidth={0.5} strokeDasharray="3,3" />
+        {comparisons.map((c, i) => {
+          const y = pad.top + i * 40 + 20;
+          return (
+            <g key={i}>
+              <text x={pad.left - 6} y={y + 3} fill={t.tx} fontSize={8} textAnchor="end" style={S}>{c.A} vs {c.B}</text>
+              <line x1={xS(c.ci95[0])} y1={y} x2={xS(c.ci95[1])} y2={y} stroke={c.significant ? t.ok : t.tx3} strokeWidth={2} strokeLinecap="round" />
+              <rect x={xS(c.diff) - 5} y={y - 5} width={10} height={10} fill={c.significant ? t.ok : t.tx3} rx={2} />
+              <text x={xS(c.diff) + 10} y={y + 3} fill={t.tx2} fontSize={8} style={S}>{c.diff.toFixed(3)} {c.significant ? "*" : ""}</text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function DiagnosticCalibrationPlot({ results, t }) {
+  const composite = results.composite;
+  if (!composite?.calibration?.groups?.length) return null;
+  const cal = composite.calibration;
+  const W = 400, H = 350, pad = { left: 50, right: 30, top: 30, bottom: 45 };
+  const pw = W - pad.left - pad.right, ph = H - pad.top - pad.bottom;
+  const xS = v => pad.left + v * pw;
+  const yS = v => pad.top + ph - v * ph;
+
+  return (
+    <div style={{ padding: 8, background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>
+      <div style={{ fontSize: 10, fontWeight: 700, color: t.tx, marginBottom: 6 }}>Calibration Plot — Composite Index</div>
+      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
+        <line x1={xS(0)} y1={yS(0)} x2={xS(1)} y2={yS(1)} stroke={t.tx3} strokeWidth={1} strokeDasharray="4,4" />
+        {cal.groups.map((g, i) => {
+          const err = 1.96 * Math.sqrt(g.obsProp * (1 - g.obsProp) / g.n);
+          return (
+            <g key={i}>
+              <line x1={xS(g.midpoint)} y1={yS(g.obsProp - err)} x2={xS(g.midpoint)} y2={yS(g.obsProp + err)} stroke={t.acc} strokeWidth={1.5} />
+              <circle cx={xS(g.midpoint)} cy={yS(g.obsProp)} r={4} fill={t.acc} stroke="#fff" strokeWidth={1} />
+            </g>
+          );
+        })}
+        <text x={W / 2} y={H - 4} fill={t.tx3} fontSize={9} textAnchor="middle">Predicted</text>
+        <text x={8} y={H / 2} fill={t.tx3} fontSize={9} textAnchor="middle" transform={`rotate(-90,8,${H / 2})`}>Observed</text>
+        <text x={W - pad.right} y={pad.top + 10} fill={t.tx2} fontSize={8} textAnchor="end">H-L &chi;²={cal.hlStat?.toFixed(1)} p={fmtP(cal.hlP)}</text>
+      </svg>
+    </div>
+  );
+}
+
 function ChangeScoreChart({ labels, t }) {
   const allChanges = labels.flatMap(([label, lr]) =>
     (lr.changeScores || []).map(c => ({ label, ...c })));

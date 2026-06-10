@@ -2,6 +2,8 @@ import { runReliabilityAll } from "./reliability.js";
 import { runDescriptiveAll } from "./descriptive.js";
 import { runComparativeAll } from "./comparative.js";
 import { runLongitudinalAll } from "./longitudinal.js";
+import { runCorrelationAll, runRegression, runLogisticRegression } from "./correlation.js";
+import { runDiagnosticAll } from "./diagnostic.js";
 
 export function runStudy(study, sessions, calibration) {
   if (study.status === "running") return study;
@@ -24,10 +26,18 @@ export function runStudy(study, sessions, calibration) {
         results = runLongitudinalAll(sessions, config, calibration);
         break;
       case "correlation":
-      case "diagnostic":
-      case "morphometrics":
-        results = { note: "Module not yet implemented" };
+        results = runCorrelationAll(sessions, config, calibration);
+        if (config.dependentVar && config.predictorVars?.length > 0) {
+          results.regression = runRegression(sessions, config, calibration);
+        }
+        if (config.dependentVar && config.predictorVars?.length > 0 && config.threshold != null) {
+          results.logistic = runLogisticRegression(sessions, config, calibration);
+        }
         break;
+      case "diagnostic":
+        results = runDiagnosticAll(sessions, config, calibration);
+        break;
+
       default:
         results = { note: "Unknown study type" };
     }

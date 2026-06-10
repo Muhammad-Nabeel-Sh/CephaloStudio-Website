@@ -4,7 +4,9 @@ import { ReliabilityResults } from "./ReliabilityPanel.jsx";
 import { DescriptiveResults } from "./DescriptivePanel.jsx";
 import { ComparativeResults } from "./ComparativePanel.jsx";
 import { LongitudinalResults } from "./LongitudinalPanel.jsx";
-import { ReliabilityCharts, DescriptiveCharts, ComparativeCharts, LongitudinalCharts } from "./moduleCharts.jsx";
+import { CorrelationResults } from "./CorrelationPanel.jsx";
+import { DiagnosticResults } from "./DiagnosticPanel.jsx";
+import { ReliabilityCharts, DescriptiveCharts, ComparativeCharts, LongitudinalCharts, CorrelationCharts, DiagnosticCharts } from "./moduleCharts.jsx";
 
 export default function ResultsDialog({ study, t, onClose }) {
   const [v, setV] = useState("tables");
@@ -14,6 +16,8 @@ export default function ResultsDialog({ study, t, onClose }) {
     descriptive: { name: "Descriptive and Normative Studies", tabLabel: "Tables", results: DescriptiveResults, charts: DescriptiveCharts },
     comparative: { name: "Comparative", tabLabel: "Tables", results: ComparativeResults, charts: ComparativeCharts },
     longitudinal: { name: "Longitudinal", tabLabel: "Tables", results: LongitudinalResults, charts: LongitudinalCharts },
+    correlation: { name: "Correlation", tabLabel: "Tables", results: CorrelationResults, charts: CorrelationCharts },
+    diagnostic: { name: "Diagnostic", tabLabel: "Tables", results: DiagnosticResults, charts: DiagnosticCharts },
   };
   const m = meta[study.type];
   if (!m) return null;

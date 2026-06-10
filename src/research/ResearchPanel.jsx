@@ -5,6 +5,8 @@ import { ReliabilityConfig, ReliabilityResults } from "./ReliabilityPanel.jsx";
 import { DescriptiveConfig, DescriptiveResults } from "./DescriptivePanel.jsx";
 import { ComparativeConfig, ComparativeResults } from "./ComparativePanel.jsx";
 import { LongitudinalConfig, LongitudinalResults } from "./LongitudinalPanel.jsx";
+import { CorrelationConfig, CorrelationResults } from "./CorrelationPanel.jsx";
+import { DiagnosticConfig, DiagnosticResults } from "./DiagnosticPanel.jsx";
 import ResultsDialog from "./ResultsDialog.jsx";
 
 export default function ResearchPanel({ t, project, onUpdateProject, calibration }) {
@@ -164,7 +166,15 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
                       <LongitudinalConfig study={s} sessions={sessions} onUpdateStudy={handleUpdateStudy} t={t} project={project} />
                     )}
 
-                    {s.type !== "reliability" && s.type !== "descriptive" && s.type !== "comparative" && s.type !== "longitudinal" && sessions.length > 0 && (
+                    {s.type === "correlation" && (
+                      <CorrelationConfig study={s} sessions={sessions} onUpdateStudy={handleUpdateStudy} t={t} />
+                    )}
+
+                    {s.type === "diagnostic" && (
+                      <DiagnosticConfig study={s} sessions={sessions} onUpdateStudy={handleUpdateStudy} t={t} />
+                    )}
+
+                    {s.type !== "reliability" && s.type !== "descriptive" && s.type !== "comparative" && s.type !== "longitudinal" && s.type !== "correlation" && s.type !== "diagnostic" && sessions.length > 0 && (
                       <div style={{ marginBottom: 8 }}>
                         <div style={{ fontSize: 9, fontWeight: 600, color: t.tx3, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 4 }}>Measurements</div>
                         <LabelSelector sessions={sessions} selected={s.config.labelIds || []} onToggle={l => handleToggleLabel(s.id, l)} t={t} />
