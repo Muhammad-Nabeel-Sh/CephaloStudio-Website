@@ -11,7 +11,7 @@ export default function ResultsDialog({ study, t, onClose }) {
 
   const meta = {
     reliability: { name: "Reliability", tabLabel: "Tables", results: ReliabilityResults, charts: ReliabilityCharts },
-    descriptive: { name: "Descriptive", tabLabel: "Tables", results: DescriptiveResults, charts: DescriptiveCharts },
+    descriptive: { name: "Descriptive and Normative Studies", tabLabel: "Tables", results: DescriptiveResults, charts: DescriptiveCharts },
     comparative: { name: "Comparative", tabLabel: "Tables", results: ComparativeResults, charts: ComparativeCharts },
     longitudinal: { name: "Longitudinal", tabLabel: "Tables", results: LongitudinalResults, charts: LongitudinalCharts },
   };

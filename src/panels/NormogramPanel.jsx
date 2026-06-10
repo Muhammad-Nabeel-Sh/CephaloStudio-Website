@@ -2,10 +2,10 @@ import { useRef, useMemo, useCallback, useState } from "react";
 import { normDeviation } from "../utils.js";
 import { RULES } from "../interpretation.js";
 
-const ROW_H = 28;
-const LABEL_W = 160;
-const CHART_L = 40;
-const CHART_R = 80;
+const ROW_H = 40;
+const LABEL_W = 220;
+const CHART_L = 60;
+const CHART_R = 60;
 const TOP = 44;
 const BOTTOM = 30;
 const SD_RANGE = 2.5;
@@ -54,7 +54,7 @@ function PolygonChart({ rows, t, formatValue, getSeverityColor, totalH, svgRef }
   const clamp = (v) => Math.max(-SD_RANGE, Math.min(SD_RANGE, v));
 
   return (
-    <svg ref={svgRef} viewBox={`0 0 700 ${totalH}`} style={{ maxWidth: "100%", width: 700, height: totalH, display: "block", overflow: "visible", fontFamily: "'DM Sans','DM Mono',sans-serif", userSelect: "none" }}>
+    <svg ref={svgRef} viewBox={`0 0 700 ${totalH}`} style={{ maxWidth: "100%", width: 1000, height: totalH, display: "block", overflow: "visible", fontFamily: "'DM Sans','DM Mono',sans-serif", userSelect: "none" }}>
       <rect x="0" y="0" width="700" height={totalH} fill={t.bg} />
       <rect x={LABEL_W} y={TOP} width={700 - LABEL_W - CHART_R} height={rows.length * ROW_H} fill={t.surf} rx="4" />
 
@@ -139,7 +139,7 @@ function WiggleChart({ rows, t, formatValue, getSeverityColor, totalH, svgRef })
   const barWidth = (sd) => Math.abs(sd * pxPerSd);
 
   return (
-    <svg ref={svgRef} viewBox={`0 0 700 ${totalH}`} style={{ maxWidth: "100%", width: 700, height: totalH, display: "block", overflow: "visible", fontFamily: "'DM Sans','DM Mono',sans-serif", userSelect: "none" }}>
+    <svg ref={svgRef} viewBox={`0 0 700 ${totalH}`} style={{ maxWidth: "100%", width: 1000, height: totalH, display: "block", overflow: "visible", fontFamily: "'DM Sans','DM Mono',sans-serif", userSelect: "none" }}>
       <rect x="0" y="0" width="700" height={totalH} fill={t.bg} />
       <rect x={LABEL_W} y={TOP} width={700 - LABEL_W - CHART_R} height={rows.length * ROW_H} fill={t.surf} rx="4" />
 
@@ -231,7 +231,7 @@ function RadarChart({ rows, t, getSeverityColor }) {
   const ringLabels = [-2, -1, 1, 2];
 
   return (
-    <svg viewBox="0 0 700 540" style={{ maxWidth: "100%", width: 700, height: 540, display: "block", overflow: "visible", fontFamily: "'DM Sans','DM Mono',sans-serif", userSelect: "none" }}>
+    <svg viewBox="0 0 700 540" style={{ maxWidth: "100%", width: 1000, height: 600, display: "block", overflow: "visible", fontFamily: "'DM Sans','DM Mono',sans-serif", userSelect: "none" }}>
       <rect x="0" y="0" width="700" height="540" fill={t.bg} rx="4" />
 
       <text x={CX} y={16} textAnchor="middle" fill={t.tx2} fontSize="13" fontWeight="700" fontFamily="'Syne',sans-serif">

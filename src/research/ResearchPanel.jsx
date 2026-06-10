@@ -92,7 +92,7 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
                   transition: "all 0.15s",
                 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 18 }}>{st.icon}</span>
+                  <span style={{ fontSize: 18 }} dangerouslySetInnerHTML={{ __html: st.icon }} />
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: t.tx }}>{st.name}</div>
                     <div style={{ fontSize: 10, color: t.tx2, marginTop: 2 }}>{st.desc}</div>
@@ -128,7 +128,7 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
                 }}>
                 <div onClick={() => setSelectedId(s.id === selectedId ? null : s.id)}
                   style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 16 }}>{meta?.icon || "📋"}</span>
+                  <span style={{ fontSize: 16 }} dangerouslySetInnerHTML={{ __html: meta?.icon || "📋" }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12, fontWeight: 600, color: t.tx, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
                     <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
