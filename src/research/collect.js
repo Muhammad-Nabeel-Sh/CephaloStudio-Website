@@ -1,6 +1,14 @@
 import { computeMeasurements } from "../utils.js";
 
+const _collectCache = new WeakMap();
+
 export function collectMeasurements(sessions, labelIds, calibration, angleMode) {
+  const labelKey = [...(labelIds || [])].sort().join(",");
+  const calKey = calibration ? `${calibration.done}:${calibration.pxPerMm}:${calibration.knownMm}` : "";
+  const cacheKey = `${labelKey}|${calKey}|${angleMode || ""}`;
+  const cached = _collectCache.get(sessions);
+  if (cached && cached.key === cacheKey) return cached.result;
+
   const rows = [];
   for (const s of sessions) {
     if (!s) continue;
@@ -30,19 +38,32 @@ export function collectMeasurements(sessions, labelIds, calibration, angleMode) 
       } catch { /* skip problematic markup */ }
     }
   }
+  _collectCache.set(sessions, { key: cacheKey, result: rows });
   return rows;
 }
 
 export function pivotMeasurements(rows) {
   const pivoted = {};
   const labels = [];
+  const seen = {};
+  const units = {};
   for (const r of rows) {
     const key = `${r.sessionId}::${r.label}`;
     if (!pivoted[key]) {
       pivoted[key] = { sessionId: r.sessionId, sessionName: r.sessionName, label: r.label, values: {} };
       labels.push(pivoted[key]);
     }
-    pivoted[key].values[r.measureKey] = r.value;
+    const subKey = `${key}::${r.measureKey}`;
+    if (seen[subKey] != null && seen[subKey] !== r.value) {
+      pivoted[key]._duplicates = pivoted[key]._duplicates || [];
+      pivoted[key]._duplicates.push({ measureKey: r.measureKey, existing: seen[subKey], incoming: r.value });
+    }
+    if (seen[subKey] == null) {
+      pivoted[key].values[r.measureKey] = r.value;
+      seen[subKey] = r.value;
+    }
+    units[r.label] = r.unit;
   }
+  labels.units = units;
   return labels;
 }

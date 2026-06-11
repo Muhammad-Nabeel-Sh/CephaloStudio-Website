@@ -305,8 +305,8 @@ function linearMixedModel(data, timepointLabels) {
   const meanSlope = slopes.length > 0 ? mean(slopes) : 0;
   const varSlope = slopes.length > 1 ? variance(slopes, meanSlope) : 0;
 
-  const logLik = -0.5 * allY.length * (Math.log(2 * Math.PI * sigma2) + 1);
-  const nParams = 2 + 3;
+  const logLik = -0.5 * allY.length * Math.log(2 * Math.PI * sigma2) - ssRes / (2 * sigma2);
+  const nParams = 2 + 3; // intercept, slope, tau2_intercept, sigma2, varSlope
   const aic = -2 * logLik + 2 * nParams;
   const bic = -2 * logLik + nParams * Math.log(allY.length);
 

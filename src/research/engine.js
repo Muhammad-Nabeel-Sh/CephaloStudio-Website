@@ -30,7 +30,7 @@ export function runStudy(study, sessions, calibration) {
         if (config.dependentVar && config.predictorVars?.length > 0) {
           results.regression = runRegression(sessions, config, calibration);
         }
-        if (config.dependentVar && config.predictorVars?.length > 0 && config.threshold != null) {
+        if (config.dependentVar && config.predictorVars?.length > 0 && config.threshold !== undefined && config.threshold !== "") {
           results.logistic = runLogisticRegression(sessions, config, calibration);
         }
         break;
@@ -42,6 +42,7 @@ export function runStudy(study, sessions, calibration) {
         results = { note: "Unknown study type" };
     }
   } catch (e) {
+    if (import.meta.env.DEV) console.error("Study run error:", e);
     return { ...study, status: "error", results: { error: e.message } };
   }
 

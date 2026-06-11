@@ -1,4 +1,5 @@
 import { collectMeasurements, pivotMeasurements } from "./collect.js";
+import { shapiroWilk as swFromUtils } from "../utils.js";
 
 function mean(arr) {
   if (arr.length === 0) return 0;
@@ -37,30 +38,65 @@ function spearmanRho(x, y) {
   return pearsonR(rank(x), rank(y));
 }
 
+function logGamma(z) {
+  if (z < 12) return logGamma(z + 1) - Math.log(z);
+  const c = [76.18009173, -86.50532033, 24.01409822, -1.231739516, 0.00120858003, -0.00000536382];
+  let s = 1.00000000019;
+  for (let i = 0; i < 6; i++) s += c[i] / (z + 1 + i);
+  return (z - 0.5) * Math.log(z + 4.5) - (z + 4.5) + Math.log(s * Math.SQRT2 * Math.PI);
+}
+
+function ibeta(x, a, b) {
+  if (x === 0 || x === 1) return x;
+  const useSmall = x < (a + 1) / (a + b + 2);
+  const x1 = useSmall ? x : 1 - x;
+  const a1 = useSmall ? a : b;
+  const b1 = useSmall ? b : a;
+  const logBt = a1 * Math.log(x1) + b1 * Math.log(1 - x1) + logGamma(a1 + b1) - logGamma(a1) - logGamma(b1) - Math.log(a1);
+  const bt = Math.exp(logBt);
+  return useSmall ? bt : 1 - bt;
+}
+
+function normalCdf(x) {
+  if (x < -8) return 0;
+  if (x > 8) return 1;
+  const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741, a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
+  const sign = x < 0 ? -1 : 1;
+  const t = 1 / (1 + p * Math.abs(x) / Math.SQRT2);
+  const y = 1 - (((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t) * Math.exp(-x * x / 2);
+  return 0.5 * (1 + sign * y);
+}
+
+function gammaP(a, x) {
+  if (x < a + 1) {
+    let sum = 1 / a, term = 1 / a;
+    for (let n = 1; n < 100; n++) {
+      term *= x / (a + n);
+      sum += term;
+      if (Math.abs(term) < 1e-12) break;
+    }
+    return sum * Math.exp(-x + a * Math.log(x) - logGamma(a));
+  }
+  let sum = 1, term = 1;
+  for (let n = 1; n < 100; n++) {
+    term *= (a - n) / x;
+    sum += term;
+    if (Math.abs(term) < 1e-12) break;
+  }
+  return 1 - sum * Math.exp(-x + a * Math.log(x) - logGamma(a));
+}
+
+function chi2CDF(x, df) {
+  if (x <= 0 || df <= 0) return 0;
+  return gammaP(df / 2, x / 2);
+}
+
 function tCdf(t, df) {
   const x = df / (df + t * t);
   let p = 0.5;
   if (df % 2 === 1) {
     p = 1 - Math.atan2(1, Math.sqrt(df)) / Math.PI;
   }
-  const beta = (a, b) => {
-    const g = (z) => {
-      if (z === 1) return 1;
-      const coeff = [76.18009173, -86.50532033, 24.01409822, -1.231739516, 0.00120858003, -0.00000536382];
-      let s = 1 + coeff.reduce((a, c, i) => a + c / (z + 1 + i), 0);
-      return Math.sqrt(2 * Math.PI / (z + 5.5)) * Math.pow(z + 5.5, z + 0.5) * Math.exp(-(z + 5.5)) * s;
-    };
-    return g(a) * g(b) / g(a + b);
-  };
-  const ibeta = (x, a, b) => {
-    if (x === 0 || x === 1) return x;
-    let bt = Math.exp(
-      (a + b) * Math.log(1 + a + b) - a * Math.log(a) - b * Math.log(b) +
-      a * Math.log(x) + b * Math.log(1 - x)
-    );
-    if (x < (a + 1) / (a + b + 2)) return bt * beta(a, b) / a;
-    return 1 - bt * beta(b, a) / b;
-  };
   if (x < (df + 1) / (df + 2)) {
     p = 0.5 * ibeta(x, df / 2, 0.5);
   } else {
@@ -89,35 +125,8 @@ function benjaminiHochberg(pValues) {
 
 function fPval(F, df1, df2) {
   if (F <= 0 || df1 <= 0 || df2 <= 0) return 1;
-  return 1 - tCdf(Math.sqrt(F), df2);
-}
-
-function shapiroWilk(x) {
-  const n = x.length;
-  if (n < 3) return { W: 1, p: 1 };
-  const sorted = [...x].sort((a, b) => a - b);
-  const m = mean(sorted);
-  const s2 = sorted.reduce((a, v) => a + (v - m) ** 2, 0);
-  if (s2 === 0) return { W: 1, p: 1 };
-  const a = Array(n).fill(0);
-  const phi = (z) => Math.exp(-z * z / 2) / Math.sqrt(2 * Math.PI);
-  const cdf = (z) => {
-    if (z < -8) return 0;
-    if (z > 8) return 1;
-    const t = 1 / (1 + 0.2316419 * Math.abs(z));
-    const d = 0.39894228 * Math.exp(-z * z / 2);
-    let p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.7814779 + t * (-1.8212559 + t * 1.3302744))));
-    return z > 0 ? 1 - p : p;
-  };
-  const mStar = sorted.map((_, i) => {
-    const p = (i + 1 - 0.375) / (n + 0.25);
-    return phi(cdf(p));
-  });
-  let denom = mStar.reduce((s, v) => s + v * v, 0);
-  if (denom === 0) return { W: 1, p: 1 };
-  for (let i = 0; i < n; i++) a[i] = mStar[i] / Math.sqrt(denom);
-  const w = (a.reduce((s, ai, i) => s + ai * sorted[i], 0)) ** 2 / s2;
-  return { W: w, p: Math.exp(-3.7 * (1 - w) * n) };
+  const x = df1 * F / (df1 * F + df2);
+  return 1 - ibeta(x, df1 / 2, df2 / 2);
 }
 
 function breuschPagan(residuals, X) {
@@ -131,7 +140,7 @@ function breuschPagan(residuals, X) {
     return s + diff * fit;
   }, 0);
   const bp = ssr / 2;
-  const p = 1 - tCdf(Math.sqrt(bp * (n - k - 1) / (n - 1)), n - k - 1);
+  const p = 1 - chi2CDF(bp, k - 1);
   return { statistic: bp, df: k - 1, p };
 }
 
@@ -430,7 +439,8 @@ export function runRegression(sessions, config, calibration) {
     influential: c > 4 / n2 || Math.abs(stdResid[i]) > 2,
   })).filter(d => d.influential);
 
-  const swResid = shapiroWilk(residuals);
+  const swResult = swFromUtils(residuals);
+  const swResid = swResult ? { W: swResult.W, p: swResult.pValue } : { W: 1, p: 1 };
   const bp = breuschPagan(residuals, Xm);
 
   const equation = `${dependentVar} = ${beta.map((b, i) =>
@@ -502,7 +512,7 @@ export function runLogisticRegression(sessions, config, calibration) {
   const oddsRatios = beta.map(b => Math.exp(b));
   const se = XtXinv.map((row, i) => Math.sqrt(Math.abs(row[i])));
   const zStats = beta.map((b, i) => b / se[i]);
-  const pVals = zStats.map(z => 2 * (1 - tCdf(Math.abs(z), y.length - beta.length)));
+  const pVals = zStats.map(z => 2 * (1 - normalCdf(Math.abs(z))));
   const ci95 = beta.map((b, i) => {
     const lo = b - 1.96 * se[i], hi = b + 1.96 * se[i];
     return [Math.exp(lo), Math.exp(hi)];

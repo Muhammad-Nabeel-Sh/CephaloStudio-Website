@@ -336,7 +336,7 @@ function DescriptiveTable({ labels, data, t }) {
         <thead>
           <tr style={{ background: t.surf2 }}>
             {["Label", "N", "Mean", "SD", "SEM", "Median", "Q1", "Q3", "Min", "Max", "Skew", "Kurt"].map(h => (
-              <th key={h} style={{ padding: "4px 6px", textAlign: "left", color: t.tx3, fontSize: 8, textTransform: "uppercase", letterSpacing: 0.3 }}>{h}</th>
+              <th key={h} style={{ padding: "4px 6px", textAlign: "left", color: t.tx, fontSize: 8, textTransform: "uppercase", letterSpacing: 0.3 }}>{h}</th>
             ))}
           </tr>
         </thead>
@@ -377,7 +377,7 @@ function RefIntervalTable({ labels, data, t }) {
         <thead>
           <tr style={{ background: t.surf2 }}>
             {["Label", "Method", "Lower", "Upper", "90% CI Lower", "90% CI Upper"].map(h => (
-              <th key={h} style={{ padding: "4px 6px", textAlign: "left", color: t.tx3, fontSize: 8, textTransform: "uppercase", letterSpacing: 0.3 }}>{h}</th>
+              <th key={h} style={{ padding: "4px 6px", textAlign: "left", color: t.tx, fontSize: 8, textTransform: "uppercase", letterSpacing: 0.3 }}>{h}</th>
             ))}
           </tr>
         </thead>
@@ -422,9 +422,9 @@ function ZScoreTable({ results, labels, t }) {
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10, fontFamily: "'DM Mono',monospace" }}>
         <thead>
           <tr style={{ background: t.surf2 }}>
-            <th style={{ padding: "4px 6px", textAlign: "left", color: t.tx3, fontSize: 8, textTransform: "uppercase", letterSpacing: 0.3 }}>Label</th>
+            <th style={{ padding: "4px 6px", textAlign: "left", color: t.tx, fontSize: 8, textTransform: "uppercase", letterSpacing: 0.3 }}>Label</th>
             {norms.map(n => (
-              <th key={n.id} colSpan={2} style={{ padding: "4px 6px", textAlign: "center", color: t.tx3, fontSize: 8, textTransform: "uppercase", letterSpacing: 0.3 }}>
+              <th key={n.id} colSpan={2} style={{ padding: "4px 6px", textAlign: "center", color: t.tx, fontSize: 8, textTransform: "uppercase", letterSpacing: 0.3 }}>
                 {n.label}
               </th>
             ))}
@@ -433,8 +433,8 @@ function ZScoreTable({ results, labels, t }) {
             <th></th>
             {norms.map(n => (
               <>
-                <th key={`${n.id}-z`} style={{ padding: "4px 6px", textAlign: "left", color: t.tx3, fontSize: 7 }}>Z</th>
-                <th key={`${n.id}-p`} style={{ padding: "4px 6px", textAlign: "left", color: t.tx3, fontSize: 7 }}>%ile</th>
+                <th key={`${n.id}-z`} style={{ padding: "4px 6px", textAlign: "left", color: t.tx, fontSize: 7 }}>Z</th>
+                <th key={`${n.id}-p`} style={{ padding: "4px 6px", textAlign: "left", color: t.tx, fontSize: 7 }}>%ile</th>
               </>
             ))}
           </tr>

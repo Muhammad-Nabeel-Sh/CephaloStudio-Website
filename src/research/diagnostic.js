@@ -444,22 +444,29 @@ export function collectDiagnosticData(sessions, config, calibration) {
   const bySession = {};
   for (const p of pivoted) {
     if (!bySession[p.sessionId]) bySession[p.sessionId] = {};
-    // Prefer actual measurement keys over coordinate keys (x, y)
+    // Prefer actual measurement keys (angle, length, distance, value) over coordinate keys (x, y)
     const keys = Object.keys(p.values);
-    const prefKey = keys.find(k => !["x", "y"].includes(k));
-    const val = prefKey ? p.values[prefKey] : Object.values(p.values).find(v => typeof v === "number" && isFinite(v));
+    const measKey = keys.find(k => !["x", "y"].includes(k));
+    const fallbackKey = keys.find(k => ["x", "y"].includes(k));
+    const chosenKey = measKey || fallbackKey || keys[0];
+    const val = chosenKey ? p.values[chosenKey] : null;
     bySession[p.sessionId][p.label] = val;
   }
 
   const sessionIds = Object.keys(bySession);
 
+  const gsIsNumeric = goldStandardPositive != null && goldStandardPositive !== "" && isFinite(Number(goldStandardPositive));
+  const gsThreshold = gsIsNumeric ? Number(goldStandardPositive) : NaN;
+
   const cases = [];
   for (const sid of sessionIds) {
     const gsVal = bySession[sid][goldStandardLabel];
-    const gsThreshold = Number(goldStandardPositive);
-    const gsBinary = typeof gsVal === "number"
-      ? (gsVal >= (isFinite(gsThreshold) ? gsThreshold : 0.5) ? 1 : 0)
-      : (String(gsVal) === String(goldStandardPositive) ? 1 : 0);
+    let gsBinary;
+    if (gsIsNumeric) {
+      gsBinary = typeof gsVal === "number" && isFinite(gsVal) ? (gsVal >= gsThreshold ? 1 : 0) : 0;
+    } else {
+      gsBinary = String(gsVal) === String(goldStandardPositive) ? 1 : 0;
+    }
 
     const predVals = {};
     let hasAll = true;
@@ -484,10 +491,16 @@ export function collectDiagnosticData(sessions, config, calibration) {
   const nP = labels.filter(l => l === 1).length;
   const nN = labels.filter(l => l === 0).length;
   if (nP === 0 || nN === 0) {
-    const gsThreshold = Number(goldStandardPositive);
     const allGS = cases.map(c => c.goldStandardLabel);
-    const gsMin = Math.min(...allGS), gsMax = Math.max(...allGS), gsMed = allGS.sort((a, b) => a - b)[Math.floor(allGS.length / 2)];
-    return { error: `All ${cases.length} cases binarize to the same class (${nP > 0 ? "positive" : "negative"}) with threshold ${isFinite(gsThreshold) ? gsThreshold : "0.5"}. Values range [${gsMin.toFixed(2)}–${gsMax.toFixed(2)}], median ${gsMed.toFixed(2)}. Enter a numeric "Positive class value" in the config above the threshold that separates classes (e.g., ${gsMed.toFixed(1)}).` };
+    const hasNumeric = allGS.some(v => typeof v === "number");
+    const gsMed = hasNumeric ? [...allGS].sort((a, b) => a - b)[Math.floor(allGS.length / 2)] : null;
+    const thresholdDesc = gsIsNumeric
+      ? `threshold ${gsThreshold}`
+      : `string match "${goldStandardPositive}"`;
+    const hint = hasNumeric
+      ? ` Enter a numeric "Positive class value" (e.g., ${gsMed.toFixed(1)}).`
+      : ` Enter a matching "Positive class value" string.`;
+    return { error: `All ${cases.length} cases binarize to the same class (${nP > 0 ? "positive" : "negative"}) with ${thresholdDesc}. Values: [${allGS.slice(0, 5).map(v => hasNumeric ? v.toFixed(2) : v).join(", ")}${allGS.length > 5 ? ", ..." : ""}].${hint}` };
   }
 
   return { cases, labels, nP, nN, n: cases.length, sessionIds, predictorLabels: cleanPredictors, goldStandardLabel, goldStandardPositive };

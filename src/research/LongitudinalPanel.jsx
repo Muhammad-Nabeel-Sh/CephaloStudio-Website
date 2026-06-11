@@ -207,9 +207,9 @@ export function LongitudinalConfig({ study, sessions, onUpdateStudy, t, project 
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 9 }}>
             <thead>
               <tr>
-                <th style={{ padding: "3px 6px", textAlign: "left", color: t.tx3, fontWeight: 600, whiteSpace: "nowrap" }}>Subject</th>
+                <th style={{ padding: "3px 6px", textAlign: "left", color: t.tx, fontWeight: 600, whiteSpace: "nowrap" }}>Subject</th>
                 {timepoints.map(tp => (
-                  <th key={tp.id} style={{ padding: "3px 6px", textAlign: "center", color: t.tx3, fontWeight: 600, whiteSpace: "nowrap" }}>{tp.label}</th>
+                  <th key={tp.id} style={{ padding: "3px 6px", textAlign: "center", color: t.tx, fontWeight: 600, whiteSpace: "nowrap" }}>{tp.label}</th>
                 ))}
                 <th style={{ width: 20 }}></th>
               </tr>
@@ -405,7 +405,7 @@ function SphericityView({ results, t }) {
         <thead>
           <tr style={{ background: t.surf2 }}>
             {["Label", "Mauchly's W", "χ²", "df", "p-value", "Spherical?", "GG ε", "HF ε", "LB ε", "Used ε"].map(h => (
-              <th key={h} style={{ padding: "4px 6px", textAlign: "left", color: t.tx3, fontSize: 8, textTransform: "uppercase", letterSpacing: 0.3 }}>{h}</th>
+              <th key={h} style={{ padding: "4px 6px", textAlign: "left", color: t.tx, fontSize: 8, textTransform: "uppercase", letterSpacing: 0.3 }}>{h}</th>
             ))}
           </tr>
         </thead>
@@ -448,7 +448,7 @@ function ANOVAView({ results, t }) {
         <thead>
           <tr style={{ background: t.surf2 }}>
             {["Label", "Source", "SS", "df", "MS", "F", "p-value", "Sig.", "η²p", "ω²"].map(h => (
-              <th key={h} style={{ padding: "4px 6px", textAlign: "left", color: t.tx3, fontSize: 8, textTransform: "uppercase", letterSpacing: 0.3 }}>{h}</th>
+              <th key={h} style={{ padding: "4px 6px", textAlign: "left", color: t.tx, fontSize: 8, textTransform: "uppercase", letterSpacing: 0.3 }}>{h}</th>
             ))}
           </tr>
         </thead>
@@ -511,7 +511,7 @@ function PairwiseView({ results, t }) {
             <thead>
               <tr style={{ background: t.surf2 }}>
                 {["From", "To", "Mean Diff", "SD", "t", "df", "p (adj.)", "Sig.", "Cohen's d"].map(h => (
-                  <th key={h} style={{ padding: "3px 6px", textAlign: "left", color: t.tx3, fontSize: 8, textTransform: "uppercase", letterSpacing: 0.3 }}>{h}</th>
+                  <th key={h} style={{ padding: "3px 6px", textAlign: "left", color: t.tx, fontSize: 8, textTransform: "uppercase", letterSpacing: 0.3 }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -561,7 +561,7 @@ function MixedModelView({ results, t }) {
                 <thead>
                   <tr style={{ background: t.surf2 }}>
                     {["Term", "Estimate", "SE", "t", "p-value", "95% CI"].map(h => (
-                      <th key={h} style={{ padding: "3px 6px", textAlign: "left", color: t.tx3, fontSize: 8, textTransform: "uppercase", letterSpacing: 0.3 }}>{h}</th>
+                      <th key={h} style={{ padding: "3px 6px", textAlign: "left", color: t.tx, fontSize: 8, textTransform: "uppercase", letterSpacing: 0.3 }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -587,7 +587,7 @@ function MixedModelView({ results, t }) {
                 <thead>
                   <tr style={{ background: t.surf2 }}>
                     {["Component", "Variance"].map(h => (
-                      <th key={h} style={{ padding: "3px 6px", textAlign: "left", color: t.tx3, fontSize: 8, textTransform: "uppercase", letterSpacing: 0.3 }}>{h}</th>
+                      <th key={h} style={{ padding: "3px 6px", textAlign: "left", color: t.tx, fontSize: 8, textTransform: "uppercase", letterSpacing: 0.3 }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -639,7 +639,7 @@ function ChangeView({ results, t }) {
             <thead>
               <tr style={{ background: t.surf2 }}>
                 {["From", "To", "Mean Δ", "SD Δ", "SEM", "MDC", "Δ > MDC?", "t", "p-value"].map(h => (
-                  <th key={h} style={{ padding: "3px 6px", textAlign: "left", color: t.tx3, fontSize: 8, textTransform: "uppercase", letterSpacing: 0.3 }}>{h}</th>
+                  <th key={h} style={{ padding: "3px 6px", textAlign: "left", color: t.tx, fontSize: 8, textTransform: "uppercase", letterSpacing: 0.3 }}>{h}</th>
                 ))}
               </tr>
             </thead>

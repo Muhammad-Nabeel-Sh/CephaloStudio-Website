@@ -383,7 +383,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     },300);
   };
 
-  useEffect(()=>{const fn=()=>dispatch({type:"SET",payload:{isMobile:window.innerWidth<768}});window.addEventListener("resize",fn);return()=>window.removeEventListener("resize",fn);},[]);
+  useEffect(()=>{const fn=()=>dispatch({type:"SET",payload:{isMobile:window.innerWidth<768}});window.addEventListener("resize",fn);return()=>window.removeEventListener("resize",fn);},[dispatch]);
 
   useEffect(()=>{
     if(!rightPanelResizing)return;
@@ -392,7 +392,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     window.addEventListener("mousemove",onMove);
     window.addEventListener("mouseup",onUp);
     return()=>{window.removeEventListener("mousemove",onMove);window.removeEventListener("mouseup",onUp);};
-  },[rightPanelResizing]);
+  },[rightPanelResizing,dispatch]);
 
   useEffect(()=>{
     if(!toolbarDragging)return;
@@ -401,7 +401,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     window.addEventListener("mousemove",onMove);
     window.addEventListener("mouseup",onUp);
     return()=>{window.removeEventListener("mousemove",onMove);window.removeEventListener("mouseup",onUp);};
-  },[toolbarDragging]);
+  },[toolbarDragging,dispatch]);
 
   // Migration: legacy session.image -> session.images[]
   useEffect(()=>{
@@ -413,20 +413,6 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       onUpdateProject(updateSessionInProject(project,activeSession.id,{images:[entry],image:undefined}));
     }
   },[]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Auto-start placing mode when project has unplaced markups (from wizard)
-  const placingInitRef=useRef(true);
-  useEffect(()=>{
-    if(!placingInitRef.current)return;
-    placingInitRef.current=false;
-    const unplaced=markups.filter(m=>!m.placed&&m.type==="point");
-    if(unplaced.length>0){
-      setPlacingQueue(unplaced.map(m=>m.id));
-      dispatch({type:"SET",payload:{placingIdx:0}});
-      dispatch({type:"SET",payload:{placingMode:true}});
-      dispatch({type:"SET",payload:{rightPanel:"markups"}});
-    }
-  },[]);
 
   const isPanning=useRef(false);const panStart=useRef(null);
   const isDragging=useRef(false);const dragStart=useRef(null);const dragStartState=useRef(null);
@@ -440,14 +426,30 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const markups=useMemo(()=>activeSession?.markups||[],[activeSession?.markups]);
   const sessionImage=useMemo(()=>activeSession?.images||[],[activeSession?.images]);
 
+  // Auto-start placing mode when project has unplaced markups (from wizard)
+  const placingInitRef=useRef(true);
+  useEffect(()=>{
+    if(!placingInitRef.current)return;
+    placingInitRef.current=false;
+    const unplaced=markups.filter(m=>!m.placed&&m.type==="point");
+    if(unplaced.length>0){
+      setPlacingQueue(unplaced.map(m=>m.id));
+      dispatch({type:"SET",payload:{placingIdx:0}});
+      dispatch({type:"SET",payload:{placingMode:true}});
+      dispatch({type:"SET",payload:{rightPanel:"markups"}});
+    }
+  },[dispatch,markups,setPlacingQueue]);
+
   const calibration=useMemo(()=>activeSession?.calibration||{done:false,pxPerMm:1},[activeSession?.calibration]);
   const processing=useMemo(()=>activeSession?.processing||{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},[activeSession?.processing]);
   const lutMode=activeSession?.lutMode||"gray";const lutInvert=activeSession?.lutInvert||false;
-  const formulas=activeSession?.formulas||[];const norms=activeSession?.norms||[];
+  const formulas=activeSession?.formulas||[];const norms=useMemo(()=>activeSession?.norms||[],[activeSession?.norms]);
   const analysisTemplate=activeSession?.analysisTemplate||"blank";
   const selectedMarkup=markups.find(m=>m.id===selectedId);
 
-  const updSession=patch=>onUpdateProject(updateSessionInProject(project,activeSession.id,patch));
+  const updSessionRef=useRef();
+  updSessionRef.current=patch=>onUpdateProject(updateSessionInProject(project,activeSession.id,patch));
+  const updSession=useCallback(patch=>updSessionRef.current(patch),[]);
   const angleMode=activeSession?.angleMode||"signed-deg";
   const setAngleMode=m=>updSession({angleMode:m});
   const formatAngle=(v)=>{
@@ -459,12 +461,18 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     if(unit==="rad")return(val*Math.PI/180).toFixed(4)+" rad";
     return val.toFixed(1)+"°";
   };
-  const pushUndo=()=>{
+  const undoRef=useRef();
+  const redoRef=useRef();
+  const updMarkupRef=useRef();
+  const delMarkupRef=useRef();
+  const pushUndoRef=useRef();
+  pushUndoRef.current=()=>{
     undoStackRef.current.push(JSON.stringify({markups,norms,placingMode,placingIdx,placingQueue}));
     if(undoStackRef.current.length>50)undoStackRef.current.shift();
     redoStackRef.current=[];
   };
-  const undo=()=>{
+  const pushUndo=useCallback(()=>pushUndoRef.current(),[]);
+  undoRef.current=()=>{
     if(undoStackRef.current.length===0)return;
     const prev=undoStackRef.current.pop();
     if(!prev)return;
@@ -476,22 +484,29 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       dispatch({type:"SET",payload:{placingMode:parsed.placingMode,placingIdx:parsed.placingIdx,placingQueue:parsed.placingQueue}});
     }
   };
-  const redo=()=>{
+  const undo=useCallback(()=>undoRef.current(),[]);
+  redoRef.current=()=>{
     if(redoStackRef.current.length===0)return;
     undoStackRef.current.push(JSON.stringify(markups));
     const next=redoStackRef.current.pop();
     if(next)updSession({markups:JSON.parse(next)});
   };
-  const refreshAutoMeas=(ms)=>{const placed={};const markupMap={};for(const m of ms){if(m.placed&&m.label)placed[m.label]=m;if(m.label)markupMap[m.label]=m;}return ms.map(m=>{if(!m.refLabels||m.refLabels.length===0)return m;if(m.type==="ratio"||m.type==="sum"||m.type==="difference"||m.type==="percentage"){const allRefsExist=m.refLabels.every(rl=>markupMap[rl]);if(!allRefsExist)return m;let nv=0;if(m.type==="ratio"){const v0=getMeasValue(markupMap[m.refLabels[0]]);const v1=getMeasValue(markupMap[m.refLabels[1]]);nv=v1!==0?v0/v1:0;}else if(m.type==="difference"){nv=getMeasValue(markupMap[m.refLabels[0]])-getMeasValue(markupMap[m.refLabels[1]]);}else if(m.type==="percentage"){const v0=getMeasValue(markupMap[m.refLabels[0]]);const v1=getMeasValue(markupMap[m.refLabels[1]]);nv=v1!==0?(v0/v1)*100:0;}else{nv=m.refLabels.reduce((s,rl)=>s+getMeasValue(markupMap[rl]),0);}if(m.computedValue!==nv)return{...m,computedValue:nv};return m;}const allPlaced=m.refLabels.every(rl=>placed[rl]);if(!allPlaced)return m;const np=m.refLabels.map(rl=>placed[rl].points[0]);if(np.some((p,i)=>p.x!==m.points[i]?.x||p.y!==m.points[i]?.y))return{...m,points:np};return m;});};
+  const redo=useCallback(()=>redoRef.current(),[]);
+  const refreshAutoMeasRef=useRef();
+  refreshAutoMeasRef.current=(ms)=>{const placed={};const markupMap={};for(const m of ms){if(m.placed&&m.label)placed[m.label]=m;if(m.label)markupMap[m.label]=m;}return ms.map(m=>{if(!m.refLabels||m.refLabels.length===0)return m;if(m.type==="ratio"||m.type==="sum"||m.type==="difference"||m.type==="percentage"){const allRefsExist=m.refLabels.every(rl=>markupMap[rl]);if(!allRefsExist)return m;let nv=0;if(m.type==="ratio"){const v0=getMeasValue(markupMap[m.refLabels[0]]);const v1=getMeasValue(markupMap[m.refLabels[1]]);nv=v1!==0?v0/v1:0;}else if(m.type==="difference"){nv=getMeasValue(markupMap[m.refLabels[0]])-getMeasValue(markupMap[m.refLabels[1]]);}else if(m.type==="percentage"){const v0=getMeasValue(markupMap[m.refLabels[0]]);const v1=getMeasValue(markupMap[m.refLabels[1]]);nv=v1!==0?(v0/v1)*100:0;}else{nv=m.refLabels.reduce((s,rl)=>s+getMeasValue(markupMap[rl]),0);}if(m.computedValue!==nv)return{...m,computedValue:nv};return m;}const allPlaced=m.refLabels.every(rl=>placed[rl]);if(!allPlaced)return m;const np=m.refLabels.map(rl=>placed[rl].points[0]);if(np.some((p,i)=>p.x!==m.points[i]?.x||p.y!==m.points[i]?.y))return{...m,points:np};return m;});};
+  const refreshAutoMeas=useCallback(ms=>refreshAutoMeasRef.current(ms),[]);
   const updMarkups=fn=>{pushUndo();updSession({markups:refreshAutoMeas(fn(markups))});};
-  const updMarkup=(id,patch)=>{
+  updMarkupRef.current=(id,patch)=>{
     updMarkups(ms=>ms.map(m=>m.id===id?{...m,...patch}:m));
   };
-  const delMarkup=id=>{
+  const updMarkup=useCallback((id,patch)=>updMarkupRef.current(id,patch),[]);
+  delMarkupRef.current=id=>{
     updMarkups(ms=>ms.filter(mm=>mm.id!==id));
     if(selectedId===id)dispatch({type:"SET",payload:{selectedId:null}});
   };
-  const addMarkup=partial=>{
+  const delMarkup=useCallback(id=>delMarkupRef.current(id),[]);
+  const addMarkupRef=useRef();
+  addMarkupRef.current=partial=>{
     const typeCount=(type)=>markups.filter(m=>m.type===type).length;
     const m={id:uid(),color:t.acc,width:1.5,style:"solid",size:6,label:"",definition:"",showLength:true,strokeColor:t.acc,fillColor:t.acc+"22",strokeWidth:1.5,visible:true,placed:true,...partial};
     if(partial.type==="point")m.label=`P${typeCount("point")+1}`;
@@ -505,7 +520,9 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     }
     updMarkups(ms=>[...ms,m]);dispatch({type:"SET",payload:{selectedId:m.id}});return m;
   };
-  const finalizeMarkup=draw=>{
+  const addMarkup=useCallback(partial=>addMarkupRef.current(partial),[]);
+  const finalizeMarkupRef=useRef();
+  finalizeMarkupRef.current=draw=>{
     const D={
       line:{color:t.acc,width:1.5,style:"solid",mode:"segment",label:`Line ${markups.filter(m=>m.type==="line").length+1}`,showLength:true},
       angle3:{color:"#f472b6",width:1.5,label:`Angle ${markups.filter(m=>m.type==="angle3").length+1}`},
@@ -522,6 +539,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       addMarkup(newMarkup);
     }
   };
+  const finalizeMarkup=useCallback(draw=>finalizeMarkupRef.current(draw),[]);
 
   // load images
   useEffect(()=>{
@@ -539,7 +557,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   },[processing,lutMode,lutInvert]);
 
   const toImage=useCallback((sx,sy)=>({x:(sx-pan.x)/zoom,y:(sy-pan.y)/zoom}),[pan,zoom]);
-  const getCanvasPos=e=>{const r=canvasRef.current.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};};
+  const getCanvasPos=useCallback(e=>{const r=canvasRef.current.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};},[]);
 
   useEffect(()=>{
     const obs=new ResizeObserver(()=>{if(skipResizeRef.current)return;const el=containerRef.current;if(!el)return;const c=canvasRef.current;if(!c)return;c.width=el.clientWidth;c.height=el.clientHeight;canvasSize.current={w:el.clientWidth,h:el.clientHeight};scheduleRedraw();});
@@ -723,8 +741,10 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       if(e.key==="0"){dispatch({type:"SET",payload:{zoom:1}});dispatch({type:"SET",payload:{pan:{x:40,y:40}}});}
     };
     window.addEventListener("keydown",fn);return()=>window.removeEventListener("keydown",fn);
-  },[selectedId,placingMode,placingIdx,placingQueue,markups,delMarkup,redo,undo]);
+  },[selectedId,placingMode,placingIdx,placingQueue,markups,delMarkup,redo,undo,dispatch]);
 
+  const autoCreateMeasurementsRef=useRef();
+  const autoCreateMeasurements=useCallback((markups,templateName)=>autoCreateMeasurementsRef.current(markups,templateName),[]);
   const handleMouseDown=useCallback(e=>{
     if(e.button!==0)return;
     const sp=getCanvasPos(e);let ip=toImage(sp.x,sp.y);
@@ -910,7 +930,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     if(["line","angle3","angle4","polygon","curve","perp"].includes(activeTool)){
       if(!currentDraw)dispatch({type:"SET",payload:{currentDraw:{type:activeTool,points:[ip],curveStyle:"linear",replacingId}}});
       else{const nps=[...currentDraw.points,ip];const need={line:2,angle3:3,angle4:4,perp:3}[activeTool];if(need&&nps.length>=need){finalizeMarkup({...currentDraw,points:nps});dispatch({type:"SET",payload:{currentDraw:null}});}else dispatch({type:"SET",payload:{currentDraw:{...currentDraw,points:nps}}});}return;}
-  },[activeTool,markups,zoom,pan,snapEnabled,currentDraw,selectedMarkup,placingMode,placingQueue,placingIdx,replacingId,setSelectedId,updMarkup,addMarkup,finalizeMarkup,toImage,getCanvasPos,t,analysisTemplate,calibration,project]);
+  },[activeTool,markups,zoom,pan,snapEnabled,currentDraw,selectedMarkup,placingMode,placingQueue,placingIdx,replacingId,setSelectedId,updMarkup,addMarkup,finalizeMarkup,toImage,getCanvasPos,t,analysisTemplate,autoCreateMeasurements,dispatch,norms,pushUndo,refreshAutoMeas,updSession]);
 
   const handleMouseMove=useCallback(e=>{
     const sp=getCanvasPos(e);dispatch({type:"SET",payload:{mousePos:sp}});
@@ -935,7 +955,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         }
       } catch { silhouetteAction.current=null; /*silent*/ }
     }
-  },[activeTool,markups,zoom,snapEnabled,selectedId,updMarkup,toImage,getCanvasPos]);
+  },[activeTool,markups,zoom,snapEnabled,selectedId,updMarkup,toImage,getCanvasPos,dispatch]);
 
   const handleMouseUp=()=>{
     if((isDragging.current||silhouetteAction.current)&&dragStartState.current){
@@ -950,7 +970,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     isPanning.current=false;isDragging.current=false;silhouetteAction.current=null;
   };
   const handleDblClick=()=>{if((activeTool==="polygon"||activeTool==="curve")&&currentDraw?.points.length>=2){finalizeMarkup(currentDraw);dispatch({type:"SET",payload:{currentDraw:null}});}};
-  useEffect(()=>{const c=canvasRef.current;if(!c)return;const onWheel=e=>{if(Math.abs(e.deltaY)>0.1||Math.abs(e.deltaX)>0.1){e.preventDefault();e.stopPropagation();const sp=getCanvasPos(e),f=e.deltaY>0?0.9:1.1,nz=clamp(zoom*f,0.05,15);dispatch({type:"SET",payload:{pan:prev=>({x:sp.x-(sp.x-prev.x)*(nz/zoom),y:sp.y-(sp.y-prev.y)*(nz/zoom)})}});dispatch({type:"SET",payload:{zoom:nz}});}};c.addEventListener("wheel",onWheel,{passive:false});return()=>c.removeEventListener("wheel",onWheel);},[zoom]);
+  useEffect(()=>{const c=canvasRef.current;if(!c)return;const onWheel=e=>{if(Math.abs(e.deltaY)>0.1||Math.abs(e.deltaX)>0.1){e.preventDefault();e.stopPropagation();const sp=getCanvasPos(e),f=e.deltaY>0?0.9:1.1,nz=clamp(zoom*f,0.05,15);dispatch({type:"SET",payload:{pan:prev=>({x:sp.x-(sp.x-prev.x)*(nz/zoom),y:sp.y-(sp.y-prev.y)*(nz/zoom)})}});dispatch({type:"SET",payload:{zoom:nz}});}};c.addEventListener("wheel",onWheel,{passive:false});return()=>c.removeEventListener("wheel",onWheel);},[zoom,dispatch,getCanvasPos]);
   const handleTouchStart=e=>{e.preventDefault();if(e.touches.length===1){const t2=e.touches[0];handleMouseDown({button:0,clientX:t2.clientX,clientY:t2.clientY});}if(e.touches.length===2)lastTouchDist.current=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);};
   const handleTouchMove=e=>{e.preventDefault();if(e.touches.length===1){const t2=e.touches[0];handleMouseMove({clientX:t2.clientX,clientY:t2.clientY});}if(e.touches.length===2&&lastTouchDist.current){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);const f=d/lastTouchDist.current,nz=clamp(zoom*f,0.05,15);const cx=(e.touches[0].clientX+e.touches[1].clientX)/2,cy=(e.touches[0].clientY+e.touches[1].clientY)/2;const r=canvasRef.current.getBoundingClientRect();const sp={x:cx-r.left,y:cy-r.top};dispatch({type:"SET",payload:{pan:prev=>({x:sp.x-(sp.x-prev.x)*(nz/zoom),y:sp.y-(sp.y-prev.y)*(nz/zoom)})}});dispatch({type:"SET",payload:{zoom:nz}});lastTouchDist.current=d;}};
   const handleTouchEnd=()=>{handleMouseUp();lastTouchDist.current=null;};
@@ -973,7 +993,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     setPlacingQueue(newMarkups.map(m=>m.id));dispatch({type:"SET",payload:{placingIdx:0}});dispatch({type:"SET",payload:{placingMode:true}});dispatch({type:"SET",payload:{rightPanel:"markups"}});
   };
 
-  const autoCreateMeasurements=(markups,templateName)=>{
+  autoCreateMeasurementsRef.current=(markups,templateName)=>{
     const analysis=PREDEFINED.lateral.find(a=>a.name===templateName)
       ||PREDEFINED.ap.find(a=>a.name===templateName)
       ||PREDEFINED.smv.find(a=>a.name===templateName)

@@ -291,15 +291,17 @@ function studentizedRangeCDF(q, k, df) {
   if (q <= 0 || k < 2 || df < 1) return 0;
   let p = 0;
   const steps = 80;
+  const dHalf = df / 2;
   for (let i = 0; i <= steps; i++) {
     const x = 0.001 + (8 - 0.001) * i / steps;
     let inner = 1;
     for (let j = 0; j < k - 1; j++) {
-      inner *= normalCdf(q * x / Math.sqrt(2) - 0);
+      inner *= normalCdf(q * x / Math.sqrt(2));
     }
     const w = (i === 0 || i === steps) ? 1 : (i % 2 === 1 ? 4 : 2);
-    const f = df > 0 ? (df ** (df / 2)) / (2 ** (df / 2 - 1) * gammaLn(df / 2)) * x ** (df - 1) * Math.exp(-df * x * x / 2) : 0;
-    p += w * inner * f * (8 - 0.001) / (3 * steps);
+    // PDF of Y = sqrt(chi^2_df / df) — compute ln-scale
+    const logF = dHalf * Math.log(df) - (dHalf - 1) * Math.log(2) - gammaLn(dHalf) + (df - 1) * Math.log(x) - df * x * x / 2;
+    p += w * inner * Math.exp(logF) * (8 - 0.001) / (3 * steps);
   }
   return Math.min(1, Math.max(0, p));
 }
