@@ -102,6 +102,20 @@ function exportCephx(project) {
   let cleaned = { ...project };
   if (cleaned.images) cleaned.images = undefined;
   
+  // Normalize session images: ensure session.image → session.images[] for all sessions
+  if (cleaned.sessions) {
+    cleaned.sessions = cleaned.sessions.map(s => {
+      if (!s.images || s.images.length === 0) {
+        const oldImg = s.image || null;
+        if (oldImg) {
+          const entry = oldImg.id ? oldImg : { id: uid(), name: "Imported", dataUrl: oldImg.dataUrl || oldImg, dx: 0, dy: 0, opacity: 1, blendMode: "normal", visible: true, color: "none", transform: { tx: 0, ty: 0, rot: 0, scale: 1 } };
+          return { ...s, images: [entry], image: undefined };
+        }
+      }
+      return s;
+    });
+  }
+  
   // Sanitize research study results (strip any session objects with image data)
   if (cleaned.researchStudies) {
     cleaned = {

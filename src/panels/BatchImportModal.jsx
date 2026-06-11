@@ -97,7 +97,7 @@ export default function BatchImportModal({ t, project, onUpdateProject, onClose 
         }
         const session = mkSession({
           name: item.name,
-          image: item.imageEntry,
+          images: [item.imageEntry],
           meta: item.meta,
           subjectId: subjectMap[subjectLabel] || "",
         });
