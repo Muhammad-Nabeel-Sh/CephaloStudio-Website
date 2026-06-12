@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } fr
 import { THEMES, TOOLS, PREDEFINED, LUT_PRESETS } from "./constants.js";
 import { SILHOUETTES } from "./silhouettes.js";
 import { uid, clamp, dist, vpts, computeMeasurements, snapPoint, alignTwoPoints, buildScope, evalFormula, getMissingVars } from "./utils.js";
+import { generateInterpretation } from "./interpretation.js";
+import { generateReport } from "./reportGenerator.js";
 import { processImageToCanvas, computeHistogram, FloatingHistogram } from "./imageUtils.jsx";
 import { KatexSpan, LatexFloatingPanel } from "./hooks.jsx";
 import { Btn, Tag, Sld, PropRow, Inp } from "./ui.jsx";
@@ -362,6 +364,9 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     spotlightMode,
     displacementOverlay,refLandmark1,refLandmark2,overlayBlend}=ui;
   const [compareSession, setCompareSession] = useState(null);
+  const [showReportOptions, setShowReportOptions] = useState(false);
+  const defaultSections = { cover: true, images: true, measurements: true, normograms: true, research: true, formulas: true, interpretation: true };
+  const [reportSections, setReportSections] = useState({ ...defaultSections });
   const rightPanelWidthRef=useRef(rightPanelWidth);rightPanelWidthRef.current=rightPanelWidth;
   const toolbarPosRef=useRef(toolbarPos);toolbarPosRef.current=toolbarPos;
   // Panel collapse state — useRef + DOM manipulation to avoid canvas re-renders
@@ -1095,6 +1100,27 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([rows.map(r=>r.map(c=>`"${c}"`).join(",")).join("\n")],{type:"text/csv"}));a.download=`${project.name}.csv`;a.click();
   };
 
+  const captureMarkupImage = useCallback(async () => {
+    const imgUrl = sessionImage?.[0]?.dataUrl;
+    if (!imgUrl) return null;
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement("canvas");
+        c.width = img.naturalWidth;
+        c.height = img.naturalHeight;
+        const ctx = c.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        const visible = markups.filter(m => m.visible !== false);
+        const cs = { w: c.width, h: c.height };
+        visible.forEach(m => drawMarkup(ctx, m, 1, { x: 0, y: 0 }, calibration, null, t, false, cs, "deg", true, 1.2));
+        resolve(c.toDataURL("image/png"));
+      };
+      img.onerror = () => resolve(null);
+      img.src = imgUrl;
+    });
+  }, [sessionImage, markups, calibration, t]);
+
   const measScope=useMemo(()=>buildScope(markups,calibration),[markups,calibration]);
   const allMeas=useMemo(()=>markups.map(m=>({m,meas:computeMeasurements(m,calibration)})).filter(x=>Object.keys(x.meas).length>0),[markups,calibration]);
   const cursorStyle={select:"default",pan:"grab",point:"crosshair",line:"crosshair",angle3:"crosshair",angle4:"crosshair",polygon:"crosshair",curve:"crosshair",perp:"crosshair",parallel:"crosshair",midpoint:"crosshair",perppoint:"crosshair",arrow:"crosshair",text:"text",ruler:"crosshair"}[activeTool]||"default";
@@ -1414,7 +1440,44 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
 
       {/* MODALS */}
       {showCalib&&<Modal t={t} title="Calibration" onClose={()=>dispatch({type:"SET",payload:{showCalib:false}})}><CalibModal t={t} calibration={calibration} onFinish={finalizeCalib}/></Modal>}
-      {showExport&&<Modal t={t} title="Export" onClose={()=>dispatch({type:"SET",payload:{showExport:false}})}><div style={{display:"flex",flexDirection:"column",gap:10}}><Btn t={t} onClick={()=>{exportCSV();dispatch({type:"SET",payload:{showExport:false}});}}>Measurements CSV</Btn><Btn t={t} onClick={()=>{onSave?.(project);dispatch({type:"SET",payload:{showExport:false}});}}>Full Project .cephx</Btn><Btn t={t} onClick={()=>{const name=window.prompt("Template name:",project.name);if(name){exportTemplateAsCepht(project,name);dispatch({type:"SET",payload:{showExport:false}});}}}>Template .cepht (definitions only)</Btn><Btn t={t} onClick={()=>{const name=window.prompt("Template name:",project.name+" (placed)");if(name){exportTemplateAsCepht(project,name,true);dispatch({type:"SET",payload:{showExport:false}});}}}>Template .cepht (with placements)</Btn><Btn t={t} ghost onClick={()=>{const p=profileProject(project);alert(`Images: ${p.imgMB}MB\nResearch: ${p.rsMB}MB\nMeta/subjects: ${p.otherMB}MB\nTotal: ${p.grandTotalMB}MB\n(See console for full breakdown)`);}}>Check Size</Btn></div></Modal>}
+      {showExport&&<Modal t={t} title="Export" onClose={()=>dispatch({type:"SET",payload:{showExport:false}})}><div style={{display:"flex",flexDirection:"column",gap:10}}>
+        <Btn t={t} onClick={()=>{exportCSV();dispatch({type:"SET",payload:{showExport:false}});}}>Measurements CSV</Btn>
+        <Btn t={t} onClick={()=>{onSave?.(project);dispatch({type:"SET",payload:{showExport:false}});}}>Full Project .cephx</Btn>
+        <Btn t={t} onClick={()=>{setReportSections({...defaultSections});setShowReportOptions(true);}}>PDF Report</Btn>
+        <Btn t={t} onClick={()=>{const name=window.prompt("Template name:",project.name);if(name){exportTemplateAsCepht(project,name);dispatch({type:"SET",payload:{showExport:false}});}}}>Template .cepht (definitions only)</Btn>
+        <Btn t={t} onClick={()=>{const name=window.prompt("Template name:",project.name+" (placed)");if(name){exportTemplateAsCepht(project,name,true);dispatch({type:"SET",payload:{showExport:false}});}}}>Template .cepht (with placements)</Btn>
+        <Btn t={t} ghost onClick={()=>{const p=profileProject(project);alert(`Images: ${p.imgMB}MB\nResearch: ${p.rsMB}MB\nMeta/subjects: ${p.otherMB}MB\nTotal: ${p.grandTotalMB}MB\n(See console for full breakdown)`);}}>Check Size</Btn>
+      </div></Modal>}
+      {showReportOptions&&<Modal t={t} title="PDF Report Options" onClose={()=>setShowReportOptions(false)}>
+        <div style={{display:"flex",flexDirection:"column",gap:8}}>
+          <div style={{fontSize:11,color:t.tx2,marginBottom:4}}>Select sections to include in the report:</div>
+          {[
+            ["cover","Cover Page"],["images","Original & Marked-up Images"],
+            ["measurements","Measurements Table"],["normograms","Normogram Charts"],
+            ["research","Research Studies"],["formulas","Custom Formulas"],
+            ["interpretation","Clinical Interpretation"],
+          ].map(([key,label])=>(
+            <div key={key} style={{display:"flex",alignItems:"center",gap:10}}>
+              <button onClick={()=>setReportSections(s=>({...s,[key]:!s[key]}))} style={{width:20,height:20,borderRadius:4,border:`1px solid ${reportSections[key]?t.acc:t.bdr}`,background:reportSections[key]?t.acc+"22":"transparent",color:reportSections[key]?t.acc:t.tx3,cursor:"pointer",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}>
+                {reportSections[key]&&<span>✓</span>}
+              </button>
+              <span style={{fontSize:13,color:t.tx,userSelect:"none",cursor:"pointer"}} onClick={()=>setReportSections(s=>({...s,[key]:!s[key]}))}>{label}</span>
+            </div>
+          ))}
+          <div style={{borderTop:`1px solid ${t.bdr}`,marginTop:10,paddingTop:12,display:"flex",gap:10}}>
+            <Btn t={t} onClick={async ()=>{setShowReportOptions(false);
+              try {
+                const origUrl = sessionImage?.[0]?.dataUrl || null;
+                const markupUrl = await captureMarkupImage();
+                const interp = generateInterpretation(allMeas, norms);
+                const fv = {}; formulas.forEach(f => { const v = evalFormula(f.expression, measScope); if (v !== null) fv[f.id] = v; });
+                await generateReport({ project, session: activeSession, allMeas, norms, formulas, formulaValues: fv, originalImageDataUrl: origUrl, markupImageDataUrl: markupUrl, interpretation: interp, sections: reportSections });
+              } catch (e) { console.error("PDF generation failed:", e); }
+            }} style={{flex:1}}>Generate PDF</Btn>
+            <Btn t={t} onClick={()=>setShowReportOptions(false)} style={{flex:1}} ghost>Cancel</Btn>
+          </div>
+        </div>
+      </Modal>}
       {pendingTextPos&&<Modal t={t} title="Text Annotation" onClose={()=>dispatch({type:"SET",payload:{pendingTextPos:null}})}><TextModal t={t} defaultColor="#fbbf24" onConfirm={(txt,opts)=>{addMarkup({type:"text",points:[pendingTextPos],text:txt,...opts});dispatch({type:"SET",payload:{pendingTextPos:null}});}} onCancel={()=>dispatch({type:"SET",payload:{pendingTextPos:null}})}/></Modal>}
       {showAnon&&<Modal t={t} title="Anonymization" onClose={()=>dispatch({type:"SET",payload:{showAnon:false}})}><AnonModal t={t} project={project} onUpdateProject={onUpdateProject} onClose={()=>dispatch({type:"SET",payload:{showAnon:false}})}/></Modal>}
       {showNormogram&&<Modal t={t} title="Cephalometric Normogram" wide onClose={()=>dispatch({type:"SET",payload:{showNormogram:false}})}><NormogramPanel allMeas={allMeas} norms={norms} t={t} formatAngle={formatAngle}/></Modal>}
