@@ -147,9 +147,10 @@ function NormBadges({ norms, meas, t }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // MEASUREMENTS PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
-export function MeasurementsPanel({ allMeas, t, calibration, norms, onUpdateNorms, onExportCSV, onOpenCalib, formatAngle }) {
+export function MeasurementsPanel({ allMeas, formulaMeas, t, calibration, norms, onUpdateNorms, onExportCSV, onOpenCalib, formatAngle }) {
   const [editingNorm, setEditingNorm] = useState(null);
   const [showGallery, setShowGallery] = useState(false);
+  const hasMeas = allMeas.length > 0 || (formulaMeas && formulaMeas.length > 0);
   return (
     <div style={{ padding: 12 }}>
       {!calibration.done && <div style={{ background: t.warn + "22", border: `1px solid ${t.warn}44`, borderRadius: 8, padding: 12, marginBottom: 12, fontSize: 12, color: t.warn }}>⚠ Calibrate for mm values.<button onClick={onOpenCalib} style={{ display: "block", marginTop: 6, background: t.warn, color: "#000", border: "none", borderRadius: 4, padding: "3px 8px", cursor: "pointer", fontSize: 11, fontWeight: 700 }}>Open Calibration</button></div>}
@@ -176,44 +177,80 @@ export function MeasurementsPanel({ allMeas, t, calibration, norms, onUpdateNorm
         onUpdateNorms([...existing, { id: uid(), markupLabel: label, measureType: type, mean, sd, source }]);
       }} onClose={() => setShowGallery(false)} />}
 
-      {allMeas.length === 0 ? <div style={{ color: t.tx3, fontSize: 12, textAlign: "center", paddingTop: 20 }}>Place lines, angles, or polygons.</div>
-        : allMeas.map(({ m, meas }) => {
-          const relNorms = (norms || []).filter(n => n.markupLabel === m.label);
-          return (
-            <div key={m.id} style={{ marginBottom: 10, padding: 10, background: t.surf2, borderRadius: 8, border: `1px solid ${t.bdr}` }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: m.color || t.acc, marginBottom: 6, display: "flex", justifyContent: "space-between" }}><span>{m.label || m.type}</span><Tag color={m.color || t.acc}>{m.type}</Tag></div>
-              {Object.entries(meas).map(([k, v]) => {
-                const norm = relNorms.find(n => n.measureType === k);
-                const dev = norm ? normDeviation(v, norm) : null;
-                return (
-                  <div key={k} style={{ marginBottom: dev ? 10 : 4 }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: t.tx2, alignItems: "center" }}>
-                      <span>{k}</span>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <span style={{ fontFamily: "'DM Mono',monospace", color: t.tx, fontWeight: 600 }}>{k === "angle" ? formatAngle(v) : v.toFixed(2) + (k === "area" ? " mm²" : " mm")}</span>
-                        <button onClick={() => setEditingNorm({ markupLabel: m.label, measureType: k, existing: norm })}
-                          style={{ background: "none", border: `1px solid ${norm ? t.ok + "55" : t.bdr}`, color: norm ? t.ok : t.tx3, borderRadius: 3, padding: "0 4px", cursor: "pointer", fontSize: 9, fontWeight: 700, lineHeight: "16px" }}>
-                          {norm ? "N" : "±N"}
-                        </button>
+      {!hasMeas ? <div style={{ color: t.tx3, fontSize: 12, textAlign: "center", paddingTop: 20 }}>Place lines, angles, or polygons.</div>
+        : <>
+          {allMeas.map(({ m, meas }) => {
+            const relNorms = (norms || []).filter(n => n.markupLabel === m.label);
+            return (
+              <div key={m.id} style={{ marginBottom: 10, padding: 10, background: t.surf2, borderRadius: 8, border: `1px solid ${t.bdr}` }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: m.color || t.acc, marginBottom: 6, display: "flex", justifyContent: "space-between" }}><span>{m.label || m.type}</span><Tag color={m.color || t.acc}>{m.type}</Tag></div>
+                {Object.entries(meas).map(([k, v]) => {
+                  const norm = relNorms.find(n => n.measureType === k);
+                  const dev = norm ? normDeviation(v, norm) : null;
+                  return (
+                    <div key={k} style={{ marginBottom: dev ? 10 : 4 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: t.tx2, alignItems: "center" }}>
+                        <span>{k}</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ fontFamily: "'DM Mono',monospace", color: t.tx, fontWeight: 600 }}>{k === "angle" ? formatAngle(v) : v.toFixed(2) + (k === "area" ? " mm²" : " mm")}</span>
+                          <button onClick={() => setEditingNorm({ markupLabel: m.label, measureType: k, existing: norm })}
+                            style={{ background: "none", border: `1px solid ${norm ? t.ok + "55" : t.bdr}`, color: norm ? t.ok : t.tx3, borderRadius: 3, padding: "0 4px", cursor: "pointer", fontSize: 9, fontWeight: 700, lineHeight: "16px" }}>
+                            {norm ? "N" : "±N"}
+                          </button>
+                        </div>
                       </div>
+                      {dev && <div style={{ marginTop: 4, padding: "5px 8px", borderRadius: 5, background: deviationColor(dev.sdUnits, t) + "18", border: `1px solid ${deviationColor(dev.sdUnits, t)}44` }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10 }}>
+                          <span style={{ color: t.tx2 }}>Norm: {norm.mean} ± {norm.sd}</span>
+                          <span style={{ fontWeight: 700, color: deviationColor(dev.sdUnits, t) }}>{dev.delta > 0 ? "+" : ""}{dev.delta.toFixed(2)} ({dev.sdUnits > 0 ? "+" : ""}{dev.sdUnits.toFixed(1)} SD)</span>
+                        </div>
+                        {norm.source && <div style={{ fontSize: 9, color: t.tx3, marginTop: 2 }}>{norm.source}</div>}
+                      </div>}
                     </div>
-                    {dev && <div style={{ marginTop: 4, padding: "5px 8px", borderRadius: 5, background: deviationColor(dev.sdUnits, t) + "18", border: `1px solid ${deviationColor(dev.sdUnits, t)}44` }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10 }}>
-                        <span style={{ color: t.tx2 }}>Norm: {norm.mean} ± {norm.sd}</span>
-                        <span style={{ fontWeight: 700, color: deviationColor(dev.sdUnits, t) }}>{dev.delta > 0 ? "+" : ""}{dev.delta.toFixed(2)} ({dev.sdUnits > 0 ? "+" : ""}{dev.sdUnits.toFixed(1)} SD)</span>
+                  );
+                })}
+              </div>
+            );
+          })}
+          {formulaMeas && formulaMeas.map(({ m, meas }) => {
+            const relNorms = (norms || []).filter(n => n.markupLabel === m.label);
+            return (
+              <div key={m.id} style={{ marginBottom: 10, padding: 10, background: t.surf2, borderRadius: 8, border: `1px solid ${t.bdr}`, borderLeft: `3px solid ${t.acc2}` }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: m.color || t.acc, marginBottom: 6, display: "flex", justifyContent: "space-between" }}><span>{m.label || m.type}</span><Tag color={m.color || t.acc}>{m.type}</Tag></div>
+                {Object.entries(meas).map(([k, v]) => {
+                  const norm = relNorms.find(n => n.measureType === k);
+                  const dev = norm ? normDeviation(v, norm) : null;
+                  const unitLabel = k === "value" ? (m.unit || "") : "";
+                  return (
+                    <div key={k} style={{ marginBottom: dev ? 10 : 4 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: t.tx2, alignItems: "center" }}>
+                        <span style={{ fontSize: 10, color: t.tx3 }}>{k}{unitLabel ? " (" + unitLabel + ")" : ""}</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                          <span style={{ fontFamily: "'DM Mono',monospace", color: t.tx, fontWeight: 600 }}>{v.toFixed(2)}</span>
+                          <button onClick={() => setEditingNorm({ markupLabel: m.label, measureType: k, existing: norm })}
+                            style={{ background: "none", border: `1px solid ${norm ? t.ok + "55" : t.bdr}`, color: norm ? t.ok : t.tx3, borderRadius: 3, padding: "0 4px", cursor: "pointer", fontSize: 9, fontWeight: 700, lineHeight: "16px" }}>
+                            {norm ? "N" : "±N"}
+                          </button>
+                        </div>
                       </div>
-                      {norm.source && <div style={{ fontSize: 9, color: t.tx3, marginTop: 2 }}>{norm.source}</div>}
-                    </div>}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
+                      {dev && <div style={{ marginTop: 4, padding: "5px 8px", borderRadius: 5, background: deviationColor(dev.sdUnits, t) + "18", border: `1px solid ${deviationColor(dev.sdUnits, t)}44` }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10 }}>
+                          <span style={{ color: t.tx2 }}>Norm: {norm.mean} ± {norm.sd}</span>
+                          <span style={{ fontWeight: 700, color: deviationColor(dev.sdUnits, t) }}>{dev.delta > 0 ? "+" : ""}{dev.delta.toFixed(2)} ({dev.sdUnits > 0 ? "+" : ""}{dev.sdUnits.toFixed(1)} SD)</span>
+                        </div>
+                        {norm.source && <div style={{ fontSize: 9, color: t.tx3, marginTop: 2 }}>{norm.source}</div>}
+                      </div>}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </>}
 
       {editingNorm && <InlineNormEditor t={t} {...editingNorm} onSave={(n) => { const filtered = (norms || []).filter(x => !(x.markupLabel === editingNorm.markupLabel && x.measureType === editingNorm.measureType)); onUpdateNorms([...filtered, { id: editingNorm.existing?.id || uid(), ...n }]); setEditingNorm(null); }} onDelete={() => { onUpdateNorms((norms || []).filter(x => !(x.markupLabel === editingNorm.markupLabel && x.measureType === editingNorm.measureType))); setEditingNorm(null); }} onClose={() => setEditingNorm(null)} />}
 
-      {allMeas.length > 0 && <Btn t={t} small onClick={onExportCSV} style={{ width: "100%", marginTop: 8 }}>⬇ Export CSV</Btn>}
+      {hasMeas && <Btn t={t} small onClick={onExportCSV} style={{ width: "100%", marginTop: 8 }}>⬇ Export CSV</Btn>}
     </div>
   );
 }
@@ -242,7 +279,7 @@ function InlineNormEditor({ t, markupLabel, measureType, existing, onSave, onDel
 // ═══════════════════════════════════════════════════════════════════════════════
 // FORMULAS PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
-export function FormulasPanel({ formulas, t, scope, onAdd, onEdit, onDelete }) {
+export function FormulasPanel({ formulas, t, scope, onAdd, onEdit, onDelete, pinnedFormulas, onPinFormula }) {
   const [bigLatex, setBigLatex] = useState(null);
   return (
     <div style={{ padding: 12 }}>
@@ -250,6 +287,8 @@ export function FormulasPanel({ formulas, t, scope, onAdd, onEdit, onDelete }) {
       <div style={{ fontSize: 11, color: t.tx2, marginBottom: 12, lineHeight: 1.5 }}>Define derived measurements. Variables use landmark label names.</div>
       {formulas.map(f => {
         const val = evalFormula(f.expression, scope);
+        const pinned = pinnedFormulas?.has(f.id);
+        const isValid = val !== null && isFinite(val);
         return (
           <div key={f.id} style={{ marginBottom: 10, padding: 10, background: t.surf2, borderRadius: 8, border: `1px solid ${t.bdr}` }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
@@ -262,8 +301,14 @@ export function FormulasPanel({ formulas, t, scope, onAdd, onEdit, onDelete }) {
             </div>}
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
               <span style={{ color: t.tx2 }}>Result</span>
-              <span style={{ fontFamily: "'DM Mono',monospace", fontWeight: 700, color: val !== null ? t.acc : t.err }}>{val !== null ? `${val.toFixed(2)} ${f.unit || ""}` : "N/A"}</span>
+              <span style={{ fontFamily: "'DM Mono',monospace", fontWeight: 700, color: isValid ? t.acc : t.err }}>{isValid ? `${val.toFixed(2)} ${f.unit || ""}` : "N/A"}</span>
             </div>
+            {isValid && <div style={{ marginTop: 6 }}>
+              <button onClick={() => onPinFormula(f.id)}
+                style={{ width: "100%", padding: "4px 0", fontSize: 10, fontWeight: 700, borderRadius: 4, border: `1px solid ${pinned ? t.ok : t.bdr}`, background: pinned ? t.ok + "18" : "transparent", color: pinned ? t.ok : t.tx2, cursor: "pointer", transition: "all 0.15s" }}>
+                {pinned ? "✓ In Measurements" : "+ Add to Measurements"}
+              </button>
+            </div>}
           </div>
         );
       })}
