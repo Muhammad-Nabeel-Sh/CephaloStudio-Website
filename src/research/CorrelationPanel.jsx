@@ -4,6 +4,7 @@
 
 import { useState } from "react";
 import { InfoBox } from "../ui.jsx";
+import PlotlyChart, { heatmapLayout, heatmapData } from "./PlotlyChart.jsx";
 
 function LabelSelector({ sessions, selected, onToggle, t }) {
   const labels = [...new Set((sessions || []).flatMap(s =>
@@ -221,62 +222,48 @@ export function CorrelationResults({ results, t }) {
   );
 }
 
+const CORR_SCALE = [
+  [0, "#b91c1c"],
+  [0.25, "#ef4444"],
+  [0.4, "#fca5a5"],
+  [0.5, "#e5e7eb"],
+  [0.6, "#93c5fd"],
+  [0.75, "#3b82f6"],
+  [1, "#1d4ed8"],
+];
+const CORR_TFONT = { color: "#1f2937", size: 9, family: "'DM Sans',sans-serif" };
+
 function CorrelationHeatmap({ results, t }) {
   const { vars, matrix, n, method } = results;
+  if (!vars || vars.length < 2) return null;
   const m = vars.length;
-  const cell = Math.max(24, Math.min(38, Math.floor(420 / m)));
-  const maxLabelLen = Math.max(...vars.map(v => v.length));
-  const offX = Math.min(Math.max(maxLabelLen * 6.5 + 20, 80), 150);
-  const offY = 40;
-  const svgW = offX + m * cell + 16;
-  const svgH = offY + m * cell + 16;
-  const vf = Math.max(3, Math.min(5, Math.floor(cell * 0.22)));
-
-  const getColor = (r) => {
-    const a = Math.abs(r);
-    if (r > 0) return `rgba(56,189,248,${(0.2 + a * 0.7).toFixed(3)})`;
-    return `rgba(248,113,113,${(0.2 + a * 0.7).toFixed(3)})`;
-  };
-
+  const z = Array.from({ length: m }, () => Array(m).fill(null));
+  const displayTxt = Array.from({ length: m }, () => Array(m).fill(""));
+  const hoverTxt = Array.from({ length: m }, () => Array(m).fill(""));
+  for (let i = 0; i < m; i++) {
+    for (let j = 0; j < m; j++) {
+      if (i === j) { z[i][j] = 1; displayTxt[i][j] = "1"; hoverTxt[i][j] = "diagonal"; continue; }
+      const d = matrix[vars[i]]?.[vars[j]];
+      if (!d) continue;
+      z[i][j] = d.r;
+      displayTxt[i][j] = d.r.toFixed(2);
+      hoverTxt[i][j] = `r=${d.r.toFixed(3)}${d.sigAdj ? "*" : " (ns)"}`;
+    }
+  }
+  const data = heatmapData(z, vars, vars, displayTxt, {
+    zmin: -1, zmax: 1,
+    colorscale: CORR_SCALE,
+    customdata: hoverTxt,
+    texttemplate: "%{text}",
+    textfont: CORR_TFONT,
+    hovertemplate: "%{x} \u00d7 %{y}: <b>%{customdata}</b><extra></extra>",
+  });
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-      <svg width={svgW} height={svgH} style={{ overflow: "visible" }}>
-        {vars.map((_, i) => vars.map((_, j) => {
-          const d = matrix[vars[i]]?.[vars[j]];
-          if (!d) return null;
-          const diag = i === j;
-          return (
-            <g key={`${vars[i]}-${vars[j]}`}>
-              <rect x={offX + j * cell} y={offY + i * cell} width={cell} height={cell}
-                fill={diag ? t.surf2 : getColor(d.r)} rx={1} />
-              {!diag && (
-                <text x={offX + j * cell + cell / 2} y={offY + i * cell + cell / 2 + 4}
-                  fill={d.r > 0 ? "#fff" : "#fff"} fontSize={vf}
-                  textAnchor="middle">{d.r.toFixed(2)}</text>
-              )}
-            </g>
-          );
-        }))}
-        {vars.map((v, i) => (
-            <g key={v}>
-            <text x={offX - 6} y={offY + i * cell + cell / 2 + 3}
-              fill={t.tx} fontSize={vf} textAnchor="end">{v}</text>
-            <text x={offX + i * cell + cell / 2} y={offY - 8}
-              fill={t.tx2} fontSize={vf} textAnchor="middle"
-              transform={`rotate(-30,${offX + i * cell + cell / 2},${offY - 8})`}>{v}</text>
-          </g>
-        ))}
-      </svg>
-
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8, fontSize: 10, color: t.tx2, flexWrap: "wrap", justifyContent: "center" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <span style={{ display: "inline-block", width: 12, height: 12, borderRadius: 2, background: "rgba(56,189,248,0.7)" }} />
-          Positive r
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-          <span style={{ display: "inline-block", width: 12, height: 12, borderRadius: 2, background: "rgba(248,113,113,0.7)" }} />
-          Negative r
-        </div>
+      <div style={{ width: "100%", maxWidth: 600 }}>
+        <PlotlyChart data={data} layout={heatmapLayout(t, { height: Math.max(400, m * 28 + 80) })} />
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 4, fontSize: 10, color: t.tx2, flexWrap: "wrap", justifyContent: "center" }}>
         <span style={{ color: t.tx3 }}>* BH-adjusted p&lt;0.05</span>
         <span style={{ color: t.tx3 }}>n={n} method={method}</span>
       </div>

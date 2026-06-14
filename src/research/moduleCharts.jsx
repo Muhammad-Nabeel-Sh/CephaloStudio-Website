@@ -1,4 +1,5 @@
 import { ChartCard, ChartLegend, HGrid, VGrid, XAxisTitle, YAxisTitle, SvgLabel, wrapLabel, RefLine, FONT, FONT_STACK, PALETTE, safeNum, safeRange } from "./moduleChartsUtils.jsx";
+import PlotlyChart, { heatmapLayout, heatmapData } from "./PlotlyChart.jsx";
 
 function fmtP(p) { if (p == null || !isFinite(p)) return "—"; if (p < 0.001) return "<.001"; return p.toFixed(3).replace(/^0(?=\.)/, ""); }
 
@@ -63,42 +64,37 @@ function ICCForestPlot({ details, t }) {
 function ICCMatrixPlot({ details, t }) {
   const n = details.length;
   if (n < 2) return null;
-  const cell = Math.max(24, Math.min(36, Math.floor(380 / n)));
-  const maxLabelLen = Math.max(...details.map(d => d.label.length));
-  const offX = Math.min(Math.max(maxLabelLen * 6.5 + 16, 70), 150);
-  const offY = 40;
-  const W = offX + n * cell + 16;
-  const H = offY + n * cell + 16;
-  const vf = Math.max(6, Math.min(8, Math.floor(cell * 0.30)));
+  const labels = details.map(d => d.label);
+  const z = Array.from({ length: n }, (_, i) =>
+    Array.from({ length: n }, (_, j) =>
+      i === j ? 1 : (details[i].icc + (details[j]?.icc || 0)) / 2
+    )
+  );
+  const displayTxt = Array.from({ length: n }, (_, i) =>
+    Array.from({ length: n }, (_, j) => z[i][j] != null ? z[i][j].toFixed(2) : "")
+  );
+  const hoverTxt = Array.from({ length: n }, (_, i) =>
+    Array.from({ length: n }, (_, j) =>
+      i === j ? "diagonal" : `ICC avg = ${z[i][j].toFixed(3)}`
+    )
+  );
+  const data = heatmapData(z, labels, labels, displayTxt, {
+    zmin: 0, zmax: 1,
+    colorscale: [
+      [0, "#b91c1c"],
+      [0.25, "#fca5a5"],
+      [0.5, "#e5e7eb"],
+      [0.75, "#86efac"],
+      [1, "#16a34a"],
+    ],
+    customdata: hoverTxt,
+    texttemplate: "%{text}",
+    textfont: { color: "#1f2937", size: 9, family: "'DM Sans',sans-serif" },
+    hovertemplate: "%{y} vs %{x}: <b>%{customdata}</b><extra></extra>",
+  });
   return (
     <ChartCard title="ICC Pairwise Heatmap" t={t}>
-      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
-        {details.map((d, i) => (
-          <text key={i} x={offX - 6} y={offY + i * cell + cell / 2 + 3}
-            fill={t.tx} fontSize={vf} textAnchor="end" fontFamily={FONT_STACK}>{d.label}</text>
-        ))}
-        {details.map((_, i) => (
-          <text key={"c" + i} x={offX + i * cell + cell / 2} y={offY - 8}
-            fill={t.tx2} fontSize={vf} textAnchor="middle"
-            transform={`rotate(-30,${offX + i * cell + cell / 2},${offY - 8})`}
-            fontFamily={FONT_STACK}>{details[i].label}</text>
-        ))}
-        {details.map((d, i) => (
-          <g key={"x" + i}>
-            {Array.from({ length: n }).map((_, j) => {
-              const val = i === j ? 1 : (d.icc + (details[j]?.icc || 0)) / 2;
-              const col = val >= 0.9 ? t.ok : val >= 0.75 ? t.acc : val >= 0.5 ? t.warn : t.err;
-              return (
-                <g key={j}>
-                  <rect x={offX + j * cell} y={offY + i * cell} width={cell} height={cell} fill={col} opacity={0.7} rx={1} />
-                  <text x={offX + j * cell + cell / 2} y={offY + i * cell + cell / 2 + 4}
-                    fill="#fff" fontSize={vf} fontWeight={700} textAnchor="middle" fontFamily={FONT_STACK}>{val.toFixed(2)}</text>
-                </g>
-              );
-            })}
-          </g>
-        ))}
-      </svg>
+      <PlotlyChart data={data} layout={heatmapLayout(t, { height: Math.max(350, n * 28 + 80) })} />
     </ChartCard>
   );
 }
@@ -698,44 +694,45 @@ function PValueHeatmap({ labels, results, t }) {
   const pLabels = labels.filter(([, lr]) => lr.result?.pValue != null);
   if (pLabels.length < 2) return null;
   const n = pLabels.length;
-  const cell = Math.max(26, Math.min(38, Math.floor(380 / n)));
-  const maxLabelLen = Math.max(...pLabels.map(([l]) => l.length));
-  const offX = Math.min(Math.max(maxLabelLen * 6 + 16, 70), 150);
-  const offY = 40;
-  const W = offX + n * cell + 16;
-  const H = offY + n * cell + 16;
   const alpha = results.alpha || 0.05;
-  const vf = Math.max(5, Math.min(8, Math.floor(cell * 0.26)));
+  const z = Array.from({ length: n }, (_, i) =>
+    Array.from({ length: n }, (_, j) => {
+      if (i === j) return 1;
+      const p = pLabels[i][1].result.pValue;
+      return j < i ? (p + (pLabels[j]?.[1]?.result?.pValue || 0)) / 2 : p;
+    })
+  );
+  const allP = z.flat().filter(v => v != null && v !== 1);
+  const maxP = allP.length > 0 ? Math.max(alpha * 2, ...allP) : 1;
+  const mid = alpha / maxP;
+  const displayTxt = Array.from({ length: n }, (_, i) =>
+    Array.from({ length: n }, (_, j) => {
+      if (i === j || z[i][j] == null) return "";
+      const p = z[i][j];
+      return p < 0.001 ? "<.001" : p.toFixed(3).replace(/^0(?=\.)/, "");
+    })
+  );
+  const hoverTxt = Array.from({ length: n }, (_, i) =>
+    Array.from({ length: n }, (_, j) =>
+      i === j ? "diagonal" : `p = ${fmtP(z[i][j])}`
+    )
+  );
+  const data = heatmapData(z, pLabels.map(([l]) => l), pLabels.map(([l]) => l), displayTxt, {
+    zmin: 0, zmax: maxP,
+    colorscale: [
+      [0, "#dc2626"],
+      [mid, "#fca5a5"],
+      [mid + 0.01, "#e5e7eb"],
+      [1, "#86efac"],
+    ],
+    customdata: hoverTxt,
+    texttemplate: "%{text}",
+    textfont: { color: "#1f2937", size: 9, family: "'DM Sans',sans-serif" },
+    hovertemplate: "%{y} vs %{x}: <b>%{customdata}</b><extra></extra>",
+  });
   return (
-    <ChartCard title="P-Value Pairwise Matrix" t={t}>
-      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
-        {pLabels.map(([label], i) => (
-          <text key={i} x={offX - 6} y={offY + i * cell + cell / 2 + 3}
-            fill={t.tx} fontSize={vf} textAnchor="end" fontFamily={FONT_STACK}>{label}</text>
-        ))}
-        {pLabels.map(([label], i) => (
-          <text key={"c" + i} x={offX + i * cell + cell / 2} y={offY - 8}
-            fill={t.tx2} fontSize={vf} textAnchor="middle"
-            transform={`rotate(-30,${offX + i * cell + cell / 2},${offY - 8})`}
-            fontFamily={FONT_STACK}>{label}</text>
-        ))}
-        {pLabels.map(([, lr], i) => (
-          <g key={"x" + i}>
-            {Array.from({ length: n }).map((_, j) => {
-              const p = lr.result.pValue;
-              const val = i === j ? 1 : j < i ? (p + (pLabels[j]?.[1]?.result?.pValue || 0)) / 2 : p;
-              const sig = val < alpha;
-              const col = sig ? t.err : t.ok;
-              return (
-                <g key={j}>
-                  <rect x={offX + j * cell} y={offY + i * cell} width={cell} height={cell} fill={col} opacity={sig ? 0.6 : 0.2} rx={1} />
-                  <text x={offX + j * cell + cell / 2} y={offY + i * cell + cell / 2 + 4} fill={sig ? "#fff" : t.tx3} fontSize={vf} textAnchor="middle" fontFamily={FONT_STACK}>{fmtP(val)}</text>
-                </g>
-              );
-            })}
-          </g>
-        ))}
-      </svg>
+    <ChartCard title={`P-Value Pairwise Matrix (\u03b1 = ${alpha})`} t={t}>
+      <PlotlyChart data={data} layout={heatmapLayout(t, { height: Math.max(350, n * 28 + 80) })} />
     </ChartCard>
   );
 }
@@ -912,49 +909,39 @@ function ChangeScoreHeatmap({ labels, t }) {
   const fromTo = [...new Set(allChanges.map(c => `${c.from}\u2192${c.to}`))];
   const nLabels = hasChanges.length;
   const nPairs = fromTo.length;
-  const cell = Math.max(22, Math.min(34, Math.floor(400 / Math.max(nPairs, 1))));
-  const maxLabelLen = Math.max(...hasChanges.map(([l]) => l.length));
-  const offX = Math.min(Math.max(maxLabelLen * 6 + 16, 80), 150);
-  const offY = 38;
-  const W = offX + nPairs * cell + 16;
-  const H = offY + nLabels * cell + 16;
   const maxAbs = Math.max(...allChanges.map(c => Math.abs(c.meanChange)), 0.1);
-  const vf = Math.max(6, Math.min(8, Math.floor(cell * 0.28)));
-
+  const z = Array.from({ length: nLabels }, (_, li) =>
+    Array.from({ length: nPairs }, (_, fi) => {
+      const entry = hasChanges[li];
+      const c = (entry[1].changeScores || []).find(c => `${c.from}\u2192${c.to}` === fromTo[fi]);
+      return c ? c.meanChange : null;
+    })
+  );
+  const displayTxt = Array.from({ length: nLabels }, (_, li) =>
+    Array.from({ length: nPairs }, (_, fi) => z[li][fi] != null ? z[li][fi].toFixed(1) : "")
+  );
+  const hoverTxt = Array.from({ length: nLabels }, (_, li) =>
+    Array.from({ length: nPairs }, (_, fi) =>
+      z[li][fi] != null ? `change = ${z[li][fi].toFixed(2)}` : "no data"
+    )
+  );
+  const data = heatmapData(z, fromTo, hasChanges.map(([l]) => l), displayTxt, {
+    zmin: -maxAbs, zmax: maxAbs,
+    colorscale: [
+      [0, "#b91c1c"],
+      [0.25, "#fca5a5"],
+      [0.5, "#e5e7eb"],
+      [0.75, "#86efac"],
+      [1, "#16a34a"],
+    ],
+    customdata: hoverTxt,
+    texttemplate: "%{text}",
+    textfont: { color: "#1f2937", size: 9, family: "'DM Sans',sans-serif" },
+    hovertemplate: "%{y} \u2192 %{x}: <b>%{customdata}</b><extra></extra>",
+  });
   return (
     <ChartCard title="Change Score Heatmap" t={t}>
-      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
-        {hasChanges.map(([label], i) => (
-          <text key={i} x={offX - 6} y={offY + i * cell + cell / 2 + 3}
-            fill={t.tx} fontSize={vf} textAnchor="end" fontFamily={FONT_STACK}>{label}</text>
-        ))}
-        {fromTo.map((ft, fi) => (
-          <text key={fi} x={offX + fi * cell + cell / 2} y={offY - 8} fill={t.tx2} fontSize={vf} textAnchor="middle"
-            transform={`rotate(-30,${offX + fi * cell + cell / 2},${offY - 8})`} fontFamily={FONT_STACK}>
-            {ft}
-          </text>
-        ))}
-        {hasChanges.map((entry, li) => (
-          <g key={"r" + li}>
-            {fromTo.map((ft, fi) => {
-              const c = (entry[1].changeScores || []).find(c => `${c.from}\u2192${c.to}` === ft);
-              if (!c) return null;
-              const tVal = c.meanChange / maxAbs;
-              const isPos = c.meanChange > 0;
-              const intensity = Math.abs(tVal);
-              let r, g, b;
-              if (isPos) { r = 214; g = Math.round(214 * (1 - intensity * 0.7)); b = Math.round(214 * (1 - intensity * 0.7)); }
-              else { r = Math.round(214 * (1 - intensity * 0.7)); g = 214; b = Math.round(214 * (1 - intensity * 0.7)); }
-              return (
-                <g key={fi}>
-                  <rect x={offX + fi * cell} y={offY + li * cell} width={cell} height={cell} fill={`rgb(${r},${g},${b})`} opacity={0.7} rx={1} />
-                  <text x={offX + fi * cell + cell / 2} y={offY + li * cell + cell / 2 + 4} fill={isPos ? t.err : t.ok} fontSize={vf} fontWeight={700} textAnchor="middle" fontFamily={FONT_STACK}>{c.meanChange.toFixed(1)}</text>
-                </g>
-              );
-            })}
-          </g>
-        ))}
-      </svg>
+      <PlotlyChart data={data} layout={heatmapLayout(t, { height: Math.max(350, nLabels * 28 + 80) })} />
     </ChartCard>
   );
 }
@@ -976,122 +963,137 @@ export function CorrelationCharts({ results, t }) {
   );
 }
 
+const CORR_SCALE = [
+  [0, "#b91c1c"],
+  [0.25, "#ef4444"],
+  [0.4, "#fca5a5"],
+  [0.5, "#e5e7eb"],
+  [0.6, "#93c5fd"],
+  [0.75, "#3b82f6"],
+  [1, "#1d4ed8"],
+];
+const CORR_TFONT = { color: "#1f2937", size: 9, family: "'DM Sans',sans-serif" };
+
 function CorrelationMatrixPlot({ results, t }) {
   const { vars, matrix, n, method } = results;
   if (!vars || vars.length < 2) return null;
   const m = vars.length;
-  const cell = Math.max(28, Math.min(40, Math.floor(420 / m)));
-  const maxLabelLen = Math.max(...vars.map(v => v.length));
-  const offX = Math.min(Math.max(maxLabelLen * 6.5 + 20, 80), 150);
-  const offY = 40;
-  const W = offX + m * cell + 16;
-  const H = offY + m * cell + 16;
-  const vf = Math.max(1.8, Math.min(3.4, Math.floor(cell * 0.22)));
-
-  const getColor = (r, sig) => {
-    const a = Math.abs(r);
-    if (!sig) return t.surf2;
-    if (r > 0) return `rgba(56,189,248,${(0.15 + a * 0.8).toFixed(3)})`;
-    return `rgba(248,113,113,${(0.15 + a * 0.8).toFixed(3)})`;
-  };
-
+  const z = Array.from({ length: m }, () => Array(m).fill(null));
+  const displayTxt = Array.from({ length: m }, () => Array(m).fill(""));
+  const hoverTxt = Array.from({ length: m }, () => Array(m).fill(""));
+  for (let i = 0; i < m; i++) {
+    for (let j = 0; j < m; j++) {
+      if (i === j) { z[i][j] = 1; displayTxt[i][j] = "1"; hoverTxt[i][j] = "diagonal"; continue; }
+      const d = matrix[vars[i]]?.[vars[j]];
+      if (!d) continue;
+      z[i][j] = d.r;
+      displayTxt[i][j] = d.r.toFixed(2);
+      hoverTxt[i][j] = `r=${d.r.toFixed(3)}${d.sigAdj ? "*" : " (ns)"}`;
+    }
+  }
+  const data = heatmapData(z, vars, vars, displayTxt, {
+    zmin: -1, zmax: 1,
+    colorscale: CORR_SCALE,
+    customdata: hoverTxt,
+    texttemplate: "%{text}",
+    textfont: CORR_TFONT,
+    hovertemplate: "%{x} \u00d7 %{y}: <b>%{customdata}</b><extra></extra>",
+  });
+  const H = Math.max(400, m * 28 + 100);
   return (
-    <ChartCard title={`Correlation Matrix — ${method} (n=${n})`} t={t}>
-      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
-        {vars.map((_, i) => vars.map((_, j) => {
-          const d = matrix[vars[i]]?.[vars[j]];
-          if (!d) return null;
-          const diag = i === j;
-          return (
-            <g key={`${vars[i]}-${vars[j]}`}>
-              <rect x={offX + j * cell} y={offY + i * cell} width={cell} height={cell}
-                fill={diag ? t.surf2 : getColor(d.r, d.sigAdj)} rx={1} />
-              {!diag && (
-                <text x={offX + j * cell + cell / 2} y={offY + i * cell + cell / 2 + 4}
-                  fill={d.sigAdj ? (d.r > 0 ? "#fff" : "#fff") : t.tx3} fontSize={vf}
-                  textAnchor="middle" fontFamily={FONT_STACK}>{d.r.toFixed(2)}</text>
-              )}
-            </g>
-          );
-        }))}
-        {vars.map((v, i) => (
-          <g key={v}>
-            <text x={offX - 6} y={offY + i * cell + cell / 2 + 3}
-              fill={t.tx} fontSize={vf} textAnchor="end" fontFamily={FONT_STACK}>{v}</text>
-            <text x={offX + i * cell + cell / 2} y={offY - 8}
-              fill={t.tx2} fontSize={vf} textAnchor="middle"
-              transform={`rotate(-30,${offX + i * cell + cell / 2},${offY - 8})`}
-              fontFamily={FONT_STACK}>{v}</text>
-          </g>
-        ))}
-        <ChartLegend items={[
-          { label: "Positive r", color: "rgba(56,189,248,0.7)" },
-          { label: "Negative r", color: "rgba(248,113,113,0.7)" },
-          { label: "Not sig.", color: t.surf2 },
-        ]} x={W - 210} y={30} t={t} fontSize={vf} />
-      </svg>
+    <ChartCard title={`Correlation Matrix \u2014 ${method} (n=${n})`} t={t}>
+      <PlotlyChart data={data} layout={heatmapLayout(t, { height: H })} style={{ height: H }} />
     </ChartCard>
   );
 }
 
 function ScatterPairPlot({ results, t }) {
-  const { vars, matrix, n } = results;
-  if (!vars || vars.length < 2) return null;
-  const N = Math.min(vars.length, 5);
+  const { vars, matrix, n, rawPairs, descriptive } = results;
+  if (!vars || vars.length < 2 || !rawPairs) return null;
+  const N = Math.min(vars.length, 7);
   const selected = vars.slice(0, N);
-  const cell = 150;
-  const size = N * cell;
-  const W = size + 70, H = size + 40;
 
-  const rng = {};
-  for (const v of selected) {
-    const d = results.descriptive?.[v];
-    if (d) rng[v] = { min: d.min, max: d.max };
-    else rng[v] = { min: 0, max: 1 };
+  const maxLen = Math.max(...selected.map(v => (rawPairs[v] || []).length));
+  const validIdx = [];
+  for (let idx = 0; idx < maxLen; idx++) {
+    if (selected.every(v => rawPairs[v]?.[idx] != null && isFinite(rawPairs[v][idx]))) {
+      validIdx.push(idx);
+    }
+  }
+  if (validIdx.length < 2) return null;
+
+  const dimensions = selected.map(v => ({
+    label: v,
+    values: validIdx.map(idx => rawPairs[v][idx]),
+  }));
+
+  const hoverTexts = validIdx.map(idx =>
+    selected.map(v => `${v}=${rawPairs[v][idx].toFixed(2)}`).join(", ")
+  );
+
+  const annotations = [];
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < N; j++) {
+      if (i === j) {
+        const d = descriptive?.[selected[i]];
+        annotations.push({
+          x: 0.5, y: 0.5,
+          xref: `x${i + 1} domain`,
+          yref: `y${i + 1} domain`,
+          text: `<b>${selected[i]}</b><br>n=${d?.n || n}`,
+          showarrow: false,
+          font: { size: 10, color: t.tx2 },
+          align: "center",
+        });
+      } else {
+        const r = matrix[selected[i]]?.[selected[j]];
+        if (!r) continue;
+        annotations.push({
+          x: 0.5, y: 0.5,
+          xref: `x${j + 1} domain`,
+          yref: `y${i + 1} domain`,
+          text: `r=${r.r.toFixed(2)}${r.sigAdj ? "*" : ""}`,
+          showarrow: false,
+          font: { size: 9, color: t.bg },
+          bgcolor: t.tx,
+          opacity: 0.8,
+        });
+      }
+    }
   }
 
-  const data = {};
-  if (results.rawPairs) {
-    for (const v of selected) data[v] = results.rawPairs[v] || [];
+  const axisCfg = {
+    showgrid: true, gridcolor: t.surf3, zeroline: false,
+    tickfont: { size: 8, color: t.tx3 },
+    showline: false, ticks: "",
+  };
+  const layout = {
+    paper_bgcolor: t.surf,
+    plot_bgcolor: t.surf,
+    font: { color: t.tx2, family: FONT_STACK, size: 10 },
+    annotations,
+    margin: { l: 40, r: 20, t: 50, b: 30 },
+    hovermode: "closest",
+  };
+  for (let i = 0; i < N; i++) {
+    layout[`xaxis${i + 1}`] = { ...axisCfg };
+    layout[`yaxis${i + 1}`] = { ...axisCfg };
   }
+
+  const CELL = 130;
+  const pxH = N * CELL + 20;
+  const data = [{
+    type: "splom",
+    dimensions,
+    text: hoverTexts,
+    hovertemplate: "<b>%{text}</b><extra></extra>",
+    marker: { size: 3, color: t.acc, opacity: 0.5, line: { width: 0.5, color: t.bg } },
+    diagonal: { visible: false },
+  }];
 
   return (
-    <ChartCard title={`Scatter Plot Matrix (first ${N} variables)`} t={t}>
-      <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
-        {selected.map((v1, i) => selected.map((v2, j) => {
-          if (i === j) {
-            const d = results.descriptive?.[v1];
-            return (
-              <g key={`${v1}-${v2}`}>
-                <rect x={40 + j * cell} y={i * cell} width={cell - 2} height={cell - 2} fill={t.surf2} rx={2} />
-                <SvgLabel x={40 + j * cell + cell / 2} y={i * cell + cell / 2 - 8} lines={wrapLabel(v1, 12)} fill={t.tx2} fontSize={FONT.sm} textAnchor="middle" />
-                <text x={40 + j * cell + cell / 2} y={i * cell + cell / 2 + 8} fill={t.tx3} fontSize={FONT.xs} textAnchor="middle" fontFamily={FONT_STACK}>n={d?.n || n}</text>
-              </g>
-            );
-          }
-          const d = matrix[v1]?.[v2];
-
-          const pairs = (data[v1] && data[v2]) ? data[v1].map((_, vi) => [data[v1][vi], data[v2][vi]]).filter(([a, b]) => a != null && b != null) : [];
-
-          const xS = (v) => 40 + j * cell + 6 + (v - rng[v2].min) / (rng[v2].max - rng[v2].min || 1) * (cell - 12);
-          const yS = (v) => i * cell + cell - 6 - (v - rng[v1].min) / (rng[v1].max - rng[v1].min || 1) * (cell - 12);
-          return (
-            <g key={`${v1}-${v2}`}>
-              <rect x={40 + j * cell} y={i * cell} width={cell - 2} height={cell - 2} fill={t.surf} rx={2} stroke={t.bdr} strokeWidth={0.5} />
-              {pairs.length > 0 ? pairs.map(([a, b], pi) => (
-                <circle key={pi} cx={xS(b)} cy={yS(a)} r={2.5} fill={t.acc} opacity={0.5} />
-              )) : (
-                <text x={40 + j * cell + cell / 2} y={i * cell + cell / 2} fill={t.tx3} fontSize={FONT.xs} textAnchor="middle" fontFamily={FONT_STACK}>no pairs</text>
-              )}
-              {d && (
-                <text x={40 + j * cell + 5} y={i * cell + 10} fill={t.tx2} fontSize={FONT.xs} fontWeight={700} fontFamily={FONT_STACK}>
-                  r={d.r.toFixed(2)}{d.sigAdj ? "*" : ""}
-                </text>
-              )}
-            </g>
-          );
-        }))}
-      </svg>
+      <ChartCard title={`Scatter Plot Matrix (${selected.length} vars)`} t={t}>
+      <PlotlyChart data={data} layout={layout} style={{ height: pxH, minHeight: pxH }} />
     </ChartCard>
   );
 }
