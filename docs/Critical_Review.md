@@ -60,6 +60,33 @@ Both branches return the same expression (`360 - Math.abs(v)`). The `reflex` mod
 
 ---
 
+## Research Module
+
+### Charts (moduleCharts.jsx)
+- **Tiny fonts** (6-9px) throughout — illegible on most screens; no hierarchical type scale.
+- **Labels truncated** silently with ellipsis — no wrapping / multi-line fallback.
+- **No axis titles** on most charts (ICC forest, box plots, CV bar, P-value dot chart, etc.).
+- **No proper legends** — corner inline `<text>` instead of boxed legends; colors undocumented.
+- **No interactivity** — no tooltips, highlight, zoom, selection; SVG is static.
+- **ScatterPairPlot generates fake random data** (`Math.random()` in loop) — placeholder, not real observations.
+- **BoxPlotCollective falls back to mean±SD** if `q1/q3` absent, misleading users into thinking they see quartiles.
+- **ChangeScoreHeatmap uses raw RGB arithmetic** instead of proper color interpolation.
+- **Collective Bland-Altman synthesizes data** from mean±SD rather than plotting real paired differences — a distributional approximation, not an actual Bland-Altman.
+- **No chart export** — no download-as-PNG/SVG on any chart card.
+- **Every chart duplicates coordinate logic** — `xS`, `yS`, grid lines, labels recalculated per component.
+
+### Studies Section
+- **Results not persisted** — in-memory only; vanish on reload (commented as known limitation).
+- **No CSV/PDF export** of result tables.
+- **No batch operations** — must run/delete studies one at a time.
+- **No progress feedback** — all computation is synchronous; UI freezes for large datasets.
+- **No data validation** — silent failure: running with zero sessions or labels produces empty tables.
+- **No cross-study comparison** — can't compare results across studies or meta-analyze.
+- **No power analysis** — no sample size estimation for any study type.
+- **No automated narrative** — users must interpret tables/charts manually.
+
+---
+
 ## Business
 
 **`"name": "temp-preview"`** in `package.json` — Still signals abandoned experiment. Should be `cephalometry-studio`.

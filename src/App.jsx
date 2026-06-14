@@ -1510,10 +1510,33 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
 // ═══════════════════════════════════════════════════════════════════════════════
 // ROOT
 // ═══════════════════════════════════════════════════════════════════════════════
+const STORAGE_KEY = "cephalometry_projects";
+
+function loadProjects() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    console.warn("Failed to load projects from localStorage:", e);
+  }
+  return [];
+}
+function saveProjects(projects) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+  } catch (e) {
+    console.warn("Failed to save projects to localStorage:", e);
+  }
+}
+
+const loadedProjects = loadProjects();
+
 export default function CephalometryStudio(){
   const[theme,setTheme]=useState("bluish");const t=useMemo(()=>({...THEMES[theme],id:theme}),[theme]);
-  const[projects,setProjects]=useState([]);const[activeId,setActiveId]=useState(null);
+  const[projects,setProjects]=useState(loadedProjects);const[activeId,setActiveId]=useState(loadedProjects.length>0?loadedProjects[0].id:null);
   const dirtyRef=useRef(false);
+
+  useEffect(()=>{saveProjects(projects);},[projects]);
 
   useEffect(()=>{
     const handler=e=>{if(dirtyRef.current){e.preventDefault();e.returnValue="";}};

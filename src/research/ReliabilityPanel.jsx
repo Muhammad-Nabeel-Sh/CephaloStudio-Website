@@ -588,7 +588,7 @@ function iccColor(val) {
 }
 
 function fmtP(p) {
-  if (p == null) return "—";
+  if (p == null || !isFinite(p)) return "—";
   if (p < 0.001) return "<0.001";
   return p.toFixed(3);
 }

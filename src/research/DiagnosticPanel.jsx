@@ -631,7 +631,7 @@ function DiagnosticReport({ results, t }) {
 // HELPERS
 // ═══════════════════════════════════════════════════════════════════════════════
 function fmtP(p) {
-  if (p == null) return "—";
+  if (p == null || !isFinite(p)) return "—";
   if (p < 0.001) return "<0.001";
   if (p < 0.01) return p.toFixed(4);
   return p.toFixed(3);

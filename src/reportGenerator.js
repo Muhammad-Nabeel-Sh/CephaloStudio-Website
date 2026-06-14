@@ -13,16 +13,22 @@ const C = {
   tx2: "#5a6278",
   tx3: "#8b93a8",
   acc: "#2563eb",
-  acc2: "#7c3aed",
+  acc2: "#a855f7",
   ok: "#16a34a",
   warn: "#d97706",
   err: "#dc2626",
+  txhd: "#ffffff",
+  dark: "#2d223e",
+  dark2: "#252530",
 };
 
 const PAGE_W = 210;
 const PAGE_H = 297;
 const MARGIN = 18;
 const BODY_W = PAGE_W - MARGIN * 2;
+const BOTTOM_SAFE = PAGE_H - 10;
+
+const LOGO_SVG = `<?xml version="1.0" encoding="UTF-8" standalone="no"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd"><svg width="100%" height="100%" viewBox="0 0 405 405" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linecap:round;"><g><path d="M71.346,200.513c0,-137.5 258.333,-137.5 258.333,0" style="fill:none;fill-rule:nonzero;stroke:#06d375;stroke-width:14.58px;"/><path d="M200.513,108.846l0,108.333" style="fill:none;fill-rule:nonzero;stroke:#fff;stroke-opacity:0.47;stroke-width:6.18px;stroke-linecap:butt;stroke-dasharray:12.362,12.362;"/><path d="M371.133,81.725l-164.881,128.456" style="fill:none;fill-rule:nonzero;stroke:#fff;stroke-opacity:0.47;stroke-width:6.62px;stroke-linecap:butt;stroke-dasharray:13.25,13.25;"/><circle cx="200.513" cy="217.18" r="25" style="fill:none;stroke:#727ef8;stroke-width:6.25px;stroke-linecap:butt;"/><circle cx="200.513" cy="108.846" r="25" style="fill:#0d1117;stroke:#f59e0b;stroke-width:10.42px;stroke-linecap:butt;"/><circle cx="200.513" cy="108.846" r="12.5" style="fill:#f56644;"/><circle cx="67.18" cy="200.513" r="18.75" style="fill:#0d1117;stroke:#dc11e8;stroke-width:8.33px;stroke-linecap:butt;"/><circle cx="67.18" cy="200.513" r="8.333" style="fill:#a855f7;"/><path d="M227.511,140.194c40.051,-0.901 64.362,17.813 72.932,56.152" style="fill:none;fill-rule:nonzero;stroke:#b95bae;stroke-width:7.5px;"/></g></svg>`;
 
 // ─── Utilities ───────────────────────────────────────────────────────────────
 function fmtAngle(v) { return v != null ? v.toFixed(1) + "\u00b0" : "\u2014"; }
@@ -36,33 +42,46 @@ function sevColor(sd) {
   const a = Math.abs(sd);
   return a <= 1 ? C.ok : a <= 2 ? C.warn : C.err;
 }
-function normCdf(z) {
-  const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
-  const a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
-  const sign = z < 0 ? -1 : 1;
-  const x = Math.abs(z) / Math.SQRT2;
-  const t = 1 / (1 + p * x);
-  const y = 1 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * Math.exp(-x * x);
-  return +(0.5 * (1 + sign * y)).toFixed(1);
-}
 
 // ─── Page background ─────────────────────────────────────────────────────────
 function darkBg(doc) {
   doc.setFillColor(C.bg);
-  doc.rect(0, 0, PAGE_W, PAGE_H, "F");
+  doc.rect(0, 0, PAGE_W, PAGE_H - 12, "F");
 }
 
-// ─── Page header (app name + top line) ──────────────────────────────────────
+// ─── Page footer (bar + page number, every page except cover) ──────────────
+function pageFooter(doc) {
+  var n = doc.internal.getNumberOfPages() - 1;
+  doc.setFillColor(C.dark2);
+  doc.rect(0, PAGE_H - 12, PAGE_W, 12, "F");
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(C.txhd);
+  doc.text("Page " + n, PAGE_W - MARGIN, PAGE_H - 6, { align: "right" });
+}
+
+// ─── Page header (logo + app name + top line) ──────────────────────────────
 function pageHeader(doc) {
   doc.setFillColor(C.acc);
   doc.rect(0, 0, PAGE_W, 2.5, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
-  doc.setTextColor(C.acc);
-  doc.text("CephaloStudio", MARGIN, 6);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(C.tx3);
-  doc.text("Cephalometric Analysis Report", MARGIN + 30, 6);
+  if (doc._logoPng) {
+    try { doc.addImage(doc._logoPng, "PNG", MARGIN, 3.2, 5, 5); } catch { /* ignore */ }
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.setTextColor(C.tx);
+    doc.text("CephaloStudio", MARGIN + 7, 6.5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(C.tx3);
+    doc.text("Cephalometric Analysis Report", MARGIN + 36, 6.5);
+  } else {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.setTextColor(C.acc);
+    doc.text("CephaloStudio", MARGIN, 6);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(C.tx3);
+    doc.text("Cephalometric Analysis Report", MARGIN + 30, 6);
+  }
 }
 
 // ─── SVG → PNG conversion ────────────────────────────────────────────────────
@@ -169,29 +188,35 @@ function buildCover(doc, project, session) {
   darkBg(doc);
 
   // Large accent block at top
-  doc.setFillColor(C.acc);
-  doc.rect(0, 0, PAGE_W, 8, "F");
+  doc.setFillColor(C.dark2);
+  doc.rect(0, 0, PAGE_W, PAGE_H, "F");
 
   // Decorative side bar
   doc.setFillColor(C.acc2);
-  doc.rect(0, 8, 3, 80, "F");
+  doc.rect(0, 0, 8, PAGE_H, "F");
+
+  // Logo
+  if (doc._logoPng) {
+    try { doc.addImage(doc._logoPng, "PNG", PAGE_W - MARGIN - 54, 240, 54, 54); } catch { /* ignore */ }
+  }
 
   // Title area
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(32);
-  doc.setTextColor(C.tx);
-  doc.text("Cephalometric", MARGIN, 48);
-  doc.text("Analysis Report", MARGIN, 72);
+  doc.setFontSize(50);
+  doc.setTextColor(C.txhd);
+  const titleX = doc._logoPng ? MARGIN + 10 : MARGIN;
+  doc.text("Cephalometric", titleX, 45);
+  doc.text("Analysis Report", titleX, 70);
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(12);
-  doc.setTextColor(C.acc);
-  doc.text(project.name || "Untitled Case", MARGIN, 90);
+  doc.setFontSize(14);
+  doc.setTextColor(C.txhd);
+  doc.text(project.name || "Untitled Case", titleX, 96);
 
   // Separator
   doc.setDrawColor(C.bdr);
   doc.setLineWidth(0.3);
-  doc.line(MARGIN, 100, PAGE_W - MARGIN, 100);
+  doc.line(MARGIN, 106, PAGE_W - MARGIN, 106);
 
   // Patient info in a structured layout
   const meta = project.meta || {};
@@ -208,48 +233,48 @@ function buildCover(doc, project, session) {
     ["Report Generated", new Date().toLocaleString()],
   ];
 
-  let y = 116;
+  let y = 122;
   doc.setFontSize(9);
-  doc.setTextColor(C.tx3);
+  doc.setTextColor(C.txhd);
   doc.text("PATIENT INFORMATION", MARGIN, y);
   y += 8;
 
   const colW = (BODY_W - 20) / 2;
   leftCol.forEach(([l, v]) => {
     doc.setFontSize(9);
-    doc.setTextColor(C.tx3);
+    doc.setTextColor(C.txhd);
     doc.text(l, MARGIN, y);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
-    doc.setTextColor(C.tx);
+    doc.setTextColor(C.txhd);
     doc.text(v || "\u2014", MARGIN + 34, y);
     doc.setFont("helvetica", "normal");
     y += 7;
   });
 
-  y = 116 + 8;
+  y = 122 + 8;
   rightCol.forEach(([l, v]) => {
     doc.setFontSize(9);
-    doc.setTextColor(C.tx3);
+    doc.setTextColor(C.txhd);
     doc.text(l, MARGIN + colW + 10, y);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
-    doc.setTextColor(C.tx);
+    doc.setTextColor(C.txhd);
     doc.text(v || "\u2014", MARGIN + colW + 10 + 34, y);
     doc.setFont("helvetica", "normal");
     y += 7;
   });
 
   // Bottom footer
-  doc.setFillColor(C.acc);
-  doc.rect(0, PAGE_H - 30, PAGE_W, 30, "F");
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor("#ffffff");
-  doc.text("CephaloStudio \u2014 Automated Cephalometric Analysis", MARGIN, PAGE_H - 16);
-  doc.setFontSize(7);
-  doc.setTextColor("#ffffffcc");
-  doc.text("Generated " + new Date().toLocaleString(), MARGIN, PAGE_H - 8);
+  // doc.setFillColor(C.dark2);
+  // doc.rect(0, PAGE_H - 15, PAGE_W, 15, "F");
+  // doc.setFont("helvetica", "normal");
+  // doc.setFontSize(8);
+  // doc.setTextColor("#ffffff");
+  // doc.text("Cephalometry Studio \u2014 Cephalometric Analysis", MARGIN, PAGE_H - 7.5);
+  // doc.setFontSize(7);
+  // doc.setTextColor("#ffffffcc");
+  // doc.text("Generated " + new Date().toLocaleString(), MARGIN, PAGE_H - 8);
 }
 
 function getImageDimensions(url) {
@@ -331,26 +356,25 @@ function buildMeasurements(doc, allMeas, norms) {
       const n = norms.find(x => x.markupLabel === m.label && x.measureType === mt);
       const vs = mt === "angle" ? fmtAngle(val) : fmtMm(val);
       const z = n && n.sd > 0 ? ((val - n.mean) / n.sd).toFixed(2) : "\u2014";
-      rows.push([m.label, m.type, vs, n ? n.mean.toFixed(1) : "\u2014", n ? n.sd.toFixed(2) : "\u2014", z]);
+      rows.push([m.label, vs, n ? n.mean.toFixed(1) : "\u2014", n ? n.sd.toFixed(2) : "\u2014", z]);
     }
   }
   if (!rows.length) return;
 
   doc.autoTable({
-    startY: 36, head: [["Measurement", "Type", "Value", "Norm Mean", "Norm SD", "Z-score"]], body: rows,
+    startY: 36, head: [["Measurement", "Value", "Norm Mean", "Norm SD", "Z-score"]], body: rows,
     theme: "grid",
     styles: { font: "helvetica", fontSize: 8, textColor: C.tx, fillColor: C.surf, lineColor: C.bdr, lineWidth: 0.3, halign: "center", valign: "middle" },
-    headStyles: { fillColor: C.surf2, textColor: C.acc, fontSize: 8.5, fontStyle: "bold", halign: "center", valign: "middle" },
+    headStyles: { fillColor: C.dark2, textColor: C.txhd, fontSize: 8.5, fontStyle: "bold", halign: "center", valign: "middle" },
     columnStyles: {
       0: { cellWidth: 44, fontStyle: "bold", halign: "center", valign: "middle" },
-      1: { cellWidth: 24, textColor: C.tx2, halign: "center", valign: "middle" },
-      2: { cellWidth: 30, fontStyle: "bold", halign: "center", valign: "middle" },
-      3: { cellWidth: 28, textColor: C.tx2, halign: "center", valign: "middle" },
-      4: { cellWidth: 24, textColor: C.tx2, halign: "center", valign: "middle" },
-      5: { cellWidth: 24, fontStyle: "bold", halign: "center", valign: "middle" },
+      1: { cellWidth: 38, fontStyle: "bold", halign: "center", valign: "middle" },
+      2: { cellWidth: 34, textColor: C.tx2, halign: "center", valign: "middle" },
+      3: { cellWidth: 29, textColor: C.tx2, halign: "center", valign: "middle" },
+      4: { cellWidth: 29, fontStyle: "bold", halign: "center", valign: "middle" },
     },
     alternateRowStyles: { fillColor: C.surf2 },
-    margin: { left: MARGIN, right: MARGIN }, tableWidth: BODY_W,
+    margin: { left: MARGIN, right: MARGIN, bottom: 10 }, tableWidth: BODY_W,
   });
 }
 
@@ -401,57 +425,26 @@ async function buildNormogram(doc, allMeas, norms) {
       const dim = svgDim(svgPoly);
       const aspect = dim ? dim.w / dim.h : 2.5;
       const dw = BODY_W;
-      const dh = Math.min(dw / aspect, 150);
+      const dh = dw / aspect;
       doc.addImage(polyPng, "PNG", MARGIN, y, dw, dh);
       y += dh + 8;
     } catch { y += 4; }
   }
 
   if (radarPng) {
-    if (y > 170) { doc.addPage(); darkBg(doc); pageHeader(doc); y = 18; doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.setTextColor(C.tx);
-      doc.text("Normogram Charts (cont.)", MARGIN, 20); y = 28; }
     try {
       const dim = svgDim(svgRadar);
       const aspect = dim ? dim.w / dim.h : 1.33;
-      const dw = Math.min(BODY_W, 130);
+      const dw = BODY_W;
       const dh = dw / aspect;
+      if (y + dh + 8 > BOTTOM_SAFE) { doc.addPage(); darkBg(doc); pageHeader(doc); y = 18; doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.setTextColor(C.tx);
+        doc.text("Normogram Charts (cont.)", MARGIN, 20); y = 28; }
       doc.addImage(radarPng, "PNG", MARGIN, y, dw, dh);
       y += dh + 8;
     } catch { y += 4; }
   }
 
-  // Summary table
-    if (y > 190) { doc.addPage(); darkBg(doc); pageHeader(doc); y = 18; }
-  const tbody = unique.map(r => {
-    const a = Math.abs(r.dev.sdUnits);
-    const sev = a <= 1 ? "Normal" : a <= 2 ? "Mild" : "Severe";
-    const pct = normCdf(r.dev.sdUnits);
-    return [r.label, fmtVal(r), r.norm.mean.toFixed(1), r.norm.sd.toFixed(2),
-      (r.dev.sdUnits > 0 ? "+" : "") + r.dev.sdUnits.toFixed(2),
-      pct < 1 ? "<1%" : pct > 99 ? ">99%" : pct + "%", sev];
-  });
-
-  doc.autoTable({
-    startY: y, head: [["Measurement", "Value", "Mean", "SD", "Z-score", "%ile", "Severity"]], body: tbody,
-    theme: "grid",
-    styles: { font: "helvetica", fontSize: 7.5, textColor: C.tx, fillColor: C.surf, lineColor: C.bdr, lineWidth: 0.3, halign: "center", valign: "middle" },
-    headStyles: { fillColor: C.surf2, textColor: C.acc, fontSize: 8, fontStyle: "bold", halign: "center", valign: "middle" },
-    columnStyles: {
-      0: { cellWidth: 44, fontStyle: "bold", halign: "center", valign: "middle" },
-      1: { cellWidth: 28, fontStyle: "bold", halign: "center", valign: "middle" },
-      2: { cellWidth: 20, textColor: C.tx2, halign: "center", valign: "middle" },
-      3: { cellWidth: 18, textColor: C.tx2, halign: "center", valign: "middle" },
-      4: { cellWidth: 24, fontStyle: "bold", halign: "center", valign: "middle" },
-      5: { cellWidth: 18, textColor: C.tx2, halign: "center", valign: "middle" },
-      6: { cellWidth: 22, halign: "center", valign: "middle" },
-    },
-    alternateRowStyles: { fillColor: C.surf2 },
-    margin: { left: MARGIN, right: MARGIN }, tableWidth: BODY_W,
-  });
-}
-
-function fmtVal(r) {
-  return r.measureType === "angle" ? fmtAngle(r.value) : fmtMm(r.value);
+  // Summary table removed — charts only
 }
 
 function buildResearchStudies(doc, project) {
@@ -491,9 +484,9 @@ function buildResearchStudies(doc, project) {
     const opts = {
       theme: "grid",
       styles: { font: "helvetica", fontSize: 7.5, textColor: C.tx, fillColor: C.surf, lineColor: C.bdr, lineWidth: 0.3, halign: "center", valign: "middle" },
-      headStyles: { fillColor: C.surf2, textColor: C.acc, fontSize: 8, fontStyle: "bold", halign: "center", valign: "middle" },
+      headStyles: { fillColor: C.dark2, textColor: C.txhd, fontSize: 8, fontStyle: "bold", halign: "center", valign: "middle" },
       alternateRowStyles: { fillColor: C.surf2 },
-      margin: { left: MARGIN, right: MARGIN },
+      margin: { left: MARGIN, right: MARGIN, bottom: 10 },
       tableWidth: BODY_W,
     };
 
@@ -584,9 +577,13 @@ function buildResearchStudies(doc, project) {
           startY: 26, head: [["Group 1", "Group 2", "Difference", "p-value (adj)", "Sig."]], body: phBody,
           theme: "grid",
           styles: { font: "helvetica", fontSize: 8, textColor: C.tx, fillColor: C.surf, lineColor: C.bdr, lineWidth: 0.3, halign: "center", valign: "middle" },
-          headStyles: { fillColor: C.surf2, textColor: C.acc, fontSize: 8.5, fontStyle: "bold", halign: "center", valign: "middle" },
+          headStyles: { fillColor: C.dark2, textColor: C.txhd, fontSize: 8.5, fontStyle: "bold", halign: "center", valign: "middle" },
           alternateRowStyles: { fillColor: C.surf2 },
-          margin: { left: MARGIN, right: MARGIN }, tableWidth: BODY_W,
+          margin: { left: MARGIN, right: MARGIN, bottom: 10 }, tableWidth: BODY_W,
+          columnStyles: {
+            2: { cellWidth: 32, halign: "center", valign: "middle" },
+            3: { cellWidth: 36, halign: "center", valign: "middle" },
+          },
         };
         doc.autoTable(phOpts);
       }
@@ -636,17 +633,6 @@ function buildResearchStudies(doc, project) {
 function buildFormulas(doc, formulas, formulaValues) {
   if (!formulas || !formulas.length) return;
 
-  doc.addPage();
-  darkBg(doc);
-  pageHeader(doc);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.setTextColor(C.tx);
-  doc.text("Custom Formulas", MARGIN, 20);
-  doc.setFontSize(9);
-  doc.setTextColor(C.tx2);
-  doc.text(formulas.length + " derived measurements", MARGIN, 28);
-
   const body = formulas.map(f => {
     const val = formulaValues?.[f.id];
     return [
@@ -657,19 +643,19 @@ function buildFormulas(doc, formulas, formulaValues) {
   });
 
   doc.autoTable({
-    startY: 36,
+    startY: (doc.lastAutoTable?.finalY || 36) + 6,
     head: [["Name", "Expression", "Value"]],
     body,
     theme: "grid",
     styles: { font: "helvetica", fontSize: 8, textColor: C.tx, fillColor: C.surf, lineColor: C.bdr, lineWidth: 0.3, halign: "center", valign: "middle" },
-    headStyles: { fillColor: C.surf2, textColor: C.acc, fontSize: 8.5, fontStyle: "bold", halign: "center", valign: "middle" },
+    headStyles: { fillColor: C.dark2, textColor: C.txhd, fontSize: 8.5, fontStyle: "bold", halign: "center", valign: "middle" },
     columnStyles: {
       0: { cellWidth: 50, fontStyle: "bold", halign: "center", valign: "middle" },
       1: { cellWidth: 80, textColor: C.tx2, fontStyle: "italic", halign: "center", valign: "middle" },
       2: { cellWidth: 30, fontStyle: "bold", halign: "center", valign: "middle" },
     },
     alternateRowStyles: { fillColor: C.surf2 },
-    margin: { left: MARGIN, right: MARGIN },
+    margin: { left: MARGIN, right: MARGIN, bottom: 10 },
     tableWidth: BODY_W,
   });
 }
@@ -741,7 +727,7 @@ function buildInterpretation(doc, interpretation) {
     return [
       d.label, d.description || "", vs,
       (d.delta > 0 ? "+" : "") + d.delta.toFixed(2),
-      (d.zScore > 0 ? "+" : "") + d.zScore.toFixed(1) + "\u03c3",
+      (d.zScore > 0 ? "+" : "") + d.zScore.toFixed(1),
       sevL, d.interpretation || "",
     ];
   });
@@ -752,18 +738,18 @@ function buildInterpretation(doc, interpretation) {
     body: rows,
     theme: "grid",
     styles: { font: "helvetica", fontSize: 7, textColor: C.tx, fillColor: C.surf, lineColor: C.bdr, lineWidth: 0.3, halign: "center", valign: "middle" },
-    headStyles: { fillColor: C.surf2, textColor: C.acc, fontSize: 7.5, fontStyle: "bold", halign: "center", valign: "middle" },
-    columnStyles: {
-      0: { cellWidth: 28, fontStyle: "bold", halign: "center", valign: "middle" },
-      1: { cellWidth: 36, textColor: C.tx2, fontSize: 6.5, halign: "center", valign: "middle" },
-      2: { cellWidth: 20, fontStyle: "bold", halign: "center", valign: "middle" },
-      3: { cellWidth: 18, halign: "center", valign: "middle" },
-      4: { cellWidth: 18, fontStyle: "bold", halign: "center", valign: "middle" },
-      5: { cellWidth: 18, halign: "center", valign: "middle" },
-      6: { cellWidth: 36, fontSize: 6.5, cellPadding: 0.5, halign: "center", valign: "middle" },
-    },
+    headStyles: { fillColor: C.dark2, textColor: C.txhd, fontSize: 7.5, fontStyle: "bold", halign: "center", valign: "middle" },
+      columnStyles: {
+        0: { cellWidth: 28, fontStyle: "bold", halign: "center", valign: "middle" },
+        1: { cellWidth: 36, textColor: C.tx2, fontSize: 6.5, halign: "center", valign: "middle" },
+        2: { cellWidth: 20, fontStyle: "bold", halign: "center", valign: "middle" },
+        3: { cellWidth: 18, halign: "center", valign: "middle" },
+        4: { cellWidth: 18, fontStyle: "bold", halign: "center", valign: "middle" },
+        5: { cellWidth: 18, halign: "center", valign: "middle" },
+        6: { cellWidth: 36, fontSize: 6.5, cellPadding: 0.5, halign: "center", valign: "middle" },
+      },
     alternateRowStyles: { fillColor: C.surf2 },
-    margin: { left: MARGIN, right: MARGIN },
+    margin: { left: MARGIN, right: MARGIN, bottom: 10 },
     tableWidth: BODY_W,
   });
 
@@ -789,7 +775,7 @@ function buildInterpretation(doc, interpretation) {
   for (const cat of catOrder) {
     const items = groups[cat];
     if (!items || !items.length) continue;
-    if (y > PAGE_H - 30) { doc.addPage(); darkBg(doc); pageHeader(doc); y = 18; }
+    if (y > BOTTOM_SAFE - 48) { doc.addPage(); darkBg(doc); pageHeader(doc); y = 18; }
 
     // Category header
     doc.setFontSize(8);
@@ -799,10 +785,10 @@ function buildInterpretation(doc, interpretation) {
     y += 5;
 
     for (const d of items) {
-      if (y > PAGE_H - 28) { doc.addPage(); darkBg(doc); pageHeader(doc); y = 18; }
+      if (y > BOTTOM_SAFE - 46) { doc.addPage(); darkBg(doc); pageHeader(doc); y = 18; }
       const sevLabel = !d.within2SD ? "Severe" : d.within2SD && !d.within1SD ? "Borderline" : "Normal";
       const sevC = sevLabel === "Severe" ? C.err : sevLabel === "Borderline" ? C.warn : C.ok;
-      const boxH = 36;
+      const boxH = 32;
 
       // Box with left color border
       doc.setFillColor(C.surf2);
@@ -823,19 +809,19 @@ function buildInterpretation(doc, interpretation) {
 
       // Value line
       const vs = d.measureType === "angle" ? fmtAngle(d.value) : fmtMm(d.value);
-      const dv = (d.delta > 0 ? "+" : "") + d.delta.toFixed(2) + " (" + (d.zScore > 0 ? "+" : "") + d.zScore.toFixed(1) + "\u03c3)";
+      const dv = (d.delta > 0 ? "+" : "") + d.delta.toFixed(2) + " (" + (d.zScore > 0 ? "+" : "") + d.zScore.toFixed(1) + " SD)";
       doc.setFontSize(8);
       doc.setTextColor(sevC);
       doc.setFont("helvetica", "bold");
-      doc.text(vs + "  \u2014  " + dv, MARGIN + 8, y + 16);
+      doc.text(vs + "  --  " + dv, MARGIN + 8, y + 14);
 
       // Description
       if (d.description) {
-        doc.setFontSize(6.5);
+        doc.setFontSize(7);
         doc.setTextColor(C.tx3);
         doc.setFont("helvetica", "normal");
-        const desc = d.description.length > 100 ? d.description.slice(0, 97) + "\u2026" : d.description;
-        doc.text(desc, MARGIN + 8, y + 24);
+        const desc = d.description.length > 100 ? d.description.slice(0, 97) + "..." : d.description;
+        doc.text(desc, MARGIN + 8, y + 19);
       }
 
       // Interpretation
@@ -843,13 +829,13 @@ function buildInterpretation(doc, interpretation) {
       doc.setFontSize(7);
       doc.setTextColor(C.tx2);
       doc.setFont("helvetica", "normal");
-      const interpShort = interp.length > 90 ? interp.slice(0, 87) + "\u2026" : interp;
-      doc.text(interpShort, MARGIN + 8, y + 31);
+      const interpShort = interp.length > 90 ? interp.slice(0, 87) + "..." : interp;
+      doc.text(interpShort, MARGIN + 8, y + 24);
 
       // Norm reference
       doc.setFontSize(5.5);
       doc.setTextColor(C.tx3);
-      doc.text("Norm: " + (d.mean != null ? d.mean.toFixed(1) : "?") + " \u00b1 " + (d.sd != null ? d.sd.toFixed(1) : "?"), MARGIN + 8, y + 28);
+      doc.text("Norm: " + (d.mean != null ? d.mean.toFixed(1) : "?") + " +/- " + (d.sd != null ? d.sd.toFixed(1) : "?"), MARGIN + 8, y + 28);
 
       y += boxH + 3;
     }
@@ -874,13 +860,21 @@ export async function generateReport({
   },
 }) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+  doc._logoPng = await svgToPng(LOGO_SVG, 405);
 
   if (sections.cover !== false) buildCover(doc, project, session);
+  // Footer on every page after cover
+  if (sections.cover === false) pageFooter(doc);
+  doc.internal.events.subscribe("addPage", () => pageFooter(doc));
   if (sections.images !== false) await buildImages(doc, originalImageDataUrl, markupImageDataUrl);
-  if (sections.measurements !== false) buildMeasurements(doc, allMeas, norms);
+  if (sections.measurements !== false) {
+    buildMeasurements(doc, allMeas, norms);
+    if (sections.formulas !== false) buildFormulas(doc, formulas, formulaValues);
+  } else if (sections.formulas !== false) {
+    buildFormulas(doc, formulas, formulaValues);
+  }
   if (sections.normograms !== false) await buildNormogram(doc, allMeas, norms);
   if (sections.research !== false) buildResearchStudies(doc, project);
-  if (sections.formulas !== false) buildFormulas(doc, formulas, formulaValues);
   if (sections.interpretation !== false) buildInterpretation(doc, interpretation);
 
   doc.save((project.name || "report").replace(/\s+/g, "_") + "_report.pdf");

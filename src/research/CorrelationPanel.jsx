@@ -161,7 +161,7 @@ export function CorrelationConfig({ study, sessions, onUpdateStudy, t }) {
 }
 
 function formatP(p) {
-  if (p == null) return "—";
+  if (p == null || !isFinite(p)) return "—";
   if (p < 0.001) return "<0.001***";
   if (p < 0.01) return p.toFixed(3) + "**";
   if (p < 0.05) return p.toFixed(3) + "*";
@@ -224,8 +224,13 @@ export function CorrelationResults({ results, t }) {
 function CorrelationHeatmap({ results, t }) {
   const { vars, matrix, n, method } = results;
   const m = vars.length;
-  const size = Math.min(500, Math.max(200, 40 * m));
-  const cell = size / m;
+  const cell = Math.max(24, Math.min(38, Math.floor(420 / m)));
+  const maxLabelLen = Math.max(...vars.map(v => v.length));
+  const offX = Math.min(Math.max(maxLabelLen * 6.5 + 20, 80), 150);
+  const offY = 40;
+  const svgW = offX + m * cell + 16;
+  const svgH = offY + m * cell + 16;
+  const vf = Math.max(3, Math.min(5, Math.floor(cell * 0.22)));
 
   const getColor = (r) => {
     const a = Math.abs(r);
@@ -235,23 +240,30 @@ function CorrelationHeatmap({ results, t }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-      <svg width={size + 100} height={size + 60} style={{ overflow: "visible" }}>
-        {vars.map((v1, i) => vars.map((v2, j) => {
-          const d = matrix[v1]?.[v2];
-          if (!d || i === j) return i === j ? (
-            <rect key={`${v1}-${v2}`} x={80 + j * cell} y={i * cell} width={cell - 1} height={cell - 1} fill={t.surf2} rx={2} />
-          ) : null;
+      <svg width={svgW} height={svgH} style={{ overflow: "visible" }}>
+        {vars.map((_, i) => vars.map((_, j) => {
+          const d = matrix[vars[i]]?.[vars[j]];
+          if (!d) return null;
+          const diag = i === j;
           return (
-            <rect key={`${v1}-${v2}`}
-              x={80 + j * cell} y={i * cell} width={cell - 1} height={cell - 1}
-              fill={getColor(d.r)} rx={2} />
+            <g key={`${vars[i]}-${vars[j]}`}>
+              <rect x={offX + j * cell} y={offY + i * cell} width={cell} height={cell}
+                fill={diag ? t.surf2 : getColor(d.r)} rx={1} />
+              {!diag && (
+                <text x={offX + j * cell + cell / 2} y={offY + i * cell + cell / 2 + 4}
+                  fill={d.r > 0 ? "#fff" : "#fff"} fontSize={vf}
+                  textAnchor="middle">{d.r.toFixed(2)}</text>
+              )}
+            </g>
           );
         }))}
         {vars.map((v, i) => (
-          <g key={v}>
-            <text x={76} y={i * cell + cell / 2 + 3} fill={t.tx2} fontSize={9} textAnchor="end">{v}</text>
-            <text x={80 + i * cell + cell / 2} y={size + 12} fill={t.tx2} fontSize={9}
-              textAnchor="middle" transform={`rotate(-30,${80 + i * cell + cell / 2},${size + 12})`}>{v}</text>
+            <g key={v}>
+            <text x={offX - 6} y={offY + i * cell + cell / 2 + 3}
+              fill={t.tx} fontSize={vf} textAnchor="end">{v}</text>
+            <text x={offX + i * cell + cell / 2} y={offY - 8}
+              fill={t.tx2} fontSize={vf} textAnchor="middle"
+              transform={`rotate(-30,${offX + i * cell + cell / 2},${offY - 8})`}>{v}</text>
           </g>
         ))}
       </svg>

@@ -498,7 +498,7 @@ function PostHocView({ results, t }) {
                     }}>{c.significant ? "Yes" : "No"}</span>
                   </td>
                   <td style={{ padding: "4px 6px", color: t.tx2 }}>
-                    {isPaired ? (c.df ?? "—") : (c.ci95 ? `[${c.ci95[0].toFixed(3)}, ${c.ci95[1].toFixed(3)}]` : "—")}
+                    {isPaired ? (c.df ?? "—") : (c.ci95 ? `[${c.ci95[0]?.toFixed(3) || "\u2014"}, ${c.ci95[1]?.toFixed(3) || "\u2014"}]` : "—")}
                   </td>
                 </tr>
               ))}
@@ -567,7 +567,7 @@ function EmptyDetail({ message, t }) {
 }
 
 function fmtP(p) {
-  if (p == null) return "—";
+  if (p == null || !isFinite(p)) return "—";
   if (p < 0.001) return "<0.001";
   return p.toFixed(3);
 }

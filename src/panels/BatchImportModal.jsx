@@ -119,7 +119,7 @@ export default function BatchImportModal({ t, project, onUpdateProject, onClose 
             <Btn
               t={t}
               onClick={() => imgRef.current?.click()}
-              style={{ width: "100%", textAlign: "center", padding: "32px 16px", background: t.surf2, borderStyle: "dashed", fontSize: 13 }}
+              style={{ width: "100%", textAlign: "center", padding: "32px 16px", background: t.surf2, border: `2px dashed ${t.bdr}`, fontSize: 13 }}
             >
               {images.length ? `${images.length} images selected` : "Click to select images"}
             </Btn>
@@ -131,7 +131,7 @@ export default function BatchImportModal({ t, project, onUpdateProject, onClose 
             <Btn
               t={t}
               onClick={() => csvRef.current?.click()}
-              style={{ width: "100%", textAlign: "center", padding: "32px 16px", background: t.surf2, borderStyle: "dashed", fontSize: 13 }}
+              style={{ width: "100%", textAlign: "center", padding: "32px 16px", background: t.surf2, border: `2px dashed ${t.bdr}`, fontSize: 13 }}
             >
               {csvRows.length ? `CSV: ${csvRows.length} rows` : "Optional: select CSV metadata"}
             </Btn>

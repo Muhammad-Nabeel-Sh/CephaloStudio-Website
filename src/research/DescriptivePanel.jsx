@@ -2,7 +2,7 @@
 // DESCRIPTIVE PANEL — Config & Results UI for Descriptive/Normative Studies
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { PREDEFINED_NORMS } from "./descriptive.js";
 import { InfoBox } from "../ui.jsx";
 
@@ -432,10 +432,10 @@ function ZScoreTable({ results, labels, t }) {
           <tr style={{ background: t.surf2 }}>
             <th></th>
             {norms.map(n => (
-              <>
-                <th key={`${n.id}-z`} style={{ padding: "4px 6px", textAlign: "left", color: t.tx, fontSize: 7 }}>Z</th>
-                <th key={`${n.id}-p`} style={{ padding: "4px 6px", textAlign: "left", color: t.tx, fontSize: 7 }}>%ile</th>
-              </>
+              <Fragment key={n.id}>
+                <th style={{ padding: "4px 6px", textAlign: "left", color: t.tx, fontSize: 7 }}>Z</th>
+                <th style={{ padding: "4px 6px", textAlign: "left", color: t.tx, fontSize: 7 }}>%ile</th>
+              </Fragment>
             ))}
           </tr>
         </thead>
@@ -445,15 +445,17 @@ function ZScoreTable({ results, labels, t }) {
               <td style={{ padding: "5px 6px", color: t.tx, fontWeight: 600 }}>{l}</td>
               {norms.map(n => {
                 const z = zScores[n.id]?.[l]?.zScore;
+                const zVal = z?.z;
+                const pctVal = z?.percentileRank;
                 return (
-                  <>
-                    <td key={`${n.id}-z`} style={{ padding: "5px 6px", color: z ? zColor(z.z) : t.tx3 }}>
-                      {z?.z?.toFixed(3) || "—"}
+                  <Fragment key={n.id}>
+                    <td style={{ padding: "5px 6px", color: z ? zColor(zVal) : t.tx3 }}>
+                      {zVal != null && isFinite(zVal) ? zVal.toFixed(3) : "\u2014"}
                     </td>
-                    <td key={`${n.id}-p`} style={{ padding: "5px 6px", color: t.tx2 }}>
-                      {z?.percentileRank?.toFixed(1) || "—"}
+                    <td style={{ padding: "5px 6px", color: t.tx2 }}>
+                      {pctVal != null && isFinite(pctVal) ? pctVal.toFixed(1) : "\u2014"}
                     </td>
-                  </>
+                  </Fragment>
                 );
               })}
             </tr>

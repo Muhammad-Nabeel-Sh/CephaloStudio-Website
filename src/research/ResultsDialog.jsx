@@ -7,6 +7,7 @@ import { LongitudinalResults } from "./LongitudinalPanel.jsx";
 import { CorrelationResults } from "./CorrelationPanel.jsx";
 import { DiagnosticResults } from "./DiagnosticPanel.jsx";
 import { ReliabilityCharts, DescriptiveCharts, ComparativeCharts, LongitudinalCharts, CorrelationCharts, DiagnosticCharts } from "./moduleCharts.jsx";
+import { exportResultsCSV } from "./resultsExport.js";
 
 export default function ResultsDialog({ study, t, onClose }) {
   const [v, setV] = useState("tables");
@@ -27,7 +28,7 @@ export default function ResultsDialog({ study, t, onClose }) {
 
   return (
     <Modal t={t} title={study.name} onClose={onClose} wide>
-      <div style={{ display: "flex", gap: 2, marginBottom: 12, borderBottom: `1px solid ${t.bdr}44` }}>
+      <div style={{ display: "flex", gap: 2, marginBottom: 12, borderBottom: `1px solid ${t.bdr}44`, alignItems: "center" }}>
         {["tables", "charts"].map(tab => (
           <button key={tab} onClick={() => setV(tab)}
             style={{
@@ -38,6 +39,15 @@ export default function ResultsDialog({ study, t, onClose }) {
             {tab === "tables" ? m.tabLabel : "Charts"}
           </button>
         ))}
+        <div style={{ flex: 1 }} />
+        <button onClick={() => exportResultsCSV(study)}
+          style={{
+            padding: "4px 10px", fontSize: 9, fontWeight: 600, cursor: "pointer",
+            border: `1px solid ${t.bdr}`, borderRadius: 4,
+            background: t.surf2, color: t.tx2, letterSpacing: 0.3,
+          }}>
+          &#8595; CSV
+        </button>
       </div>
 
       {v === "tables" && <ResultsComp results={study.results} t={t} />}
