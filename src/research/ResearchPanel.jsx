@@ -159,7 +159,7 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
                     )}
 
                     {s.type === "comparative" && (
-                      <ComparativeConfig study={s} sessions={sessions} onUpdateStudy={handleUpdateStudy} t={t} />
+                      <ComparativeConfig study={s} sessions={sessions} onUpdateStudy={handleUpdateStudy} t={t} project={project} />
                     )}
 
                     {s.type === "longitudinal" && (

@@ -23,6 +23,9 @@ export function mkProject(projection) {
     reproStudies: [],
     researchStudies: [],
     subjects: [],
+    groups: [],
+    timepoints: [],
+    operators: [],
   };
 }
 

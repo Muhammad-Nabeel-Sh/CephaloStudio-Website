@@ -115,7 +115,8 @@ export function LongitudinalConfig({ study, sessions, onUpdateStudy, t, project 
       <InfoBox t={t}>
         Each <b>subject</b> is measured at multiple <b>timepoints</b>.
         Define timepoints and subjects, then assign each subject's session
-        to each timepoint. Use <b>"From Sessions"</b> to auto-populate
+        to each timepoint. Use <b>"From Managed"</b> to auto-populate
+        from managed timepoints and subjects, or <b>"From Sessions"</b>
         from session metadata.
       </InfoBox>
 
@@ -178,6 +179,26 @@ export function LongitudinalConfig({ study, sessions, onUpdateStudy, t, project 
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
           <span style={{ fontSize: 9, fontWeight: 600, color: t.tx3, textTransform: "uppercase", letterSpacing: 0.3 }}>Subjects ({subjects.length})</span>
           <div style={{ display: "flex", gap: 4 }}>
+            <button onClick={() => {
+              const managedTps = project?.timepoints || [];
+              const managedSubjects = project?.subjects || [];
+              if (managedTps.length < 2 || managedSubjects.length < 1) return;
+              const newTps = managedTps.map(l => ({ id: uid(), label: l, targetAge: null, window: 90 }));
+              const newSubjects = managedSubjects.filter(sub => sessions.some(s => s.subjectId === sub.id)).map(sub => {
+                const records = {};
+                for (const tp of newTps) {
+                  const match = sessions.find(s => s.subjectId === sub.id && s.meta?.timepoint === tp.label);
+                  records[tp.id] = match?.id || null;
+                }
+                return { id: sub.id, label: sub.label, records };
+              });
+              if (newTps.length >= 2 && newSubjects.length >= 1) {
+                update({ timepoints: newTps, subjects: newSubjects });
+              }
+            }}
+              style={{ fontSize: 9, padding: "2px 8px", borderRadius: 3, border: `1px solid ${t.acc}`, background: "transparent", color: t.acc, cursor: "pointer" }}>
+              From Managed
+            </button>
             <button onClick={() => {
               const uniqueTpLabels = [...new Set(sessions.map(s => s.meta?.timepoint).filter(Boolean))];
               const newTps = uniqueTpLabels.map(l => ({ id: uid(), label: l, targetAge: null, window: 90 }));

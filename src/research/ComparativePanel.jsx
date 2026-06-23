@@ -37,7 +37,7 @@ function LabelSelector({ sessions, selected, onToggle, t }) {
 }
 
 // ─── Config Panel ────────────────────────────────────────────────────────
-export function ComparativeConfig({ study, sessions, onUpdateStudy, t }) {
+export function ComparativeConfig({ study, sessions, onUpdateStudy, t, project }) {
   const config = study.config;
   const groups = config.groups || [];
   const labelIds = config.labelIds || [];
@@ -81,8 +81,8 @@ export function ComparativeConfig({ study, sessions, onUpdateStudy, t }) {
 
       <InfoBox t={t}>
         Each <b>group</b> contains sessions for one arm of the study.
-        Assign sessions to groups, then use <b>"From Groups"</b> to
-        auto-populate from session metadata.
+        Assign sessions to groups, or use <b>"From Managed"</b> to
+        auto-populate from managed groups, or <b>"From Groups"</b> from session metadata.
       </InfoBox>
 
       {/* Design selector */}
@@ -113,6 +113,17 @@ export function ComparativeConfig({ study, sessions, onUpdateStudy, t }) {
           <span style={{ fontSize: 9, fontWeight: 600, color: t.tx3, textTransform: "uppercase", letterSpacing: 0.3 }}>Groups</span>
           <div style={{ display: "flex", gap: 4 }}>
             <button onClick={() => {
+              const managedGroups = project?.groups || [];
+              if (managedGroups.length < 2) return;
+              update({ groups: managedGroups.map(g => ({
+                id: uid(), label: g,
+                caseIds: sessions.filter(s => s.meta?.group === g).map(s => s.id),
+              })) });
+            }}
+              style={{ fontSize: 9, padding: "2px 8px", borderRadius: 3, border: `1px solid ${t.acc}`, background: "transparent", color: t.acc, cursor: "pointer" }}>
+              From Managed
+            </button>
+            <button onClick={() => {
               const uniqueGroups = [...new Set(sessions.map(s => s.meta?.group).filter(Boolean))];
               if (uniqueGroups.length < 2) return;
               update({ groups: uniqueGroups.map(g => ({
@@ -120,7 +131,7 @@ export function ComparativeConfig({ study, sessions, onUpdateStudy, t }) {
                 caseIds: sessions.filter(s => s.meta?.group === g).map(s => s.id),
               })) });
             }}
-              style={{ fontSize: 9, padding: "2px 8px", borderRadius: 3, border: `1px solid ${t.acc}`, background: "transparent", color: t.acc, cursor: "pointer" }}>
+              style={{ fontSize: 9, padding: "2px 8px", borderRadius: 3, border: `1px solid ${t.bdr}`, background: "transparent", color: t.tx2, cursor: "pointer" }}>
               From Groups
             </button>
             <button onClick={addGroup}

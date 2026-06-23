@@ -3,6 +3,7 @@ import { mkSession } from "../model/session.js";
 import { mkSubject, addSession, removeSession, duplicateSessionInProject, addSubject, removeSubject, updateSubject } from "../model/project.js";
 import { Btn, Tag, InfoBox } from "../ui.jsx";
 import BatchImportModal from "./BatchImportModal.jsx";
+import SessionMetadataModal from "./SessionMetadataModal.jsx";
 
 export default function SessionsPanel({
   project, t, onUpdateProject,
@@ -17,8 +18,10 @@ export default function SessionsPanel({
   const [showBatchImport, setShowBatchImport] = useState(false);
   const [tab, setTab] = useState("sessions");
   const [newSubjectLabel, setNewSubjectLabel] = useState("");
-  const [newSubInput, setNewSubInput] = useState("");
+
   const [showCompare, setShowCompare] = useState(false);
+  const [showMetaModal, setShowMetaModal] = useState(false);
+
   const sessionList = project?.sessions || [];
   const subjects = project?.subjects || [];
   const activeId = project?.activeSessionId;
@@ -26,6 +29,8 @@ export default function SessionsPanel({
   const otherSessions = sessionList.filter(s => s.id !== activeId);
   const pointLabels = (activeSession?.markups || []).filter(m => m.type === "point" && m.label).map(m => m.label);
   const uniquePointLabels = [...new Set(pointLabels)];
+  const groups = project?.groups || [];
+  const timepoints = project?.timepoints || [];
 
   const handleAdd = () => {
     const session = mkSession({ name: newName || `Session ${sessionList.length + 1}` });
@@ -78,22 +83,37 @@ export default function SessionsPanel({
       {tab === "sessions" && (
         <>
           <InfoBox t={t}>
-            Each <b>session</b> is one patient visit / imaging event. Assign a <b>subject</b> (patient),
-            an optional <b>group</b> (e.g. control, treatment) and <b>timepoint</b> (e.g. T0, T1, follow-up)
-            to organise sessions for research analysis.
+            Each <b>session</b> is one patient visit / imaging event. Assign <b>metadata</b>
+            (group, timepoint, patient, operator) to organise sessions for research analysis.
           </InfoBox>
+
+          {/* ─── Add / Import / Metadata ─── */}
           <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
             <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="New session name..."
               style={{ flex: 1, background: t.surf3, border: `1px solid ${t.bdr}`, borderRadius: 4, padding: "4px 8px", color: t.tx, fontSize: 12, fontFamily: "inherit" }}
               onKeyDown={e => { if (e.key === "Enter") handleAdd(); }} />
             <Btn t={t} small onClick={handleAdd}>+ Add</Btn>
-            <Btn t={t} small ghost onClick={() => setShowBatchImport(true)} title="Batch import images with CSV metadata">📦 Import</Btn>
+            <Btn t={t} small ghost onClick={() => setShowBatchImport(true)} title="Batch import images with CSV metadata">📦</Btn>
+            <button onClick={() => setShowMetaModal(true)} title="Edit session metadata"
+              style={{
+                width: 30, height: 30, borderRadius: 6, border: `1px solid ${t.acc}44`,
+                background: t.acc + "12", color: t.acc, cursor: "pointer", fontSize: 15,
+                display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+              }}>
+              <svg xmlns="http://www.w3.org/2000/svg" height="16" viewBox="0 -960 960 960" width="16" fill={t.acc}>
+                <path d="M120-240v-80h480v80H120Zm0-200v-80h720v80H120Zm0-200v-80h720v80H120Z"/>
+              </svg>
+            </button>
           </div>
           {showBatchImport && (
             <BatchImportModal t={t} project={project} onUpdateProject={onUpdateProject} onClose={() => setShowBatchImport(false)} />
           )}
+          {showMetaModal && (
+            <SessionMetadataModal t={t} project={project} onUpdateProject={onUpdateProject} onClose={() => setShowMetaModal(false)} />
+          )}
 
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          {/* ─── Session cards ─── */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 8 }}>
             {sessionList.map((s, i) => (
               <div key={s.id} onClick={() => handleSetActive(s.id)}
                 style={{
@@ -107,35 +127,6 @@ export default function SessionsPanel({
                     <SessionNameEditor name={s.name || `Session ${i + 1}`} onRename={n => patchSession(s.id, { name: n })} t={t} />
                     {s.meta?.group && <Tag color={t.acc} style={{ fontSize: 8 }}>{s.meta.group}</Tag>}
                     {s.meta?.timepoint && <Tag color={t.warn} style={{ fontSize: 8 }}>{s.meta.timepoint}</Tag>}
-                  </div>
-                  <div style={{ display: "flex", gap: 4, marginTop: 2, flexWrap: "wrap" }}>
-                    {/* Subject picker with inline creation */}
-                    {newSubInput && s.id === newSubInput.split(":")[0] ? (
-                      <form onSubmit={e => { e.preventDefault(); e.stopPropagation(); const v = newSubInput.split(":")[1]; if (v.trim()) { const sub = mkSubject({ label: v.trim() }); onUpdateProject({ ...addSubject(project, sub), sessions: sessionList.map(s2 => s2.id === s.id ? { ...s2, subjectId: sub.id, meta: { ...s2.meta } } : s2) }); } setNewSubInput(""); }}
-                        style={{ display: "flex", gap: 2 }} onClick={e => e.stopPropagation()}>
-                        <input autoFocus value={newSubInput.split(":")[1] || ""} onChange={e => setNewSubInput(`${s.id}:${e.target.value}`)}
-                          placeholder="Subject name..." style={{ width: 80, fontSize: 9, padding: "1px 4px", borderRadius: 3, border: `1px solid ${t.acc}`, background: t.surf, color: t.tx }} />
-                        <button type="submit" style={{ padding: "1px 6px", borderRadius: 3, border: "none", background: t.acc, color: t.bg, fontSize: 9, cursor: "pointer" }}>OK</button>
-                        <button type="button" onClick={() => setNewSubInput("")} style={{ padding: "1px 4px", borderRadius: 3, border: `1px solid ${t.bdr}`, background: "transparent", color: t.tx3, fontSize: 9, cursor: "pointer" }}>✕</button>
-                      </form>
-                    ) : (
-                      <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
-                        <select value={s.subjectId || ""} onChange={e => { e.stopPropagation(); patchSession(s.id, { subjectId: e.target.value }); }}
-                          onClick={e => e.stopPropagation()}
-                          style={{ fontSize: 9, padding: "1px 4px", borderRadius: 3, border: `1px solid ${t.bdr}`, background: t.surf2, color: t.tx, maxWidth: 100 }}>
-                          <option value="">No subject</option>
-                          {subjects.map(sub => <option key={sub.id} value={sub.id}>{sub.label}</option>)}
-                        </select>
-                        <button onClick={e => { e.stopPropagation(); setNewSubInput(`${s.id}:`); }} title="New subject"
-                          style={{ background: "none", border: "none", color: t.acc, cursor: "pointer", fontSize: 12, padding: 0, lineHeight: 1 }}>+</button>
-                      </div>
-                    )}
-                    {/* Group */}
-                    <input value={s.meta?.group || ""} placeholder="Group" onChange={e => { e.stopPropagation(); patchSession(s.id, { meta: { ...s.meta, group: e.target.value } }); }}
-                      onClick={e => e.stopPropagation()} style={{ width: 60, fontSize: 9, padding: "1px 4px", borderRadius: 3, border: `1px solid ${t.bdr}`, background: t.surf2, color: t.tx }} />
-                    {/* Timepoint */}
-                    <input value={s.meta?.timepoint || ""} placeholder="Timepoint" onChange={e => { e.stopPropagation(); patchSession(s.id, { meta: { ...s.meta, timepoint: e.target.value } }); }}
-                      onClick={e => e.stopPropagation()} style={{ width: 60, fontSize: 9, padding: "1px 4px", borderRadius: 3, border: `1px solid ${t.bdr}`, background: t.surf2, color: t.tx }} />
                   </div>
                   <div style={{ fontSize: 10, color: t.tx3, marginTop: 2 }}>
                     {(s.images && s.images.length > 0) ? (s.images[0].name || "Image loaded") : "No image"}{(s.images && s.images.length > 1) ? ` +${s.images.length - 1} layers` : ""}
@@ -151,6 +142,24 @@ export default function SessionsPanel({
               </div>
             ))}
           </div>
+
+          {/* ─── Quick status ─── */}
+          {groups.length > 0 && (
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 8 }}>
+              {groups.map(g => {
+                const count = sessionList.filter(s => s.meta?.group === g).length;
+                return count > 0 ? <Tag key={g} color={t.acc} style={{ fontSize: 9 }}>{g}: {count}</Tag> : null;
+              })}
+            </div>
+          )}
+          {timepoints.length > 0 && (
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 4 }}>
+              {timepoints.map(tp => {
+                const count = sessionList.filter(s => s.meta?.timepoint === tp).length;
+                return count > 0 ? <Tag key={tp} color={t.warn} style={{ fontSize: 9 }}>{tp}: {count}</Tag> : null;
+              })}
+            </div>
+          )}
 
           {/* ─── Session Comparison ─── */}
           <div style={{ marginTop: 16, borderTop: `1px solid ${t.bdr}44`, paddingTop: 12 }}>
@@ -171,14 +180,12 @@ export default function SessionsPanel({
                     ))}
                   </select>
                 </div>
-
                 {compareSession && (
                   <>
                     <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
                       <Btn t={t} small active={showDisplacement} onClick={() => setShowDisplacement(v => !v)}>⇝ Vec</Btn>
                       <Btn t={t} small active={displacementOverlay} onClick={() => setDisplacementOverlay(v => !v)}>Overlay</Btn>
                     </div>
-
                     {displacementOverlay && (
                       <div style={{ marginBottom: 8, padding: 8, borderRadius: 6, background: t.surf3, border: `1px solid ${t.bdr}44` }}>
                         <div style={{ fontSize: 10, color: t.tx2, marginBottom: 6 }}>Alignment</div>
@@ -206,7 +213,6 @@ export default function SessionsPanel({
                         </div>
                       </div>
                     )}
-
                     <div style={{ fontSize: 9, color: t.tx3, lineHeight: 1.5 }}>
                       <b style={{ color: t.tx2 }}>⇝ Vec</b> draws displacement lines between matching landmarks.
                       <br /><b style={{ color: t.tx2 }}>Overlay</b> renders the compared session's markups with structural alignment using two anchor points.
@@ -223,14 +229,38 @@ export default function SessionsPanel({
         <div>
           <InfoBox t={t}>
             <b>Subjects</b> are the patients or specimens being studied. Create them here, then
-            assign sessions to each subject in the <b>Sessions</b> tab. Research modules
+            assign sessions to each subject in the <b>Metadata</b> table. Research modules
             use subjects to auto-populate cases, groups and timepoints.
           </InfoBox>
-          <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+          <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
             <input value={newSubjectLabel} onChange={e => setNewSubjectLabel(e.target.value)} placeholder="Subject name..."
               style={{ flex: 1, background: t.surf3, border: `1px solid ${t.bdr}`, borderRadius: 4, padding: "4px 8px", color: t.tx, fontSize: 12, fontFamily: "inherit" }}
               onKeyDown={e => { if (e.key === "Enter") handleAddSubject(); }} />
             <Btn t={t} small onClick={handleAddSubject}>+ Add</Btn>
+          </div>
+          {/* Subject presets */}
+          <div style={{ display: "flex", gap: 3, flexWrap: "wrap", marginBottom: 10 }}>
+            {[
+              { label: "Subject 1-5", range: [1, 5], gen: i => `Subject ${i}` },
+              { label: "Subject 6-10", range: [6, 10], gen: i => `Subject ${i}` },
+              { label: "Patient 001-005", range: [1, 5], gen: i => `Patient ${String(i).padStart(3, "0")}` },
+              { label: "Group A (×3)", range: [1, 3], gen: i => `Group A - Subject ${i}` },
+              { label: "Group B (×3)", range: [1, 3], gen: i => `Group B - Subject ${i}` },
+            ].map(p => (
+              <button key={p.label} onClick={() => {
+                const [start, end] = p.range;
+                const next = [...Array(end - start + 1)].map((_, i) => i + start);
+                let proj = project;
+                for (const i of next) {
+                  const sub = mkSubject({ label: p.gen(i) });
+                  proj = addSubject(proj, sub);
+                }
+                onUpdateProject(proj);
+              }}
+                style={{ fontSize: 9, padding: "2px 7px", borderRadius: 3, border: `1px solid ${t.bdr}`, background: t.surf3, color: t.tx2, cursor: "pointer" }}>
+                {p.label}
+              </button>
+            ))}
           </div>
           {subjects.length === 0 && (
             <div style={{ fontSize: 11, color: t.tx3, textAlign: "center", padding: 20 }}>No subjects defined.</div>
@@ -267,6 +297,8 @@ export default function SessionsPanel({
     </div>
   );
 }
+
+/* ─── Sub-components ────────────────────────────────────────────────────── */
 
 function SessionNameEditor({ name, onRename, t }) {
   const [editing, setEditing] = useState(false);

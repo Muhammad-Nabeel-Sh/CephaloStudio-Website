@@ -19,6 +19,7 @@ import ResearchPanel from "./research/ResearchPanel.jsx";
 import InterpretationPanel from "./panels/InterpretationPanel.jsx";
 import NormogramPanel from "./panels/NormogramPanel.jsx";
 import { mkProject, updateSessionInProject } from "./model/project.js";
+import { storeImageBlob, getImageDataUrl } from "./storage/imageStore.js";
 
 import { INITIAL_UI, Actions, useWorkspaceStore } from "./state/workspaceStore.js";
 
@@ -560,13 +561,26 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   };
   const finalizeMarkup=useCallback(draw=>finalizeMarkupRef.current(draw),[]);
 
-  // load images
+  // load images — from dataUrl (just imported) or from IndexedDB (restored from auto-save)
   useEffect(()=>{
-    const pending=sessionImage.filter(imgE=>!imgRefs.current[imgE.id]&&imgE.dataUrl);
+    const pending=sessionImage.filter(imgE=>!imgRefs.current[imgE.id]);
     if(!pending.length)return;
     dispatch({type:"SET",payload:{loadingImages:true}});
     let loaded=0;
-    pending.forEach(imgE=>{const img=new Image();img.onload=()=>{imgRefs.current[imgE.id]=img;loaded++;if(loaded===pending.length)dispatch({type:"SET",payload:{loadingImages:false}});scheduleRedraw();};img.src=imgE.dataUrl;});
+    const onLoad=(id,src)=>{const img=new Image();img.onload=()=>{imgRefs.current[id]=img;loaded++;if(loaded===pending.length)dispatch({type:"SET",payload:{loadingImages:false}});scheduleRedraw();};img.onerror=()=>{loaded++;if(loaded===pending.length)dispatch({type:"SET",payload:{loadingImages:false}});};img.src=src;};
+    pending.forEach(imgE=>{
+      if(imgE.dataUrl){
+        onLoad(imgE.id,imgE.dataUrl);
+      } else {
+        getImageDataUrl(imgE.id).then(dataUrl=>{
+          if(dataUrl){
+            onLoad(imgE.id,dataUrl);
+          } else {
+            loaded++;if(loaded===pending.length)dispatch({type:"SET",payload:{loadingImages:false}});
+          }
+        });
+      }
+    });
   },[sessionImage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const getProcessed=useCallback(imgEntry=>{
@@ -1101,24 +1115,17 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   };
 
   const captureMarkupImage = useCallback(async () => {
-    const imgUrl = sessionImage?.[0]?.dataUrl;
-    if (!imgUrl) return null;
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.onload = () => {
-        const c = document.createElement("canvas");
-        c.width = img.naturalWidth;
-        c.height = img.naturalHeight;
-        const ctx = c.getContext("2d");
-        ctx.drawImage(img, 0, 0);
-        const visible = markups.filter(m => m.visible !== false);
-        const cs = { w: c.width, h: c.height };
-        visible.forEach(m => drawMarkup(ctx, m, 1, { x: 0, y: 0 }, calibration, null, t, false, cs, "deg", true, 1.2));
-        resolve(c.toDataURL("image/png"));
-      };
-      img.onerror = () => resolve(null);
-      img.src = imgUrl;
-    });
+    const imgEl = sessionImage?.[0] ? imgRefs.current[sessionImage[0].id] : null;
+    if (!imgEl) return null;
+    const c = document.createElement("canvas");
+    c.width = imgEl.naturalWidth;
+    c.height = imgEl.naturalHeight;
+    const ctx = c.getContext("2d");
+    ctx.drawImage(imgEl, 0, 0);
+    const visible = markups.filter(m => m.visible !== false);
+    const cs = { w: c.width, h: c.height };
+    visible.forEach(m => drawMarkup(ctx, m, 1, { x: 0, y: 0 }, calibration, null, t, false, cs, "deg", true, 1.2));
+    return c.toDataURL("image/png");
   }, [sessionImage, markups, calibration, t]);
 
   const measScope=useMemo(()=>buildScope(markups,calibration),[markups,calibration]);
@@ -1215,7 +1222,10 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
             <path d="M440-320v-326L336-542l-56-58 200-200 200 200-56 58-104-104v326h-80ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z"/>
           </svg>
         </Btn>
-        <Btn ghost t={t} small title="Save project" onClick={()=>onSave?.(project)}>
+        <Btn ghost t={t} small title="Save project" onClick={()=>{
+          const patched={...project,sessions:project.sessions?.map(s=>({...s,images:s.images?.map(img=>({...img,dataUrl:imgRefs.current[img.id]?.src||img.dataUrl}))}))};
+          onSave?.(patched);
+        }}>
           <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}>
             <path d="M840-680v480q0 33-23.5 56.5T760-120H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h480l160 160Zm-80 34L646-760H200v560h560v-446ZM565-275q35-35 35-85t-35-85q-35-35-85-35t-85 35q-35 35-35 85t35 85q35 35 85 35t85-35ZM240-560h360v-160H240v160Zm-40-86v446-560 114Z"/>
           </svg>
@@ -1482,7 +1492,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           <div style={{borderTop:`1px solid ${t.bdr}`,marginTop:10,paddingTop:12,display:"flex",gap:10}}>
             <Btn t={t} onClick={async ()=>{setShowReportOptions(false);
               try {
-                const origUrl = sessionImage?.[0]?.dataUrl || null;
+                const imgEl = sessionImage?.[0] ? imgRefs.current[sessionImage[0].id] : null;
+                const origUrl = imgEl ? imgEl.src : null;
                 const markupUrl = await captureMarkupImage();
                 const interp = generateInterpretation(allMeas, norms);
                 const fv = {}; formulas.forEach(f => { const v = evalFormula(f.expression, measScope); if (v !== null) fv[f.id] = v; });
@@ -1523,9 +1534,26 @@ function loadProjects() {
 }
 function saveProjects(projects) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+    const imageBatch = [];
+    const stripped = projects.map(p => ({
+      ...p,
+      sessions: p.sessions?.map(s => ({
+        ...s,
+        images: s.images?.map(img => {
+          if (img.dataUrl) {
+            imageBatch.push({ id: img.id, dataUrl: img.dataUrl });
+            return { ...img, dataUrl: null };
+          }
+          return { ...img, dataUrl: null };
+        })
+      }))
+    }));
+    if (imageBatch.length > 0) {
+      Promise.all(imageBatch.map(({ id, dataUrl }) => storeImageBlob(id, dataUrl))).catch(() => {});
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stripped));
   } catch (e) {
-    console.warn("Failed to save projects to localStorage:", e);
+    console.warn("Failed to save projects:", e);
   }
 }
 

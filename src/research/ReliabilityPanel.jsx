@@ -209,8 +209,11 @@ export function ReliabilityConfig({ study, sessions, onUpdateStudy, t, project }
             <button onClick={() => {
               const subjects = project?.subjects || [];
               if (subjects.length === 0) return;
-              const op = operators[0] || { id: uid(), name: "Operator 1", role: isMethod ? "test" : "primary" };
-              const newOps = operators.length === 0 ? [op] : operators;
+              const managedOps = project?.operators || [];
+              const newOps = managedOps.length > 0
+                ? managedOps.map((name, i) => ({ id: uid(), name, role: i === 0 ? (isMethod ? "test" : "primary") : "secondary" }))
+                : [{ id: uid(), name: operators[0]?.name || "Operator 1", role: isMethod ? "test" : "primary" }];
+              const op = newOps[0];
               const newCases = subjects.map(sub => {
                 const subSessions = sessions.filter(s => s.subjectId === sub.id);
                 return {
