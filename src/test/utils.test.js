@@ -1,0 +1,633 @@
+import { describe, it, expect } from "vitest";
+import {
+  uid,
+  clamp,
+  dist,
+  angle3pt,
+  angle4pt,
+  perpDist,
+  polyArea,
+  polyLen,
+  vpts,
+  computeMeasurements,
+  snapPoint,
+  snapToLine,
+  perpPoint,
+  projectedDistance,
+  calculateICC,
+  calculateICC_CI,
+  dahlbergError,
+  blandAltman,
+  mean,
+  stdev,
+  variance,
+  median,
+  iqr,
+  skewness,
+  kurtosis,
+  coefficientOfVariation,
+  shapiroWilk,
+  oneWayAnova,
+  pearsonCorrelation,
+  spearmanCorrelation,
+  tTestPaired,
+  linearRegression,
+  confidenceInterval,
+  normDeviation,
+  detectOutliers,
+  buildScope,
+  evalFormula,
+  getMissingVars,
+} from "../utils.js";
+
+// ═════════════════════════════════════════════════════════════════
+// Helpers
+// ═════════════════════════════════════════════════════════════════
+
+describe("uid", () => {
+  it("generates an 8-character string", () => {
+    expect(uid()).toHaveLength(8);
+  });
+
+  it("generates unique values", () => {
+    const a = uid(), b = uid();
+    expect(a).not.toBe(b);
+  });
+});
+
+describe("clamp", () => {
+  it("clamps below min", () => {
+    expect(clamp(-5, 0, 10)).toBe(0);
+  });
+
+  it("clamps above max", () => {
+    expect(clamp(15, 0, 10)).toBe(10);
+  });
+
+  it("passes through mid value", () => {
+    expect(clamp(5, 0, 10)).toBe(5);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════
+// Geometry
+// ═════════════════════════════════════════════════════════════════
+
+describe("dist", () => {
+  it("returns 0 for same point", () => {
+    expect(dist({ x: 1, y: 2 }, { x: 1, y: 2 })).toBe(0);
+  });
+
+  it("computes Euclidean distance", () => {
+    expect(dist({ x: 0, y: 0 }, { x: 3, y: 4 })).toBe(5);
+  });
+});
+
+describe("angle3pt", () => {
+  it("returns 90° for right angle", () => {
+    const a = angle3pt({ x: 1, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 1 });
+    expect(a).toBeCloseTo(90, 8);
+  });
+
+  it("returns 45°", () => {
+    const a = angle3pt({ x: 1, y: 0 }, { x: 0, y: 0 }, { x: 1, y: 1 });
+    expect(a).toBeCloseTo(45, 8);
+  });
+
+  it("returns 0° when two points coincide", () => {
+    const a = angle3pt({ x: 1, y: 1 }, { x: 1, y: 1 }, { x: 2, y: 2 });
+    expect(a).toBeCloseTo(0, 8);
+  });
+});
+
+describe("angle4pt", () => {
+  it("returns 0° for parallel lines", () => {
+    const a = angle4pt({ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 });
+    expect(a).toBeCloseTo(0, 8);
+  });
+
+  it("returns 90° for perpendicular lines", () => {
+    const a = angle4pt({ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 1 });
+    expect(a).toBeCloseTo(90, 8);
+  });
+});
+
+describe("perpDist", () => {
+  it("returns 0 for point on line", () => {
+    expect(perpDist({ x: 1, y: 1 }, { x: 0, y: 0 }, { x: 2, y: 2 })).toBeCloseTo(0, 10);
+  });
+
+  it("computes perpendicular distance", () => {
+    const d = perpDist({ x: 0, y: 1 }, { x: 0, y: 0 }, { x: 1, y: 0 });
+    expect(d).toBeCloseTo(1, 10);
+  });
+});
+
+describe("polyArea", () => {
+  it("computes area of a triangle", () => {
+    const area = polyArea([{ x: 0, y: 0 }, { x: 3, y: 0 }, { x: 0, y: 4 }]);
+    expect(area).toBeCloseTo(6, 10);
+  });
+
+  it("computes area of a square", () => {
+    const area = polyArea([{ x: 0, y: 0 }, { x: 2, y: 0 }, { x: 2, y: 2 }, { x: 0, y: 2 }]);
+    expect(area).toBeCloseTo(4, 10);
+  });
+});
+
+describe("polyLen", () => {
+  it("computes perimeter of a triangle", () => {
+    const p = polyLen([{ x: 0, y: 0 }, { x: 3, y: 0 }, { x: 0, y: 4 }]);
+    expect(p).toBeCloseTo(12, 10);
+  });
+
+  it("computes open polyline length", () => {
+    const p = polyLen([{ x: 0, y: 0 }, { x: 3, y: 0 }, { x: 3, y: 4 }], false);
+    expect(p).toBeCloseTo(7, 10);
+  });
+});
+
+describe("vpts", () => {
+  it("filters out unplaced points", () => {
+    const m = { points: [{ x: 10, y: 20 }, { x: -99999, y: -99999 }] };
+    expect(vpts(m)).toHaveLength(1);
+    expect(vpts(m)[0]).toEqual({ x: 10, y: 20 });
+  });
+
+  it("returns empty array for missing points", () => {
+    expect(vpts({})).toEqual([]);
+  });
+});
+
+describe("perpPoint", () => {
+  it("projects point onto line", () => {
+    const pp = perpPoint({ x: 1, y: 1 }, { x: 0, y: 0 }, { x: 2, y: 0 });
+    expect(pp.x).toBeCloseTo(1, 10);
+    expect(pp.y).toBeCloseTo(0, 10);
+  });
+});
+
+describe("projectedDistance", () => {
+  it("computes projected distance along line (abs value)", () => {
+    const d = projectedDistance({ x: 0, y: 1 }, { x: 2, y: 1 }, { x: 0, y: 0 }, { x: 4, y: 0 });
+    expect(Math.abs(d)).toBeCloseTo(2, 10);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════
+// Compute Measurements
+// ═════════════════════════════════════════════════════════════════
+
+describe("computeMeasurements", () => {
+  const cal = { done: true, pxPerMm: 2 };
+
+  it("returns x,y for a point", () => {
+    const m = { type: "point", points: [{ x: 10, y: 20 }] };
+    expect(computeMeasurements(m, cal)).toEqual({ x: 10, y: 20 });
+  });
+
+  it("returns length for a line", () => {
+    const m = { type: "line", points: [{ x: 0, y: 0 }, { x: 6, y: 0 }] };
+    expect(computeMeasurements(m, cal).length).toBeCloseTo(3, 10);
+  });
+
+  it("returns angle for angle3", () => {
+    const m = { type: "angle3", label: "test", points: [{ x: 1, y: 0 }, { x: 0, y: 0 }, { x: 0, y: 1 }] };
+    expect(computeMeasurements(m, cal).angle).toBeCloseTo(90, 8);
+  });
+
+  it("returns signed ANB angle", () => {
+    const m = { type: "angle3", label: "ANB", points: [{ x: 10, y: 5 }, { x: 0, y: 0 }, { x: 5, y: 10 }] };
+    const meas = computeMeasurements(m, cal);
+    expect(meas.angle).toBeDefined();
+    expect(typeof meas.angle).toBe("number");
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════
+// Snap
+// ═════════════════════════════════════════════════════════════════
+
+describe("snapPoint", () => {
+  const markups = [
+    { type: "point", label: "N", points: [{ x: 100, y: 200 }], visible: true },
+    { type: "point", label: "S", points: [{ x: 300, y: 400 }], visible: true },
+  ];
+
+  it("snaps to nearest point within radius", () => {
+    const result = snapPoint({ x: 101, y: 201 }, markups, 5, true);
+    expect(result).toEqual({ x: 100, y: 200 });
+  });
+
+  it("returns input if no point is close", () => {
+    const result = snapPoint({ x: 0, y: 0 }, markups, 5, true);
+    expect(result).toEqual({ x: 0, y: 0 });
+  });
+
+  it("returns input if snap is disabled", () => {
+    const result = snapPoint({ x: 101, y: 201 }, markups, 5, false);
+    expect(result).toEqual({ x: 101, y: 201 });
+  });
+});
+
+describe("snapToLine", () => {
+  it("snaps to nearest point on a line", () => {
+    const markups = [
+      { type: "line", points: [{ x: 0, y: 0 }, { x: 10, y: 0 }], visible: true },
+    ];
+    const result = snapToLine({ x: 5, y: 3 }, markups, 10);
+    expect(result.x).toBeCloseTo(5, 5);
+    expect(result.y).toBeCloseTo(0, 5);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════
+// ICC (Intraclass Correlation Coefficient)
+// ═════════════════════════════════════════════════════════════════
+
+describe("calculateICC", () => {
+  it("returns null for <2 raters", () => {
+    expect(calculateICC([[1, 2]])).toBeNull();
+  });
+
+  it("returns null for <2 subjects", () => {
+    expect(calculateICC([[1], [2]])).toBeNull();
+  });
+
+  it("returns high ICC for near-perfect agreement", () => {
+    const result = calculateICC([
+      [10, 20, 30, 40, 50],
+      [10.001, 20.001, 30.001, 40.001, 50.001],
+    ]);
+    expect(result).not.toBeNull();
+    expect(result.ICC_Absolute).toBeGreaterThan(0.99);
+    expect(result.interpretation).toBe("Excellent");
+  });
+
+  it("returns interpretation strings correctly", () => {
+    const r = calculateICC([
+      [1, 3, 5],
+      [2, 3, 6],
+    ]);
+    expect(r).not.toBeNull();
+    expect(["Poor", "Moderate", "Good", "Excellent"]).toContain(r.interpretation);
+  });
+});
+
+describe("calculateICC_CI", () => {
+  it("returns null for invalid inputs", () => {
+    expect(calculateICC_CI(null, 2, 2)).toBeNull();
+  });
+
+  it("computes confidence interval", () => {
+    const ci = calculateICC_CI(0.8, 10, 3, 0.95);
+    expect(ci.lower).toBeLessThan(ci.upper);
+    expect(ci.confidence).toBe(0.95);
+  });
+
+  it("handles 0.99 confidence", () => {
+    const ci = calculateICC_CI(0.8, 10, 3, 0.99);
+    expect(ci.lower).toBeLessThan(ci.upper);
+    expect(ci.confidence).toBe(0.99);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════
+// Dahlberg Error & Bland-Altman
+// ═════════════════════════════════════════════════════════════════
+
+describe("dahlbergError", () => {
+  it("returns null for mismatched lengths", () => {
+    expect(dahlbergError([1, 2], [1])).toBeNull();
+  });
+
+  it("returns 0 for identical measurements", () => {
+    const d = dahlbergError([10, 20, 30], [10, 20, 30]);
+    expect(d.error).toBeCloseTo(0, 10);
+    expect(d.n).toBe(3);
+  });
+
+  it("computes correctly for known values", () => {
+    const d = dahlbergError([10, 20], [12, 18]);
+    const expected = Math.sqrt(((10 - 12) ** 2 + (20 - 18) ** 2) / (2 * 2));
+    expect(d.error).toBeCloseTo(expected, 10);
+  });
+});
+
+describe("blandAltman", () => {
+  it("returns null for <2 pairs", () => {
+    expect(blandAltman([1], [2])).toBeNull();
+  });
+
+  it("computes bias and limits of agreement", () => {
+    const ba = blandAltman([10, 20, 30], [12, 18, 32]);
+    expect(ba.meanDiff).toBeCloseTo(-0.6667, 3);
+    expect(ba.stdDiff).toBeGreaterThan(0);
+    expect(ba.lowerLOA).toBeLessThan(ba.upperLOA);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════
+// Descriptive Statistics
+// ═════════════════════════════════════════════════════════════════
+
+describe("mean", () => {
+  it("computes arithmetic mean", () => {
+    expect(mean([1, 2, 3, 4, 5])).toBe(3);
+  });
+
+  it("handles single value", () => {
+    expect(mean([42])).toBe(42);
+  });
+});
+
+describe("variance", () => {
+  it("computes sample variance", () => {
+    const v = variance([1, 2, 3, 4, 5], 3);
+    expect(v).toBeCloseTo(2.5, 10);
+  });
+});
+
+describe("stdev", () => {
+  it("computes sample standard deviation", () => {
+    const s = stdev([1, 2, 3, 4, 5], 3);
+    expect(s).toBeCloseTo(Math.sqrt(2.5), 10);
+  });
+});
+
+describe("median", () => {
+  it("returns middle for odd count", () => {
+    expect(median([1, 3, 5])).toBe(3);
+  });
+
+  it("averages middle two for even count", () => {
+    expect(median([1, 3, 5, 7])).toBe(4);
+  });
+});
+
+describe("iqr", () => {
+  it("computes interquartile range", () => {
+    const result = iqr([1, 2, 3, 4, 5, 6, 7]);
+    expect(result.iqr).toBeGreaterThan(0);
+    expect(result.q1).toBeLessThan(result.q3);
+  });
+});
+
+describe("skewness", () => {
+  it("returns 0 for symmetric data", () => {
+    expect(skewness([1, 2, 3, 4, 5])).toBeCloseTo(0, 8);
+  });
+
+  it("is positive for right-skewed data", () => {
+    expect(skewness([1, 1, 1, 2, 10])).toBeGreaterThan(0);
+  });
+});
+
+describe("kurtosis", () => {
+  it("returns expected excess kurtosis for uniform-like data", () => {
+    expect(kurtosis([1, 2, 3, 4, 5])).toBeCloseTo(-1.912, 2);
+  });
+});
+
+describe("coefficientOfVariation", () => {
+  it("returns percentage CV", () => {
+    const cv = coefficientOfVariation([10, 12, 11]);
+    expect(cv).toBeGreaterThan(0);
+  });
+
+  it("returns null for zero mean", () => {
+    expect(coefficientOfVariation([0, 0, 0])).toBeNull();
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════
+// Shapiro-Wilk Normality Test
+// ═════════════════════════════════════════════════════════════════
+
+describe("shapiroWilk", () => {
+  it("returns null for n < 3", () => {
+    expect(shapiroWilk([1, 2])).toBeNull();
+  });
+
+  it("classifies normal data correctly", () => {
+    const result = shapiroWilk([1.2, 0.8, 1.5, 2.0, -0.5, 1.1, -0.2, 1.8, 0.5, 0.9]);
+    expect(result).not.toBeNull();
+    expect(result.W).toBeGreaterThan(0);
+    expect(result.normal).toBe(true);
+    expect(result.pValue).toBeGreaterThan(0.05);
+  });
+
+  it("returns W=1 for constant data", () => {
+    const result = shapiroWilk([5, 5, 5, 5, 5]);
+    expect(result.W).toBe(1);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════
+// One-Way ANOVA
+// ═════════════════════════════════════════════════════════════════
+
+describe("oneWayAnova", () => {
+  it("returns null for <2 groups", () => {
+    expect(oneWayAnova([1, 2, 3])).toBeNull();
+  });
+
+  it("detects significant difference between groups", () => {
+    const result = oneWayAnova([10, 11, 10, 9], [20, 21, 20, 19]);
+    expect(result).not.toBeNull();
+    expect(result.F).toBeGreaterThan(0);
+    expect(result.significant).toBe(true);
+    expect(result.pValue).toBeLessThan(0.05);
+  });
+
+  it("detects no difference between identical groups", () => {
+    const result = oneWayAnova([10, 10, 10], [10, 10, 10]);
+    expect(result).toBeNull(); // ssWithin = 0
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════
+// t-Tests
+// ═════════════════════════════════════════════════════════════════
+
+describe("tTestPaired", () => {
+  it("returns null for mismatched lengths", () => {
+    expect(tTestPaired([1, 2], [1])).toBeNull();
+  });
+
+  it("returns null for n < 2", () => {
+    expect(tTestPaired([1], [2])).toBeNull();
+  });
+
+  it("detects significant difference", () => {
+    const result = tTestPaired([10, 11, 12, 13], [8, 9, 8, 10]);
+    expect(result).not.toBeNull();
+    expect(result.t).toBeGreaterThan(0);
+    expect(result.significant).toBe(true);
+  });
+
+  it("returns null for identical pairs (zero variance)", () => {
+    expect(tTestPaired([10, 20, 30], [10, 20, 30])).toBeNull();
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════
+// Correlation
+// ═════════════════════════════════════════════════════════════════
+
+describe("pearsonCorrelation", () => {
+  it("returns null for <2 pairs", () => {
+    expect(pearsonCorrelation([1], [2])).toBeNull();
+  });
+
+  it("returns 1 for perfect positive correlation", () => {
+    expect(pearsonCorrelation([1, 2, 3], [4, 6, 8])).toBeCloseTo(1, 10);
+  });
+
+  it("returns -1 for perfect negative correlation", () => {
+    expect(pearsonCorrelation([1, 2, 3], [9, 6, 3])).toBeCloseTo(-1, 10);
+  });
+
+  it("returns 0 for no correlation", () => {
+    expect(pearsonCorrelation([1, 2, 3], [5, 5, 5])).toBeNull(); // denominator 0
+  });
+});
+
+describe("spearmanCorrelation", () => {
+  it("returns 1 for monotonic increasing data", () => {
+    const r = spearmanCorrelation([1, 2, 3, 4], [100, 200, 300, 400]);
+    expect(r).toBeCloseTo(1, 5);
+  });
+
+  it("returns null for mismatched lengths", () => {
+    expect(spearmanCorrelation([1], [1, 2])).toBeNull();
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════
+// Linear Regression
+// ═════════════════════════════════════════════════════════════════
+
+describe("linearRegression", () => {
+  it("returns null for <3 points", () => {
+    expect(linearRegression([1, 2], [3, 4])).toBeNull();
+  });
+
+  it("fits y = 2x + 1", () => {
+    const r = linearRegression([1, 2, 3, 4], [3, 5, 7, 9]);
+    expect(r.slope).toBeCloseTo(2, 8);
+    expect(r.intercept).toBeCloseTo(1, 8);
+    expect(r.r2).toBeCloseTo(1, 8);
+    expect(r.significant).toBe(true);
+  });
+
+  it("fits nearly horizontal line", () => {
+    const r = linearRegression([1, 2, 3], [5, 5.1, 4.9]);
+    expect(r).not.toBeNull();
+    expect(r.slope).toBeCloseTo(0, 1);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════
+// Confidence Interval & Norm Deviation
+// ═════════════════════════════════════════════════════════════════
+
+describe("confidenceInterval", () => {
+  it("returns null for n < 2", () => {
+    expect(confidenceInterval([5])).toBeNull();
+  });
+
+  it("computes CI containing the mean", () => {
+    const ci = confidenceInterval([10, 12, 11, 13, 10, 12]);
+    expect(ci.mean).toBeCloseTo(11.333, 2);
+    expect(ci.lower).toBeLessThan(ci.mean);
+    expect(ci.upper).toBeGreaterThan(ci.mean);
+  });
+
+  it("handles zero variance", () => {
+    const ci = confidenceInterval([5, 5, 5]);
+    expect(ci.lower).toBe(5);
+    expect(ci.upper).toBe(5);
+  });
+});
+
+describe("normDeviation", () => {
+  it("computes deviation from norm", () => {
+    const result = normDeviation(85, { mean: 82, sd: 2 });
+    expect(result.delta).toBe(3);
+    expect(result.sdUnits).toBe(1.5);
+    expect(result.within1SD).toBe(false);
+    expect(result.within2SD).toBe(true);
+  });
+
+  it("reports exactly at mean", () => {
+    const result = normDeviation(82, { mean: 82, sd: 2 });
+    expect(result.delta).toBe(0);
+    expect(result.sdUnits).toBe(0);
+    expect(result.within1SD).toBe(true);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════
+// Outlier Detection
+// ═════════════════════════════════════════════════════════════════
+
+describe("detectOutliers", () => {
+  it("returns empty for n < 4", () => {
+    expect(detectOutliers([1, 2, 3]).outliers).toHaveLength(0);
+  });
+
+  it("detects IQR outliers", () => {
+    const result = detectOutliers([1, 2, 3, 4, 5, 100]);
+    expect(result.outliers.length).toBeGreaterThan(0);
+    expect(result.outliers[0].v).toBe(100);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════
+// Formula System
+// ═════════════════════════════════════════════════════════════════
+
+describe("buildScope", () => {
+  it("builds scope from markups", () => {
+    const markups = [
+      { type: "line", label: "SN", points: [{ x: 0, y: 0 }, { x: 10, y: 0 }] },
+    ];
+    const cal = { done: true, pxPerMm: 1 };
+    const scope = buildScope(markups, cal);
+    expect(scope.SN_length).toBeCloseTo(10, 5);
+  });
+});
+
+describe("evalFormula", () => {
+  it("evaluates simple arithmetic", () => {
+    expect(evalFormula("2 + 3", {})).toBe(5);
+  });
+
+  it("uses scope variables", () => {
+    expect(evalFormula("SNA_angle - SNB_angle", { SNA_angle: 82, SNB_angle: 80 })).toBe(2);
+  });
+
+  it("returns null for missing vars", () => {
+    expect(evalFormula("unknown", {})).toBeNull();
+  });
+
+  it("handles mathjs functions", () => {
+    expect(evalFormula("sin(pi/2)", {})).toBeCloseTo(1, 10);
+  });
+});
+
+describe("getMissingVars", () => {
+  it("reports missing variables", () => {
+    const missing = getMissingVars("A + B", { A: 5 });
+    expect(missing).toContain("B");
+  });
+
+  it("returns empty when all vars present", () => {
+    expect(getMissingVars("A + B", { A: 1, B: 2 })).toEqual([]);
+  });
+
+  it("handles empty expression", () => {
+    expect(getMissingVars("", {})).toEqual([]);
+  });
+});
