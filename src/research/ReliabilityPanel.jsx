@@ -4,6 +4,8 @@
 
 import { useState } from "react";
 import { InfoBox } from "../ui.jsx";
+import { mkReliabilitySession } from "../model/session.js";
+import { addSession } from "../model/project.js";
 
 function uid() {
   return Math.random().toString(36).slice(2, 10);
@@ -42,18 +44,93 @@ function LabelSelector({ sessions, selected, onToggle, t }) {
 }
 
 // ─── Config Panel ────────────────────────────────────────────────────────
-export function ReliabilityConfig({ study, sessions, onUpdateStudy, t, project }) {
+export function ReliabilityConfig({ study, sessions, onUpdateStudy, t, project, onUpdateProject }) {
   const config = study.config;
   const operators = config.operators || [];
   const cases = config.cases || [];
   const labelIds = config.labelIds || [];
-  const unusedSessions = sessions.filter(s => !cases.some(c => (c.sessions || []).some(cs => cs.sessionId === s.id)));
+  const protocol = config.protocol || {};
+  const occasions = protocol.occasions || 2;
+  const workflow = config.workflow || {};
+
+  if (workflow.active) {
+    return (
+      <ReliabilityWorkflow
+        study={study}
+        sessions={sessions}
+        onUpdateStudy={onUpdateStudy}
+        onUpdateProject={onUpdateProject}
+        project={project}
+        t={t}
+      />
+    );
+  }
+
+  const syncCaseSessions = (c) => {
+    if (!c.sessionId) return { ...c, sessions: [] };
+    return {
+      ...c,
+      sessions: operators.flatMap(op =>
+        Array.from({ length: occasions }, (_, i) => ({
+          sessionId: c.sessionId,
+          operatorId: op.id,
+          occasion: i + 1,
+        }))
+      ),
+    };
+  };
+
+  const startWorkflow = () => {
+    const steps = [];
+    for (let oi = 0; oi < operators.length; oi++) {
+      const op = operators[oi];
+      for (let ti = 1; ti <= occasions; ti++) {
+        for (let ci = 0; ci < cases.length; ci++) {
+          const c = cases[ci];
+          if (!c.sessionId) continue;
+          const baseSes = sessions.find(s => s.id === c.sessionId);
+          steps.push({
+            operatorIdx: oi,
+            operatorId: op.id,
+            operatorName: op.name,
+            trialNum: ti,
+            caseIdx: ci,
+            caseName: c.name,
+            caseId: c.id,
+            baseSessionId: c.sessionId,
+            baseSessionName: baseSes?.name || baseSes?.label || c.sessionId.slice(0, 8),
+            cloneSessionId: null,
+            done: false,
+          });
+        }
+      }
+    }
+    if (steps.length === 0) return;
+    update({
+      workflow: { active: true, steps, currentStep: 0, complete: false },
+    });
+  };
 
   const update = (patch) => {
-    onUpdateStudy({
-      ...study,
-      config: { ...config, ...patch },
-    });
+    const newConfig = { ...config, ...patch };
+    // Auto-sync cases when operators or occasions change
+    if (patch.operators || patch.protocol) {
+      const opList = newConfig.operators || operators;
+      const occ = (newConfig.protocol || protocol).occasions || 2;
+      newConfig.cases = (newConfig.cases || cases).map(c =>
+        !c.sessionId ? { ...c, sessions: [] } : {
+          ...c,
+          sessions: opList.flatMap(op =>
+            Array.from({ length: occ }, (_, i) => ({
+              sessionId: c.sessionId,
+              operatorId: op.id,
+              occasion: i + 1,
+            }))
+          ),
+        }
+      );
+    }
+    onUpdateStudy({ ...study, config: newConfig });
   };
 
   const isMethod = config.design === "method_comparison";
@@ -74,28 +151,18 @@ export function ReliabilityConfig({ study, sessions, onUpdateStudy, t, project }
   };
 
   const addCase = () => {
-    update({ cases: [...cases, { id: uid(), name: `Case ${cases.length + 1}`, sessions: [] }] });
+    update({ cases: [...cases, { id: uid(), name: `Case ${cases.length + 1}`, sessionId: "", sessions: [] }] });
   };
 
   const removeCase = (id) => {
     update({ cases: cases.filter(c => c.id !== id) });
   };
 
-  const addSessionToCase = (caseId, sessionId, operatorId, occasion) => {
+  const setCaseSession = (caseId, sessionId) => {
     update({
       cases: cases.map(c => {
         if (c.id !== caseId) return c;
-        const next = [...(c.sessions || []), { sessionId, operatorId, occasion: occasion || 1 }];
-        return { ...c, sessions: next };
-      }),
-    });
-  };
-
-  const removeSessionFromCase = (caseId, sessionId) => {
-    update({
-      cases: cases.map(c => {
-        if (c.id !== caseId) return c;
-        return { ...c, sessions: (c.sessions || []).filter(s => s.sessionId !== sessionId) };
+        return syncCaseSessions({ ...c, sessionId });
       }),
     });
   };
@@ -109,8 +176,8 @@ export function ReliabilityConfig({ study, sessions, onUpdateStudy, t, project }
     <div style={{ display: "flex", flexDirection: "column", gap: 12, fontSize: 11 }}>
 
       <InfoBox t={t}>
-        Each <b>case</b> represents one subject at one timepoint. Assign sessions to cases,
-        then match each session to an <b>operator</b> and <b>occasion</b>.
+        Each <b>case</b> represents one subject at one timepoint. Pick a <b>session</b> (image) for the case;
+        all <b>operator</b> × <b>trial</b> combinations are auto-generated from that session.
         Use <b>"From Subjects"</b> to auto-populate from your project subjects.
       </InfoBox>
 
@@ -183,7 +250,7 @@ export function ReliabilityConfig({ study, sessions, onUpdateStudy, t, project }
           <select value={config.protocol?.occasions || 2}
             onChange={e => update({ protocol: { ...config.protocol, occasions: Number(e.target.value) } })}
             style={{ padding: "3px 4px", borderRadius: 3, border: `1px solid ${t.bdr}`, background: t.surf, color: t.tx, fontSize: 9 }}>
-            {[2, 3].map(n => <option key={n} value={n}>{n}</option>)}
+            {[1, 2, 3].map(n => <option key={n} value={n}>{n}</option>)}
           </select>
           <label style={{ fontSize: 10, color: t.tx2, display: "flex", alignItems: "center", gap: 4 }}>
             <input type="checkbox" checked={config.protocol?.blindingEnforced || false}
@@ -210,19 +277,30 @@ export function ReliabilityConfig({ study, sessions, onUpdateStudy, t, project }
               const subjects = project?.subjects || [];
               if (subjects.length === 0) return;
               const managedOps = project?.operators || [];
-              const newOps = managedOps.length > 0
+              const opList = managedOps.length > 0
                 ? managedOps.map((name, i) => ({ id: uid(), name, role: i === 0 ? (isMethod ? "test" : "primary") : "secondary" }))
-                : [{ id: uid(), name: operators[0]?.name || "Operator 1", role: isMethod ? "test" : "primary" }];
-              const op = newOps[0];
+                : operators.length > 0
+                  ? operators
+                  : [{ id: uid(), name: "Operator 1", role: isMethod ? "test" : "primary" }];
               const newCases = subjects.map(sub => {
                 const subSessions = sessions.filter(s => s.subjectId === sub.id);
+                const firstSessionId = subSessions[0]?.id || "";
                 return {
                   id: uid(),
                   name: sub.label,
-                  sessions: subSessions.map((s, i) => ({ sessionId: s.id, operatorId: op.id, occasion: i + 1 })),
+                  sessionId: firstSessionId,
+                  sessions: firstSessionId
+                    ? opList.flatMap(op =>
+                        Array.from({ length: occasions }, (_, i) => ({
+                          sessionId: firstSessionId,
+                          operatorId: op.id,
+                          occasion: i + 1,
+                        }))
+                      )
+                    : [],
                 };
               });
-              update({ operators: newOps, cases: newCases });
+              update({ operators: opList, cases: newCases });
             }}
               style={{ fontSize: 9, padding: "2px 8px", borderRadius: 3, border: `1px solid ${t.acc}`, background: "transparent", color: t.acc, cursor: "pointer" }}>
               From Subjects
@@ -234,9 +312,11 @@ export function ReliabilityConfig({ study, sessions, onUpdateStudy, t, project }
           </div>
         </div>
         {cases.length === 0 && (
-          <div style={{ fontSize: 10, color: t.tx3, padding: "6px 0" }}>No cases defined. Add a case and assign sessions to it.</div>
+          <div style={{ fontSize: 10, color: t.tx3, padding: "6px 0" }}>No cases defined. Add a case and assign a session to it.</div>
         )}
-        {cases.map(c => (
+        {cases.map(c => {
+          const ses = c.sessionId ? sessions.find(s => s.id === c.sessionId) : null;
+          return (
           <div key={c.id} style={{ marginBottom: 8, padding: 8, borderRadius: 4, background: t.surf3, border: `1px solid ${t.bdr}44` }}>
             <div style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 6 }}>
               <input value={c.name} onChange={e => update({ cases: cases.map(c2 => c2.id === c.id ? { ...c2, name: e.target.value } : c2) })}
@@ -245,37 +325,55 @@ export function ReliabilityConfig({ study, sessions, onUpdateStudy, t, project }
                 style={{ background: "none", border: "none", color: t.tx3, cursor: "pointer", fontSize: 10, padding: 2 }}>✕</button>
             </div>
 
-            {/* Sessions in this case */}
-            {(c.sessions || []).map(cs => {
-              const ses = sessions.find(s => s.id === cs.sessionId);
-              const op = operators.find(o => o.id === cs.operatorId);
-              return (
-                <div key={cs.sessionId} style={{ display: "flex", alignItems: "center", gap: 4, marginBottom: 3, padding: "3px 4px", background: t.surf2, borderRadius: 3 }}>
-                  <span style={{ flex: 1, fontSize: 9, color: t.tx, fontFamily: "'DM Mono',monospace", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {ses?.name || ses?.label || cs.sessionId.slice(0, 8)}
-                  </span>
-                  <span style={{ fontSize: 8, color: t.tx3 }}>→</span>
-                  <span style={{ fontSize: 9, color: t.acc, fontWeight: 600 }}>{op?.name || cs.operatorId}</span>
-                  <span style={{ fontSize: 8, color: t.tx3 }}>Occ:</span>
-                  <span style={{ fontSize: 9, color: t.tx2 }}>{cs.occasion || 1}</span>
-                  <button onClick={() => removeSessionFromCase(c.id, cs.sessionId)}
-                    style={{ background: "none", border: "none", color: t.tx3, cursor: "pointer", fontSize: 9, padding: 1 }}>✕</button>
-                </div>
-              );
-            })}
+            {/* Single session picker */}
+            <div style={{ marginBottom: 6 }}>
+              <label style={{ fontSize: 9, color: t.tx3, display: "block", marginBottom: 2 }}>Session (image):</label>
+              <div style={{ display: "flex", gap: 3 }}>
+                <select value={c.sessionId || ""} onChange={e => setCaseSession(c.id, e.target.value)}
+                  style={{ flex: 1, padding: "3px 4px", borderRadius: 3, border: `1px solid ${t.bdr}`, background: t.surf, color: t.tx, fontSize: 9 }}>
+                  <option value="">Select session...</option>
+                  {sessions.map(s => (
+                    <option key={s.id} value={s.id}>{s.name || s.label || s.id.slice(0, 8)}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
-            {/* Add session to this case */}
-            {unusedSessions.length > 0 && (
-              <SessionPicker
-                sessions={unusedSessions}
-                operators={operators}
-                occasions={config.protocol?.occasions || 2}
-                onPick={(sessionId, operatorId, occasion) => addSessionToCase(c.id, sessionId, operatorId, occasion)}
-                t={t}
-              />
+            {/* Operator × Trial auto-generated grid */}
+            {c.sessionId && (c.sessions || []).length > 0 && (
+              <div>
+                <div style={{ fontSize: 8, color: t.tx3, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 3 }}>
+                  {operators.length} {agentLabel.toLowerCase()}{operators.length !== 1 ? "s" : ""} × {occasions} trial{occasions !== 1 ? "s" : ""} — {c.sessions.length} entries
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                  {(c.sessions || []).map(cs => {
+                    const op = operators.find(o => o.id === cs.operatorId);
+                    return (
+                      <div key={`${cs.operatorId}-${cs.occasion}`}
+                        style={{ display: "flex", alignItems: "center", gap: 4, padding: "2px 4px", background: t.surf2, borderRadius: 2, fontSize: 9 }}>
+                        <span style={{ color: t.acc, fontWeight: 600, minWidth: 80, fontSize: 8 }}>{op?.name || cs.operatorId}</span>
+                        <span style={{ color: t.tx3 }}>Trial {cs.occasion}:</span>
+                        <span style={{ color: t.tx, fontFamily: "'DM Mono',monospace", flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {ses?.name || ses?.label || cs.sessionId.slice(0, 8)}
+                        </span>
+                        <span style={{ color: t.ok, fontSize: 8 }}>✓ auto</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* No session selected */}
+            {!c.sessionId && sessions.length > 0 && (
+              <div style={{ fontSize: 9, color: t.tx3, fontStyle: "italic" }}>Select a session above to auto-generate operator × trial entries.</div>
+            )}
+            {!c.sessionId && sessions.length === 0 && (
+              <div style={{ fontSize: 9, color: t.tx3, fontStyle: "italic" }}>No sessions available. Import an image first.</div>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Measurement labels */}
@@ -286,53 +384,252 @@ export function ReliabilityConfig({ study, sessions, onUpdateStudy, t, project }
 
       {/* Ready indicator */}
       <div style={{ fontSize: 10, color: t.tx2, textAlign: "center", padding: 6, background: t.surf3, borderRadius: 4 }}>
-        {cases.length === 0 ? "⚠ Add at least one case with mapped sessions" :
+        {cases.length === 0 ? "⚠ Add at least one case with a session assigned" :
+         cases.every(c => !c.sessionId) ? "⚠ Assign a session to each case" :
          operators.length < (config.design === "intra" ? 1 : 2) ? `⚠ Define enough ${agentLabel.toLowerCase()}s for this design` :
-         `✓ ${cases.length} case(s), ${operators.length} ${agentLabel.toLowerCase()}s, ${labelIds.length || "all"} measurement(s)`}
+         `✓ ${cases.length} case(s), ${operators.length} ${agentLabel.toLowerCase()}s × ${occasions} trial(s), ${labelIds.length || "all"} measurement(s)`}
       </div>
+
+      {/* Run Study button */}
+      <button onClick={startWorkflow}
+        disabled={cases.length === 0 || cases.every(c => !c.sessionId) || operators.length === 0}
+        style={{
+          padding: "8px 12px", borderRadius: 6, border: "none", cursor: "pointer",
+          background: t.ok, color: t.bg, fontSize: 12, fontWeight: 700,
+          opacity: cases.length > 0 && cases.some(c => c.sessionId) && operators.length > 0 ? 1 : 0.4,
+        }}>
+        ▶ Run Study
+      </button>
     </div>
   );
 }
 
-// ─── Session Picker (inline dropdown for adding to a case) ──────────────
-function SessionPicker({ sessions, operators, occasions, onPick, t }) {
-  const [sessionId, setSessionId] = useState("");
-  const [operatorId, setOperatorId] = useState(operators[0]?.id || "");
-  const [occasion, setOccasion] = useState(1);
+// ─── Workflow Panel (guided data collection) ─────────────────────────────
+function ReliabilityWorkflow({ study, sessions, onUpdateStudy, onUpdateProject, project, t }) {
+  const config = study.config;
+  const workflow = config.workflow || {};
+  const steps = workflow.steps || [];
+  const occasions = config.protocol?.occasions || 2;
+  const currentStep = workflow.currentStep || 0;
+  const current = steps[currentStep];
+  const total = steps.length;
+  const doneCount = steps.filter(s => s.done).length;
+  const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
 
-  const handleAdd = () => {
-    if (!sessionId || !operatorId) return;
-    onPick(sessionId, operatorId, occasion);
-    setSessionId("");
+  const update = (patch) => {
+    onUpdateStudy({ ...study, config: { ...config, ...patch } });
   };
 
+  const exitWorkflow = () => {
+    update({ workflow: { ...workflow, active: false } });
+  };
+
+  const openSession = () => {
+    if (!current) return;
+    let cloneId = current.cloneSessionId;
+    if (!cloneId) {
+      const baseSession = sessions.find(s => s.id === current.baseSessionId);
+      if (!baseSession) return;
+      const newSession = mkReliabilitySession(baseSession, current.operatorId, current.trialNum);
+      cloneId = newSession.id;
+
+      // Update this step's cloneSessionId
+      const newSteps = steps.map((s, i) =>
+        i === currentStep ? { ...s, cloneSessionId: cloneId } : s
+      );
+
+      // Update the case's session entry to point to the clone (unique sessionId per operator×trial)
+      const updatedCases = config.cases.map(c =>
+        c.id !== current.caseId ? c : {
+          ...c,
+          sessions: (c.sessions || []).map(cs =>
+            cs.operatorId === current.operatorId && cs.occasion === current.trialNum
+              ? { ...cs, sessionId: cloneId }
+              : cs
+          ),
+        }
+      );
+
+      // Single combined project update: add session + update study + navigate
+      const updatedProject = addSession(project, newSession);
+      const updatedStudy = {
+        ...study,
+        config: {
+          ...config,
+          cases: updatedCases,
+          workflow: { ...workflow, steps: newSteps, currentStep },
+        },
+      };
+      onUpdateProject({
+        ...updatedProject,
+        researchStudies: (updatedProject.researchStudies || []).map(s =>
+          s.id === study.id ? updatedStudy : s
+        ),
+      });
+    } else {
+      onUpdateProject({ ...project, activeSessionId: cloneId });
+    }
+  };
+
+  const ensureClone = (step) => {
+    if (step.cloneSessionId) return step;
+    const baseSession = sessions.find(s => s.id === step.baseSessionId);
+    if (!baseSession) return step;
+    const newSession = mkReliabilitySession(baseSession, step.operatorId, step.trialNum);
+    const cloneId = newSession.id;
+    // Update case session entry to point to clone
+    const updatedCases = config.cases.map(c =>
+      c.id !== step.caseId ? c : {
+        ...c,
+        sessions: (c.sessions || []).map(cs =>
+          cs.operatorId === step.operatorId && cs.occasion === step.trialNum
+            ? { ...cs, sessionId: cloneId }
+            : cs
+        ),
+      }
+    );
+    const updatedProject = addSession(project, newSession);
+    onUpdateProject({
+      ...updatedProject,
+      researchStudies: (updatedProject.researchStudies || []).map(s =>
+        s.id === study.id ? {
+          ...study,
+          config: { ...config, cases: updatedCases },
+        } : s
+      ),
+    });
+    return { ...step, cloneSessionId: cloneId };
+  };
+
+  const completeAndNext = () => {
+    if (!current) return;
+    // Auto-create clone if not yet opened (so analysis sees unique sessionIds)
+    const resolved = current.cloneSessionId ? current : ensureClone(current);
+    const newSteps = steps.map((s, i) =>
+      i === currentStep ? { ...resolved, done: true } : s
+    );
+    const nextIdx = currentStep + 1;
+    const complete = nextIdx >= total;
+    const updatedStudy = {
+      ...study,
+      config: {
+        ...config,
+        workflow: { ...workflow, steps: newSteps, currentStep: nextIdx, complete },
+      },
+    };
+    onUpdateStudy(updatedStudy);
+  };
+
+  if (!current && !workflow.complete) {
+    return (
+      <div style={{ fontSize: 10, color: t.tx3, textAlign: "center", padding: 20 }}>No workflow steps available.</div>
+    );
+  }
+
   return (
-    <div style={{ display: "flex", gap: 3, marginTop: 4, alignItems: "center" }}>
-      <select value={sessionId} onChange={e => setSessionId(e.target.value)}
-        style={{ flex: 1, padding: "3px 4px", borderRadius: 3, border: `1px solid ${t.bdr}`, background: t.surf, color: t.tx, fontSize: 9 }}>
-        <option value="">Select session...</option>
-        {sessions.map(s => (
-          <option key={s.id} value={s.id}>{s.name || s.label || s.id.slice(0, 8)}</option>
-        ))}
-      </select>
-      <select value={operatorId} onChange={e => setOperatorId(e.target.value)}
-        style={{ padding: "3px 4px", borderRadius: 3, border: `1px solid ${t.bdr}`, background: t.surf, color: t.tx, fontSize: 9 }}>
-        {operators.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-      </select>
-      <select value={occasion} onChange={e => setOccasion(Number(e.target.value))}
-        style={{ padding: "3px 4px", borderRadius: 3, border: `1px solid ${t.bdr}`, background: t.surf, color: t.tx, fontSize: 9 }}>
-        {Array.from({ length: occasions }, (_, i) => (
-          <option key={i} value={i + 1}>Occ. {i + 1}</option>
-        ))}
-      </select>
-      <button onClick={handleAdd} disabled={!sessionId || !operatorId}
-        style={{
-          padding: "3px 8px", borderRadius: 3, border: "none", cursor: "pointer",
-          background: t.acc, color: t.bg, fontSize: 9, fontWeight: 700,
-          opacity: sessionId && operatorId ? 1 : 0.4,
-        }}>
-        + Add
-      </button>
+    <div style={{ display: "flex", flexDirection: "column", gap: 10, fontSize: 11 }}>
+
+      {/* Header */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: t.tx }}>Study Workflow</span>
+        <button onClick={exitWorkflow}
+          style={{ background: "none", border: "none", color: t.tx3, cursor: "pointer", fontSize: 9, textDecoration: "underline" }}>
+          Exit
+        </button>
+      </div>
+
+      {/* Progress bar */}
+      <div>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: t.tx2, marginBottom: 3 }}>
+          <span>{doneCount}/{total} steps done</span>
+          <span>{pct}%</span>
+        </div>
+        <div style={{ height: 6, background: t.surf3, borderRadius: 3, overflow: "hidden" }}>
+          <div style={{ height: "100%", width: pct + "%", background: t.ok, borderRadius: 3, transition: "width 0.2s" }} />
+        </div>
+      </div>
+
+      {/* Workflow complete */}
+      {workflow.complete && (
+        <div style={{ padding: 12, background: t.ok + "18", borderRadius: 6, border: `1px solid ${t.ok}44`, textAlign: "center" }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: t.ok, marginBottom: 4 }}>✓ All steps complete!</div>
+          <div style={{ fontSize: 10, color: t.tx2 }}>All operators have completed their trials. Ready for analysis.</div>
+        </div>
+      )}
+
+      {/* Current step */}
+      {!workflow.complete && current && (
+        <div style={{ padding: 10, background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>
+          <div style={{ fontSize: 8, color: t.tx3, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 6 }}>
+            Step {currentStep + 1} of {total}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 5, marginBottom: 8 }}>
+            <div style={{ display: "flex", gap: 6, fontSize: 10 }}>
+              <span style={{ color: t.tx3, minWidth: 60 }}>Operator:</span>
+              <span style={{ color: t.acc, fontWeight: 700 }}>{current.operatorName}</span>
+            </div>
+            <div style={{ display: "flex", gap: 6, fontSize: 10 }}>
+              <span style={{ color: t.tx3, minWidth: 60 }}>Trial:</span>
+              <span style={{ color: t.tx, fontWeight: 600 }}>{current.trialNum} of {occasions}</span>
+            </div>
+            <div style={{ display: "flex", gap: 6, fontSize: 10 }}>
+              <span style={{ color: t.tx3, minWidth: 60 }}>Case:</span>
+              <span style={{ color: t.tx, fontWeight: 600 }}>{current.caseName}</span>
+            </div>
+            <div style={{ display: "flex", gap: 6, fontSize: 10 }}>
+              <span style={{ color: t.tx3, minWidth: 60 }}>Session:</span>
+              <span style={{ color: t.tx2, fontFamily: "'DM Mono',monospace" }}>{current.baseSessionName}</span>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div style={{ display: "flex", gap: 4 }}>
+            <button onClick={openSession}
+              style={{
+                flex: 1, padding: "6px 8px", borderRadius: 4, border: "none", cursor: "pointer",
+                background: t.acc, color: t.bg, fontSize: 10, fontWeight: 700,
+              }}>
+              {current.cloneSessionId ? "Open Session" : "▶ Open & Create"}
+            </button>
+            <button onClick={completeAndNext}
+              style={{
+                flex: 1, padding: "6px 8px", borderRadius: 4, border: `1px solid ${t.ok}`, cursor: "pointer",
+                background: t.ok + "18", color: t.ok, fontSize: 10, fontWeight: 700,
+              }}>
+              {currentStep + 1 >= total ? "Finish ✓" : "Complete & Next →"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Operator progress summary */}
+      <div>
+        <div style={{ fontSize: 8, color: t.tx3, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 4 }}>Operator Progress</div>
+        {(() => {
+          const opSteps = {};
+          for (const s of steps) {
+            if (!opSteps[s.operatorName]) opSteps[s.operatorName] = { total: 0, done: 0 };
+            opSteps[s.operatorName].total++;
+            if (s.done) opSteps[s.operatorName].done++;
+          }
+          return Object.entries(opSteps).map(([name, stats]) => (
+            <div key={name} style={{ display: "flex", alignItems: "center", gap: 6, padding: "3px 4px", marginBottom: 2, background: t.surf2, borderRadius: 3, fontSize: 9 }}>
+              <span style={{ color: t.acc, fontWeight: 600, minWidth: 80 }}>{name}</span>
+              <div style={{ flex: 1, height: 4, background: t.surf3, borderRadius: 2, overflow: "hidden" }}>
+                <div style={{ height: "100%", width: (stats.done / stats.total * 100) + "%", background: stats.done === stats.total ? t.ok : t.acc2, borderRadius: 2 }} />
+              </div>
+              <span style={{ color: t.tx2 }}>{stats.done}/{stats.total}</span>
+              {stats.done === stats.total && <span style={{ color: t.ok }}>✓</span>}
+            </div>
+          ));
+        })()}
+      </div>
+
+      {workflow.complete && (
+        <div style={{ fontSize: 9, color: t.tx3, textAlign: "center", padding: 4 }}>
+          All data collected. Run analysis below.
+        </div>
+      )}
     </div>
   );
 }

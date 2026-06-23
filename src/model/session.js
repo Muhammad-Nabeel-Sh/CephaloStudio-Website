@@ -35,6 +35,25 @@ export function updateSession(session, patch) {
   return { ...session, ...patch, meta: { ...session.meta, ...(patch.meta || {}) } };
 }
 
+export function mkReliabilitySession(baseSession, operatorId, trialNumber) {
+  const s = mkSession({
+    name: (baseSession.name || "Untitled") + " (Reliability)",
+    images: baseSession.images || [],
+    calibration: baseSession.calibration,
+    subjectId: baseSession.subjectId,
+    processing: baseSession.processing,
+    analysisTemplate: baseSession.analysisTemplate,
+    markups: [],
+    meta: {
+      ...baseSession.meta,
+      operatorId: operatorId || "",
+      trialNumber: trialNumber ?? null,
+      tags: [...(baseSession.meta?.tags || []), "reliability"],
+    },
+  });
+  return s;
+}
+
 export function duplicateSession(session) {
   return mkSession({
     ...session,

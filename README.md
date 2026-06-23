@@ -1,6 +1,6 @@
 # Cephalometry Studio
 
-A web-based cephalometric analysis application for orthodontics and maxillofacial surgery. Built with React 19, Vite 8, and Canvas 2D. Supports image markup, calibration, formula computation, template library, batch import, and four research analysis modules (reliability, descriptive/normative, comparative, longitudinal).
+A web-based cephalometric analysis application for orthodontics and maxillofacial surgery. Built with React 19, Vite 8, and Canvas 2D. Supports image markup, calibration, formula computation, template library, batch import, session metadata management, and four research analysis modules (reliability with guided workflow, descriptive/normative, comparative, longitudinal).
 
 ---
 
@@ -33,17 +33,26 @@ A web-based cephalometric analysis application for orthodontics and maxillofacia
 ├── Data/                       # CSV reference data
 ├── src/
 │   ├── main.jsx
-│   ├── App.jsx                 # Root component (~1360 lines)
+│   ├── App.jsx                 # Root component (~1380 lines)
 │   ├── constants.js            # Themes, tools, predefined analyses, LUT presets
 │   ├── utils.js                # Math, geometry, statistics (798 lines, 60+ exports)
 │   ├── markups.jsx             # Markup data models, hit-testing, template parsing
 │   ├── panels.jsx              # Side panels
-│   ├── ui.jsx                  # UI primitives (Btn, Tag, etc.)
+│   ├── ui.jsx                  # UI primitives (Btn, Tag, InfoBox, etc.)
 │   ├── FormulasModule.jsx      # Formula editor, KaTeX rendering
 │   ├── imageUtils.jsx          # Image processing (brightness, contrast, LUT)
 │   ├── hooks.jsx               # Custom hooks
-│   ├── session.js              # Sessions data model
-│   ├── project.js              # Project model with session management
+│   ├── model/
+│   │   ├── session.js          # Session data model (mkSession, duplicateSession, mkReliabilitySession)
+│   │   ├── project.js          # Project model with session CRUD, subject CRUD, group/timepoint/operator lists
+│   │   └── ...
+│   ├── storage/
+│   │   └── imageStore.js       # IndexedDB wrapper for image blob storage
+│   ├── panels/
+│   │   ├── SessionsPanel.jsx   # Session cards, subjects tab, metadata modal trigger
+│   │   ├── SessionMetadataModal.jsx  # Spreadsheet-style metadata editor with batch ops, filename parser
+│   │   ├── BatchImportModal.jsx
+│   │   └── SessionFilmstrip.jsx
 │   ├── research/
 │   │   ├── studyModel.js       # Study configuration model
 │   │   ├── engine.js           # Research engine orchestrator
@@ -53,10 +62,17 @@ A web-based cephalometric analysis application for orthodontics and maxillofacia
 │   │   ├── longitudinal.js     # RM-ANOVA, LMM, sphericity, change scores
 │   │   ├── correlation.js      # Correlation analysis
 │   │   ├── diagnostic.js       # Diagnostic performance metrics
+│   │   ├── ReliabilityPanel.jsx # Config + results UI + guided data collection workflow
+│   │   ├── DescriptivePanel.jsx
+│   │   ├── ComparativePanel.jsx
+│   │   ├── LongitudinalPanel.jsx
+│   │   ├── CorrelationPanel.jsx
+│   │   ├── DiagnosticPanel.jsx
+│   │   ├── ResearchPanel.jsx   # Study list, type selector, per-study config/run/results
+│   │   ├── ResultsDialog.jsx   # Floating modal with Tables/Charts tabs
 │   │   ├── moduleCharts.jsx    # Chart rendering (ICC forest, Bland-Altman, etc.)
 │   │   ├── moduleChartsUtils.jsx
-│   │   ├── resultsExport.js
-│   │   └── *Panel.jsx          # Config + results UI for each module
+│   │   └── resultsExport.js
 │   └── test/
 │       ├── setup.js
 │       ├── utils.test.js       # 88 tests: geometry, statistics, formulas, ICC
@@ -237,11 +253,30 @@ Each analysis has `{ name, pts: [{ l, def, color }] }` and optional lines. Templ
 
 ---
 
-## 10. Research Modules
+## 10. Session Metadata Management
 
-Four integrated research modules accessed via the Research Panel. Each follows a config → run → results pattern with a shared `ResultsDialog` for tables and charts.
+Managed via the **Session Metadata Modal** (spreadsheet-style table):
 
-### Reliability Module (`reliability.js`)
+| Feature | Description |
+|---------|-------------|
+| Field columns | Subject, Group, Timepoint, Patient ID, Operator |
+| Dropdowns | Populated from project-level managed lists; "Custom..." for ad-hoc values |
+| Batch assign | Select multiple rows (shift-click) → batch action bar applies subject/group/timepoint/operator/patientId |
+| Filename parser | Auto-detect delimiters in filenames like `{patient}_{group}_{timepoint}.jpg` with preset patterns |
+| Preset buttons | Groups (Treatment/Control/A/B), Timepoints (T0–T5/Baseline/6mo), Operators (Rater 1/2, Reader A/B), Subjects |
+| Quick-status | Visual tags per session indicating calibration state, markup count |
+
+Managed value lists stored on the project: `project.groups`, `project.timepoints`, `project.operators`. Study panels consume these via "From Managed" buttons.
+
+---
+
+## 11. Research Modules
+
+Four integrated research modules accessed via the Research Panel. Each follows a config → run → results pattern with a shared `ResultsDialog` for tables and charts. All modules support "From Managed" buttons to consume project-level groups/timepoints/operators.
+
+### Reliability Module (`ReliabilityPanel.jsx` + `reliability.js`)
+
+Guided multi-operator data collection workflow:
 
 | Feature | Description |
 |---------|-------------|
@@ -249,7 +284,14 @@ Four integrated research modules accessed via the Research Panel. Each follows a
 | Bland-Altman | Mean bias, LoA, proportional bias regression, CI for limits |
 | Dahlberg / SEM / MDC | Random error, standard error of measurement, minimal detectable change |
 | Landmark Error Map | Per-landmark centroid, radial error, 95% confidence ellipse from 2×2 eigendecomposition |
-| Designs | Intra-operator, inter-operator, multiple raters |
+| Designs | Intra-operator, inter-operator, method comparison |
+| Guided workflow | ▶ Run Study → sequential operator→trial→case steps with progress tracking |
+| Clone sessions | Each operator×trial gets a clean session copy (same image, independent markups) |
+| Auto-navigate | "Open & Create" creates clone session and navigates to it in the workspace |
+| Occasion options | 1–3 trials per operator (single trial for inter-operator) |
+| Operator progress | Per-operator bar with done/total counts |
+
+**Workflow flow**: Configure operators/occasions/cases → click "Run Study" → for each step (Operator A / Trial 1 / Case 1, etc.), click "Open & Create" → place markups on clean canvas → "Complete & Next" → auto-advances. After all steps, run analysis for ICC/Bland-Altman/SEM.
 
 ### Descriptive / Normative Module (`descriptive.js`)
 
@@ -287,7 +329,7 @@ Four integrated research modules accessed via the Research Panel. Each follows a
 
 ---
 
-## 11. Sessions & Templates
+## 12. Sessions & Templates
 
 ### Sessions Model
 
@@ -306,13 +348,13 @@ Multi-image import with optional CSV sidecar parsing for batch data ingestion.
 
 ---
 
-## 12. Sessions Filmstrip
+## 13. Sessions Filmstrip
 
 Floating bottom-center horizontal thumbnail bar showing all sessions. Supports quick navigation, add/delete, and visual indicators for calibrated vs. uncalibrated sessions.
 
 ---
 
-## 13. Testing & CI
+## 14. Testing & CI
 
 ### Test Suite (103 tests, 6 files)
 
@@ -337,7 +379,7 @@ npm run test:coverage   # Generates text + lcov + html reports
 
 ---
 
-## 14. Statistical Engine (src/utils.js)
+## 15. Statistical Engine (src/utils.js)
 
 ### Descriptive Statistics
 
@@ -387,7 +429,7 @@ npm run test:coverage   # Generates text + lcov + html reports
 
 ---
 
-## 15. Geometry & Canvas Utilities
+## 16. Geometry & Canvas Utilities
 
 | Function | Description |
 |----------|-------------|
@@ -410,7 +452,7 @@ npm run test:coverage   # Generates text + lcov + html reports
 
 ---
 
-## 16. Theme System
+## 17. Theme System
 
 Six themes defined in `THEMES`:
 
@@ -427,7 +469,7 @@ Theme objects provide consistent color keys: `bg`, `surf`, `surf2`, `surf3`, `bd
 
 ---
 
-## 17. Keyboard Shortcuts
+## 18. Keyboard Shortcuts
 
 | Key | Tool |
 |-----|------|
@@ -449,19 +491,19 @@ Theme objects provide consistent color keys: `bg`, `surf`, `surf2`, `surf3`, `bd
 
 ---
 
-## 18. Auto-Save System
+## 19. Auto-Save System (Hybrid)
 
-- **Storage**: `localStorage`, key `"cephalo-autosave"`
-- **Data**: `{ projects, activeId, savedAt }` — entire project state serialized
-- **Trigger**: Debounced `useEffect` (500ms) on any `projects` or `activeId` change
-- **Restore**: On app load, projects initialized from localStorage if available
-- **Clear**: On `.cephx` export, `localStorage.removeItem("cephalo-autosave")`
+- **Metadata**: `localStorage`, key `"cephalo-autosave"` — project JSON (sessions, markups, configs)
+- **Images**: IndexedDB (`CephaloStudioDB`) — image Blobs keyed by image ID, bypassing 5MB localStorage limit
+- **Trigger**: Debounced `useEffect` (500ms) on any project state change
+- **Restore**: On app load, metadata from localStorage, images loaded lazily from IDB
+- **Clear**: On `.cephx` export, `localStorage.removeItem("cephalo-autosave")` + IDB clear
 - **Banner**: "Auto-saved session recovered" on first load after restore
 - **Indicator**: Timestamp display next to Save button, polled every 3s
 
 ---
 
-## 19. LUT Presets
+## 20. LUT Presets
 
 | ID | Name | Color Stops |
 |----|------|-------------|
@@ -475,7 +517,7 @@ Theme objects provide consistent color keys: `bg`, `surf`, `surf2`, `surf3`, `bd
 
 ---
 
-## 20. Build Output
+## 21. Build Output
 
 ```
 dist/
@@ -490,7 +532,7 @@ Chart rendering uses Plotly.js loaded as a dynamic import (not in main bundle).
 
 ---
 
-## 21. Limitations & Known Constraints
+## 22. Limitations & Known Constraints
 
 - No TypeScript — all values implicitly typed
 - Undo/redo is in-memory only (not persisted across sessions)

@@ -151,7 +151,7 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
                   <div onClick={e => e.stopPropagation()} style={{ marginTop: 8, paddingTop: 8, borderTop: `1px solid ${t.bdr}44` }}>
                     {/* Config — always editable */}
                     {s.type === "reliability" && (
-                      <ReliabilityConfig study={s} sessions={sessions} onUpdateStudy={handleUpdateStudy} t={t} project={project} />
+                      <ReliabilityConfig study={s} sessions={sessions} onUpdateStudy={handleUpdateStudy} onUpdateProject={onUpdateProject} t={t} project={project} />
                     )}
 
                     {s.type === "descriptive" && (

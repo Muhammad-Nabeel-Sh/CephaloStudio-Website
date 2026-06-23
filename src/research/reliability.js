@@ -260,6 +260,7 @@ export function runReliabilityAll(sessions, config, calibration) {
   }
 
   // Build session → { caseId, caseName, operatorId, occasion } lookup
+  // Each sessionId maps to ONE entry (last write wins if duplicates exist)
   const sessionMap = {};
   for (const c of cases) {
     for (const cs of (c.sessions || [])) {
