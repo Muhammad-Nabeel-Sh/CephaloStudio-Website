@@ -35,7 +35,7 @@ function readCoords(tokens, i, count) {
   return { pts, next: idx };
 }
 
-function sampleCubic(p0, p1, p2, p3, numSamples = 6) {
+function sampleCubic(p0, p1, p2, p3, numSamples = 1) {
   const pts = [];
   for (let i = 0; i <= numSamples; i++) {
     const t = i / numSamples;
@@ -113,7 +113,7 @@ function parsePath(d) {
           const c2 = cmd === "C" ? r2 : { x: cx + r2.x, y: cy + r2.y };
           const end = cmd === "C" ? r3 : { x: cx + r3.x, y: cy + r3.y };
           const p0 = { x: cx, y: cy };
-          const samples = sampleCubic(p0, c1, c2, end, 6);
+          const samples = sampleCubic(p0, c1, c2, end, 1);
           for (let s = 1; s < samples.length; s++) currentPoints.push(samples[s]);
           cx = end.x; cy = end.y;
           prevCtrl2 = c2;
@@ -133,7 +133,7 @@ function parsePath(d) {
             ? { x: 2 * cx - prevCtrl2.x, y: 2 * cy - prevCtrl2.y }
             : { x: cx, y: cy };
           const p0 = { x: cx, y: cy };
-          const samples = sampleCubic(p0, c1, c2, end, 6);
+          const samples = sampleCubic(p0, c1, c2, end, 1);
           for (let s = 1; s < samples.length; s++) currentPoints.push(samples[s]);
           cx = end.x; cy = end.y;
           prevCtrl2 = c2;
@@ -247,6 +247,33 @@ function dedupe(pts) {
   return out;
 }
 
+// ── Ramer-Douglas-Peucker line simplification ──────────────────────────────
+function perpendicularDist(point, start, end) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len === 0) return Math.hypot(point.x - start.x, point.y - start.y);
+  return Math.abs(dy * point.x - dx * point.y + end.x * start.y - end.y * start.x) / len;
+}
+
+function simplifyRDP(points, epsilon) {
+  if (points.length <= 2) return points;
+  let maxDist = 0;
+  let maxIdx = 0;
+  const first = points[0];
+  const last = points[points.length - 1];
+  for (let i = 1; i < points.length - 1; i++) {
+    const d = perpendicularDist(points[i], first, last);
+    if (d > maxDist) { maxDist = d; maxIdx = i; }
+  }
+  if (maxDist > epsilon) {
+    const left = simplifyRDP(points.slice(0, maxIdx + 1), epsilon);
+    const right = simplifyRDP(points.slice(maxIdx), epsilon);
+    return [...left.slice(0, -1), ...right];
+  }
+  return [first, last];
+}
+
 function processSVG(filePath) {
   const input = fs.readFileSync(filePath, "utf-8");
 
@@ -273,8 +300,8 @@ function processSVG(filePath) {
 
   const filtered = [];
   for (let i = 0; i < norm.length; i++) {
-    norm[i] = dedupe(norm[i]);
-    if (norm[i].length >= 4) filtered.push(norm[i]);
+    const pts = dedupe(norm[i]);
+    if (pts.length >= 4) filtered.push(pts);
   }
 
   return filtered;
@@ -297,22 +324,25 @@ function formatPathsJS(normalised) {
 
 // ── File mapping: filename → silhouette definition ──────────────────────────
 const FILE_MAP = {
-  "CV2.svg":                      { key: "cv2",                   name: "CV2 (Axis)",                    category: "Spine",        color: "#60a5fa" },
-  "CV3.svg":                      { key: "cv3",                   name: "CV3",                           category: "Spine",        color: "#60a5fa" },
-  "CV4.svg":                      { key: "cv4",                   name: "CV4",                           category: "Spine",        color: "#60a5fa" },
+  "Atlas C1.svg":                 { key: "atlasC1",               name: "Atlas C1",                     category: "Spine",        color: "#60a5fa" },
+  "C2.svg":                       { key: "c2",                    name: "C2 (Axis)",                    category: "Spine",        color: "#60a5fa" },
+  "C3.svg":                       { key: "c3",                    name: "C3",                           category: "Spine",        color: "#60a5fa" },
+  "C4.svg":                       { key: "c4",                    name: "C4",                           category: "Spine",        color: "#60a5fa" },
   "External Auditory Meatus.svg": { key: "externalAuditoryMeatus", name: "External Auditory Meatus",     category: "Craniofacial", color: "#f59e0b" },
   "Frontal and Nasal Bones.svg":  { key: "frontalAndNasalBones",  name: "Frontal and Nasal Bones",       category: "Craniofacial", color: "#f59e0b" },
   "Frontal Sinus.svg":            { key: "frontalSinus",          name: "Frontal Sinus",                 category: "Craniofacial", color: "#f59e0b" },
   "Hyoid Bone.svg":               { key: "hyoidBone",             name: "Hyoid Bone",                    category: "Soft Tissue",  color: "#fb923c" },
   "Inner Mandibular Border.svg":  { key: "innerMandibularBorder", name: "Inner Mandibular Border",       category: "Mandible",     color: "#a78bfa" },
-  "Mandibular Central Incisor.svg": { key: "mandibularCentralIncisor", name: "Mandibular Central Incisor", category: "Teeth",    color: "#f472b6" },
-  "Mandibular First Molar.svg":   { key: "mandibularFirstMolar",  name: "Mandibular First Molar",        category: "Teeth",        color: "#f472b6" },
-  "Mandibular Outline.svg":       { key: "mandibularOutline",     name: "Mandibular Outline",            category: "Mandible",     color: "#a78bfa" },
+  "Key Ridge.svg":                { key: "keyRidge",              name: "Key Ridge",                     category: "Craniofacial", color: "#f59e0b" },
+  "Mandibular Central.svg":       { key: "mandibularCentral",     name: "Mandibular Central",            category: "Teeth",        color: "#f472b6" },
+  "Mandibular Molar.svg":         { key: "mandibularMolar",       name: "Mandibular Molar",              category: "Teeth",        color: "#f472b6" },
+  "Mandibular Border.svg":        { key: "mandibularBorder",      name: "Mandibular Border",             category: "Mandible",     color: "#a78bfa" },
   "Maxillary Bone.svg":           { key: "maxillaryBone",         name: "Maxillary Bone",                category: "Craniofacial", color: "#f59e0b" },
-  "Maxillary Central Incisor.svg": { key: "maxillaryCentralIncisor", name: "Maxillary Central Incisor", category: "Teeth",       color: "#4ade80" },
-  "Maxillary First Molar.svg":    { key: "maxillaryFirstMolar",   name: "Maxillary First Molar",         category: "Teeth",        color: "#4ade80" },
+  "Maxillary Central.svg":        { key: "maxillaryCentral",      name: "Maxillary Central",             category: "Teeth",        color: "#4ade80" },
+  "Maxillary Molar.svg":          { key: "maxillaryMolar",        name: "Maxillary Molar",               category: "Teeth",        color: "#4ade80" },
+  "Occipital bone.svg":           { key: "occipitalBone",         name: "Occipital Bone",                category: "Craniofacial", color: "#f59e0b" },
   "Orbital Rim.svg":              { key: "orbitalRim",            name: "Orbital Rim",                   category: "Craniofacial", color: "#f59e0b" },
-  "Pterygomaxillary Fissure.svg": { key: "pterygomaxillaryFissure", name: "Pterygomaxillary Fissure",    category: "Craniofacial", color: "#38bdf8" },
+  "Pterygomaxillary Suture.svg":  { key: "pterygomaxillarySuture", name: "Pterygomaxillary Suture",      category: "Craniofacial", color: "#38bdf8" },
   "Soft Tissue Profile.svg":      { key: "softTissueProfile",     name: "Soft Tissue Profile",           category: "Craniofacial", color: "#f59e0b" },
 };
 

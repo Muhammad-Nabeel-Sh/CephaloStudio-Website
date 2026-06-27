@@ -1,9 +1,18 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg width="100%" height="100%" viewBox="0 0 50 50" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linecap:round;stroke-linejoin:round;">
-    <g transform="matrix(1,0,0,1,-199.81727,-678.825491)">
-        <g transform="matrix(5.669291,0,0,5.669291,0,0)">
-            <path id="External-Auditory-Meatus" serif:id="External Auditory Meatus" d="M37.355,121.13C36.755,121.642 36.27,122.237 35.994,122.976C35.719,123.715 35.653,124.597 35.895,125.424C36.138,126.25 36.689,127.022 37.439,127.463C38.188,127.904 39.136,128.014 39.963,127.915C40.79,127.816 41.495,127.507 42.058,127.088C42.62,126.669 43.039,126.14 43.237,125.523C43.436,124.905 43.414,124.2 43.323,123.602C43.232,123.004 43.072,122.513 42.78,122.036C42.488,121.559 42.063,121.096 41.476,120.718C40.889,120.34 40.445,120.167 39.413,120.264C38.381,120.361 37.955,120.617 37.355,121.13Z" style="fill:none;fill-rule:nonzero;stroke:black;stroke-width:1px;"/>
-        </g>
-    </g>
-</svg>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="8.1784143mm"
+   height="8.4868593mm"
+   viewBox="0 0 8.1784143 8.4868593"
+   version="1.1"
+   id="svg1"
+   xml:space="preserve"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"><defs
+     id="defs1" /><g
+     id="layer1"
+     transform="translate(-35.452877,-119.70748)"><path
+       style="opacity:1;fill:none;fill-opacity:1;stroke:#000000;stroke-width:1;stroke-linecap:round;stroke-linejoin:round;paint-order:stroke fill markers"
+       d="m 36.95713,121.22543 c -0.531348,0.58693 -0.905572,1.51443 -0.984282,2.3897 -0.07871,0.87526 0.08913,1.87252 0.525865,2.57385 0.436736,0.70133 1.183488,1.25815 2.035367,1.42878 0.85188,0.17063 1.900717,0.043 2.733963,-0.35358 0.833245,-0.39655 1.573824,-1.20713 1.779018,-2.1009 0.205193,-0.89377 -0.01419,-2.0968 -0.412133,-2.90731 -0.397941,-0.8105 -1.032396,-1.35473 -1.658499,-1.66311 -0.626103,-0.30838 -1.349951,-0.44793 -2.060904,-0.35855 -0.710954,0.0894 -1.427047,0.4042 -1.958395,0.99112 z"
+       id="path13" /></g></svg>
