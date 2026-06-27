@@ -608,6 +608,10 @@ function drawSilhouette(ctx, m, isSel, t, zoom, pan, showAnnotations, annotation
     const strokeColor = m.color || defColor;
     const lineWidth = (m.width || 1.5) * Math.sqrt(zoom);
 
+    if (m.style === "dashed") ctx.setLineDash([8 * zoom, 4 * zoom]);
+    else if (m.style === "dotted") ctx.setLineDash([2 * zoom, 4 * zoom]);
+    else ctx.setLineDash([]);
+
     if (path.closed) {
       ctx.beginPath();
       if (sp.length >= 3) catmullRom(ctx, sp, true);
@@ -632,6 +636,7 @@ function drawSilhouette(ctx, m, isSel, t, zoom, pan, showAnnotations, annotation
       ctx.lineWidth = lineWidth;
       ctx.stroke();
     }
+    ctx.setLineDash([]);
   });
 
   if (isSel && minX < Infinity) {

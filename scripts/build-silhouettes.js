@@ -247,32 +247,6 @@ function dedupe(pts) {
   return out;
 }
 
-// ── Ramer-Douglas-Peucker line simplification ──────────────────────────────
-function perpendicularDist(point, start, end) {
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  const len = Math.sqrt(dx * dx + dy * dy);
-  if (len === 0) return Math.hypot(point.x - start.x, point.y - start.y);
-  return Math.abs(dy * point.x - dx * point.y + end.x * start.y - end.y * start.x) / len;
-}
-
-function simplifyRDP(points, epsilon) {
-  if (points.length <= 2) return points;
-  let maxDist = 0;
-  let maxIdx = 0;
-  const first = points[0];
-  const last = points[points.length - 1];
-  for (let i = 1; i < points.length - 1; i++) {
-    const d = perpendicularDist(points[i], first, last);
-    if (d > maxDist) { maxDist = d; maxIdx = i; }
-  }
-  if (maxDist > epsilon) {
-    const left = simplifyRDP(points.slice(0, maxIdx + 1), epsilon);
-    const right = simplifyRDP(points.slice(maxIdx), epsilon);
-    return [...left.slice(0, -1), ...right];
-  }
-  return [first, last];
-}
 
 function processSVG(filePath) {
   const input = fs.readFileSync(filePath, "utf-8");
@@ -322,6 +296,37 @@ function formatPathsJS(normalised) {
   return out;
 }
 
+function processMultiPathSVG(filePath) {
+  const input = fs.readFileSync(filePath, "utf-8");
+
+  let tx = 0, ty = 0;
+  const tMatch = input.match(/<g[^>]*\stransform="translate\(([^,]+),([^)]+)\)"/);
+  if (tMatch) {
+    tx = parseFloat(tMatch[1]) || 0;
+    ty = parseFloat(tMatch[2]) || 0;
+  }
+
+  const pathRegex = /<path[^>]*\sd="([^"]+)"/g;
+  let match;
+  const allRaw = [];
+  while ((match = pathRegex.exec(input)) !== null) {
+    const d = match[1];
+    const raw = parsePath(d);
+    allRaw.push(...raw);
+  }
+
+  if (allRaw.length === 0) return null;
+
+  const filtered = [];
+  const norm = normalise(allRaw, -tx, -ty);
+  for (let i = 0; i < norm.length; i++) {
+    const pts = dedupe(norm[i]);
+    if (pts.length >= 4) filtered.push(pts);
+  }
+
+  return filtered;
+}
+
 // ── File mapping: filename → silhouette definition ──────────────────────────
 const FILE_MAP = {
   "Atlas C1.svg":                 { key: "atlasC1",               name: "Atlas C1",                     category: "Spine",        color: "#60a5fa" },
@@ -344,6 +349,7 @@ const FILE_MAP = {
   "Orbital Rim.svg":              { key: "orbitalRim",            name: "Orbital Rim",                   category: "Craniofacial", color: "#f59e0b" },
   "Pterygomaxillary Suture.svg":  { key: "pterygomaxillarySuture", name: "Pterygomaxillary Suture",      category: "Craniofacial", color: "#38bdf8" },
   "Soft Tissue Profile.svg":      { key: "softTissueProfile",     name: "Soft Tissue Profile",           category: "Craniofacial", color: "#f59e0b" },
+  "Full Tracing.svg":             { key: "fullTracing",            name: "Full Tracing",                  category: "Composite",    color: "#60a5fa", multiPath: true, onInsertFit: true },
 };
 
 // ── Main ───────────────────────────────────────────────────────────────────
@@ -359,7 +365,7 @@ function main() {
       continue;
     }
 
-    const paths = processSVG(filePath);
+    const paths = def.multiPath ? processMultiPathSVG(filePath) : processSVG(filePath);
     if (!paths || paths.length === 0) {
       console.error(`Warning: ${filename} produced no valid paths, skipping`);
       continue;
@@ -436,6 +442,7 @@ export const SILHOUETTES = {
     output += `    name: "${e.name}",\n`;
     output += `    category: "${e.category}",\n`;
     output += `    color: "${e.color}",\n`;
+    if (e.onInsertFit) output += `    onInsertFit: true,\n`;
     output += `    ${pathsJS}`;
     output += `  }${ei < entries.length - 1 ? "," : ""}\n\n`;
   }
@@ -450,6 +457,7 @@ export const SILHOUETTES = {
     "Teeth": "#4ade80",
     "Soft Tissue": "#fb923c",
     "Spine": "#60a5fa",
+    "Composite": "#60a5fa",
   };
 
   output += `// ─────────────────────────────────────────────────────────────────────────────\n`;

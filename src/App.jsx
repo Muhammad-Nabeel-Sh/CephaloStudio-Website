@@ -839,7 +839,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
                   if (d < bestDist) { bestDist = d; bestPathIdx = pi; bestPtIdx = ptI; }
                 });
               });
-              if (bestDist < ptThr) {
+              if (bestDist < ptThr && !e.ctrlKey && !e.shiftKey) {
                 isDragging.current = true;
                 dragMid.current = hit;
                 dragStartState.current = JSON.stringify(markups);
@@ -1423,11 +1423,12 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
                       if (!def) return;
                       const cw = canvasSize.current?.w || 800, ch = canvasSize.current?.h || 600;
                       const center = toImage(cw / 2, ch / 2);
+                      const scale = def.onInsertFit ? Math.min(cw, ch) / 100 : 1;
                       addMarkup({
                         type: "silhouette",
                         silhouetteType,
                         position: center,
-                        scale: 1,
+                        scale,
                         rotation: 0,
                         color: def.color,
                         fillColor: def.color + "22",

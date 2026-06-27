@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { create, all } from "mathjs";
+import { SILHOUETTES } from "./silhouettes.js";
 
 const math = create(all, { number: "number", precision: 14 });
 math.import({
@@ -111,6 +112,36 @@ export function computeMeasurements(m, cal) {
   if (m.type === "difference" && m.computedValue !== undefined) { meas.value = m.computedValue; }
   if (m.type === "percentage" && m.computedValue !== undefined) { meas.value = m.computedValue; }
   if (m.type === "projDist" && vp.length >= 4) { meas.projectedDistance = projectedDistance(vp[0], vp[1], vp[2], vp[3]) / ppm; }
+  if (m.type === "silhouette") {
+    const paths = (m.paths || SILHOUETTES?.[m.silhouetteType]?.paths);
+    if (paths && paths.length > 0) {
+      const rot = m.rotation || 0;
+      const sc = m.scale || 1;
+      const pos = m.position || { x: 0, y: 0 };
+      const cosR = Math.cos(rot);
+      const sinR = Math.sin(rot);
+      let totalPerimeter = 0;
+      let totalArea = 0;
+      for (const path of paths) {
+        if (path.points.length < 2) continue;
+        const transformed = path.points.map(p => {
+          const sx = p.x * sc * 100;
+          const sy = p.y * sc * 100;
+          return {
+            x: sx * cosR - sy * sinR + pos.x,
+            y: sx * sinR + sy * cosR + pos.y,
+          };
+        });
+        let perim = 0;
+        for (let i = 1; i < transformed.length; i++) perim += dist(transformed[i - 1], transformed[i]);
+        if (path.closed && transformed.length > 2) perim += dist(transformed[transformed.length - 1], transformed[0]);
+        totalPerimeter += perim;
+        if (path.closed && transformed.length >= 3) totalArea += polyArea(transformed);
+      }
+      if (totalPerimeter > 0) meas.perimeter = totalPerimeter / ppm;
+      if (totalArea > 0) meas.area = totalArea / (ppm * ppm);
+    }
+  }
   return meas;
 }
 
