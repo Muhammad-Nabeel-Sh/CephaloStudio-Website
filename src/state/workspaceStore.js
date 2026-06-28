@@ -39,6 +39,8 @@ export const INITIAL_UI = {
   rightPanelWidth: 440,
   rightPanelResizing: false,
   spotlightMode: false,
+  selectedIds: [],
+  boxSelectRect: null,
   showDisplacement: false,
   compareSessionId: null,
   displacementOverlay: false,

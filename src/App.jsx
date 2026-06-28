@@ -154,9 +154,9 @@ function exportTemplateAsCepht(project,name,includeCoord){
   const session=project.sessions?.find(s=>s.id===project.activeSessionId)||project.sessions?.[0];
   const allMarkups=session?.markups||[];
   const markupsToExport=allMarkups.map(m=>{
-    const base={type:m.type,label:m.label,definition:m.definition,color:m.color,visible:m.visible};
-    if(includeCoord&&m.points)return{...base,points:m.points,placed:m.placed!==false};
-    return base;
+    if(includeCoord)return{...m,placed:m.placed!==false};
+    const{points:_pts,placed:_p,...rest}=m;
+    return rest;
   });
   const template={name,projection:project.projection,markups:markupsToExport,formulas:session?.formulas||[],norms:session?.norms||[]};
   exportCepht(template,includeCoord?"2.0":"1.0");
@@ -354,7 +354,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const{ui,dispatch,setSelectedId,setActiveTool,setRightPanel,
     setPlacingQueue,setShowMobilePanel,
     setShowLUT,setShowScaleBar,setShowHistogram,setShowDisplacement,setDisplacementOverlay,setRefLandmark1,setRefLandmark2,setOverlayBlend}=useWorkspaceStore();
-  const{zoom,pan,mousePos,snapPos,selectedId,replacingId,currentDraw,
+  const{zoom,pan,mousePos,snapPos,selectedId,selectedIds,boxSelectRect,replacingId,currentDraw,
     activeTool,snapEnabled,showScaleBar,showDefTooltips,
     showLUT,showHistogram,showAnnotations,annotationSize,showDisplacement,rightPanel,showCalib,pendingRuler,
     showExport,showAnon,showNormogram,
@@ -437,6 +437,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const isPanning=useRef(false);const panStart=useRef(null);
   const isDragging=useRef(false);const dragStart=useRef(null);const dragStartState=useRef(null);
   const dragMid=useRef(null);const dragPtIdx=useRef(null);
+  const multiDragIdsRef=useRef(null);
   const silhouetteAction=useRef(null);const hoveredPtRef=useRef(null);
   const canvasSize=useRef({w:800,h:600});const lastTouchDist=useRef(null);
   const undoStackRef=useRef([]);
@@ -691,6 +692,53 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     }
     if(currentDraw)drawInProgress(ctx,currentDraw,mousePos,zoom,pan,t);
     if(snapEnabled&&snapPos)drawSnapIndicator(ctx,snapPos,zoom,pan);
+    if(boxSelectRect){
+      const{x1,y1,x2,y2}=boxSelectRect;
+      ctx.save();
+      ctx.strokeStyle=t.acc;ctx.lineWidth=1.5/zoom;ctx.setLineDash([4/zoom,4/zoom]);
+      ctx.strokeRect(x1*zoom+pan.x,y1*zoom+pan.y,(x2-x1)*zoom,(y2-y1)*zoom);
+      ctx.fillStyle=t.acc+"22";ctx.fillRect(x1*zoom+pan.x,y1*zoom+pan.y,(x2-x1)*zoom,(y2-y1)*zoom);
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+    if(selectedIds.length>0){
+      let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+      selectedIds.forEach(id=>{
+        const m=markups.find(x=>x.id===id);
+        if(!m||m.visible===false)return;
+        let pts=[];
+        if(m.type==="silhouette"){
+          const pos=m.position||{x:0,y:0};
+          if(pos.x>-9000)pts.push(pos);
+          const paths=m.paths||SILHOUETTES[m.silhouetteType]?.paths;
+          if(paths){
+            const rot=m.rotation||0;const sc=m.scale||1;const baseSize=100;
+            const cosR=Math.cos(rot);const sinR=Math.sin(rot);
+            paths.forEach(path=>{path.points.forEach(p=>{
+              const sx=p.x*sc*baseSize;const sy=p.y*sc*baseSize;
+              pts.push({x:sx*cosR-sy*sinR+pos.x,y:sx*sinR+sy*cosR+pos.y});
+            });});
+          }
+        }else{pts=vpts(m);}
+        pts.forEach(p=>{if(p.x>-9000){if(p.x<minX)minX=p.x;if(p.y<minY)minY=p.y;if(p.x>maxX)maxX=p.x;if(p.y>maxY)maxY=p.y;}});
+      });
+      if(isFinite(minX)){
+        ctx.save();
+        const bx=minX*zoom+pan.x,by=minY*zoom+pan.y,bw=(maxX-minX)*zoom,bh=(maxY-minY)*zoom;
+        const pad=4/zoom;
+        ctx.strokeStyle=t.acc;ctx.lineWidth=1.5/zoom;ctx.setLineDash([5/zoom,4/zoom]);
+        ctx.strokeRect(bx-pad,by-pad,bw+pad*2,bh+pad*2);
+        ctx.setLineDash([]);
+        const hs=6/zoom;
+        const hc=[[bx-pad,by-pad],[bx+bw+pad,by-pad],[bx-pad,by+bh+pad],[bx+bw+pad,by+bh+pad]];
+        hc.forEach(([cx,cy])=>{
+          ctx.fillStyle=t.surf;ctx.strokeStyle=t.acc;ctx.lineWidth=1/zoom;
+          ctx.fillRect(cx-hs/2,cy-hs/2,hs,hs);
+          ctx.strokeRect(cx-hs/2,cy-hs/2,hs,hs);
+        });
+        ctx.restore();
+      }
+    }
     if(showScaleBar)drawScaleBar(ctx,zoom,drawCalibration,canvas.width,canvas.height);
     if(showLUT&&lutMode!=="gray")drawLUTLegend(ctx,lutMode,lutInvert,canvas.width,canvas.height,t);
     if(placingMode&&placingQueue.length>0&&placingIdx<placingQueue.length){
@@ -730,7 +778,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         ctx.restore();
       }
     }
-  },[markups,selectedId,zoom,pan,sessionImage,calibration,t,currentDraw,mousePos,snapEnabled,snapPos,showScaleBar,showDefTooltips,showLUT,showAnnotations,annotationSize,placingMode,placingQueue,placingIdx,showDisplacement,compareSession,getProcessed,angleMode,lutMode,lutInvert,activeTool,displacementOverlay,overlayBlend,refLandmark1,refLandmark2]);
+  },[markups,selectedId,selectedIds,boxSelectRect,zoom,pan,sessionImage,calibration,t,currentDraw,mousePos,snapEnabled,snapPos,showScaleBar,showDefTooltips,showLUT,showAnnotations,annotationSize,placingMode,placingQueue,placingIdx,showDisplacement,compareSession,getProcessed,angleMode,lutMode,lutInvert,activeTool,displacementOverlay,overlayBlend,refLandmark1,refLandmark2]);
 
   useEffect(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});});
   const scheduleRedraw=useCallback(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});},[redraw]);
@@ -763,18 +811,23 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA")return;
       if((e.ctrlKey||e.metaKey)&&e.key==="z"){undo();return;}
       if((e.ctrlKey||e.metaKey)&&e.key==="y"){redo();return;}
-      if(e.key==="Escape"){dispatch({type:"SET",payload:{currentDraw:null}});dispatch({type:"SET",payload:{selectedId:null}});if(placingMode){if(placingIdx<placingQueue.length-1)dispatch({type:"SET",payload:{placingIdx:placingIdx+1}});else{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}}return;}
+      if(e.key==="Escape"){dispatch({type:"SET",payload:{currentDraw:null,selectedId:null,selectedIds:[],boxSelectRect:null}});if(placingMode){if(placingIdx<placingQueue.length-1)dispatch({type:"SET",payload:{placingIdx:placingIdx+1}});else{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}}return;}
       const tool=TOOLS.filter(Boolean).find(t2=>t2.key===e.key.toLowerCase());
       if(tool){dispatch({type:"SET",payload:{activeTool:tool.id}});dispatch({type:"SET",payload:{currentDraw:null}});return;}
       if(e.key==="Backspace"&&placingMode&&placingQueue.length>0){if(placingIdx>0)dispatch({type:"SET",payload:{placingIdx:placingIdx-1}});else{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}return;}
-      if(e.key==="Delete"&&selectedId){const m=markups.find(x=>x.id===selectedId);if(!m?.locked)delMarkup(selectedId);return;}
-      if(e.key==="Backspace"&&selectedId){const m=markups.find(x=>x.id===selectedId);if(!m?.locked)delMarkup(selectedId);return;}
+      if((e.key==="Delete"||e.key==="Backspace")&&(selectedId||selectedIds.length)){
+        const idsToDelete=selectedIds.length?selectedIds:selectedId?[selectedId]:[];
+        const lockedIds=new Set(markups.filter(m=>m.locked).map(m=>m.id));
+        const filtered=idsToDelete.filter(id=>!lockedIds.has(id));
+        if(filtered.length){pushUndo();updSession({markups:refreshAutoMeas(markups.filter(m=>!filtered.includes(m.id)))});}
+        dispatch({type:"SET",payload:{selectedIds:[],selectedId:null}});return;
+      }
       if(e.key==="+"||e.key==="=")dispatch({type:"SET",payload:{zoom:z=>clamp(z*1.15,0.05,15)}});
       if(e.key==="-")dispatch({type:"SET",payload:{zoom:z=>clamp(z/1.15,0.05,15)}});
       if(e.key==="0"){dispatch({type:"SET",payload:{zoom:1}});dispatch({type:"SET",payload:{pan:{x:40,y:40}}});}
     };
     window.addEventListener("keydown",fn);return()=>window.removeEventListener("keydown",fn);
-  },[selectedId,placingMode,placingIdx,placingQueue,markups,delMarkup,redo,undo,dispatch]);
+  },[selectedId,selectedIds,placingMode,placingIdx,placingQueue,markups,delMarkup,redo,undo,dispatch]);
 
   const autoCreateMeasurementsRef=useRef();
   const autoCreateMeasurements=useCallback((markups,templateName)=>autoCreateMeasurementsRef.current(markups,templateName),[]);
@@ -803,10 +856,16 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     if(activeTool==="pan"){isPanning.current=true;panStart.current={mx:e.clientX,my:e.clientY,px:pan.x,py:pan.y};return;}
     if(activeTool==="select"){
       const hit=hitTest(markups,ip,zoom);
+      if(!hit){
+        dispatch({type:"SET",payload:{selectedIds:[],selectedId:null,boxSelectRect:{x1:ip.x,y1:ip.y,x2:ip.x,y2:ip.y}}});
+        return;
+      }
       setSelectedId(hit);
-      if(hit){
-        const m=markups.find(x=>x.id===hit);
-        if(m?.locked){isDragging.current=false;return;}
+      const isMulti=selectedIds.length&&selectedIds.includes(hit);
+      if(isMulti){multiDragIdsRef.current=[...selectedIds];dragStart.current=ip;isDragging.current=true;dragStartState.current=JSON.stringify(markups);return;}
+      if(selectedIds.length)dispatch({type:"SET",payload:{selectedIds:[]}});
+      const m=markups.find(x=>x.id===hit);
+      if(m?.locked){isDragging.current=false;return;}
         if(m?.type==="silhouette"){
           try {
             const handles = getSilhouetteHandlesImage(m, zoom);
@@ -945,7 +1004,6 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         let bi=0,bd=Infinity;(m.points||[]).forEach((p,i)=>{const d=dist(p,ip);if(d<bd){bd=d;bi=i;}});
         if(bd>8/zoom)bi=-1;
         dragPtIdx.current=bi;dragStart.current=ip;
-      }
       return;
     }
     if(activeTool==="text"){dispatch({type:"SET",payload:{pendingTextPos:ip}});return;}
@@ -963,13 +1021,15 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     if(["line","angle3","angle4","polygon","curve","perp"].includes(activeTool)){
       if(!currentDraw)dispatch({type:"SET",payload:{currentDraw:{type:activeTool,points:[ip],curveStyle:"linear",replacingId}}});
       else{const nps=[...currentDraw.points,ip];const need={line:2,angle3:3,angle4:4,perp:3}[activeTool];if(need&&nps.length>=need){finalizeMarkup({...currentDraw,points:nps});dispatch({type:"SET",payload:{currentDraw:null}});}else dispatch({type:"SET",payload:{currentDraw:{...currentDraw,points:nps}}});}return;}
-  },[activeTool,markups,zoom,pan,snapEnabled,currentDraw,selectedMarkup,placingMode,placingQueue,placingIdx,replacingId,setSelectedId,updMarkup,addMarkup,finalizeMarkup,toImage,getCanvasPos,t,analysisTemplate,autoCreateMeasurements,dispatch,norms,pushUndo,refreshAutoMeas,updSession]);
+  },[activeTool,markups,zoom,pan,snapEnabled,currentDraw,selectedMarkup,selectedIds,placingMode,placingQueue,placingIdx,replacingId,setSelectedId,updMarkup,addMarkup,finalizeMarkup,toImage,getCanvasPos,t,analysisTemplate,autoCreateMeasurements,dispatch,norms,pushUndo,refreshAutoMeas,updSession]);
 
   const handleMouseMove=useCallback(e=>{
     const sp=getCanvasPos(e);dispatch({type:"SET",payload:{mousePos:sp}});
     if(snapEnabled&&activeTool!=="select"&&activeTool!=="pan"){const ip=toImage(sp.x,sp.y);const sn=snapPoint(ip,markups,12/zoom,snapEnabled);dispatch({type:"SET",payload:{snapPos:(Math.abs(sn.x-ip.x)>0.1||Math.abs(sn.y-ip.y)>0.1)?sn:null}});}else dispatch({type:"SET",payload:{snapPos:null}});
     if(activeTool==="select"&&!isDragging.current&&!silhouetteAction.current){const ip=toImage(sp.x,sp.y);let best=null,bd=Infinity;const ptThr=8/zoom;for(const m2 of markups){if(m2.locked||m2.visible===false)continue;if(m2.type==="point"){const vp=vpts(m2);if(vp.length){const d=dist(ip,vp[0]);if(d<bd&&d<ptThr){bd=d;best={type:"point",mid:m2.id};}}}if(m2.type==="silhouette"){const paths=m2.paths||SILHOUETTES[m2.silhouetteType]?.paths;if(!paths)continue;const rot=m2.rotation||0;const sc=m2.scale||1;const pos=m2.position||{x:0,y:0};const cosR=Math.cos(rot);const sinR=Math.sin(rot);paths.forEach((path,pi)=>{path.points.forEach((p,ptI)=>{const sx=p.x*sc*100;const sy=p.y*sc*100;const rx=sx*cosR-sy*sinR;const ry=sx*sinR+sy*cosR;const d=dist(ip,{x:rx+pos.x,y:ry+pos.y});if(d<bd&&d<ptThr){bd=d;best={type:"silhouette",mid:m2.id,pathIdx:pi,ptIdx:ptI};}});});if(m2.id===selectedId){try{const h=getSilhouetteHandlesImage(m2,zoom);const rotThr=Math.max(10,22*Math.sqrt(zoom))/zoom;if(h.rotCenter&&isFinite(h.rotCenter.x)){const d=dist(ip,h.rotCenter);if(d<rotThr&&d<bd){bd=d;best={type:"rotate",mid:m2.id};}}const cornerThr=Math.max(8,12*Math.sqrt(zoom))/zoom;h.corners.forEach((c,ci)=>{if(isFinite(c.x)){const d=dist(ip,c);if(d<cornerThr&&d<bd){bd=d;best={type:"corner",mid:m2.id,cornerIdx:ci};}}});}catch{/*silent*/}}}else if(m2.type==="curve"||m2.type==="polygon"){(m2.points||[]).forEach((p,i)=>{const d=dist(ip,p);if(d<bd&&d<ptThr){bd=d;best={type:"path",mid:m2.id,ptIdx:i};}});}}hoveredPtRef.current=best;}else{hoveredPtRef.current=null;}
+    if(boxSelectRect){const ip=toImage(sp.x,sp.y);dispatch({type:"SET",payload:{boxSelectRect:{...boxSelectRect,x2:ip.x,y2:ip.y}}});return;}
     if(isPanning.current&&panStart.current)dispatch({type:"SET",payload:{pan:{x:panStart.current.px+(e.clientX-panStart.current.mx),y:panStart.current.py+(e.clientY-panStart.current.my)}}});
+    if(isDragging.current&&multiDragIdsRef.current){const ip=toImage(sp.x,sp.y);const dx=ip.x-dragStart.current.x,dy=ip.y-dragStart.current.y;const ids=multiDragIdsRef.current;updMarkups(ms=>ms.map(m=>{if(!ids.includes(m.id))return m;if(m.type==="silhouette")return{...m,position:{x:(m.position?.x||0)+dx,y:(m.position?.y||0)+dy}};return{...m,points:(m.points||[]).map(p=>p.x>-9000?{x:p.x+dx,y:p.y+dy}:p)};}));dragStart.current=ip;return;}
     if(isDragging.current&&dragMid.current){const ip=toImage(sp.x,sp.y);const dx=ip.x-dragStart.current.x,dy=ip.y-dragStart.current.y;const m=markups.find(x=>x.id===dragMid.current);if(!m)return;if(m.type==="silhouette"){if(typeof dragPtIdx.current==="object"&&dragPtIdx.current!==null){const sc=m.scale||1;const rot=m.rotation||0;const cosR=Math.cos(rot);const sinR=Math.sin(rot);const baseSize=100;const dnx=(cosR*dx+sinR*dy)/(sc*baseSize);const dny=(-sinR*dx+cosR*dy)/(sc*baseSize);const{pathIdx,ptIdx}=dragPtIdx.current;updMarkup(dragMid.current,{paths:(m.paths||[]).map((path,pi)=>({...path,points:path.points.map((p,ptI)=>pi===pathIdx&&ptI===ptIdx?{x:p.x+dnx,y:p.y+dny}:p)}))});}else{updMarkup(dragMid.current,{position:{x:(m.position?.x||0)+dx,y:(m.position?.y||0)+dy}});}}else{updMarkup(dragMid.current,{points:(m.points||[]).map((p,i)=>i===dragPtIdx.current?{x:p.x+dx,y:p.y+dy}:p)});}dragStart.current=ip;}
     if(silhouetteAction.current){
       try {
@@ -988,9 +1048,23 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         }
       } catch { silhouetteAction.current=null; /*silent*/ }
     }
-  },[activeTool,markups,zoom,snapEnabled,selectedId,updMarkup,toImage,getCanvasPos,dispatch]);
+  },[activeTool,markups,zoom,snapEnabled,selectedId,boxSelectRect,updMarkup,updMarkups,toImage,getCanvasPos,dispatch]);
 
   const handleMouseUp=()=>{
+    if(boxSelectRect){
+      const{x1,y1,x2,y2}=boxSelectRect;
+      dispatch({type:"SET",payload:{boxSelectRect:null}});
+      const minX=Math.min(x1,x2),maxX=Math.max(x1,x2);
+      const minY=Math.min(y1,y2),maxY=Math.max(y1,y2);
+      const inside=markups.filter(m=>{
+        if(m.locked||m.visible===false)return false;
+        const pts=m.type==="silhouette"?(m.position?[m.position]:[]):vpts(m);
+        return pts.some(p=>p.x>=minX&&p.x<=maxX&&p.y>=minY&&p.y<=maxY);
+      });
+      const ids=inside.map(m=>m.id);
+      dispatch({type:"SET",payload:{selectedIds:ids,selectedId:ids.length===1?ids[0]:null}});
+      multiDragIdsRef.current=null;
+    }
     if((isDragging.current||silhouetteAction.current)&&dragStartState.current){
       const currentState=JSON.stringify(markups);
       if(dragStartState.current!==currentState){
@@ -1000,7 +1074,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       }
       dragStartState.current=null;
     }
-    isPanning.current=false;isDragging.current=false;silhouetteAction.current=null;
+    isPanning.current=false;isDragging.current=false;silhouetteAction.current=null;multiDragIdsRef.current=null;
   };
   const handleDblClick=()=>{if((activeTool==="polygon"||activeTool==="curve")&&currentDraw?.points.length>=2){finalizeMarkup(currentDraw);dispatch({type:"SET",payload:{currentDraw:null}});}};
   useEffect(()=>{const c=canvasRef.current;if(!c)return;const onWheel=e=>{if(Math.abs(e.deltaY)>0.1||Math.abs(e.deltaX)>0.1){e.preventDefault();e.stopPropagation();const sp=getCanvasPos(e),f=e.deltaY>0?0.9:1.1,nz=clamp(zoom*f,0.05,15);dispatch({type:"SET",payload:{pan:prev=>({x:sp.x-(sp.x-prev.x)*(nz/zoom),y:sp.y-(sp.y-prev.y)*(nz/zoom)})}});dispatch({type:"SET",payload:{zoom:nz}});}};c.addEventListener("wheel",onWheel,{passive:false});return()=>c.removeEventListener("wheel",onWheel);},[zoom,dispatch,getCanvasPos]);
@@ -1145,7 +1219,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     });
     return res;
   }, [formulas, measScope, pinnedFormulas, t]);
-  const cursorStyle={select:"default",pan:"grab",point:"crosshair",line:"crosshair",angle3:"crosshair",angle4:"crosshair",polygon:"crosshair",curve:"crosshair",perp:"crosshair",parallel:"crosshair",midpoint:"crosshair",perppoint:"crosshair",arrow:"crosshair",text:"text",ruler:"crosshair"}[activeTool]||"default";
+  const cursorStyle={select:"default",boxselect:"crosshair",pan:"grab",point:"crosshair",line:"crosshair",angle3:"crosshair",angle4:"crosshair",polygon:"crosshair",curve:"crosshair",perp:"crosshair",parallel:"crosshair",midpoint:"crosshair",perppoint:"crosshair",arrow:"crosshair",text:"text",ruler:"crosshair"}[activeTool]||"default";
   const _availAnalyses=PREDEFINED[project.projection]||[];
 
   const panelIcons={
