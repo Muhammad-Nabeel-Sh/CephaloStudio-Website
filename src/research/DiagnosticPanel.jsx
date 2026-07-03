@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import PlotlyChart from "./PlotlyChart.jsx";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TAB BAR (shared with other panels)
@@ -430,37 +431,39 @@ function CalibrationView({ result, t }) {
   const cal = result.calibration;
   if (!cal?.groups?.length) return <div style={{ fontSize: 11, color: t.tx3, padding: 12, textAlign: "center" }}>Calibration data not available for individual predictors. Use Composite Index tab for calibration.</div>;
 
-  const W = 400, H = 350, pad = { left: 50, right: 30, top: 30, bottom: 45 };
-  const pw = W - pad.left - pad.right, ph = H - pad.top - pad.bottom;
-  const xS = v => pad.left + v * pw;
-  const yS = v => pad.top + ph - v * ph;
+  const groups = cal.groups.filter(g => g.n > 0);
+  const scData = [{
+    type: "scatter", mode: "markers",
+    x: groups.map(g => g.midpoint),
+    y: groups.map(g => g.obsProp),
+    error_y: {
+      type: "data", symmetric: false, thickness: 1.5, width: 6,
+      array: groups.map(g => 1.96 * Math.sqrt(g.obsProp * (1 - g.obsProp) / g.n)),
+      arrayminus: groups.map(g => 1.96 * Math.sqrt(g.obsProp * (1 - g.obsProp) / g.n)),
+    },
+    marker: { color: t.acc, size: 8, line: { color: "#fff", width: 1 } },
+    hovertemplate: "Predicted: %{x:.3f}<br>Observed: %{y:.3f}<br>n=%{customdata}<extra></extra>",
+    customdata: groups.map(g => g.n),
+    showlegend: false,
+  }];
+  const idealLine = {
+    type: "scatter", mode: "lines",
+    x: [0, 1], y: [0, 1],
+    line: { color: t.tx3, width: 1, dash: "dash" },
+    showlegend: false, hoverinfo: "skip",
+  };
+  const scLayout = {
+    paper_bgcolor: "transparent", plot_bgcolor: "transparent",
+    font: { color: t.tx2, family: "'DM Sans','DM Mono',monospace", size: 11 },
+    margin: { l: 50, r: 20, t: 10, b: 50 },
+    xaxis: { title: { text: "Predicted probability", font: { size: 12 } }, range: [0, 1], gridcolor: t.surf3, zeroline: false },
+    yaxis: { title: { text: "Observed proportion", font: { size: 12 } }, range: [0, 1], gridcolor: t.surf3, zeroline: false },
+    width: 400, height: 350,
+  };
 
   return (
     <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-      <svg width={W} height={H} style={{ border: `1px solid ${t.bdr}`, borderRadius: 8, background: t.surf2 }}>
-        <line x1={pad.left} y1={yS(0)} x2={pad.left + pw} y2={yS(0)} stroke={t.bdr} strokeWidth={0.5} />
-        <line x1={pad.left} y1={yS(1)} x2={pad.left + pw} y2={yS(1)} stroke={t.bdr} strokeWidth={0.5} />
-        <line x1={xS(0)} y1={yS(0)} x2={xS(1)} y2={yS(1)} stroke={t.tx3} strokeWidth={1} strokeDasharray="4,4" />
-        {cal.groups.map((g, i) => {
-          const x = xS(g.midpoint);
-          const y = yS(g.obsProp);
-          const err = 1.96 * Math.sqrt(g.obsProp * (1 - g.obsProp) / g.n);
-          return (
-            <g key={i}>
-              <line x1={x} y1={yS(g.obsProp - err)} x2={x} y2={yS(g.obsProp + err)} stroke={t.acc} strokeWidth={1.5} />
-              <circle cx={x} cy={y} r={4} fill={t.acc} stroke="#fff" strokeWidth={1} />
-            </g>
-          );
-        })}
-        <text x={W / 2} y={H - 4} fill={t.tx3} fontSize={9} textAnchor="middle">Predicted probability</text>
-        <text x={8} y={H / 2} fill={t.tx3} fontSize={9} textAnchor="middle" transform={`rotate(-90,8,${H / 2})`}>Observed proportion</text>
-        {[0, 0.25, 0.5, 0.75, 1].map(v => (
-          <g key={v}>
-            <text x={xS(v)} y={H - pad.bottom + 14} fill={t.tx3} fontSize={7} textAnchor="middle">{v.toFixed(2)}</text>
-            <text x={pad.left - 8} y={yS(v) + 3} fill={t.tx3} fontSize={7} textAnchor="end">{v.toFixed(2)}</text>
-          </g>
-        ))}
-      </svg>
+      <PlotlyChart data={[idealLine, ...scData]} layout={scLayout} style={{ width: 400, height: 350, minHeight: 0 }} />
 
       <div style={{ flex: 1 }}>
         <div style={{ padding: "8px 10px", background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>

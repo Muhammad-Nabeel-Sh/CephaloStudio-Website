@@ -114,15 +114,9 @@ function CollectiveBlandAltman({ details, t }) {
   if (chartable.length === 0) return null;
   const COLORS = [t.acc, t.err, t.warn, t.ok, t.tx2, "#a78bfa", "#f472b6", "#34d399"];
 
-  const points = chartable.flatMap((d, idx) => {
-    const n = Math.min(d.n || 20, 50);
-    return Array.from({ length: n }, (_, i) => {
-      const t2 = (i + 0.5) / n;
-      const mn = 50 + t2 * 100;
-      const z = (t2 - 0.5) * 4;
-      return { label: d.label, mean: mn, diff: d.meanDiff + z * d.sdDiff, idx };
-    });
-  });
+  const points = chartable.flatMap((d, idx) =>
+    (d.points || []).map(p => ({ label: d.label, mean: p.mean, diff: p.diff, idx }))
+  );
   const xMin = Math.min(...points.map(v => v.mean)) - 10;
   const xMax = Math.max(...points.map(v => v.mean)) + 10;
   const allDiffs = chartable.map(d => d.meanDiff);
@@ -527,55 +521,6 @@ function DescriptiveScatterPlot({ combined, labels, t }) {
   return <ChartCard title="Scatter Plot — Clustered by Variable" t={t}><PlotlyChart data={traces} layout={layout} style={{ height: layout.height }} /></ChartCard>;
 }
 
-// function ZScoresProfileChart({ results, t }) {
-//   const zs = results.zScores || {};
-//   const labels = Object.keys(zs);
-//   if (labels.length < 2) return null;
-//   const norms = Object.keys(zs[labels[0]] || {});
-//   if (norms.length === 0) return null;
-//   const W = 650, H = 330;
-//   const pad = { left: 90, right: 120, top: 35, bottom: 55 };
-//   const pw = W - pad.left - pad.right;
-//   const ph = H - pad.top - pad.bottom;
-//   const allZ = labels.flatMap(l => Object.values(zs[l] || {}));
-//   const zMin = Math.min(-3, ...allZ) - 0.5;
-//   const zMax = Math.max(3, ...allZ) + 0.5;
-//   const COLORS = ["#a78bfa", t.acc, t.err, t.warn, t.ok, "#f472b6", "#34d399", t.tx2];
-//   const xS = i => pad.left + i * pw / Math.max(labels.length - 1, 1);
-//   const zSpan = safeRange(zMin, zMax);
-//   const yS = v => safeNum(pad.top + ph - (v - zMin) / zSpan * ph);
-
-//   return (
-//     <ChartCard title="Z-Score Profile — Across Norm References" t={t}>
-//       <svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{ overflow: "visible", display: "block" }}>
-//         <VGrid ticks={[zMin, 0, zMax]} xMin={pad.left} xMax={W - pad.right} yS={v => yS(v)} pad={pad} W={W} H={H} t={t} label="Z-score" />
-//         {labels.map((l, i) => (
-//           <text key={i} x={xS(i)} y={H - pad.bottom + 16} fill={t.tx2} fontSize={FONT.xs} textAnchor="middle" fontFamily={FONT_STACK}
-//             transform={labels.length > 6 ? `rotate(-30,${xS(i)},${H - pad.bottom + 16})` : undefined}>
-//             {l.length > 10 ? l.slice(0, 8) + "\u2026" : l}
-//           </text>
-//         ))}
-//         {norms.map((norm, ni) => (
-//           <g key={ni}>
-//             {labels.map((l, i) => {
-//               const z = zs[l]?.[norm];
-//               if (z == null) return null;
-//               const nextZ = i + 1 < labels.length ? zs[labels[i + 1]]?.[norm] : null;
-//               return (
-//                 <g key={i}>
-//                   {nextZ != null && <line x1={xS(i)} y1={yS(z)} x2={xS(i + 1)} y2={yS(nextZ)} stroke={COLORS[ni % COLORS.length]} strokeWidth={2} opacity={0.7} />}
-//                   <circle cx={xS(i)} cy={yS(z)} r={3.5} fill={COLORS[ni % COLORS.length]} opacity={0.85} />
-//                 </g>
-//               );
-//             })}
-//           </g>
-//         ))}
-//         <ChartLegend items={norms.map((n, i) => ({ label: n, color: COLORS[i % COLORS.length] }))} x={W - pad.right + 8} y={pad.top} t={t} fontSize={FONT.xs} />
-//       </svg>
-//     </ChartCard>
-//   );
-// }
-
 function BoxPlotCollective({ combined, labels, t }) {
   const valid = labels.filter(l => {
     const s = combined[l]?.stats;
@@ -590,7 +535,6 @@ function BoxPlotCollective({ combined, labels, t }) {
       return vals.map(() => l);
     }),
     x: valid.flatMap(l => combined[l].values || []),
-    boxmean: "sd",
     marker: { color: t.acc, opacity: 0.35, line: { color: t.acc, width: 1 } },
     line: { color: t.acc, width: 1 },
     fillcolor: t.acc + "4D",
