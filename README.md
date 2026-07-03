@@ -469,14 +469,12 @@ npm run test:coverage   # Generates text + lcov + html reports
 
 ## 17. Theme System
 
-Six themes defined in `THEMES`:
+Four themes defined in `THEMES`:
 
 | Theme | ID | Background | Accent |
 |-------|-----|-----------|--------|
 | Plasticity | `bluish` | `#0f0f12` | `#a855f7` |
 | GitHub Dark | `dark` | `#0d1117` | `#58a6ff` |
-| Mocha | `mocha` | `#37353e` | `#79763b` |
-| Sage | `sage` | `#d6dac8` | `#6b827c` |
 | Paper | `paper` | `#f5f5f5` | `#2563eb` |
 | GitHub Light | `light` | `#e8eaed` | `#06a23d` |
 
