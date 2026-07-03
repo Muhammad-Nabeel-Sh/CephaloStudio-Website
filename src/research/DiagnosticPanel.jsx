@@ -453,7 +453,7 @@ function CalibrationView({ result, t }) {
     showlegend: false, hoverinfo: "skip",
   };
   const scLayout = {
-    paper_bgcolor: "transparent", plot_bgcolor: "transparent",
+    paper_bgcolor: t.surf2, plot_bgcolor: t.surf2,
     font: { color: t.tx2, family: "'DM Sans','DM Mono',monospace", size: 11 },
     margin: { l: 50, r: 20, t: 10, b: 50 },
     xaxis: { title: { text: "Predicted probability", font: { size: 12 } }, range: [0, 1], gridcolor: t.surf3, zeroline: false },

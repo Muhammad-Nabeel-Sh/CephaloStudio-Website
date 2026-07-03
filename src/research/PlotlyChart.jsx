@@ -12,10 +12,10 @@ export function heatmapLayout(t, extra) {
   return {
     paper_bgcolor: t.surf,
     plot_bgcolor: t.surf,
-    font: { color: t.tx2, family: FONT_STACK, size: 11 },
-    xaxis: { side: "top", tickangle: -30, tickfont: { size: 9 }, gridcolor: t.surf3, zeroline: false },
-    yaxis: { tickfont: { size: 9 }, gridcolor: t.surf3, zeroline: false, autorange: "reversed" },
-    margin: { l: 80, r: 20, t: 60, b: 20 },
+    font: { color: t.tx2, family: FONT_STACK, size: 12 },
+    xaxis: { side: "top", tickangle: -30, tickfont: { size: 11 }, gridcolor: t.surf3, zeroline: false, title: { font: { size: 13 } } },
+    yaxis: { tickfont: { size: 11 }, gridcolor: t.surf3, zeroline: false, autorange: "reversed", title: { font: { size: 13 } } },
+    margin: { l: 90, r: 20, t: 60, b: 20 },
     ...extra,
   };
 }
@@ -47,18 +47,29 @@ export default function PlotlyChart({ data, layout, config, style }) {
   const [fullscreen, setFullscreen] = useState(false);
   const plotlyRef = useRef(null);
 
-  // Inject minor grid defaults into all cartesian axes
+  // Inject font size bumps + minor grid defaults into all cartesian axes
   const enrichedLayout = useMemo(() => {
     if (!layout) return layout;
     const out = deepClone(layout);
+    // Bump base font
+    if (out.font && out.font.size != null && out.font.size < 12) out.font.size = 12;
     for (const key of Object.keys(out)) {
       if (key.startsWith("xaxis") || key.startsWith("yaxis")) {
         const ax = out[key];
         if (ax && typeof ax === "object") {
           ax.minor = { ...(ax.minor || {}), showgrid: true, gridcolor: ax.gridcolor ? ax.gridcolor + "44" : "#33333344", gridwidth: 0.5 };
+          // Bump tick font
+          if (ax.tickfont && ax.tickfont.size != null && ax.tickfont.size < 11) ax.tickfont.size = 11;
+          // Bump axis title font
+          if (ax.title && typeof ax.title === "object") {
+            if (!ax.title.font) ax.title.font = { size: 13 };
+            else if (ax.title.font.size != null && ax.title.font.size < 12) ax.title.font.size = 12;
+          }
         }
       }
     }
+    // Bump legend font
+    if (out.legend?.font?.size != null && out.legend.font.size < 11) out.legend.font.size = 11;
     return out;
   }, [layout]);
 

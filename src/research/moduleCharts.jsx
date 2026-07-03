@@ -335,7 +335,7 @@ function DistributionsChart({ combined, labels, t }) {
           ];
 
           const layout = {
-            paper_bgcolor: "transparent", plot_bgcolor: "transparent",
+            paper_bgcolor: t.surf2, plot_bgcolor: t.surf2,
             font: { color: t.tx2, family: FONT_STACK, size: 10 },
             margin: { l: 50, r: 16, t: 22, b: 4 },
             xaxis: { title: "Value", showgrid: false, zeroline: false, showticklabels: false, ticks: "" },
@@ -644,7 +644,7 @@ function GroupMeansChart({ labels, t }) {
           };
 
           const l = {
-            paper_bgcolor: "transparent", plot_bgcolor: "transparent",
+            paper_bgcolor: t.surf2, plot_bgcolor: t.surf2,
             font: { color: t.tx2, family: FONT_STACK, size: 10 },
             margin: { l: 24, r: 16, t: 24, b: 20 },
             xaxis: { title: "Group", showgrid: false, zeroline: false, tickfont: { size: 10, color: t.tx2 } },
@@ -939,7 +939,7 @@ function LongitudinalTrajectories({ labels, t }) {
           }
 
           const l = {
-            paper_bgcolor: "transparent", plot_bgcolor: "transparent",
+            paper_bgcolor: t.surf2, plot_bgcolor: t.surf2,
             font: { color: t.tx2, family: FONT_STACK, size: 10 },
             margin: { l: 40, r: 12, t: 22, b: 28 },
             xaxis: {
@@ -1240,7 +1240,7 @@ function ResidualDiagnosticPlot({ results, t }) {
   };
 
   const resLayout = {
-    paper_bgcolor: "transparent", plot_bgcolor: "transparent",
+    paper_bgcolor: t.surf2, plot_bgcolor: t.surf2,
     font: { color: t.tx2, family: FONT_STACK, size: 10 },
     margin: { l: 55, r: 20, t: 10, b: 45 },
     xaxis: { title: "Fitted values", gridcolor: t.surf3, zeroline: false, tickfont: { size: 10 } },
@@ -1268,7 +1268,7 @@ function ResidualDiagnosticPlot({ results, t }) {
             hovertemplate: "Index: %{x}<br>Cook's D: %{y:.4f}<extra></extra>",
             showlegend: false,
           }]} layout={{
-            paper_bgcolor: "transparent", plot_bgcolor: "transparent",
+            paper_bgcolor: t.surf2, plot_bgcolor: t.surf2,
             font: { color: t.tx2, family: FONT_STACK, size: 10 },
             margin: { l: 50, r: 30, t: 10, b: 40 },
             xaxis: { title: "Observation index", gridcolor: t.surf3, zeroline: false, tickfont: { size: 10 } },
