@@ -15,6 +15,8 @@ math.import({
 
 export const uid = () => Math.random().toString(36).slice(2, 10);
 
+export const onEnter = (fn) => (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fn(e); } };
+
 export const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 export const dist = (a, b) => Math.sqrt((b.x - a.x) ** 2 + (b.y - a.y) ** 2);

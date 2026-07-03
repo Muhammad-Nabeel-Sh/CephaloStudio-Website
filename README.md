@@ -4,6 +4,21 @@ A web-based cephalometric analysis application for orthodontics and maxillofacia
 
 ---
 
+## Browser Support
+
+Minimum browser versions required:
+
+| Browser | Version |
+|---------|---------|
+| Chrome  | 80+     |
+| Firefox | 90+     |
+| Safari  | 14+     |
+| Edge    | 80+     |
+
+Requires ES2020 support, Canvas 2D, and IndexedDB. Not supported in Internet Explorer.
+
+---
+
 ## 1. Technology Stack
 
 | Layer | Technology |

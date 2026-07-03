@@ -9,7 +9,7 @@ import { KatexSpan, LatexFloatingPanel } from "./hooks.jsx";
 import { Btn, Tag, Sld, PropRow, Inp } from "./ui.jsx";
 import ToolBtn from "./ToolBtn.jsx";
 import { drawMarkup, drawInProgress, drawScaleBar, drawLUTLegend, drawSnapIndicator, drawDisplacementVectors, drawAirwayOverlay, hitTest, getSilhouetteHandlesImage } from "./markups.jsx";
-import { MarkupsPanel, MeasurementsPanel, FormulasPanel, ImagePanel, LayersPanel, MarkupProps, TemplatesPanel, SilhouettesPanel } from "./panels.jsx";
+import { MarkupsPanel, MeasurementsPanel, FormulasPanel, ImagePanel, LayersPanel, MarkupProps, TemplatesPanel, SilhouettesPanel, ExamplesPanel } from "./panels.jsx";
 import { Modal } from "./panels/Modal.jsx";
 import HomePage from "./panels/HomePage.jsx";
 import SessionsPanel from "./panels/SessionsPanel.jsx";
@@ -464,7 +464,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const calibration=useMemo(()=>activeSession?.calibration||{done:false,pxPerMm:1},[activeSession?.calibration]);
   const processing=useMemo(()=>activeSession?.processing||{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},[activeSession?.processing]);
   const lutMode=activeSession?.lutMode||"gray";const lutInvert=activeSession?.lutInvert||false;
-  const formulas=activeSession?.formulas||[];const norms=useMemo(()=>activeSession?.norms||[],[activeSession?.norms]);
+  const formulas=useMemo(()=>activeSession?.formulas||[],[activeSession?.formulas]);const norms=useMemo(()=>activeSession?.norms||[],[activeSession?.norms]);
   const analysisTemplate=activeSession?.analysisTemplate||"blank";
   const selectedMarkup=markups.find(m=>m.id===selectedId);
 
@@ -516,7 +516,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const refreshAutoMeasRef=useRef();
   refreshAutoMeasRef.current=(ms)=>{const placed={};const markupMap={};for(const m of ms){if(m.placed&&m.label)placed[m.label]=m;if(m.label)markupMap[m.label]=m;}return ms.map(m=>{if(!m.refLabels||m.refLabels.length===0)return m;if(m.type==="ratio"||m.type==="sum"||m.type==="difference"||m.type==="percentage"){const allRefsExist=m.refLabels.every(rl=>markupMap[rl]);if(!allRefsExist)return m;let nv=0;if(m.type==="ratio"){const v0=getMeasValue(markupMap[m.refLabels[0]]);const v1=getMeasValue(markupMap[m.refLabels[1]]);nv=v1!==0?v0/v1:0;}else if(m.type==="difference"){nv=getMeasValue(markupMap[m.refLabels[0]])-getMeasValue(markupMap[m.refLabels[1]]);}else if(m.type==="percentage"){const v0=getMeasValue(markupMap[m.refLabels[0]]);const v1=getMeasValue(markupMap[m.refLabels[1]]);nv=v1!==0?(v0/v1)*100:0;}else{nv=m.refLabels.reduce((s,rl)=>s+getMeasValue(markupMap[rl]),0);}if(m.computedValue!==nv)return{...m,computedValue:nv};return m;}const allPlaced=m.refLabels.every(rl=>placed[rl]);if(!allPlaced)return m;const np=m.refLabels.map(rl=>placed[rl].points[0]);if(np.some((p,i)=>p.x!==m.points[i]?.x||p.y!==m.points[i]?.y))return{...m,points:np};return m;});};
   const refreshAutoMeas=useCallback(ms=>refreshAutoMeasRef.current(ms),[]);
-  const updMarkups=fn=>{pushUndo();updSession({markups:refreshAutoMeas(fn(markups))});};
+  const updMarkups=useCallback(fn=>{pushUndo();updSession({markups:refreshAutoMeas(fn(markups))});},[pushUndo,updSession,refreshAutoMeas,markups]);
   updMarkupRef.current=(id,patch)=>{
     updMarkups(ms=>ms.map(m=>m.id===id?{...m,...patch}:m));
   };
@@ -827,7 +827,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       if(e.key==="0"){dispatch({type:"SET",payload:{zoom:1}});dispatch({type:"SET",payload:{pan:{x:40,y:40}}});}
     };
     window.addEventListener("keydown",fn);return()=>window.removeEventListener("keydown",fn);
-  },[selectedId,selectedIds,placingMode,placingIdx,placingQueue,markups,delMarkup,redo,undo,dispatch]);
+  },[selectedId,selectedIds,placingMode,placingIdx,placingQueue,markups,delMarkup,redo,undo,dispatch,pushUndo,refreshAutoMeas,updSession]);
 
   const autoCreateMeasurementsRef=useRef();
   const autoCreateMeasurements=useCallback((markups,templateName)=>autoCreateMeasurementsRef.current(markups,templateName),[]);
@@ -1243,9 +1243,10 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     research:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M316-80q-52 0-88-38t-36-90q0-36 17-64t45-44l-14-464q-2-62 40-105t104-43q62 0 104 43t40 105l-14 464q28 16 45 44t17 64q0 52-36 90t-88 38H316Zm2-560h124l2-60q1-26-16-45t-43-19q-26 0-43 17t-19 43l-5 64Zm-2 480h128q14 0 24-11t10-25q0-14-9-24t-23-10l-36-2 6-188H344l-4 188-36 2q-14 0-23 10t-9 24q0 14 10 25t24 11Zm-2-80Zm258-20q-14-14-20-30.5t-4-33.5l82-456q5-28 25-48t48-20q32 0 54 24.5t18 56.5l-38 458q-2 26-20.5 44.5T672-200q-26 0-46-17t-24-43h-28Z"/></svg>,
     interpretation:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M280-280h280v-80H280v80Zm0-160h400v-80H280v80Zm0-160h400v-80H280v80Zm-80 480q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm0-560v560-560Z"/></svg>,
     templates:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M480-60q-50 0-85-35t-35-85q0-39 22.5-70t57.5-43v-73q-11-4-21-9.5T401-389l-63 37q1 5 1.5 10.5t.5 11.5q0 50-35 85t-85 35q-50 0-85-35t-35-85q0-50 35-85t85-35q23 0 43 7.5t36 21.5l62-36q-1-5-1.5-11t-.5-12q0-6 .5-11.5T361-502l-62-37q-16 14-36 21.5t-43 7.5q-50 0-85-35t-35-85q0-50 35-85t85-35q50 0 85 35t35 85q0 6-.5 12t-1.5 11l63 36q8-8 18-13t21-9v-73q-35-12-57.5-43.5T360-780q0-50 35-85t85-35q50 0 85 35t35 85q0 39-22.5 70.5T520-666v73q11 4 20.5 9.5T558-570l64-38q-1-5-1.5-10.5T620-630q0-50 35-85t85-35q50 0 85 35t35 85q0 50-35 85t-85 35q-23 0-42.5-7.5T662-539l-65 38q1 5 1.5 10.5t.5 10.5q0 5-.5 11t-1.5 11l65 37q16-14 35.5-21.5T740-450q50 0 85 35t35 85q0 50-35 85t-85 35q-50 0-85-35t-35-85q0-6 .5-11.5T622-352l-64-37q-8 8-17.5 13t-20.5 9v74q35 12 57.5 43t22.5 70q0 50-35 85t-85 35Zm0-80q17 0 28.5-11.5T520-180q0-17-11.5-28.5T480-220q-17 0-28.5 11.5T440-180q0 17 11.5 28.5T480-140ZM220-290q17 0 28.5-11.5T260-330q0-17-11.5-28.5T220-370q-17 0-28.5 11.5T180-330q0 17 11.5 28.5T220-290Zm520 0q17 0 28.5-11.5T780-330q0-17-11.5-28.5T740-370q-17 0-28.5 11.5T700-330q0 17 11.5 28.5T740-290ZM480-440q17 0 28.5-11.5T520-480q0-17-11.5-28.5T480-520q-17 0-28.5 11.5T440-480q0 17 11.5 28.5T480-440ZM220-590q17 0 28.5-11.5T260-630q0-17-11.5-28.5T220-670q-17 0-28.5 11.5T180-630q0 17 11.5 28.5T220-590Zm520 0q17 0 28.5-11.5T780-630q0-17-11.5-28.5T740-670q-17 0-28.5 11.5T700-630q0 17 11.5 28.5T740-590ZM480-740q17 0 28.5-11.5T520-780q0-17-11.5-28.5T480-820q-17 0-28.5 11.5T440-780q0 17 11.5 28.5T480-740Z"/></svg>,
-    silhouettes:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M240-80v-170q-39-17-68.5-45.5t-50-64.5q-20.5-36-31-77T80-520q0-158 112-259t288-101q176 0 288 101t112 259q0 42-10.5 83t-31 77q-20.5 36-50 64.5T720-250v170H240Zm80-80h40v-80h80v80h80v-80h80v80h40v-142q38-9 67.5-30t50-50q20.5-29 31.5-64t11-74q0-125-88.5-202.5T480-800q-143 0-231.5 77.5T160-520q0 39 11 74t31.5 64q20.5 29 50.5 50t67 30v142Zm100-200h120l-60-120-60 120Zm-80-80q33 0 56.5-23.5T420-520q0-33-23.5-56.5T340-600q-33 0-56.5 23.5T260-520q0 33 23.5 56.5T340-440Zm280 0q33 0 56.5-23.5T700-520q0-33-23.5-56.5T620-600q-33 0-56.5 23.5T540-520q0 33 23.5 56.5T620-440ZM480-160Z"/></svg>
+    silhouettes:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M240-80v-170q-39-17-68.5-45.5t-50-64.5q-20.5-36-31-77T80-520q0-158 112-259t288-101q176 0 288 101t112 259q0 42-10.5 83t-31 77q-20.5 36-50 64.5T720-250v170H240Zm80-80h40v-80h80v80h80v-80h80v80h40v-142q38-9 67.5-30t50-50q20.5-29 31.5-64t11-74q0-125-88.5-202.5T480-800q-143 0-231.5 77.5T160-520q0 39 11 74t31.5 64q20.5 29 50.5 50t67 30v142Zm100-200h120l-60-120-60 120Zm-80-80q33 0 56.5-23.5T420-520q0-33-23.5-56.5T340-600q-33 0-56.5 23.5T260-520q0 33 23.5 56.5T340-440Zm280 0q33 0 56.5-23.5T700-520q0-33-23.5-56.5T620-600q-33 0-56.5 23.5T540-520q0 33 23.5 56.5T620-440ZM480-160Z"/></svg>,
+    examples:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M382-240 154-468l57-56 171 171 367-367 57 57-424 424Z"/></svg>
   };
-  const panelTabs=[["markups","Markups"],["measurements","Measure"],["formulas","Formulas"],["image","Image"],["layers","Layers"],["sessions","Sessions"],["research","Research"],["interpretation","Interpret"],["templates","Templates"],["silhouettes","Silhouettes"]];
+  const panelTabs=[["markups","Markups"],["measurements","Measure"],["formulas","Formulas"],["image","Image"],["layers","Layers"],["sessions","Sessions"],["research","Research"],["interpretation","Interpret"],["templates","Templates"],["silhouettes","Silhouettes"],["examples","Examples"]];
 
   return(
     <div style={{height:"100vh",display:"flex",flexDirection:"column",background:t.bg,color:t.tx,fontFamily:"'DM Sans',sans-serif",overflow:"hidden"}}>
@@ -1319,7 +1320,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           </Btn>}
         <div style={{width:1,height:20,background:t.bdr,flexShrink:0}}/>
         {Object.values(THEMES).map(th=>(
-          <button key={th.id} onClick={()=>setTheme(th.id)} title={th.name} style={{width:22,height:22,borderRadius:6,border:theme===th.id?`2px solid ${t.acc}`:`1px solid ${t.bdr}`,background:th.bg,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <button key={th.id} onClick={()=>setTheme(th.id)} title={th.name} aria-label={th.name} style={{width:22,height:22,borderRadius:6,border:theme===th.id?`2px solid ${t.acc}`:`1px solid ${t.bdr}`,background:th.bg,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
             <div style={{width:10,height:10,borderRadius:3,background:th.acc}}/>
           </button>
         ))}
@@ -1374,23 +1375,23 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
               </div>
               {/* Row 8b: Spotlight mode */}
               <div style={{display:"flex",justifyContent:"center"}}>
-                <button onClick={()=>{const next=!spotlightMode;dispatch({type:"SET",payload:{spotlightMode:next}});if(sessionImage.length>0){const img=sessionImage[0];const upd=next?{...img,opacityBeforeSpotlight:img.opacity||1,opacity:0.5}:{...img,opacity:img.opacityBeforeSpotlight||1};updSession({images:sessionImage.map((x,i)=>i===0?upd:x)});}}} title="Spotlight (reduce image opacity)" style={{width:42,height:42,borderRadius:8,border:"none",background:spotlightMode?t.acc:t.surf2,color:spotlightMode?(theme==="light"?"#fff":t.bg):t.tx,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:spotlightMode?`0 0 0 2px ${t.acc}`:"none"}}>💡</button>
+                <button onClick={()=>{const next=!spotlightMode;dispatch({type:"SET",payload:{spotlightMode:next}});if(sessionImage.length>0){const img=sessionImage[0];const upd=next?{...img,opacityBeforeSpotlight:img.opacity||1,opacity:0.5}:{...img,opacity:img.opacityBeforeSpotlight||1};updSession({images:sessionImage.map((x,i)=>i===0?upd:x)});}}} title="Spotlight (reduce image opacity)" aria-label="Spotlight" style={{width:42,height:42,borderRadius:8,border:"none",background:spotlightMode?t.acc:t.surf2,color:spotlightMode?(theme==="light"?"#fff":t.bg):t.tx,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:spotlightMode?`0 0 0 2px ${t.acc}`:"none"}}>💡</button>
               </div>
               {/* Separator */}
               <div style={{width:"100%",height:1,background:t.bdr,margin:"4px 0"}}/>
               {/* Row 9: Undo | Redo */}
               <div style={{display:"flex",gap:1}}>
-                <button onClick={undo} disabled={undoStackRef.current.length===0} style={{flex:1,height:32,borderRadius:6,border:"none",background:activeTool==="select"?"transparent":"transparent",color:undoStackRef.current.length>0?t.tx2:t.bdr,cursor:undoStackRef.current.length>0?"pointer":"not-allowed",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Undo (Ctrl+Z)">↶</button>
-                <button onClick={redo} disabled={redoStackRef.current.length===0} style={{flex:1,height:32,borderRadius:6,border:"none",background:activeTool==="select"?"transparent":"transparent",color:redoStackRef.current.length>0?t.tx2:t.bdr,cursor:redoStackRef.current.length>0?"pointer":"not-allowed",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Redo (Ctrl+Y)">↷</button>
+                <button onClick={undo} disabled={undoStackRef.current.length===0} aria-label="Undo (Ctrl+Z)" style={{flex:1,height:32,borderRadius:6,border:"none",background:activeTool==="select"?"transparent":"transparent",color:undoStackRef.current.length>0?t.tx2:t.bdr,cursor:undoStackRef.current.length>0?"pointer":"not-allowed",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Undo (Ctrl+Z)">↶</button>
+                <button onClick={redo} disabled={redoStackRef.current.length===0} aria-label="Redo (Ctrl+Y)" style={{flex:1,height:32,borderRadius:6,border:"none",background:activeTool==="select"?"transparent":"transparent",color:redoStackRef.current.length>0?t.tx2:t.bdr,cursor:redoStackRef.current.length>0?"pointer":"not-allowed",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Redo (Ctrl+Y)">↷</button>
               </div>
               {/* Row 10: Zoom in | Zoom out */}
               <div style={{display:"flex",gap:1}}>
-                <button onClick={()=>dispatch({type:"SET",payload:{zoom:z=>clamp(z*1.3,0.05,15)}})} style={{flex:1,height:32,borderRadius:6,border:"none",background:"transparent",color:t.tx2,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Zoom In">＋</button>
-                <button onClick={()=>dispatch({type:"SET",payload:{zoom:z=>clamp(z/1.3,0.05,15)}})} style={{flex:1,height:32,borderRadius:6,border:"none",background:"transparent",color:t.tx2,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Zoom Out">－</button>
+                <button onClick={()=>dispatch({type:"SET",payload:{zoom:z=>clamp(z*1.3,0.05,15)}})} aria-label="Zoom In" style={{flex:1,height:32,borderRadius:6,border:"none",background:"transparent",color:t.tx2,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Zoom In">＋</button>
+                <button onClick={()=>dispatch({type:"SET",payload:{zoom:z=>clamp(z/1.3,0.05,15)}})} aria-label="Zoom Out" style={{flex:1,height:32,borderRadius:6,border:"none",background:"transparent",color:t.tx2,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Zoom Out">－</button>
               </div>
               {/* Row 11: Fit to Window */}
               <div style={{display:"flex",justifyContent:"center"}}>
-                <button onClick={()=>{dispatch({type:"SET",payload:{zoom:1}});dispatch({type:"SET",payload:{pan:{x:40,y:40}}});}} style={{width:38,height:32,borderRadius:6,border:"none",background:"transparent",color:t.tx2,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Fit to Window (⊙)">⊙</button>
+                <button onClick={()=>{dispatch({type:"SET",payload:{zoom:1}});dispatch({type:"SET",payload:{pan:{x:40,y:40}}});}} aria-label="Fit to Window" style={{width:38,height:32,borderRadius:6,border:"none",background:"transparent",color:t.tx2,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Fit to Window (⊙)">⊙</button>
               </div>
               {/* Separator */}
               <div style={{width:"100%",height:1,background:t.bdr,margin:"4px 0"}}/>
@@ -1452,10 +1453,11 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
                   research:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M316-80q-52 0-88-38t-36-90q0-36 17-64t45-44l-14-464q-2-62 40-105t104-43q62 0 104 43t40 105l-14 464q28 16 45 44t17 64q0 52-36 90t-88 38H316Zm2-560h124l2-60q1-26-16-45t-43-19q-26 0-43 17t-19 43l-5 64Zm-2 480h128q14 0 24-11t10-25q0-14-9-24t-23-10l-36-2 6-188H344l-4 188-36 2q-14 0-23 10t-9 24q0 14 10 25t24 11Zm-2-80Zm258-20q-14-14-20-30.5t-4-33.5l82-456q5-28 25-48t48-20q32 0 54 24.5t18 56.5l-38 458q-2 26-20.5 44.5T672-200q-26 0-46-17t-24-43h-28Z"/></svg>,
                   interpretation:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M280-280h280v-80H280v80Zm0-160h400v-80H280v80Zm0-160h400v-80H280v80Zm-80 480q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm0-560v560-560Z"/></svg>,
                   templates:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M480-60q-50 0-85-35t-35-85q0-39 22.5-70t57.5-43v-73q-11-4-21-9.5T401-389l-63 37q1 5 1.5 10.5t.5 11.5q0 50-35 85t-85 35q-50 0-85-35t-35-85q0-50 35-85t85-35q23 0 43 7.5t36 21.5l62-36q-1-5-1.5-11t-.5-12q0-6 .5-11.5T361-502l-62-37q-16 14-36 21.5t-43 7.5q-50 0-85-35t-35-85q0-50 35-85t85-35q50 0 85 35t35 85q0 6-.5 12t-1.5 11l63 36q8-8 18-13t21-9v-73q-35-12-57.5-43.5T360-780q0-50 35-85t85-35q50 0 85 35t35 85q0 39-22.5 70.5T520-666v73q11 4 20.5 9.5T558-570l64-38q-1-5-1.5-10.5T620-630q0-50 35-85t85-35q50 0 85 35t35 85q0 50-35 85t-85 35q-23 0-42.5-7.5T662-539l-65 38q1 5 1.5 10.5t.5 10.5q0 5-.5 11t-1.5 11l65 37q16-14 35.5-21.5T740-450q50 0 85 35t35 85q0 50-35 85t-85 35q-50 0-85-35t-35-85q0-6 .5-11.5T622-352l-64-37q-8 8-17.5 13t-20.5 9v74q35 12 57.5 43t22.5 70q0 50-35 85t-85 35Zm0-80q17 0 28.5-11.5T520-180q0-17-11.5-28.5T480-220q-17 0-28.5 11.5T440-180q0 17 11.5 28.5T480-140ZM220-290q17 0 28.5-11.5T260-330q0-17-11.5-28.5T220-370q-17 0-28.5 11.5T180-330q0 17 11.5 28.5T220-290Zm520 0q17 0 28.5-11.5T780-330q0-17-11.5-28.5T740-370q-17 0-28.5 11.5T700-330q0 17 11.5 28.5T740-290ZM480-440q17 0 28.5-11.5T520-480q0-17-11.5-28.5T480-520q-17 0-28.5 11.5T440-480q0 17 11.5 28.5T480-440ZM220-590q17 0 28.5-11.5T260-630q0-17-11.5-28.5T220-670q-17 0-28.5 11.5T180-630q0 17 11.5 28.5T220-590Zm520 0q17 0 28.5-11.5T780-630q0-17-11.5-28.5T740-670q-17 0-28.5 11.5T700-630q0 17 11.5 28.5T740-590ZM480-740q17 0 28.5-11.5T520-780q0-17-11.5-28.5T480-820q-17 0-28.5 11.5T440-780q0 17 11.5 28.5T480-740Z"/></svg>,
-                  silhouettes:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M240-80v-170q-39-17-68.5-45.5t-50-64.5q-20.5-36-31-77T80-520q0-158 112-259t288-101q176 0 288 101t112 259q0 42-10.5 83t-31 77q-20.5 36-50 64.5T720-250v170H240Zm80-80h40v-80h80v80h80v-80h80v80h40v-142q38-9 67.5-30t50-50q20.5-29 31.5-64t11-74q0-125-88.5-202.5T480-800q-143 0-231.5 77.5T160-520q0 39 11 74t31.5 64q20.5 29 50.5 50t67 30v142Zm100-200h120l-60-120-60 120Zm-80-80q33 0 56.5-23.5T420-520q0-33-23.5-56.5T340-600q-33 0-56.5 23.5T260-520q0 33 23.5 56.5T340-440Zm280 0q33 0 56.5-23.5T700-520q0-33-23.5-56.5T620-600q-33 0-56.5 23.5T540-520q0 33 23.5 56.5T620-440ZM480-160Z"/></svg>,
-                };
-                return(
-                  <button key={id} onClick={()=>setRightPanel(id)} title={label}
+                   silhouettes:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M240-80v-170q-39-17-68.5-45.5t-50-64.5q-20.5-36-31-77T80-520q0-158 112-259t288-101q176 0 288 101t112 259q0 42-10.5 83t-31 77q-20.5 36-50 64.5T720-250v170H240Zm80-80h40v-80h80v80h80v-80h80v80h40v-142q38-9 67.5-30t50-50q20.5-29 31.5-64t11-74q0-125-88.5-202.5T480-800q-143 0-231.5 77.5T160-520q0 39 11 74t31.5 64q20.5 29 50.5 50t67 30v142Zm100-200h120l-60-120-60 120Zm-80-80q33 0 56.5-23.5T420-520q0-33-23.5-56.5T340-600q-33 0-56.5 23.5T260-520q0 33 23.5 56.5T340-440Zm280 0q33 0 56.5-23.5T700-520q0-33-23.5-56.5T620-600q-33 0-56.5 23.5T540-520q0 33 23.5 56.5T620-440ZM480-160Z"/></svg>,
+                   examples:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M382-240 154-468l57-56 171 171 367-367 57 57-424 424Z"/></svg>,
+                 };
+                 return(
+                  <button key={id} onClick={()=>setRightPanel(id)} aria-label={label} title={label}
                     onMouseEnter={e=>{if(rightPanel!==id)e.currentTarget.style.background=t.accMuted;e.currentTarget.style.color=t.acc;}}
                     onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color=rightPanel===id?t.acc:t.tx;}}
                     style={{width:52,minHeight:52,padding:"6px 4px",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,border:"none",background:"transparent",color:rightPanel===id?t.acc:t.tx,cursor:"pointer",borderRadius:8,marginBottom:4,transition:"all 0.15s",boxShadow:rightPanel===id?`inset 2px 0 0 ${t.acc}`:"none"}}>
@@ -1465,7 +1467,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
               })}
               {/* Collapse/expand toggle */}
               <div style={{flex:1,display:"flex",flexDirection:"column",justifyContent:"flex-end",paddingBottom:8}}>
-                <button ref={toggleBtnRef} onClick={toggleCollapsed} title="Toggle panel"
+                <button ref={toggleBtnRef} onClick={toggleCollapsed} aria-label="Toggle panel" title="Toggle panel"
                   style={{width:44,height:36,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"center",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx2,cursor:"pointer",fontSize:16,transition:"all 0.15s"}}>
                   ▶
                 </button>
@@ -1525,8 +1527,9 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           });
           updSession({markups:[...markups,...newMarkups],formulas:[...formulas,...(data.formulas||[])],norms:[...norms,...(data.norms||[])],analysisTemplate:data.name||"Imported"});
           if(!hasCoords){setPlacingQueue(newMarkups.filter(m=>!m.placed).map(m=>m.id));dispatch({type:"SET",payload:{placingIdx:0,placingMode:true,rightPanel:"markups"}});}
-        }        }/>}
-                </div>
+         }        }/>}
+                   {rightPanel==="examples"&&<ExamplesPanel t={t}/>}
+                 </div>
               </div>
               {selectedMarkup&&<div style={{borderTop:`1px solid ${t.bdr}`,padding:12,flexShrink:0,maxHeight:isMobile?180:260,overflowY:"auto",scrollbarWidth:"none"}}>
                 <MarkupProps m={selectedMarkup} t={t} theme={theme} onUpdate={p=>updMarkup(selectedMarkup.id,p)} onDelete={()=>delMarkup(selectedMarkup.id)} calibration={calibration} onParallel={()=>dispatch({type:"SET",payload:{activeTool:"parallel"}})} formatAngle={formatAngle} norms={norms} onUpdateNorms={ns=>updSession({norms:ns})}/>
@@ -1693,7 +1696,6 @@ export default function CephalometryStudio(){
 
   return(
     <div style={{background:t.bg,minHeight:"100vh"}}>
-      <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet"/>
       {!activeId&&<HomePage t={t} theme={theme} setTheme={setTheme} projects={projects} onOpen={id=>setActiveId(id)} onCreate={createProject} onImport={importCephxFile}/>}
       {activeId&&activeProject&&(
         <Workspace key={activeId} project={activeProject}

@@ -7,18 +7,17 @@
  *   or:  node scripts/svg-to-silhouette.js path-data.txt
  */
 
+/* global process */
+
 import * as fs from "fs";
-import * as path from "path";
 
 // ── SVG path command tokeniser ──────────────────────────────────────────────
 function tokenise(d) {
   const tokens = [];
   const re = /([mlcqasztMLCQASZT])\s*|([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)\s*/g;
   let m;
-  let lastCmd = null;
   while ((m = re.exec(d)) !== null) {
     if (m[1]) {
-      lastCmd = m[1];
       tokens.push({ type: "cmd", value: m[1] });
     } else if (m[2]) {
       tokens.push({ type: "num", value: parseFloat(m[2]) });
@@ -197,10 +196,10 @@ function parsePath(d) {
         while (true) {
           // rx ry x-axis-rotation large-arc sweep x y
           const rx = tokens[i]?.value; i++;
-          const ry = tokens[i]?.value; i++;
-          const rot = tokens[i]?.value; i++;
-          const laf = tokens[i]?.value; i++;
-          const sf = tokens[i]?.value; i++;
+          const _ry = tokens[i]?.value; i++;
+          const _rot = tokens[i]?.value; i++;
+          const _laf = tokens[i]?.value; i++;
+          const _sf = tokens[i]?.value; i++;
           const xy = readCoord(tokens, i);
           if (xy === null || rx === undefined) break;
           const ex = cmd === "A" ? xy.x : cx + xy.x;

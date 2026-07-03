@@ -6,12 +6,13 @@ import { useState } from "react";
 
 export function Btn({ onClick, children, style, active, small, danger, t, disabled, title, ghost }) {
   const [hov, setHov] = useState(false);
+  const aLabel = title || (typeof children === "string" ? children : undefined);
   return (
     <button
       onClick={onClick}
       disabled={disabled}
       title={title}
-      aria-label={title}
+      aria-label={aLabel}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{
@@ -70,6 +71,7 @@ export function Sld({ label, value, min, max, step = 1, onChange, t, unit = "" }
         step={step}
         value={value}
         onChange={e => onChange(+e.target.value)}
+        aria-label={label}
         style={{ width: "100%", accentColor: t.acc }}
       />
     </div>

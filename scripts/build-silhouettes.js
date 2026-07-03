@@ -350,6 +350,7 @@ const FILE_MAP = {
   "Pterygomaxillary Suture.svg":  { key: "pterygomaxillarySuture", name: "Pterygomaxillary Suture",      category: "Craniofacial", color: "#38bdf8" },
   "Soft Tissue Profile.svg":      { key: "softTissueProfile",     name: "Soft Tissue Profile",           category: "Craniofacial", color: "#f59e0b" },
   "Full Tracing.svg":             { key: "fullTracing",            name: "Full Tracing",                  category: "Composite",    color: "#60a5fa", multiPath: true, onInsertFit: true },
+  "Full Tracing with Dentition.svg": { key: "fullTracingWithDentition", name: "Full Tracing with Dentition", category: "Composite",    color: "#60a5fa", multiPath: true, onInsertFit: true },
 };
 
 // ── Main ───────────────────────────────────────────────────────────────────

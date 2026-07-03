@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { mkSession } from "../model/session.js";
 import { addSession, removeSession } from "../model/project.js";
+import { onEnter } from "../utils.js";
 
 export default function SessionFilmstrip({ project, t, onUpdateProject }) {
   const sessions = project?.sessions || [];
@@ -38,7 +39,12 @@ export default function SessionFilmstrip({ project, t, onUpdateProject }) {
           return (
             <div
               key={s.id}
+              role="button"
+              tabIndex={0}
+              aria-label={s.label || s.name || "Session"}
+              aria-current={isActive ? "page" : undefined}
               onClick={() => handleSetActive(s.id)}
+              onKeyDown={onEnter(() => handleSetActive(s.id))}
               onMouseEnter={() => setHoveredId(s.id)}
               onMouseLeave={() => setHoveredId(null)}
               style={{
@@ -91,6 +97,7 @@ export default function SessionFilmstrip({ project, t, onUpdateProject }) {
         <button
           onClick={handleAdd}
           title="Add session"
+          aria-label="Add session"
           style={{
             display: "flex", alignItems: "center", justifyContent: "center",
             width: 30, height: 30, borderRadius: 6, flexShrink: 0,

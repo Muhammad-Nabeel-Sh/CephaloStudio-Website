@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { THEMES } from "../constants.js";
 import { Btn, Tag } from "../ui.jsx";
+import { onEnter } from "../utils.js";
 import StartupWizard from "./StartupWizard.jsx";
 
 function NewCaseForm({t,onSubmit,onCancel}){
@@ -88,7 +89,7 @@ export default function HomePage({t,theme,setTheme,projects,onOpen,onCreate,onIm
       {/* PORTAL CARDS */}
       <div style={{maxWidth:1100,margin:"0 auto",padding:"0 32px 40px",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))",gap:20}}>
         {portals.map(portal=>(
-          <div key={portal.id} onMouseEnter={()=>setHov(portal.id)} onMouseLeave={()=>setHov(null)} onClick={()=>setFlow({proj:portal.id,phase:"form"})}
+          <div key={portal.id} role="button" tabIndex={0} aria-label={portal.title} onMouseEnter={()=>setHov(portal.id)} onMouseLeave={()=>setHov(null)} onClick={()=>setFlow({proj:portal.id,phase:"form"})} onKeyDown={onEnter(()=>setFlow({proj:portal.id,phase:"form"}))}
             style={{background:hov===portal.id?t.surf2:t.surf,border:`1px solid ${hov===portal.id?portal.color+"88":t.bdr}`,borderRadius:16,padding:28,cursor:"pointer",transition:"all 0.2s",transform:hov===portal.id?"translateY(-4px)":"none",boxShadow:hov===portal.id?`0 16px 40px ${t.shadow},0 0 0 1px ${portal.color}22`:`0 2px 8px ${t.shadow}`}}>
             <div style={{marginBottom:20,display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
               {portal.icon}
@@ -129,7 +130,7 @@ export default function HomePage({t,theme,setTheme,projects,onOpen,onCreate,onIm
         <div style={{fontSize:13,fontWeight:700,color:t.tx2,textTransform:"uppercase",letterSpacing:0.5,marginBottom:16}}>Recent Cases</div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(240px,1fr))",gap:12}}>
           {projects.map(p=>(
-            <div key={p.id} onClick={()=>onOpen(p.id)} onMouseEnter={()=>setHov(p.id+"-e")} onMouseLeave={()=>setHov(null)}
+            <div key={p.id} role="button" tabIndex={0} aria-label={p.name} onClick={()=>onOpen(p.id)} onKeyDown={onEnter(()=>onOpen(p.id))} onMouseEnter={()=>setHov(p.id+"-e")} onMouseLeave={()=>setHov(null)}
               style={{border:`1px solid ${hov===p.id+"-e"?t.acc:t.bdr}`,borderRadius:10,padding:14,cursor:"pointer",background:hov===p.id+"-e"?t.surf2:t.surf,transition:"all 0.15s"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
                 <div style={{fontFamily:"'Syne',sans-serif",fontWeight:700,fontSize:13,color:t.tx}}>{p.name}</div>

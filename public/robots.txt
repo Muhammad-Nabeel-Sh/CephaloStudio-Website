@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://cephalometry.studio/sitemap.xml
