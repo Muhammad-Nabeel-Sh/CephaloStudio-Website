@@ -660,27 +660,41 @@ function GroupMeansChart({ labels, t }) {
             means.push(m);
             ses.push(se);
             gNames.push(gName);
+            const jitter = vals.map(() => gi + (Math.random() - 0.5) * 0.3);
             individualTraces.push({
               type: "scatter", mode: "markers",
-              x: vals.map(() => gi), y: vals,
-              marker: { color, size: 4, opacity: 0.3, symbol: "circle" },
-              showlegend: false, hoverinfo: "skip",
+              x: jitter, y: vals,
+              marker: { color, size: 5, opacity: 0.25, symbol: "circle", line: { width: 0.5, color } },
+              showlegend: false,
+              hovertemplate: `${gName}: %{y:.2f}<extra></extra>`,
             });
           });
+
+          const lineTrace = {
+            type: "scatter", mode: "lines+markers",
+            x: gNames, y: means,
+            line: { color: t.acc, width: 1.5, dash: "dot", shape: "spline" },
+            marker: { size: 0 },
+            showlegend: false,
+            hoverinfo: "skip",
+          };
 
           const meanTrace = {
             type: "scatter", mode: "markers",
             x: gNames, y: means,
-            marker: { color: COLORS.slice(0, nGroups), size: 12, symbol: "square", line: { width: 1.5, color: t.bg } },
+            marker: {
+              color: COLORS.slice(0, nGroups), size: 14, symbol: "diamond",
+              line: { width: 2, color: t.bg },
+            },
             error_y: {
               type: "data", symmetric: true,
               array: ses, color: COLORS.slice(0, nGroups),
-              thickness: 2, width: 6,
+              thickness: 2, width: 8,
             },
-            text: means.map(m => m.toFixed(1)),
-            textposition: "middle center",
-            textfont: { size: 9, color: t.bg, family: FONT_STACK },
-            hovertemplate: "%{x}: %{y:.2f} ± %{customdata:.2f}<extra></extra>",
+            text: means.map((m, i) => `${m.toFixed(1)} ± ${ses[i].toFixed(1)}`),
+            textposition: "top center",
+            textfont: { size: 8, color: t.tx2, family: FONT_STACK },
+            hovertemplate: "%{x}: <b>%{y:.2f}</b> ± %{customdata:.2f}<extra></extra>",
             customdata: ses,
             showlegend: false,
           };
@@ -688,19 +702,19 @@ function GroupMeansChart({ labels, t }) {
           const l = {
             paper_bgcolor: "transparent", plot_bgcolor: "transparent",
             font: { color: t.tx2, family: FONT_STACK, size: 9 },
-            margin: { l: 20, r: 12, t: 20, b: 18 },
-            xaxis: { showgrid: false, zeroline: false, tickfont: { size: 8 } },
+            margin: { l: 24, r: 16, t: 24, b: 20 },
+            xaxis: { showgrid: false, zeroline: false, tickfont: { size: 9, color: t.tx2 } },
             yaxis: { range: [yMin - yPad, yMax + yPad], gridcolor: t.surf3, zeroline: false, tickfont: { size: 8 } },
-            height: 130,
+            height: 150,
             annotations: [{
-              x: 0, y: 1.1, xref: "paper", yref: "paper",
+              x: 0.5, y: 1.15, xref: "paper", yref: "paper",
               text: `<b>${label}</b>`, showarrow: false,
-              xanchor: "left", yanchor: "top",
-              font: { size: 11, color: t.tx },
+              xanchor: "center", yanchor: "top",
+              font: { size: 12, color: t.tx },
             }],
           };
 
-          return <PlotlyChart key={label} data={[...individualTraces, meanTrace]} layout={l} style={{ height: 110 }} />;
+          return <PlotlyChart key={label} data={[...individualTraces, lineTrace, meanTrace]} layout={l} style={{ height: 120 }} />;
         })}
       </div>
     </ChartCard>
@@ -848,14 +862,15 @@ function PValueHeatmap({ labels, results, t }) {
   const data = heatmapData(z, pLabels.map(([l]) => l), pLabels.map(([l]) => l), displayTxt, {
     zmin: 0, zmax: maxP,
     colorscale: [
-      [0, "#dc2626"],
-      [mid, "#fca5a5"],
-      [mid + 0.01, "#e5e7eb"],
-      [1, "#86efac"],
+      [0, "#b91c1c"],
+      [mid * 0.5, "#fca5a5"],
+      [mid, "#fecaca"],
+      [mid + 0.001, "#f1f5f9"],
+      [1, "#94a3b8"],
     ],
     customdata: hoverTxt,
     texttemplate: "%{text}",
-    textfont: { color: "#1f2937", size: 9, family: "'DM Sans',sans-serif" },
+    textfont: { color: "#1e293b", size: 9, family: FONT_STACK },
     hovertemplate: "%{y} vs %{x}: <b>%{customdata}</b><extra></extra>",
   });
   return (

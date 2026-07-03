@@ -483,7 +483,7 @@ function selectAndRunTest(labelData, design, alpha) {
   try {
     if (paired) {
       if (nGroups === 2) {
-        if (allNormal && minN >= 20) {
+        if (allNormal && minN >= 5) {
           testName = "Paired t-test";
           result = tTestPaired(groups[0], groups[1]);
         } else {
@@ -502,7 +502,7 @@ function selectAndRunTest(labelData, design, alpha) {
     } else {
       // independent design
       if (nGroups === 2) {
-        if (allNormal && minN >= 20) {
+        if (allNormal && minN >= 5) {
           testName = assumptions.equalVar ? "Independent t-test" : "Welch's t-test";
           result = independentTTest(groups[0], groups[1], !assumptions.equalVar);
         } else {
