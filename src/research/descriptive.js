@@ -226,7 +226,7 @@ export function runDescriptiveAll(sessions, config, calibration) {
       const values = samples.map(s => s.value);
       const stats = descriptiveStats(values);
       const refInterval = referenceInterval(values);
-      groupResult.labels[label] = { values: samples, stats, referenceInterval: refInterval };
+      groupResult.labels[label] = { values, stats, referenceInterval: refInterval };
     }
 
     results.groups[gName] = groupResult;
@@ -238,7 +238,7 @@ export function runDescriptiveAll(sessions, config, calibration) {
     const values = samples.map(s => s.value);
     const stats = descriptiveStats(values);
     const refInterval = referenceInterval(values);
-    results.combined[label] = { values: samples, stats, referenceInterval: refInterval };
+    results.combined[label] = { values, stats, referenceInterval: refInterval };
   }
 
   // Compute z-scores against reference norms
