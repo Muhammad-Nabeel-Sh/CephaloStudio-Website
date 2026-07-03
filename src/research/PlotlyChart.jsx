@@ -12,9 +12,9 @@ export function heatmapLayout(t, extra) {
   return {
     paper_bgcolor: t.surf,
     plot_bgcolor: t.surf,
-    font: { color: t.tx2, family: FONT_STACK, size: 10 },
-    xaxis: { side: "top", tickangle: -30, tickfont: { size: 8 }, gridcolor: t.surf3, zeroline: false },
-    yaxis: { tickfont: { size: 8 }, gridcolor: t.surf3, zeroline: false, autorange: "reversed" },
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
+    xaxis: { side: "top", tickangle: -30, tickfont: { size: 9 }, gridcolor: t.surf3, zeroline: false },
+    yaxis: { tickfont: { size: 9 }, gridcolor: t.surf3, zeroline: false, autorange: "reversed" },
     margin: { l: 80, r: 20, t: 60, b: 20 },
     ...extra,
   };

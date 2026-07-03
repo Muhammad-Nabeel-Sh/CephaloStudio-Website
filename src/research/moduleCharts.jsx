@@ -50,10 +50,10 @@ function ICCForestPlot({ details, t }) {
 
   const layout = {
     paper_bgcolor: t.surf, plot_bgcolor: t.surf,
-    font: { color: t.tx2, family: FONT_STACK, size: 10 },
-    margin: { l: 140, r: 60, t: 15, b: 45 },
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
+    margin: { l: 180, r: 60, t: 15, b: 45 },
     xaxis: { title: "Intraclass Correlation Coefficient (ICC)", range: [xMin, xMax], gridcolor: t.surf3, zeroline: false, dtick: 0.25 },
-    yaxis: { autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 9 } },
+    yaxis: { title: { text: "Landmark", font: { size: 12 } }, autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 10 } },
     height: Math.max(220, details.length * 30 + 50),
     shapes: [{
       type: "line", x0: 0.75, x1: 0.75, y0: -0.5, y1: labels.length - 0.5,
@@ -61,7 +61,7 @@ function ICCForestPlot({ details, t }) {
     }],
     annotations: [{
       x: 0.75, y: 1, xref: "x", yref: "paper",
-      text: "ICC=0.75", showarrow: false, font: { size: 9, color: t.tx3 },
+      text: "ICC=0.75", showarrow: false, font: { size: 10, color: t.tx3 },
       yanchor: "bottom", xanchor: "center",
     }],
   };
@@ -99,12 +99,12 @@ function ICCMatrixPlot({ details, t }) {
     ],
     customdata: hoverTxt,
     texttemplate: "%{text}",
-    textfont: { color: "#1f2937", size: 9, family: "'DM Sans',sans-serif" },
+    textfont: { color: "#1f2937", size: 10, family: "'DM Sans',sans-serif" },
     hovertemplate: "%{y} vs %{x}: <b>%{customdata}</b><extra></extra>",
   });
   return (
     <ChartCard title="ICC Pairwise Heatmap" t={t}>
-      <PlotlyChart data={data} layout={heatmapLayout(t, { height: Math.max(350, n * 28 + 80) })} />
+      <PlotlyChart data={data} layout={{...heatmapLayout(t, { height: Math.max(350, n * 28 + 80) }), xaxis: { ...heatmapLayout(t).xaxis, title: { text: "Landmark", font: { size: 12 } } }, yaxis: { ...heatmapLayout(t).yaxis, title: { text: "Landmark", font: { size: 12 } } } }} />
     </ChartCard>
   );
 }
@@ -153,11 +153,11 @@ function CollectiveBlandAltman({ details, t }) {
 
   const layout = {
     paper_bgcolor: t.surf, plot_bgcolor: t.surf,
-    font: { color: t.tx2, family: FONT_STACK, size: 10 },
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
     margin: { l: 55, r: 20, t: 15, b: 45 },
     xaxis: { title: "Mean of measurements", gridcolor: t.surf3, zeroline: false, range: [xMin, xMax] },
     yaxis: { title: "Difference", gridcolor: t.surf3, zeroline: false, range: [yMin, yMax] },
-    legend: { orientation: "h", y: 1.02, x: 0.5, xanchor: "center", font: { size: 9 } },
+    legend: { orientation: "h", y: 1.02, x: 0.5, xanchor: "center", font: { size: 10 } },
     height: 400,
   };
   return <ChartCard title="Collective Bland-Altman — All Landmarks" t={t}><PlotlyChart data={[...refTraces, pointTrace]} layout={layout} style={{ height: layout.height }} /></ChartCard>;
@@ -197,13 +197,13 @@ function ErrorMapPlot({ results, t }) {
 
   const layout = {
     paper_bgcolor: t.surf, plot_bgcolor: t.surf,
-    font: { color: t.tx2, family: FONT_STACK, size: 10 },
-    margin: { l: 130, r: 30, t: 15, b: 45 },
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
+    margin: { l: 120, r: 30, t: 15, b: 45 },
     xaxis: { title: "Error (mm)", range: [0, maxV * 1.1], gridcolor: t.surf3, zeroline: false },
-    yaxis: { autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 9 } },
+    yaxis: { title: { text: "Landmark", font: { size: 12 } }, autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 10 } },
     height: Math.max(240, entries.length * 24 + 50),
     barmode: "overlay",
-    legend: { orientation: "h", y: 1.02, x: 0.5, xanchor: "center", font: { size: 9 } },
+    legend: { orientation: "h", y: 1.02, x: 0.5, xanchor: "center", font: { size: 10 } },
   };
 
   return <ChartCard title="Landmark Error Map — All Landmarks" t={t}>
@@ -244,13 +244,13 @@ function MethodErrorBarPlot({ details, t }) {
 
   const layout = {
     paper_bgcolor: t.surf, plot_bgcolor: t.surf,
-    font: { color: t.tx2, family: FONT_STACK, size: 10 },
-    margin: { l: 130, r: 30, t: 15, b: 45 },
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
+    margin: { l: 120, r: 30, t: 15, b: 45 },
     xaxis: { title: "Error (mm)", range: [0, maxV * 1.1], gridcolor: t.surf3, zeroline: false },
-    yaxis: { autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 9 } },
+    yaxis: { title: { text: "Landmark", font: { size: 12 } }, autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 10 } },
     height: Math.max(240, chartable.length * 24 + 50),
     barmode: "overlay",
-    legend: { orientation: "h", y: 1.02, x: 0.5, xanchor: "center", font: { size: 9 } },
+    legend: { orientation: "h", y: 1.02, x: 0.5, xanchor: "center", font: { size: 10 } },
   };
 
   return <ChartCard title="Method Error Comparison — All Landmarks" t={t}>
@@ -342,10 +342,10 @@ function DistributionsChart({ combined, labels, t }) {
 
           const layout = {
             paper_bgcolor: "transparent", plot_bgcolor: "transparent",
-            font: { color: t.tx2, family: FONT_STACK, size: 9 },
+            font: { color: t.tx2, family: FONT_STACK, size: 10 },
             margin: { l: 50, r: 16, t: 22, b: 4 },
-            xaxis: { showgrid: false, zeroline: false, showticklabels: false, ticks: "" },
-            yaxis: { showgrid: false, zeroline: false, showticklabels: false, ticks: "", range: [0, yMax] },
+            xaxis: { title: "Value", showgrid: false, zeroline: false, showticklabels: false, ticks: "" },
+            yaxis: { title: "Density", showgrid: false, zeroline: false, showticklabels: false, ticks: "", range: [0, yMax] },
             height: 130,
             annotations: [
               {
@@ -396,10 +396,10 @@ function RaincloudPlot({ combined, labels, t }) {
   });
   const layout = {
     paper_bgcolor: t.surf, plot_bgcolor: t.surf,
-    font: { color: t.tx2, family: FONT_STACK, size: 10 },
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
     margin: { l: 100, r: 30, t: 10, b: 40 },
-    xaxis: { zeroline: false, gridcolor: t.surf3, tickfont: { size: 9 } },
-    yaxis: { autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 9 } },
+    xaxis: { title: "Value", zeroline: false, gridcolor: t.surf3, tickfont: { size: 10 } },
+    yaxis: { title: "Group", autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 10 } },
     height: Math.max(300, valid.length * 150),
     violingap: 0.4,
     violingroupgap: 0.4,
@@ -426,18 +426,18 @@ function CVBarChart({ combined, labels, t }) {
     marker: { color: barColors, opacity: 0.7 },
     text: pctText,
     textposition: "outside",
-    textfont: { size: 9, color: t.tx2, family: FONT_STACK },
+    textfont: { size: 10, color: t.tx2, family: FONT_STACK },
     hovertemplate: "%{y}: %{text}<extra></extra>",
     showlegend: false,
   }];
 
   const layout = {
     paper_bgcolor: t.surf, plot_bgcolor: t.surf,
-    font: { color: t.tx2, family: FONT_STACK, size: 10 },
-    margin: { l: 110, r: 60, t: 15, b: 45 },
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
+    margin: { l: 120, r: 60, t: 15, b: 45 },
     xaxis: { title: "Coefficient of Variation (%)", range: [0, maxCV], gridcolor: t.surf3, zeroline: false,
       tickformat: ",.0%", dtick: maxCV / 2 },
-    yaxis: { autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 9 } },
+    yaxis: { title: { text: "Landmark", font: { size: 12 } }, autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 10 } },
     height: Math.max(220, sorted.length * 22 + 50),
     bargap: 0.2,
   };
@@ -463,7 +463,7 @@ function DescriptiveBarChart({ combined, labels, t }) {
     marker: { color: t.acc, opacity: 0.7 },
     text: [...valid].reverse().map((l, i) => `${means[valid.length - 1 - i].toFixed(2)} ± ${sds[valid.length - 1 - i].toFixed(2)}`),
     textposition: "outside",
-    textfont: { size: 9 },
+    textfont: { size: 10 },
     hovertemplate: "%{y}: %{text}<br>n = %{customdata}<extra></extra>",
     customdata: [...nns].reverse(),
     showlegend: false,
@@ -485,10 +485,10 @@ function DescriptiveBarChart({ combined, labels, t }) {
   const xMax = Math.max(0, ...means) + Math.max(...sds) * 1.2;
   const layout = {
     paper_bgcolor: t.surf, plot_bgcolor: t.surf,
-    font: { color: t.tx2, family: FONT_STACK, size: 10 },
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
     margin: { l: 120, r: 80, t: 10, b: 40 },
     xaxis: { title: "Mean ± SD", range: [xMin, xMax], gridcolor: t.surf3, zeroline: hasNeg, zerolinecolor: t.bdr },
-    yaxis: { autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 9 } },
+    yaxis: { title: { text: "Measurement", font: { size: 12 } }, autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 10 } },
     height: Math.max(220, valid.length * 26 + 60),
     bargap: 0.3,
   };
@@ -517,10 +517,10 @@ function DescriptiveScatterPlot({ combined, labels, t }) {
   const xMax = Math.max(...allV) + (Math.max(...allV) - Math.min(...allV)) * 0.1;
   const layout = {
     paper_bgcolor: t.surf, plot_bgcolor: t.surf,
-    font: { color: t.tx2, family: FONT_STACK, size: 10 },
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
     margin: { l: 100, r: 20, t: 10, b: 45 },
     xaxis: { title: "Value", range: [xMin, xMax], gridcolor: t.surf3, zeroline: false },
-    yaxis: { autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 9 } },
+    yaxis: { title: { text: "Value", font: { size: 12 } }, autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 10 } },
     height: Math.max(220, valid.length * 28 + 60),
     showlegend: false,
   };
@@ -601,10 +601,10 @@ function BoxPlotCollective({ combined, labels, t }) {
 
   const layout = {
     paper_bgcolor: t.surf, plot_bgcolor: t.surf,
-    font: { color: t.tx2, family: FONT_STACK, size: 10 },
-    margin: { l: 90, r: 20, t: 10, b: 45 },
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
+    margin: { l: 120, r: 20, t: 10, b: 45 },
     xaxis: { gridcolor: t.surf3, zeroline: false, title: "Value" },
-    yaxis: { zeroline: false, showgrid: false, tickfont: { size: 9 } },
+    yaxis: { title: { text: "Group", font: { size: 12 } }, zeroline: false, showgrid: false, tickfont: { size: 10 } },
     height: Math.max(220, valid.length * 40 + 60),
   };
 
@@ -693,7 +693,7 @@ function GroupMeansChart({ labels, t }) {
             },
             text: means.map((m, i) => `${m.toFixed(1)} ± ${ses[i].toFixed(1)}`),
             textposition: "top center",
-            textfont: { size: 8, color: t.tx2, family: FONT_STACK },
+            textfont: { size: 10, color: t.tx2, family: FONT_STACK },
             hovertemplate: "%{x}: <b>%{y:.2f}</b> ± %{customdata:.2f}<extra></extra>",
             customdata: ses,
             showlegend: false,
@@ -701,10 +701,10 @@ function GroupMeansChart({ labels, t }) {
 
           const l = {
             paper_bgcolor: "transparent", plot_bgcolor: "transparent",
-            font: { color: t.tx2, family: FONT_STACK, size: 9 },
+            font: { color: t.tx2, family: FONT_STACK, size: 10 },
             margin: { l: 24, r: 16, t: 24, b: 20 },
-            xaxis: { showgrid: false, zeroline: false, tickfont: { size: 9, color: t.tx2 } },
-            yaxis: { range: [yMin - yPad, yMax + yPad], gridcolor: t.surf3, zeroline: false, tickfont: { size: 8 } },
+            xaxis: { title: "Group", showgrid: false, zeroline: false, tickfont: { size: 10, color: t.tx2 } },
+            yaxis: { title: "Mean", range: [yMin - yPad, yMax + yPad], gridcolor: t.surf3, zeroline: false, tickfont: { size: 10 } },
             height: 150,
             annotations: [{
               x: 0.5, y: 1.15, xref: "paper", yref: "paper",
@@ -757,10 +757,10 @@ function EffectSizeForest({ labels, t }) {
 
   const layout = {
     paper_bgcolor: t.surf, plot_bgcolor: t.surf,
-    font: { color: t.tx2, family: FONT_STACK, size: 10 },
-    margin: { l: 140, r: 60, t: 15, b: 45 },
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
+    margin: { l: 160, r: 60, t: 15, b: 45 },
     xaxis: { title: esMeasure, range: [xMin, xMax], gridcolor: t.surf3, zeroline: true, zerolinecolor: t.tx3 },
-    yaxis: { autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 9 } },
+    yaxis: { title: { text: "Comparison", font: { size: 12 } }, autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 10 } },
     height: Math.max(240, esLabels.length * 30 + 50),
   };
 
@@ -791,7 +791,7 @@ function VolcanoPlot({ labels, results, t }) {
     y: logP.filter((_, i) => sigFlags[i]),
     text: plotLabels.filter((_, i) => sigFlags[i]),
     textposition: "right",
-    textfont: { size: 9, color: t.tx2, family: FONT_STACK },
+    textfont: { size: 10, color: t.tx2, family: FONT_STACK },
     marker: { color: t.err, size: 8, opacity: 0.85 },
     name: `Significant (p<${alpha})`,
     hovertemplate: "%{text}: ES=%{x:.3f}, -log10(p)=%{y:.2f}<extra></extra>",
@@ -808,7 +808,7 @@ function VolcanoPlot({ labels, results, t }) {
 
   const layout = {
     paper_bgcolor: t.surf, plot_bgcolor: t.surf,
-    font: { color: t.tx2, family: FONT_STACK, size: 10 },
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
     margin: { l: 55, r: 30, t: 15, b: 50 },
     xaxis: { title: "Effect Size", range: [xMin, xMax], gridcolor: t.surf3, zeroline: true, zerolinecolor: t.tx3 },
     yaxis: { title: "\u2212log\u2081\u2080(p)", range: [0, yMaxVal], gridcolor: t.surf3, zeroline: false },
@@ -821,10 +821,10 @@ function VolcanoPlot({ labels, results, t }) {
     annotations: [{
       x: xMin + 0.02 * (xMax - xMin), y: -Math.log10(alpha),
       text: "\u03b1=" + alpha, showarrow: false,
-      font: { size: 9, color: t.err },
+      font: { size: 10, color: t.err },
       yanchor: "bottom",
     }],
-    legend: { orientation: "h", y: 1.02, x: 0.5, xanchor: "center", font: { size: 9 } },
+    legend: { orientation: "h", y: 1.02, x: 0.5, xanchor: "center", font: { size: 10 } },
   };
 
   return <ChartCard title="Volcano Plot — Effect Size vs. Significance" t={t}>
@@ -870,12 +870,12 @@ function PValueHeatmap({ labels, results, t }) {
     ],
     customdata: hoverTxt,
     texttemplate: "%{text}",
-    textfont: { color: "#1e293b", size: 9, family: FONT_STACK },
+    textfont: { color: "#1e293b", size: 10, family: FONT_STACK },
     hovertemplate: "%{y} vs %{x}: <b>%{customdata}</b><extra></extra>",
   });
   return (
     <ChartCard title={`P-Value Pairwise Matrix (\u03b1 = ${alpha})`} t={t}>
-      <PlotlyChart data={data} layout={heatmapLayout(t, { height: Math.max(350, n * 28 + 80) })} />
+      <PlotlyChart data={data} layout={{...heatmapLayout(t, { height: Math.max(350, n * 28 + 80) }), xaxis: { ...heatmapLayout(t).xaxis, title: { text: "Predictor", font: { size: 12 } } }, yaxis: { ...heatmapLayout(t).yaxis, title: { text: "Predictor", font: { size: 12 } } } }} />
     </ChartCard>
   );
 }
@@ -899,17 +899,17 @@ function PValueDotChart({ labels, results, t }) {
     },
     text: pVals.map(p => fmtP(p)),
     textposition: "right",
-    textfont: { size: 9, color: t.tx2, family: FONT_STACK },
+    textfont: { size: 10, color: t.tx2, family: FONT_STACK },
     hovertemplate: "%{y}: p = %{x:.4f}<extra></extra>",
     showlegend: false,
   };
 
   const layout = {
     paper_bgcolor: t.surf, plot_bgcolor: t.surf,
-    font: { color: t.tx2, family: FONT_STACK, size: 10 },
-    margin: { l: 110, r: 70, t: 15, b: 45 },
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
+    margin: { l: 120, r: 70, t: 15, b: 45 },
     xaxis: { title: "p-value", range: [0, maxP * 1.15], gridcolor: t.surf3, zeroline: false, dtick: maxP / 2 },
-    yaxis: { autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 9 } },
+    yaxis: { title: { text: "Comparison", font: { size: 12 } }, autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 10 } },
     height: Math.max(200, pLabels.length * 28 + 50),
     shapes: [{
       type: "line", x0: alpha, x1: alpha,
@@ -996,16 +996,17 @@ function LongitudinalTrajectories({ labels, t }) {
 
           const l = {
             paper_bgcolor: "transparent", plot_bgcolor: "transparent",
-            font: { color: t.tx2, family: FONT_STACK, size: 9 },
+            font: { color: t.tx2, family: FONT_STACK, size: 10 },
             margin: { l: 40, r: 12, t: 22, b: 28 },
             xaxis: {
+              title: "Timepoint",
               tickmode: "array",
               tickvals: tpNames.map((_, i) => i),
               ticktext: tpNames,
               showgrid: false, zeroline: false,
-              tickfont: { size: 8 },
+              tickfont: { size: 10 },
             },
-            yaxis: { range: [yMin, yMax], gridcolor: t.surf3, zeroline: false, tickfont: { size: 8 } },
+            yaxis: { title: "Value", range: [yMin, yMax], gridcolor: t.surf3, zeroline: false, tickfont: { size: 10 } },
             height: 200,
             annotations: [{
               x: 0, y: 1.05, xref: "paper", yref: "paper",
@@ -1055,7 +1056,7 @@ function MeanTrajectoryOverlay({ labels, t }) {
 
   const layout = {
     paper_bgcolor: t.surf, plot_bgcolor: t.surf,
-    font: { color: t.tx2, family: FONT_STACK, size: 10 },
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
     margin: { l: 60, r: 20, t: 15, b: 55 },
     xaxis: {
       tickmode: "array",
@@ -1063,11 +1064,11 @@ function MeanTrajectoryOverlay({ labels, t }) {
       ticktext: allTps,
       title: "Timepoint",
       gridcolor: t.surf3, zeroline: false,
-      tickfont: { size: 9 },
+      tickfont: { size: 10 },
     },
-    yaxis: { title: "Mean value", range: [yMin, yMax], gridcolor: t.surf3, zeroline: false, tickfont: { size: 9 } },
+    yaxis: { title: "Mean value", range: [yMin, yMax], gridcolor: t.surf3, zeroline: false, tickfont: { size: 10 } },
     height: 380,
-    legend: { orientation: "v", font: { size: 9 } },
+    legend: { orientation: "v", font: { size: 10 } },
   };
 
   return <ChartCard title="Mean Trajectory Overlay — All Landmarks" t={t}>
@@ -1110,12 +1111,12 @@ function ChangeScoreHeatmap({ labels, t }) {
     ],
     customdata: hoverTxt,
     texttemplate: "%{text}",
-    textfont: { color: "#1f2937", size: 9, family: "'DM Sans',sans-serif" },
+    textfont: { color: "#1f2937", size: 10, family: "'DM Sans',sans-serif" },
     hovertemplate: "%{y} \u2192 %{x}: <b>%{customdata}</b><extra></extra>",
   });
   return (
     <ChartCard title="Change Score Heatmap" t={t}>
-      <PlotlyChart data={data} layout={heatmapLayout(t, { height: Math.max(350, nLabels * 28 + 80) })} />
+      <PlotlyChart data={data} layout={{...heatmapLayout(t, { height: Math.max(350, nLabels * 28 + 80) }), xaxis: { ...heatmapLayout(t).xaxis, title: { text: "Timepoint (before)", font: { size: 12 } } }, yaxis: { ...heatmapLayout(t).yaxis, title: { text: "Timepoint (after)", font: { size: 12 } } } }} />
     </ChartCard>
   );
 }
@@ -1146,7 +1147,7 @@ const CORR_SCALE = [
   [0.75, "#3b82f6"],
   [1, "#1d4ed8"],
 ];
-const CORR_TFONT = { color: "#1f2937", size: 9, family: "'DM Sans',sans-serif" };
+const CORR_TFONT = { color: "#1f2937", size: 10, family: "'DM Sans',sans-serif" };
 
 function CorrelationMatrixPlot({ results, t }) {
   const { vars, matrix, n, method } = results;
@@ -1176,7 +1177,7 @@ function CorrelationMatrixPlot({ results, t }) {
   const H = Math.max(400, m * 28 + 100);
   return (
     <ChartCard title={`Correlation Matrix \u2014 ${method} (n=${n})`} t={t}>
-      <PlotlyChart data={data} layout={heatmapLayout(t, { height: H })} style={{ height: H }} />
+      <PlotlyChart data={data} layout={{...heatmapLayout(t, { height: H }), xaxis: { ...heatmapLayout(t).xaxis, title: { text: "Variable", font: { size: 12 } } }, yaxis: { ...heatmapLayout(t).yaxis, title: { text: "Variable", font: { size: 12 } } } }} style={{ height: H }} />
     </ChartCard>
   );
 }
@@ -1228,7 +1229,7 @@ function ScatterPairPlot({ results, t }) {
           yref: `y${i + 1} domain`,
           text: `r=${r.r.toFixed(2)}${r.sigAdj ? "*" : ""}`,
           showarrow: false,
-          font: { size: 9, color: t.bg },
+          font: { size: 10, color: t.bg },
           bgcolor: t.tx,
           opacity: 0.8,
         });
@@ -1238,20 +1239,21 @@ function ScatterPairPlot({ results, t }) {
 
   const axisCfg = {
     showgrid: true, gridcolor: t.surf3, zeroline: false,
-    tickfont: { size: 8, color: t.tx3 },
+    tickfont: { size: 10, color: t.tx3 },
     showline: false, ticks: "",
   };
   const layout = {
     paper_bgcolor: t.surf,
     plot_bgcolor: t.surf,
-    font: { color: t.tx2, family: FONT_STACK, size: 10 },
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
     annotations,
     margin: { l: 40, r: 20, t: 50, b: 30 },
     hovermode: "closest",
   };
   for (let i = 0; i < N; i++) {
-    layout[`xaxis${i + 1}`] = { ...axisCfg };
-    layout[`yaxis${i + 1}`] = { ...axisCfg };
+    const title = dimensions[i].label || "Variable";
+    layout[`xaxis${i + 1}`] = { ...axisCfg, title: { text: title, font: { size: 11 } } };
+    layout[`yaxis${i + 1}`] = { ...axisCfg, title: { text: title, font: { size: 11 } } };
   }
 
   const CELL = 130;
@@ -1295,10 +1297,10 @@ function ResidualDiagnosticPlot({ results, t }) {
 
   const resLayout = {
     paper_bgcolor: "transparent", plot_bgcolor: "transparent",
-    font: { color: t.tx2, family: FONT_STACK, size: 9 },
+    font: { color: t.tx2, family: FONT_STACK, size: 10 },
     margin: { l: 55, r: 20, t: 10, b: 45 },
-    xaxis: { title: "Fitted values", gridcolor: t.surf3, zeroline: false, tickfont: { size: 8 } },
-    yaxis: { title: "Residuals", gridcolor: t.surf3, zeroline: true, zerolinecolor: t.tx3, tickfont: { size: 8 } },
+    xaxis: { title: "Fitted values", gridcolor: t.surf3, zeroline: false, tickfont: { size: 10 } },
+    yaxis: { title: "Residuals", gridcolor: t.surf3, zeroline: true, zerolinecolor: t.tx3, tickfont: { size: 10 } },
     height: 280,
     shapes: [{
       type: "line", y0: 0, y1: 0,
@@ -1323,10 +1325,10 @@ function ResidualDiagnosticPlot({ results, t }) {
             showlegend: false,
           }]} layout={{
             paper_bgcolor: "transparent", plot_bgcolor: "transparent",
-            font: { color: t.tx2, family: FONT_STACK, size: 9 },
+            font: { color: t.tx2, family: FONT_STACK, size: 10 },
             margin: { l: 50, r: 30, t: 10, b: 40 },
-            xaxis: { title: "Observation index", gridcolor: t.surf3, zeroline: false, tickfont: { size: 8 } },
-            yaxis: { range: [0, cookMax * 1.2], gridcolor: t.surf3, zeroline: false, tickfont: { size: 8 } },
+            xaxis: { title: "Observation index", gridcolor: t.surf3, zeroline: false, tickfont: { size: 10 } },
+            yaxis: { title: "Cook's Distance", range: [0, cookMax * 1.2], gridcolor: t.surf3, zeroline: false, tickfont: { size: 10 } },
             height: 120,
             shapes: cookMax > 4 / n ? [{
               type: "line", y0: 4 / n, y1: 4 / n,
@@ -1350,7 +1352,7 @@ function ROCCurvePlot({ results, t }) {
   ];
   const layout = {
     paper_bgcolor: t.surf, plot_bgcolor: t.surf,
-    font: { color: t.tx2, family: FONT_STACK, size: 10 },
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
     margin: { l: 50, r: 20, t: 10, b: 50 },
     xaxis: { title: "1 \u2212 Specificity (FPR)", range: [0, 1], gridcolor: t.surf3, zeroline: false, dtick: 0.25 },
     yaxis: { title: "Sensitivity (TPR)", range: [0, 1], gridcolor: t.surf3, zeroline: false, dtick: 0.25 },
@@ -1405,12 +1407,12 @@ function DiagnosticROCCurves({ results, t }) {
 
   const layout = {
     paper_bgcolor: t.surf, plot_bgcolor: t.surf,
-    font: { color: t.tx2, family: FONT_STACK, size: 10 },
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
     margin: { l: 50, r: 20, t: 15, b: 50 },
     xaxis: { title: "1 \u2212 Specificity (FPR)", range: [0, 1], gridcolor: t.surf3, zeroline: false, dtick: 0.25 },
     yaxis: { title: "Sensitivity (TPR)", range: [0, 1], gridcolor: t.surf3, zeroline: false, dtick: 0.25 },
     height: 350,
-    legend: { orientation: "h", y: 1.02, x: 0.5, xanchor: "center", font: { size: 9 } },
+    legend: { orientation: "h", y: 1.02, x: 0.5, xanchor: "center", font: { size: 10 } },
   };
 
   return <ChartCard title="ROC Curves — All Predictors" t={t}>
@@ -1440,7 +1442,7 @@ function DiagnosticAUCComparison({ results, t }) {
     },
     text: diffs.map((v, i) => `${v.toFixed(3)} ${comparisons[i].significant ? "*" : ""}`),
     textposition: "right",
-    textfont: { size: 9, color: t.tx2, family: FONT_STACK },
+    textfont: { size: 10, color: t.tx2, family: FONT_STACK },
     hovertemplate: "%{y}: %{x:.4f} [%{customdata[0]:.4f}, %{customdata[1]:.4f}]<extra></extra>",
     customdata: diffs.map((v, i) => [ciLower[i], ciUpper[i]]),
     showlegend: false,
@@ -1448,10 +1450,10 @@ function DiagnosticAUCComparison({ results, t }) {
 
   const layout = {
     paper_bgcolor: t.surf, plot_bgcolor: t.surf,
-    font: { color: t.tx2, family: FONT_STACK, size: 10 },
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
     margin: { l: 140, r: 80, t: 15, b: 45 },
     xaxis: { title: "AUC difference", range: [-absMax, absMax], gridcolor: t.surf3, zeroline: true, zerolinecolor: t.tx3 },
-    yaxis: { autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 9 } },
+    yaxis: { title: { text: "Predictor", font: { size: 12 } }, autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 10 } },
     height: Math.max(200, comparisons.length * 44 + 50),
   };
 
@@ -1499,7 +1501,7 @@ function DiagnosticCalibrationPlot({ results, t }) {
 
   const layout = {
     paper_bgcolor: t.surf, plot_bgcolor: t.surf,
-    font: { color: t.tx2, family: FONT_STACK, size: 10 },
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
     margin: { l: 55, r: 30, t: 15, b: 55 },
     xaxis: { title: "Predicted probability", range: [0, 1], gridcolor: t.surf3, zeroline: false, dtick: 0.25 },
     yaxis: { title: "Observed proportion", range: [0, 1], gridcolor: t.surf3, zeroline: false, dtick: 0.25 },
@@ -1532,17 +1534,17 @@ function ChangeScoreChart({ labels, t }) {
     marker: { color: colors, opacity: 0.6 },
     text: vals.map((v, i) => `${allChanges[i].from}\u2192${allChanges[i].to}: ${v.toFixed(2)}`),
     textposition: "outside",
-    textfont: { size: 9, color: t.tx2, family: FONT_STACK },
+    textfont: { size: 10, color: t.tx2, family: FONT_STACK },
     hovertemplate: "%{y}: %{x:.2f}<extra></extra>",
     showlegend: false,
   };
 
   const layout = {
     paper_bgcolor: t.surf, plot_bgcolor: t.surf,
-    font: { color: t.tx2, family: FONT_STACK, size: 10 },
-    margin: { l: 150, r: 90, t: 15, b: 45 },
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
+    margin: { l: 120, r: 90, t: 15, b: 45 },
     xaxis: { title: "Change score", range: [-maxAbs, maxAbs], gridcolor: t.surf3, zeroline: true, zerolinecolor: t.tx3 },
-    yaxis: { autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 9 } },
+    yaxis: { title: { text: "Measurement", font: { size: 12 } }, autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 10 } },
     height: Math.max(200, allChanges.length * 28 + 50),
   };
 

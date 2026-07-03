@@ -15,14 +15,14 @@ export function safeRange(min, max) {
 
 // ─── Type Scale ──────────────────────────────────────────────────────────────
 export const FONT = {
-  xs: 8,
-  sm: 9,
-  md: 10,
-  lg: 11,
-  xl: 13,
-  title: 12,
-  tick: 8,
-  annotation: 9,
+  xs: 9,
+  sm: 10,
+  md: 11,
+  lg: 12,
+  xl: 14,
+  title: 13,
+  tick: 9,
+  annotation: 10,
 };
 
 export const FONT_STACK = "'DM Sans','DM Mono',monospace";
