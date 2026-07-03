@@ -12,6 +12,7 @@ import { drawMarkup, drawInProgress, drawScaleBar, drawLUTLegend, drawSnapIndica
 import { MarkupsPanel, MeasurementsPanel, FormulasPanel, ImagePanel, LayersPanel, MarkupProps, TemplatesPanel, SilhouettesPanel, ExamplesPanel } from "./panels.jsx";
 import { Modal } from "./panels/Modal.jsx";
 import HomePage from "./panels/HomePage.jsx";
+import ErrorBoundary from "./ErrorBoundary.jsx";
 import SessionsPanel from "./panels/SessionsPanel.jsx";
 import SessionFilmstrip from "./panels/SessionFilmstrip.jsx";
 import AnonModal from "./panels/AnonModal.jsx";
@@ -65,11 +66,7 @@ function profileProject(project) {
   const otherMB = (restBytes / 1024 / 1024).toFixed(1);
   
   rows.sort((a, b) => parseFloat(b.mb) - parseFloat(a.mb));
-  console.log("=== Project Size Profile ===");
-  console.table(rows);
-  console.log(`Images total: ${imgMB}MB | Research studies: ${rsMB}MB | Meta/subjects: ${otherMB}MB`);
   const grandTotal = totalImgBytes + rs.reduce((s, r) => s + JSON.stringify(r).length, 0) + restBytes;
-  console.log(`Grand total (approx chars): ${(grandTotal / 1024 / 1024).toFixed(1)}MB`);
   return { rows, imgMB, rsMB, otherMB, grandTotalMB: (grandTotal / 1024 / 1024).toFixed(1) };
 }
 
@@ -99,7 +96,6 @@ function sanitizeResults(obj, depth = 0) {
 }
 
 function exportCephx(project) {
-  console.log("[cephx] Profiling project before export...");
   profileProject(project);
   
   let cleaned = { ...project };
@@ -132,7 +128,6 @@ function exportCephx(project) {
   
   const payload = { format: "cephx", version: "2.1", exported: Date.now(), project: cleaned };
   const json = JSON.stringify(payload);
-  console.log(`[cephx] Final export: ${(json.length / 1024 / 1024).toFixed(1)}MB`);
   
   const blob = new Blob([json], { type: "application/json" });
   const a = document.createElement("a");
@@ -1631,7 +1626,11 @@ function saveProjects(projects) {
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(stripped));
   } catch (e) {
-    console.warn("Failed to save projects:", e);
+    if (e.name === "QuotaExceededError" || e.name === "NS_ERROR_DOM_QUOTA_REACHED") {
+      alert("Storage is full. Your projects could not be saved.\n\nExport your project files (.cephx) to preserve your data, then clear browser storage or remove unused projects.");
+    } else {
+      console.warn("Failed to save projects:", e);
+    }
   }
 }
 
@@ -1695,15 +1694,17 @@ export default function CephalometryStudio(){
   };
 
   return(
-    <div style={{background:t.bg,minHeight:"100vh"}}>
-      {!activeId&&<HomePage t={t} theme={theme} setTheme={setTheme} projects={projects} onOpen={id=>setActiveId(id)} onCreate={createProject} onImport={importCephxFile}/>}
-      {activeId&&activeProject&&(
-        <Workspace key={activeId} project={activeProject}
-          onUpdateProject={patch=>updateProject(activeId,patch)}
-          onHome={()=>setActiveId(null)} t={t} theme={theme} setTheme={setTheme}
-          onSave={proj=>{exportCephx(proj);dirtyRef.current=false;}}
-          onImport={importCephxFile}/>
-      )}
-    </div>
+    <ErrorBoundary t={t}>
+      <div style={{background:t.bg,minHeight:"100vh"}}>
+        {!activeId&&<HomePage t={t} theme={theme} setTheme={setTheme} projects={projects} onOpen={id=>setActiveId(id)} onCreate={createProject} onImport={importCephxFile}/>}
+        {activeId&&activeProject&&(
+          <Workspace key={activeId} project={activeProject}
+            onUpdateProject={patch=>updateProject(activeId,patch)}
+            onHome={()=>setActiveId(null)} t={t} theme={theme} setTheme={setTheme}
+            onSave={proj=>{exportCephx(proj);dirtyRef.current=false;}}
+            onImport={importCephxFile}/>
+        )}
+      </div>
+    </ErrorBoundary>
   );
 }
