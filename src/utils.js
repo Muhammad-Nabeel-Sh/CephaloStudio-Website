@@ -542,6 +542,31 @@ export function fCDF(f, d1, d2) {
   return 1 - betaIncomplete(d1 / 2, d2 / 2, x);
 }
 
+export function chi2CDF(x, df) {
+  if (x <= 0 || df <= 0) return 0;
+  const a = df / 2, y = x / 2;
+  const logBase = -y + a * Math.log(y) - gammaLn(a);
+  let p;
+  if (y < a + 1) {
+    let sum = 1 / a, term = 1 / a;
+    for (let n = 1; n < 200; n++) {
+      term *= y / (a + n);
+      sum += term;
+      if (Math.abs(term) < 1e-14) break;
+    }
+    p = sum * Math.exp(logBase);
+  } else {
+    let sum = 1, term = 1;
+    for (let n = 1; n < 200; n++) {
+      term *= (a - n) / y;
+      sum += term;
+      if (Math.abs(term) < 1e-14) break;
+    }
+    p = 1 - sum * Math.exp(logBase);
+  }
+  return p > 1 ? 1 : p < 0 ? 0 : p;
+}
+
 export function spearmanCorrelation(arr1, arr2) {
   if (arr1.length !== arr2.length || arr1.length < 2) return null;
   const rank1 = rankArray(arr1), rank2 = rankArray(arr2);

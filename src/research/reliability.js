@@ -242,8 +242,8 @@ function runLandmarkErrorMap(coords) {
       maxError,
       sdError,
       ellipse: {
-        major: 2 * 1.96 * Math.sqrt(Math.max(eig1, 0)),
-        minor: 2 * 1.96 * Math.sqrt(Math.max(eig2, 0)),
+        major: Math.sqrt(5.991) * Math.sqrt(Math.max(eig1, 0)),
+        minor: Math.sqrt(5.991) * Math.sqrt(Math.max(eig2, 0)),
         angle,
       },
     };

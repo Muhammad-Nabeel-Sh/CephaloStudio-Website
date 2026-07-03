@@ -1,4 +1,4 @@
-import { computeMeasurements } from "../utils.js";
+import { computeMeasurements, chi2CDF } from "../utils.js";
 
 // ─── Statistical helpers ──────────────────────────────────────────────────
 function stdNormalCdf(x) {
@@ -49,12 +49,14 @@ function descriptiveStats(values) {
   const tCrit = tCritical(0.975, n - 1);
   const ciMean = [mean - tCrit * sem, mean + tCrit * sem];
 
-  // Simple normality test using skewness and kurtosis (D'Agostino-Pearson)
+  // D'Agostino-Pearson omnibus K² normality test (combined skewness + kurtosis)
   const sk = skewness;
   const ku = excessKurtosis;
-  const zSk = n >= 8 ? Math.abs(sk) / Math.sqrt(6 / n) : 0;
-  const zKu = n >= 8 ? Math.abs(ku) / Math.sqrt(24 / n) : 0;
-  const isNormal = zSk < 2.58 && zKu < 2.58; // 99% confidence
+  const zSk = n >= 8 ? sk / Math.sqrt(6 / n) : 0;
+  const zKu = n >= 8 ? ku / Math.sqrt(24 / n) : 0;
+  const k2 = zSk * zSk + zKu * zKu;
+  const pNormal = n >= 8 ? 1 - chi2CDF(k2, 2) : 0;
+  const isNormal = pNormal > 0.01; // 99% confidence
 
   return {
     n, mean, sd, sem, variance,

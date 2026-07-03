@@ -1,4 +1,4 @@
-import { computeMeasurements, mean, stdev, variance, tTestPaired, fCDF, tDistributeCDF, clamp } from "../utils.js";
+import { computeMeasurements, mean, stdev, variance, tTestPaired, fCDF, chi2CDF, tDistributeCDF, clamp } from "../utils.js";
 
 // ─── Matrix helpers ─────────────────────────────────────────────────────────
 function sum(arr) {
@@ -104,7 +104,7 @@ function mauchlysTest(contrasts) {
   const df = p * (p + 1) / 2 - 1;
   if (df <= 0 || W <= 0 || f <= 0) return { W, chi2: 0, df, p: 1, spherical: true };
   const chi2 = -f * (n - 1) * Math.log(W);
-  const pVal = 1 - fCDF(chi2, df, 100000);
+  const pVal = 1 - chi2CDF(chi2, df);
   return { W, chi2: chi2, df, p: pVal, spherical: pVal > 0.05 };
 }
 
