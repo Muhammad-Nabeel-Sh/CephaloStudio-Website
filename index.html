@@ -19,9 +19,22 @@
     <link rel="manifest" href="/site.webmanifest" />
     <link rel="apple-touch-icon" href="/favicon_apple.png" />
     <title>Cephalometry Studio</title>
+    <style>
+      body { margin: 0; background: #1a1a2e; }
+      #splash { display:flex; align-items:center; justify-content:center; height:100vh; background:#1a1a2e; flex-direction:column; gap:16px; }
+      #splash-logo { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; color: #7c5cfc; }
+      #splash-sub { font-family: 'DM Sans', sans-serif; font-size: 13px; color: #888; }
+      @keyframes splashPulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
+      #splash-dot { animation: splashPulse 1.2s ease-in-out infinite; }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="splash">
+        <span id="splash-logo">Cephalometry Studio</span>
+        <span id="splash-sub"><span id="splash-dot">●</span> loading</span>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
