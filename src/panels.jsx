@@ -658,25 +658,21 @@ export function SilhouettesPanel({ t, onInsert }) {
       <div style={{ fontSize: 11, color: t.tx2, marginBottom: 12, lineHeight: 1.5 }}>
         Click a silhouette to place it on the canvas. Use handles to resize and rotate.
       </div>
-      {hasFullTracing && !search && (
-        <button key="fullTracing" onClick={() => onInsert("fullTracing")}
-          style={{ width: "100%", marginBottom: 12, padding: "10px 12px", borderRadius: 8, border: `1.5px solid ${t.acc}`, background: t.acc + "15", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, outline: "none", transition: "all 0.15s" }}>
-          <div style={{ flexShrink: 0, width: 40, height: 40, borderRadius: 6, background: t.surf3, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, color: t.acc }}>⊞</div>
-          <div style={{ textAlign: "left" }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: t.tx }}>Insert Full Tracing</div>
-            <div style={{ fontSize: 10, color: t.tx3, marginTop: 2 }}>Auto-scales to fill the canvas</div>
-          </div>
-        </button>
-      )}
-      {hasFullTracingWithDentition && !search && (
-        <button key="fullTracingWithDentition" onClick={() => onInsert("fullTracingWithDentition")}
-          style={{ width: "100%", marginBottom: 12, padding: "10px 12px", borderRadius: 8, border: `1.5px solid ${t.acc}`, background: t.acc + "15", cursor: "pointer", display: "flex", alignItems: "center", gap: 10, outline: "none", transition: "all 0.15s" }}>
-          <div style={{ flexShrink: 0, width: 40, height: 40, borderRadius: 6, background: t.surf3, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, color: t.acc }}>⊞</div>
-          <div style={{ textAlign: "left" }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: t.tx }}>Insert Full Tracing with Dentition</div>
-            <div style={{ fontSize: 10, color: t.tx3, marginTop: 2 }}>Auto-scales to fill the canvas</div>
-          </div>
-        </button>
+      {(hasFullTracing || hasFullTracingWithDentition) && !search && (
+        <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+          {hasFullTracing && (
+            <button key="fullTracing" onClick={() => onInsert("fullTracing")}
+              style={{ flex: 1, padding: "14px 8px", borderRadius: 10, border: `1.5px solid ${t.acc}`, background: t.acc + "15", cursor: "pointer", outline: "none", transition: "all 0.15s", fontSize: 12, fontWeight: 600, color: t.tx, textAlign: "center", lineHeight: 1.3 }}>
+              Full Tracing
+            </button>
+          )}
+          {hasFullTracingWithDentition && (
+            <button key="fullTracingWithDentition" onClick={() => onInsert("fullTracingWithDentition")}
+              style={{ flex: 1, padding: "14px 8px", borderRadius: 10, border: `1.5px solid ${t.acc}`, background: t.acc + "15", cursor: "pointer", outline: "none", transition: "all 0.15s", fontSize: 12, fontWeight: 600, color: t.tx, textAlign: "center", lineHeight: 1.3 }}>
+              With Dentition
+            </button>
+          )}
+        </div>
       )}
       <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search silhouettes..." style={{ width: "100%", padding: "7px 10px", border: `1px solid ${t.bdr}`, borderRadius: 6, background: t.surf3, color: t.tx, fontSize: 12, outline: "none", marginBottom: 12, fontFamily: "inherit", boxSizing: "border-box" }} />
       {allSilhouettes.length === 0 ? (
