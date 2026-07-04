@@ -592,6 +592,11 @@ function drawSilhouette(ctx, m, isSel, t, zoom, pan, showAnnotations, annotation
 
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
 
+  const nameColor = {};
+  if (m.pathColors) {
+    paths.forEach((p, i) => { if (p.name && m.pathColors[i]) nameColor[p.name] = m.pathColors[i]; });
+  }
+
   paths.forEach((path, pi) => {
     if (path.points.length < 2) return;
     const sp = path.points.map(transform);
@@ -603,7 +608,7 @@ function drawSilhouette(ctx, m, isSel, t, zoom, pan, showAnnotations, annotation
       if (p.y > maxY) maxY = p.y;
     });
 
-    const pc = m.pathColors?.[pi];
+    const pc = m.pathColors?.[pi] || (path.name && nameColor[path.name]);
     let strokeColor, fillColor;
     if (pc) {
       strokeColor = pc;
