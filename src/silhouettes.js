@@ -867,7 +867,7 @@ export const SILHOUETTES = {
     color: "#60a5fa",
     onInsertFit: true,
     paths: [
-      { closed: true, points: [
+      { closed: true, name: "C1", points: [
         { x: -0.28130, y: -0.00354 },
         { x: -0.28802, y: -0.01456 },
         { x: -0.29181, y: -0.02447 },
@@ -913,7 +913,7 @@ export const SILHOUETTES = {
         { x: -0.28130, y: -0.00354 },
         { x: -0.28130, y: -0.00354 },
       ]},
-      { closed: true, points: [
+      { closed: true, name: "C2", points: [
         { x: -0.22273, y: -0.00028 },
         { x: -0.21483, y: -0.01597 },
         { x: -0.20180, y: -0.02433 },
@@ -935,7 +935,7 @@ export const SILHOUETTES = {
         { x: -0.22273, y: -0.00028 },
         { x: -0.22273, y: -0.00028 },
       ]},
-      { closed: true, points: [
+      { closed: true, name: "C3", points: [
         { x: -0.26207, y: 0.21337 },
         { x: -0.25004, y: 0.17937 },
         { x: -0.24352, y: 0.16545 },
@@ -955,7 +955,7 @@ export const SILHOUETTES = {
         { x: -0.26612, y: 0.22409 },
         { x: -0.26207, y: 0.21337 },
       ]},
-      { closed: true, points: [
+      { closed: true, name: "C4", points: [
         { x: -0.29208, y: 0.27848 },
         { x: -0.28631, y: 0.26758 },
         { x: -0.27998, y: 0.25428 },
@@ -993,7 +993,7 @@ export const SILHOUETTES = {
         { x: -0.29208, y: 0.27848 },
         { x: -0.29208, y: 0.27848 },
       ]},
-      { closed: true, points: [
+      { closed: true,name: "Maxilla", points: [
         { x: 0.27777, y: 0.08870 },
         { x: 0.27335, y: 0.07308 },
         { x: 0.26866, y: 0.05163 },
@@ -1042,7 +1042,7 @@ export const SILHOUETTES = {
         { x: 0.27777, y: 0.08870 },
         { x: 0.27777, y: 0.08870 },
       ]},
-      { closed: true, points: [
+      { closed: true,name: "Hyoid", points: [
         { x: -0.07688, y: 0.29134 },
         { x: -0.07023, y: 0.28800 },
         { x: -0.06079, y: 0.29050 },
@@ -1064,7 +1064,7 @@ export const SILHOUETTES = {
         { x: -0.07688, y: 0.29134 },
         { x: -0.07688, y: 0.29134 },
       ]},
-      { closed: false, points: [
+      { closed: false,name:"Frontonasal", points: [
         { x: 0.20039, y: -0.49741 },
         { x: 0.21870, y: -0.44922 },
         { x: 0.23450, y: -0.40129 },
@@ -1082,7 +1082,7 @@ export const SILHOUETTES = {
         { x: 0.24984, y: -0.24144 },
         { x: 0.24821, y: -0.26643 },
       ]},
-      { closed: false, points: [
+      { closed: false, name: "Mandible", points: [
         { x: -0.06069, y: -0.01965 },
         { x: -0.07278, y: -0.01734 },
         { x: -0.08968, y: -0.01956 },
@@ -1154,7 +1154,7 @@ export const SILHOUETTES = {
         { x: 0.19783, y: 0.31277 },
         { x: 0.20709, y: 0.32036 },
       ]},
-      { closed: false, points: [
+      { closed: false, name: "Inner Mandibular Border", points: [
         { x: 0.24182, y: 0.23841 },
         { x: 0.24784, y: 0.26096 },
         { x: 0.25034, y: 0.27765 },
@@ -1172,7 +1172,7 @@ export const SILHOUETTES = {
         { x: 0.22009, y: 0.23600 },
         { x: 0.22376, y: 0.23036 },
       ]},
-      { closed: false, points: [
+      { closed: false, name: "Orbital Rim", points: [
         { x: 0.19699, y: -0.30907 },
         { x: 0.17977, y: -0.28995 },
         { x: 0.16129, y: -0.25527 },
@@ -1184,7 +1184,7 @@ export const SILHOUETTES = {
         { x: 0.18490, y: -0.11121 },
         { x: 0.20445, y: -0.11501 },
       ]},
-      { closed: true, points: [
+      { closed: true, name: "Frontal Sinus", points: [
         { x: 0.19739, y: -0.39742 },
         { x: 0.18940, y: -0.38915 },
         { x: 0.18620, y: -0.37578 },
@@ -1202,7 +1202,7 @@ export const SILHOUETTES = {
         { x: 0.19739, y: -0.39742 },
         { x: 0.19739, y: -0.39742 },
       ]},
-      { closed: true, points: [
+      { closed: true,name: "Pterygomaxillary Fissure", points: [
         { x: 0.00226, y: -0.10934 },
         { x: 0.00151, y: -0.12683 },
         { x: -0.00032, y: -0.13530 },
@@ -1222,7 +1222,7 @@ export const SILHOUETTES = {
         { x: 0.00226, y: -0.10934 },
         { x: 0.00226, y: -0.10934 },
       ]},
-      { closed: false, points: [
+      { closed: false, name: "Soft Tissue", points: [
         { x: 0.24845, y: -0.50000 },
         { x: 0.25875, y: -0.47288 },
         { x: 0.26696, y: -0.44110 },
@@ -1282,7 +1282,7 @@ export const SILHOUETTES = {
         { x: 0.02252, y: 0.48215 },
         { x: 0.02236, y: 0.50000 },
       ]},
-      { closed: true, points: [
+      { closed: true,name: "Porion",points: [
         { x: -0.25633, y: -0.10168 },
         { x: -0.26047, y: -0.09165 },
         { x: -0.25826, y: -0.08084 },
@@ -1294,13 +1294,13 @@ export const SILHOUETTES = {
         { x: -0.24811, y: -0.10585 },
         { x: -0.25633, y: -0.10168 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Maxillary Central", points: [
         { x: 0.24869, y: 0.10672 },
         { x: 0.25712, y: 0.09700 },
         { x: 0.26606, y: 0.09423 },
         { x: 0.27766, y: 0.09628 },
       ]},
-      { closed: true, points: [
+      { closed: true,name: "Maxillary Central", points: [
         { x: 0.27667, y: 0.15361 },
         { x: 0.28226, y: 0.13516 },
         { x: 0.28119, y: 0.11023 },
@@ -1317,7 +1317,7 @@ export const SILHOUETTES = {
         { x: 0.26920, y: 0.15240 },
         { x: 0.27667, y: 0.15361 },
       ]},
-      { closed: true, points: [
+      { closed: true, name: "Mandibular Central", points: [
         { x: 0.25567, y: 0.14311 },
         { x: 0.25091, y: 0.15615 },
         { x: 0.24379, y: 0.16796 },
@@ -1337,13 +1337,13 @@ export const SILHOUETTES = {
         { x: 0.25567, y: 0.14311 },
         { x: 0.25567, y: 0.14311 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Maxillary First Molar", points: [
         { x: 0.07362, y: 0.07243 },
         { x: 0.09061, y: 0.07330 },
         { x: 0.10845, y: 0.07854 },
         { x: 0.11598, y: 0.08327 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Maxillary First Molar", points: [
         { x: 0.09181, y: 0.02493 },
         { x: 0.09781, y: 0.01155 },
         { x: 0.10391, y: 0.00287 },
@@ -1351,7 +1351,7 @@ export const SILHOUETTES = {
         { x: 0.10661, y: 0.02931 },
         { x: 0.10695, y: 0.03604 },
       ]},
-      { closed: true, points: [
+      { closed: true,name: "Maxillary First Molar", points: [
         { x: 0.06820, y: 0.10463 },
         { x: 0.06512, y: 0.09480 },
         { x: 0.06822, y: 0.08171 },
@@ -1380,14 +1380,14 @@ export const SILHOUETTES = {
         { x: 0.06820, y: 0.10463 },
         { x: 0.06820, y: 0.10463 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Mandibular First Molar", points: [
         { x: 0.06607, y: 0.13416 },
         { x: 0.07454, y: 0.14041 },
         { x: 0.09435, y: 0.14802 },
         { x: 0.11006, y: 0.15135 },
         { x: 0.11635, y: 0.15076 },
       ]},
-      { closed: true, points: [
+      { closed: true,name: "Mandibular First Molar", points: [
         { x: 0.04625, y: 0.20007 },
         { x: 0.05235, y: 0.18577 },
         { x: 0.05866, y: 0.16047 },
@@ -1417,13 +1417,13 @@ export const SILHOUETTES = {
         { x: 0.04517, y: 0.20306 },
         { x: 0.04625, y: 0.20007 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Cranial Base", points: [
         { x: 0.11775, y: -0.29785 },
         { x: 0.14433, y: -0.30130 },
         { x: 0.17422, y: -0.30642 },
         { x: 0.19626, y: -0.31022 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Cranial Base", points: [
         { x: -0.02792, y: -0.24577 },
         { x: -0.00921, y: -0.25161 },
         { x: 0.02047, y: -0.26077 },
@@ -1436,7 +1436,7 @@ export const SILHOUETTES = {
         { x: 0.17055, y: -0.36463 },
         { x: 0.17467, y: -0.39058 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Cranial Base", points: [
         { x: 0.04260, y: -0.24229 },
         { x: 0.03860, y: -0.21143 },
         { x: 0.03337, y: -0.18858 },
@@ -1483,7 +1483,7 @@ export const SILHOUETTES = {
         { x: 0.16959, y: -0.27596 },
         { x: 0.18681, y: -0.28133 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Cranial Base", points: [
         { x: -0.41376, y: -0.05354 },
         { x: -0.39246, y: -0.05382 },
         { x: -0.36256, y: -0.05539 },
@@ -1497,7 +1497,7 @@ export const SILHOUETTES = {
         { x: -0.18635, y: -0.04178 },
         { x: -0.18320, y: -0.06577 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Key Ridge", points: [
         { x: 0.13321, y: -0.27178 },
         { x: 0.12451, y: -0.24171 },
         { x: 0.11312, y: -0.20601 },

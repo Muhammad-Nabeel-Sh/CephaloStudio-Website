@@ -592,7 +592,7 @@ function drawSilhouette(ctx, m, isSel, t, zoom, pan, showAnnotations, annotation
 
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
 
-  paths.forEach(path => {
+  paths.forEach((path, pi) => {
     if (path.points.length < 2) return;
     const sp = path.points.map(transform);
 
@@ -603,9 +603,16 @@ function drawSilhouette(ctx, m, isSel, t, zoom, pan, showAnnotations, annotation
       if (p.y > maxY) maxY = p.y;
     });
 
-    const defColor = SILHOUETTES[m.silhouetteType]?.color;
-    const fillColor = m.fillColor || (m.color || defColor) + "22";
-    const strokeColor = m.color || defColor;
+    const pc = m.pathColors?.[pi];
+    let strokeColor, fillColor;
+    if (pc) {
+      strokeColor = pc;
+      fillColor = pc + "22";
+    } else {
+      const defColor = path.color || SILHOUETTES[m.silhouetteType]?.color;
+      strokeColor = m.color || defColor;
+      fillColor = m.fillColor || (m.color || defColor) + "22";
+    }
     const lineWidth = (m.width || 1.5) * Math.sqrt(zoom);
 
     if (m.style === "dashed") ctx.setLineDash([8 * zoom, 4 * zoom]);
