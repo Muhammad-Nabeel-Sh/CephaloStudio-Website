@@ -315,7 +315,7 @@ export function FormulasPanel({ formulas, t, scope, onAdd, onEdit, onDelete, pin
           </div>
         );
       })}
-      <Btn t={t} small onClick={onAdd} style={{ width: "100%", marginTop: 4 }}>+ New Formula</Btn>
+      <Btn t={t} small onClick={onAdd} style={{ width: "100%", padding: "14px 8px", borderRadius: 10, border: `1.5px solid ${t.acc}`, background: t.acc + "15", cursor: "pointer", outline: "none", transition: "all 0.15s", fontSize: 12, fontWeight: 600, color: t.tx, textAlign: "center", lineHeight: 1.3 }}>New Formula</Btn>
       {bigLatex && <LatexFloatingPanel latex={bigLatex} onClose={() => setBigLatex(null)} />}
     </div>
   );
