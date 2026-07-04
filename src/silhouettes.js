@@ -1530,7 +1530,7 @@ export const SILHOUETTES = {
     color: "#60a5fa",
     onInsertFit: true,
     paths: [
-      { closed: true, points: [
+      { closed: true, name: "C1", points: [
         { x: -0.28130, y: -0.00354 },
         { x: -0.28802, y: -0.01456 },
         { x: -0.29181, y: -0.02447 },
@@ -1576,7 +1576,7 @@ export const SILHOUETTES = {
         { x: -0.28130, y: -0.00354 },
         { x: -0.28130, y: -0.00354 },
       ]},
-      { closed: true, points: [
+      { closed: true, name: "C2", points: [
         { x: -0.22273, y: -0.00028 },
         { x: -0.21483, y: -0.01597 },
         { x: -0.20180, y: -0.02433 },
@@ -1598,7 +1598,7 @@ export const SILHOUETTES = {
         { x: -0.22273, y: -0.00028 },
         { x: -0.22273, y: -0.00028 },
       ]},
-      { closed: true, points: [
+      { closed: true,name: "C3", points: [
         { x: -0.26207, y: 0.21337 },
         { x: -0.25004, y: 0.17937 },
         { x: -0.24352, y: 0.16545 },
@@ -1618,7 +1618,7 @@ export const SILHOUETTES = {
         { x: -0.26612, y: 0.22409 },
         { x: -0.26207, y: 0.21337 },
       ]},
-      { closed: true, points: [
+      { closed: true, name: "C4", points: [
         { x: -0.29208, y: 0.27848 },
         { x: -0.28631, y: 0.26758 },
         { x: -0.27998, y: 0.25428 },
@@ -1656,7 +1656,7 @@ export const SILHOUETTES = {
         { x: -0.29208, y: 0.27848 },
         { x: -0.29208, y: 0.27848 },
       ]},
-      { closed: true, points: [
+      { closed: true, name: "Maxilla", points: [
         { x: 0.27777, y: 0.08870 },
         { x: 0.27335, y: 0.07308 },
         { x: 0.26866, y: 0.05163 },
@@ -1705,7 +1705,7 @@ export const SILHOUETTES = {
         { x: 0.27777, y: 0.08870 },
         { x: 0.27777, y: 0.08870 },
       ]},
-      { closed: true, points: [
+      { closed: true,name: "Hyoid", points: [
         { x: -0.07688, y: 0.29134 },
         { x: -0.07023, y: 0.28800 },
         { x: -0.06079, y: 0.29050 },
@@ -1727,7 +1727,7 @@ export const SILHOUETTES = {
         { x: -0.07688, y: 0.29134 },
         { x: -0.07688, y: 0.29134 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Frontonasal", points: [
         { x: 0.20039, y: -0.49741 },
         { x: 0.21870, y: -0.44922 },
         { x: 0.23450, y: -0.40129 },
@@ -1745,7 +1745,7 @@ export const SILHOUETTES = {
         { x: 0.24984, y: -0.24144 },
         { x: 0.24821, y: -0.26643 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Mandible", points: [
         { x: -0.06069, y: -0.01965 },
         { x: -0.07278, y: -0.01734 },
         { x: -0.08968, y: -0.01956 },
@@ -1817,7 +1817,7 @@ export const SILHOUETTES = {
         { x: 0.19783, y: 0.31277 },
         { x: 0.20709, y: 0.32036 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Inner mandibular border", points: [
         { x: 0.24182, y: 0.23841 },
         { x: 0.24784, y: 0.26096 },
         { x: 0.25034, y: 0.27765 },
@@ -1835,7 +1835,7 @@ export const SILHOUETTES = {
         { x: 0.22009, y: 0.23600 },
         { x: 0.22376, y: 0.23036 },
       ]},
-      { closed: false, points: [
+      { closed: false, name: "Orbital Rim", points: [
         { x: 0.19699, y: -0.30907 },
         { x: 0.17977, y: -0.28995 },
         { x: 0.16129, y: -0.25527 },
@@ -1847,7 +1847,7 @@ export const SILHOUETTES = {
         { x: 0.18490, y: -0.11121 },
         { x: 0.20445, y: -0.11501 },
       ]},
-      { closed: true, points: [
+      { closed: true, name: "Frontal Sinus", points: [
         { x: 0.19739, y: -0.39742 },
         { x: 0.18940, y: -0.38915 },
         { x: 0.18620, y: -0.37578 },
@@ -1865,7 +1865,7 @@ export const SILHOUETTES = {
         { x: 0.19739, y: -0.39742 },
         { x: 0.19739, y: -0.39742 },
       ]},
-      { closed: true, points: [
+      { closed: true,name: "Pterygomaxillary Fissure", points: [
         { x: 0.00226, y: -0.10934 },
         { x: 0.00151, y: -0.12683 },
         { x: -0.00032, y: -0.13530 },
@@ -1885,7 +1885,7 @@ export const SILHOUETTES = {
         { x: 0.00226, y: -0.10934 },
         { x: 0.00226, y: -0.10934 },
       ]},
-      { closed: false, points: [
+      { closed: false, name: "Soft Tissue", points: [
         { x: 0.24845, y: -0.50000 },
         { x: 0.25875, y: -0.47288 },
         { x: 0.26696, y: -0.44110 },
@@ -1945,7 +1945,7 @@ export const SILHOUETTES = {
         { x: 0.02252, y: 0.48215 },
         { x: 0.02236, y: 0.50000 },
       ]},
-      { closed: true, points: [
+      { closed: true,name: "Porion", points: [
         { x: -0.25633, y: -0.10168 },
         { x: -0.26047, y: -0.09165 },
         { x: -0.25826, y: -0.08084 },
@@ -1957,13 +1957,13 @@ export const SILHOUETTES = {
         { x: -0.24811, y: -0.10585 },
         { x: -0.25633, y: -0.10168 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Cranial Base", points: [
         { x: 0.11775, y: -0.29785 },
         { x: 0.14433, y: -0.30130 },
         { x: 0.17422, y: -0.30642 },
         { x: 0.19626, y: -0.31022 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Cranial Base", points: [
         { x: -0.02792, y: -0.24577 },
         { x: -0.00921, y: -0.25161 },
         { x: 0.02047, y: -0.26077 },
@@ -1976,7 +1976,7 @@ export const SILHOUETTES = {
         { x: 0.17055, y: -0.36463 },
         { x: 0.17467, y: -0.39058 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Cranial Base", points: [
         { x: 0.04260, y: -0.24229 },
         { x: 0.03860, y: -0.21143 },
         { x: 0.03337, y: -0.18858 },
@@ -2023,7 +2023,7 @@ export const SILHOUETTES = {
         { x: 0.16959, y: -0.27596 },
         { x: 0.18681, y: -0.28133 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Cranial Base", points: [
         { x: -0.41376, y: -0.05354 },
         { x: -0.39246, y: -0.05382 },
         { x: -0.36256, y: -0.05539 },
@@ -2037,7 +2037,7 @@ export const SILHOUETTES = {
         { x: -0.18635, y: -0.04178 },
         { x: -0.18320, y: -0.06577 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Key Ridge", points: [
         { x: 0.13321, y: -0.27178 },
         { x: 0.12451, y: -0.24171 },
         { x: 0.11312, y: -0.20601 },
@@ -2058,7 +2058,7 @@ export const SILHOUETTES = {
         { x: 0.21547, y: -0.11975 },
         { x: 0.20404, y: -0.11521 },
       ]},
-      { closed: true, points: [
+      { closed: true,name: "Dentition", points: [
         { x: 0.25567, y: 0.14311 },
         { x: 0.25091, y: 0.15615 },
         { x: 0.24379, y: 0.16796 },
@@ -2078,14 +2078,14 @@ export const SILHOUETTES = {
         { x: 0.25567, y: 0.14311 },
         { x: 0.25567, y: 0.14311 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Dentition", points: [
         { x: 0.20098, y: 0.17869 },
         { x: 0.20556, y: 0.18600 },
         { x: 0.21320, y: 0.18855 },
         { x: 0.22302, y: 0.18633 },
         { x: 0.23459, y: 0.17952 },
       ]},
-      { closed: true, points: [
+      { closed: true,name: "Dentition", points: [
         { x: 0.20942, y: 0.15403 },
         { x: 0.21441, y: 0.14692 },
         { x: 0.22186, y: 0.14219 },
@@ -2107,14 +2107,14 @@ export const SILHOUETTES = {
         { x: 0.20418, y: 0.16633 },
         { x: 0.20942, y: 0.15403 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Dentition", points: [
         { x: 0.16792, y: 0.16730 },
         { x: 0.17644, y: 0.17827 },
         { x: 0.18431, y: 0.18109 },
         { x: 0.19408, y: 0.17822 },
         { x: 0.20043, y: 0.17369 },
       ]},
-      { closed: true, points: [
+      { closed: true,name: "Dentition", points: [
         { x: 0.16598, y: 0.17137 },
         { x: 0.16288, y: 0.19197 },
         { x: 0.16010, y: 0.21647 },
@@ -2135,14 +2135,14 @@ export const SILHOUETTES = {
         { x: 0.16732, y: 0.15623 },
         { x: 0.16598, y: 0.17137 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Dentition", points: [
         { x: 0.12792, y: 0.14702 },
         { x: 0.13202, y: 0.15528 },
         { x: 0.13843, y: 0.16158 },
         { x: 0.14721, y: 0.16392 },
         { x: 0.15792, y: 0.16049 },
       ]},
-      { closed: true, points: [
+      { closed: true,name: "Dentition", points: [
         { x: 0.15991, y: 0.15674 },
         { x: 0.15121, y: 0.17582 },
         { x: 0.13903, y: 0.20346 },
@@ -2163,14 +2163,14 @@ export const SILHOUETTES = {
         { x: 0.16441, y: 0.14845 },
         { x: 0.15991, y: 0.15674 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Dentition", points: [
         { x: 0.06607, y: 0.13416 },
         { x: 0.07454, y: 0.14041 },
         { x: 0.09435, y: 0.14802 },
         { x: 0.11006, y: 0.15135 },
         { x: 0.11635, y: 0.15076 },
       ]},
-      { closed: true, points: [
+      { closed: true,name: "Dentition", points: [
         { x: 0.04625, y: 0.20007 },
         { x: 0.05235, y: 0.18577 },
         { x: 0.05866, y: 0.16047 },
@@ -2200,14 +2200,14 @@ export const SILHOUETTES = {
         { x: 0.04517, y: 0.20306 },
         { x: 0.04625, y: 0.20007 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Dentition", points: [
         { x: 0.01097, y: 0.11618 },
         { x: 0.01639, y: 0.12271 },
         { x: 0.02755, y: 0.12845 },
         { x: 0.04077, y: 0.13257 },
         { x: 0.05389, y: 0.13424 },
       ]},
-      { closed: true, points: [
+      { closed: true,name: "Dentition", points: [
         { x: -0.00787, y: 0.15957 },
         { x: -0.00129, y: 0.14350 },
         { x: 0.00759, y: 0.12563 },
@@ -2238,13 +2238,13 @@ export const SILHOUETTES = {
         { x: -0.00787, y: 0.15957 },
         { x: -0.00787, y: 0.15957 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Dentition", points: [
         { x: 0.24869, y: 0.10672 },
         { x: 0.25712, y: 0.09700 },
         { x: 0.26606, y: 0.09423 },
         { x: 0.27766, y: 0.09628 },
       ]},
-      { closed: true, points: [
+      { closed: true,name: "Dentition", points: [
         { x: 0.27667, y: 0.15361 },
         { x: 0.28226, y: 0.13516 },
         { x: 0.28119, y: 0.11023 },
@@ -2261,14 +2261,14 @@ export const SILHOUETTES = {
         { x: 0.26920, y: 0.15240 },
         { x: 0.27667, y: 0.15361 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Dentition", points: [
         { x: 0.19856, y: 0.09595 },
         { x: 0.21015, y: 0.08692 },
         { x: 0.22069, y: 0.08338 },
         { x: 0.22959, y: 0.08530 },
         { x: 0.23666, y: 0.09256 },
       ]},
-      { closed: true, points: [
+      { closed: true,name: "Dentition", points: [
         { x: 0.19836, y: 0.09811 },
         { x: 0.19921, y: 0.08986 },
         { x: 0.20000, y: 0.07147 },
@@ -2292,13 +2292,13 @@ export const SILHOUETTES = {
         { x: 0.19836, y: 0.09811 },
         { x: 0.19836, y: 0.09811 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Dentition", points: [
         { x: 0.16634, y: 0.09399 },
         { x: 0.17427, y: 0.09006 },
         { x: 0.18141, y: 0.09077 },
         { x: 0.19037, y: 0.09826 },
       ]},
-      { closed: true, points: [
+      { closed: true,name: "Dentition", points: [
         { x: 0.16575, y: 0.09275 },
         { x: 0.16837, y: 0.07474 },
         { x: 0.17080, y: 0.05333 },
@@ -2321,13 +2321,13 @@ export const SILHOUETTES = {
         { x: 0.16575, y: 0.09275 },
         { x: 0.16575, y: 0.09275 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Dentition", points: [
         { x: 0.12903, y: 0.08507 },
         { x: 0.13852, y: 0.08132 },
         { x: 0.14603, y: 0.08155 },
         { x: 0.15320, y: 0.08730 },
       ]},
-      { closed: true, points: [
+      { closed: true,name: "Dentition", points: [
         { x: 0.12427, y: 0.09243 },
         { x: 0.12991, y: 0.08151 },
         { x: 0.13649, y: 0.06234 },
@@ -2351,13 +2351,13 @@ export const SILHOUETTES = {
         { x: 0.12427, y: 0.09243 },
         { x: 0.12427, y: 0.09243 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Dentition", points: [
         { x: 0.07362, y: 0.07243 },
         { x: 0.09061, y: 0.07330 },
         { x: 0.10845, y: 0.07854 },
         { x: 0.11598, y: 0.08327 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Dentition", points: [
         { x: 0.09181, y: 0.02493 },
         { x: 0.09781, y: 0.01155 },
         { x: 0.10391, y: 0.00287 },
@@ -2365,7 +2365,7 @@ export const SILHOUETTES = {
         { x: 0.10661, y: 0.02931 },
         { x: 0.10695, y: 0.03604 },
       ]},
-      { closed: true, points: [
+      { closed: true,name: "Dentition", points: [
         { x: 0.06820, y: 0.10463 },
         { x: 0.06512, y: 0.09480 },
         { x: 0.06822, y: 0.08171 },
@@ -2394,21 +2394,21 @@ export const SILHOUETTES = {
         { x: 0.06820, y: 0.10463 },
         { x: 0.06820, y: 0.10463 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Dentition", points: [
         { x: 0.04986, y: 0.00174 },
         { x: 0.05366, y: -0.00359 },
         { x: 0.05616, y: -0.00424 },
         { x: 0.05857, y: 0.00238 },
         { x: 0.05931, y: 0.01201 },
       ]},
-      { closed: false, points: [
+      { closed: false,name: "Dentition", points: [
         { x: 0.02403, y: 0.05674 },
         { x: 0.03750, y: 0.05933 },
         { x: 0.04861, y: 0.06229 },
         { x: 0.05649, y: 0.06586 },
         { x: 0.06348, y: 0.07146 },
       ]},
-      { closed: true, points: [
+      { closed: true,name: "Dentition", points: [
         { x: 0.02236, y: 0.05887 },
         { x: 0.02667, y: 0.05016 },
         { x: 0.03241, y: 0.03377 },
