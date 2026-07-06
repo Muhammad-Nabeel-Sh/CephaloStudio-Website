@@ -360,16 +360,12 @@ export const PREDEFINED = {
   photolateral: _photolateralAnalyses,
   photofrontal: _photofrontalAnalyses,
   other: [
-    { group: "Standard Orthodontic & Orthognathic", projections: [
+    { group: "Head and Neck Projections", projections: [
       { name: "Submentovertex (SMV)", def: "Evaluating cranial base symmetry, condylar angulation, and transverse discrepancies from a bottom-up angle.", color: "#f59e0b" },
       { name: "Panoramic Radiograph (OPG)", def: "Providing a broad overview of the dentition, jaws, and vertical ramal/condylar asymmetries.", color: "#60a5fa" },
-    ]},
-    { group: "TMJ-Specific", projections: [
       { name: "Transcranial View (Schüller)", def: "Evaluating the lateral aspect of the TMJ and condylar position/translation.", color: "#34d399" },
       { name: "Transpharyngeal View (Parma)", def: "Providing a clear view of the condylar head and neck across the pharynx.", color: "#a78bfa" },
       { name: "Transorbital View (Zimmer)", def: "Viewing the TMJ from an anterior-to-posterior perspective through the orbit.", color: "#fb923c" },
-    ]},
-    { group: "Specialized Cranial & Midface", projections: [
       { name: "Waters View", def: "Examining the midface, maxillary sinuses, and zygomatic arches.", color: "#f472b6" },
       { name: "Caldwell View", def: "Evaluating the frontal and ethmoid sinuses, as well as lateral orbital walls.", color: "#c084fc" },
       { name: "Towne's View", def: "Checking for medial/lateral condylar displacement and evaluating the occipital bone.", color: "#22d3ee" },

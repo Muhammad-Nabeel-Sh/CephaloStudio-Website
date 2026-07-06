@@ -2,6 +2,17 @@ import { useState, useRef, useCallback } from "react";
 import { PREDEFINED } from "../constants.js";
 import { Btn, Tag } from "../ui.jsx";
 
+const projectionKeyMap={
+  "Submentovertex (SMV)":"smv",
+  "Panoramic Radiograph (OPG)":"opg",
+  "Hand-Wrist Radiograph":"handwrist",
+};
+function getOtherAnalysis(name){
+  const key=projectionKeyMap[name];
+  if(key&&PREDEFINED[key]&&PREDEFINED[key].length>0)return PREDEFINED[key][0];
+  return null;
+}
+
 function StepDots({ current, total, t }) {
   return (
     <div style={{ display: "flex", gap: 8, justifyContent: "center", marginBottom: 24 }}>
@@ -242,27 +253,47 @@ function StepCalibrate({ t, imageDataUrl, onCalibrate }) {
   );
 }
 
+function StepPickProjection({ t, onPick }) {
+  const otherGroups = PREDEFINED.other || [];
+  return (
+    <div>
+      <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 20, color: t.tx, marginBottom: 4 }}>
+        Step 1 · Choose Projection
+      </div>
+      <div style={{ fontSize: 13, color: t.tx2, marginBottom: 20 }}>
+        Select the radiographic projection for this analysis.
+      </div>
+      {otherGroups.map(group => (
+        <div key={group.group} style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: t.tx2, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>{group.group}</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {group.projections.map(p => (
+              <div key={p.name} onClick={() => {
+                const analysis = getOtherAnalysis(p.name);
+                onPick(p.name, analysis);
+              }}
+                style={{ padding: "12px 14px", border: `1px solid ${p.color}88`, borderRadius: 10, cursor: "pointer", background: t.surf2, borderLeft: `4px solid ${p.color}`, transition: "all 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.background = t.accMuted; }}
+                onMouseLeave={e => { e.currentTarget.style.background = t.surf2; }}
+              >
+                <div style={{ fontWeight: 700, fontSize: 14, color: t.tx, marginBottom: 4 }}>{p.name}</div>
+                <div style={{ fontSize: 11, color: t.tx2, lineHeight: 1.5 }}>{p.def}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+      <Btn t={t} onClick={() => onPick(null, null)} style={{ width: "100%", marginTop: 8 }}>Cancel</Btn>
+    </div>
+  );
+}
+
 function StepTemplate({ t, projection, onPick }) {
   const [step, setStep] = useState("choose");
   const [selectedAnalysis, setSelectedAnalysis] = useState(null);
   const templateRef = useRef(null);
 
   const analyses = PREDEFINED[projection] || [];
-  const otherGroups = PREDEFINED.other || [];
-
-  // For "other" projection, map sub-projection name to PREDEFINED key
-  const projectionKeyMap={
-    "Submentovertex (SMV)":"smv",
-    "Panoramic Radiograph (OPG)":"opg",
-    "Hand-Wrist Radiograph":"handwrist",
-    "Lateral Photo":"photolateral",
-    "Frontal Photo":"photofrontal",
-  };
-  const getOtherAnalysis=(name)=>{
-    const key=projectionKeyMap[name];
-    if(key&&PREDEFINED[key]&&PREDEFINED[key].length>0)return PREDEFINED[key][0];
-    return null;
-  };
 
   const options = [
     { id: "blank", icon: "☐", title: "Blank", desc: "Start with a clean canvas. Place your own landmarks, lines, and measurements." },
@@ -270,42 +301,6 @@ function StepTemplate({ t, projection, onPick }) {
     { id: "complete", icon: "⬡", title: "Complete Analysis", desc: "Load all landmark points + standard measurement planes for the selected analysis." },
     { id: "upload", icon: "↑", title: "Upload Template", desc: "Import a .cepht template file shared by a colleague or from a previous case." },
   ];
-
-  // Sub-projection picker for "other" projection
-  if (projection === "other") {
-    return (
-      <div>
-        <div style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, fontSize: 20, color: t.tx, marginBottom: 4 }}>
-          Step 3 · Choose Projection
-        </div>
-        <div style={{ fontSize: 13, color: t.tx2, marginBottom: 20 }}>
-          Select the radiographic projection for this analysis.
-        </div>
-        {otherGroups.map(group => (
-          <div key={group.group} style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: t.tx2, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.5 }}>{group.group}</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {group.projections.map(p => (
-                <div key={p.name} onClick={() => {
-                  const analysis = getOtherAnalysis(p.name);
-                  if (analysis) onPick("complete", analysis);
-                  else onPick("blank");
-                }}
-                  style={{ padding: "12px 14px", border: `1px solid ${t.bdr}`, borderRadius: 10, cursor: "pointer", background: t.surf2, borderLeft: `4px solid ${p.color}`, transition: "all 0.15s" }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = p.color; e.currentTarget.style.background = t.accMuted; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = t.bdr; e.currentTarget.style.background = t.surf2; }}
-                >
-                  <div style={{ fontWeight: 700, fontSize: 14, color: t.tx, marginBottom: 4 }}>{p.name}</div>
-                  <div style={{ fontSize: 11, color: t.tx2, lineHeight: 1.5 }}>{p.def}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-        <Btn t={t} onClick={() => onPick("cancel")} style={{ width: "100%", marginTop: 8 }}>Cancel</Btn>
-      </div>
-    );
-  }
 
   if (step === "analysis") return (
     <div>
@@ -401,11 +396,47 @@ function StepTemplate({ t, projection, onPick }) {
   );
 }
 
+function buildImgEntry(imageData) {
+  return imageData ? {
+    id: Math.random().toString(36).slice(2, 10),
+    name: imageData.file.name,
+    dataUrl: imageData.dataUrl,
+    dx: 0, dy: 0, opacity: 1, blendMode: "normal",
+    visible: true, color: "none",
+    transform: { tx: 0, ty: 0, rot: 0, scale: 1 },
+  } : null;
+}
+
+function buildCalib(result) {
+  return result ? { done: true, pxPerMm: result.pxPerMm, knownMm: result.knownMm } : { done: false, pxPerMm: 1, knownMm: "" };
+}
+
+function buildResult(name, imageData, calib, type, analysis, templateData, imageName) {
+  return {
+    name: imageName || "Untitled Case",
+    image: buildImgEntry(imageData),
+    calibration: buildCalib(calib),
+    templateType: type,
+    analysis,
+    templateData,
+  };
+}
+
 export default function StartupWizard({ t, projection, onComplete, onCancel }) {
   const [step, setStep] = useState(0);
-  const [imageData, setImageData] = useState(null); // { file, dataUrl }
+  const [imageData, setImageData] = useState(null);
   const [calib, setCalib] = useState(null);
   const [imageName, setImageName] = useState("");
+  const [subProjection, setSubProjection] = useState(null);
+
+  const isOther = projection === "other";
+  const stepLabels = isOther ? ["Projection", "Image", "Calibrate"] : ["Image", "Calibrate", "Template"];
+
+  const handlePickProjection = (name, analysis) => {
+    if (!name) { onCancel(); return; }
+    setSubProjection({ name, analysis });
+    setStep(1);
+  };
 
   const handleImage = (data) => {
     setImageData(data);
@@ -414,29 +445,18 @@ export default function StartupWizard({ t, projection, onComplete, onCancel }) {
 
   const handleCalibrate = (result) => {
     setCalib(result);
-    if (result) setStep(2);
-    else { setStep(2); setCalib({ pxPerMm: 1, knownMm: "" }); }
+    if (isOther) {
+      const type = subProjection?.analysis ? "complete" : "blank";
+      onComplete(buildResult(imageName, imageData, result || { pxPerMm: 1, knownMm: "" }, type, subProjection?.analysis || null, null, imageName));
+    } else {
+      if (result) setStep(2);
+      else { setStep(2); setCalib({ pxPerMm: 1, knownMm: "" }); }
+    }
   };
 
   const handlePick = (type, analysis, templateData) => {
     if (type === "cancel") { onCancel(); return; }
-    const imgEntry = imageData ? {
-      id: Math.random().toString(36).slice(2, 10),
-      name: imageData.file.name,
-      dataUrl: imageData.dataUrl,
-      dx: 0, dy: 0, opacity: 1, blendMode: "normal",
-      visible: true, color: "none",
-      transform: { tx: 0, ty: 0, rot: 0, scale: 1 },
-    } : null;
-
-    onComplete({
-      name: imageName || "Untitled Case",
-      image: imgEntry,
-      calibration: calib ? { done: true, pxPerMm: calib.pxPerMm, knownMm: calib.knownMm } : { done: false, pxPerMm: 1, knownMm: "" },
-      templateType: type,
-      analysis,
-      templateData,
-    });
+    onComplete(buildResult(imageName, imageData, calib, type, analysis, templateData, imageName));
   };
 
   return (
@@ -448,16 +468,25 @@ export default function StartupWizard({ t, projection, onComplete, onCancel }) {
           style={{ background: "none", border: "none", color: t.tx2, cursor: "pointer", fontSize: 14, padding: 4 }}>
           {step > 0 ? "← Back" : "← Cancel"}
         </button>
+        {stepLabels[step] && <span style={{ fontSize: 11, color: t.tx3, fontWeight: 600 }}>{step + 1} of 3 · {stepLabels[step]}</span>}
       </div>
 
-      {step === 0 && (
-        <StepImage t={t} initialPreview={imageData?.dataUrl} onImage={handleImage} onNext={() => imageData && setStep(1)}/>
-      )}
-      {step === 1 && imageData && (
-        <StepCalibrate t={t} imageDataUrl={imageData.dataUrl} onCalibrate={handleCalibrate}/>
-      )}
-      {step === 2 && (
-        <StepTemplate t={t} projection={projection} onPick={handlePick}/>
+      {isOther ? (
+        <>
+          {step === 0 && <StepPickProjection t={t} onPick={handlePickProjection}/>}
+          {step === 1 && <StepImage t={t} initialPreview={imageData?.dataUrl} onImage={handleImage} onNext={() => imageData && setStep(2)}/>}
+          {step === 2 && imageData && (
+            <StepCalibrate t={t} imageDataUrl={imageData.dataUrl} onCalibrate={handleCalibrate}/>
+          )}
+        </>
+      ) : (
+        <>
+          {step === 0 && <StepImage t={t} initialPreview={imageData?.dataUrl} onImage={handleImage} onNext={() => imageData && setStep(1)}/>}
+          {step === 1 && imageData && (
+            <StepCalibrate t={t} imageDataUrl={imageData.dataUrl} onCalibrate={handleCalibrate}/>
+          )}
+          {step === 2 && <StepTemplate t={t} projection={projection} onPick={handlePick}/>}
+        </>
       )}
 
       <div style={{marginTop:24,paddingTop:16,borderTop:`1px solid ${t.bdr}`,display:"flex",justifyContent:"center"}}>
