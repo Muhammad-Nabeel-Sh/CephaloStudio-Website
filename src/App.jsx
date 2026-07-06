@@ -1257,7 +1257,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         </button>
         <button onClick={onHome} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:5,padding:"4px 8px",borderRadius:6,flexShrink:0}}>
           <span><img src="/favicon.svg" alt="Website Icon" width="48" height="48"/> </span>
-          {!isMobile&&<span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,color:t.tx,fontSize:17}}>Cephalometry Studio</span>}
+          {!isMobile&&<span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,color:t.tx,fontSize:17,display:"inline-flex",alignItems:"center",gap:6}}>Cephalometry Studio<span style={{fontSize:8,fontWeight:700,color:t.acc,background:t.accMuted,borderRadius:5,padding:"1px 5px",letterSpacing:0.8}}>BETA</span></span>}
         </button>
         <div style={{width:1,height:20,background:t.bdr,flexShrink:0}}/>
         <Tag color={t.acc}>{project.projection?.toUpperCase()}</Tag>

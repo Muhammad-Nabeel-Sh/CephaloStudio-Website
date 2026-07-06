@@ -59,7 +59,7 @@ export default function HomePage({t,theme,setTheme,projects,onOpen,onCreate,onIm
         <style>{`@media (max-width: 767px) {.home-header {position:relative !important;padding:12px 16px !important; display:block !important;}}`}</style>
         <div style={{display:"flex",alignItems:"center",gap:12}}>
           <div style={{width:50,height:50,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}><img src="/favicon.svg" alt="Website Icon" width="48" height="48"/> </div>
-          <div><div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:20,letterSpacing:-0.5,color:t.tx}}>Cephalometry Studio</div><div style={{fontSize:10,color:t.tx2,letterSpacing:1,textTransform:"uppercase",fontWeight:600}}>Advanced Cephalometric Analysis</div></div>
+          <div><div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:20,letterSpacing:-0.5,color:t.tx,display:"flex",alignItems:"center",gap:8}}>Cephalometry Studio<span style={{fontSize:9,fontWeight:700,color:t.acc,background:t.accMuted,borderRadius:6,padding:"1px 6px",letterSpacing:0.8}}>BETA</span></div><div style={{fontSize:10,color:t.tx2,letterSpacing:1,textTransform:"uppercase",fontWeight:600}}>Advanced Cephalometric Analysis</div></div>
         </div>
         <div style={{display:"flex",gap:6,alignItems:"center"}}>
           {Object.values(THEMES).map(th=>(

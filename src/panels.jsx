@@ -719,7 +719,14 @@ export function ExamplesPanel({ t }) {
   }, []);
 
   return (
-    <div style={{ padding: 12 }}>
+    <div style={{ padding: 12, position: "relative" }}>
+      {/* Coming Soon Overlay */}
+      <div style={{ position:"absolute",inset:0,zIndex:10,background:`${t.surf}CC`,backdropFilter:"blur(1px)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",borderRadius:8 }}>
+        <div style={{ fontSize:28,marginBottom:6,opacity:0.8 }}>🚧</div>
+        <div style={{ fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:18,color:t.tx,marginBottom:4 }}>Coming Soon</div>
+        <div style={{ fontSize:11,color:t.tx2,textAlign:"center",maxWidth:180,lineHeight:1.4 }}>Example templates are being finalized for the next release.</div>
+      </div>
+
       {data && (
         <ExampleViewerModal
           t={t}
@@ -727,10 +734,10 @@ export function ExamplesPanel({ t }) {
           onClose={() => setData(null)}
         />
       )}
-      <div style={{ fontSize: 11, color: t.tx2, marginBottom: 12, lineHeight: 1.5 }}>
+      <div style={{ fontSize: 11, color: t.tx2, marginBottom: 12, lineHeight: 1.5, pointerEvents:"none" }}>
         Browse example templates. Click <strong>View</strong> to see a preview on canvas.
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, pointerEvents:"none", opacity:0.5 }}>
         {EXAMPLE_LIST.map(ex => (
           <div key={ex.id} onClick={() => openExample(ex.id)}
             style={{ padding: "12px", borderRadius: 8, background: t.surf2, border: `1px solid ${t.bdr}`, cursor: "pointer", display: "flex", alignItems: "center", gap: 10, transition: "border-color 0.15s" }}>
