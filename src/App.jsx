@@ -660,7 +660,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         const vp=vpts(hp);
         if(vp.length){
           const sp={x:vp[0].x*zoom+pan.x,y:vp[0].y*zoom+pan.y};
-          const tipW=Math.min(340,canvas.width-sp.x-20);
+          const tipW=Math.max(120,Math.min(340,canvas.width-sp.x-20));
+          ctx.font=`11px "DM Sans",sans-serif`;
           const lines=[];let line="";
           for(const word of hp.definition.split(" ")){
             const test=line?line+" "+word:word;
@@ -675,7 +676,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           ctx.save();
           ctx.shadowColor="rgba(0,0,0,0.4)";ctx.shadowBlur=10;ctx.shadowOffsetY=2;
           ctx.fillStyle=t.surf2;ctx.beginPath();ctx.roundRect(tx,ty,tipW,tipH,8);ctx.fill();
-          ctx.shadowBlur=0;
+          ctx.shadowColor="transparent";ctx.shadowBlur=0;ctx.shadowOffsetY=0;
           ctx.fillStyle=t.acc;ctx.beginPath();ctx.roundRect(tx,ty,tipW,3,{upperLeft:8,upperRight:8});ctx.fill();
           ctx.fillStyle=t.tx;ctx.font=`bold 12px "DM Sans",sans-serif`;
           ctx.fillText(hp.label,tx+12,ty+20);
@@ -1200,6 +1201,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const measScope=useMemo(()=>buildScope(markups,calibration),[markups,calibration]);
   const allMeas=useMemo(()=>markups.map(m=>({m,meas:computeMeasurements(m,calibration)})).filter(x=>Object.keys(x.meas).length>0),[markups,calibration]);
   const [pinnedFormulas, setPinnedFormulas] = useState(new Set());
+  const [filmstripOpen, setFilmstripOpen] = useState(true);
   const formulaMeas = useMemo(() => {
     const res = [];
     formulas.forEach(f => {
@@ -1415,10 +1417,19 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
               {["polygon","curve"].includes(activeTool)?`${currentDraw.points.length} pts · dbl-click done`:(()=>{const n={line:2,angle3:3,angle4:4,perp:3,ruler:2}[activeTool];return`${currentDraw.points.length}/${n}`;})()}
             </div>}
           </div>}
-          {/* Floating session filmstrip at bottom */}
-          <div style={{position:"absolute",bottom:8,left:"50%",transform:"translateX(-50%)",zIndex:5,borderRadius:8,background:t.surf+"ee",border:`1px solid ${t.bdr}`,boxShadow:`0 2px 12px ${t.shadow}44`,backdropFilter:"blur(6px)"}}>
-            <SessionFilmstrip project={project} t={t} onUpdateProject={onUpdateProject}/>
-          </div>
+          {/* Floating session filmstrip at bottom — collapsible to the left */}
+          {filmstripOpen ? (
+            <div style={{position:"absolute",bottom:8,left:"50%",transform:"translateX(-50%)",zIndex:5,borderRadius:8,background:t.surf+"ee",border:`1px solid ${t.bdr}`,boxShadow:`0 2px 12px ${t.shadow}44`,backdropFilter:"blur(6px)",display:"flex",alignItems:"stretch",overflow:"hidden"}}>
+              <SessionFilmstrip project={project} t={t} onUpdateProject={onUpdateProject}/>
+              <button onClick={()=>setFilmstripOpen(false)} title="Collapse filmstrip"
+                style={{background:"none",border:"none",borderLeft:`1px solid ${t.bdr}`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:"0 6px",color:t.tx3,fontSize:10,flexShrink:0,transition:"color 0.15s"}}
+                onMouseEnter={e=>e.currentTarget.style.color=t.tx} onMouseLeave={e=>e.currentTarget.style.color=t.tx3}>◀</button>
+            </div>
+          ) : (
+            <button onClick={()=>setFilmstripOpen(true)} title="Show filmstrip"
+              style={{position:"absolute",left:8,bottom:8,zIndex:5,background:t.surf+"ee",border:`1px solid ${t.bdr}`,borderRadius:6,boxShadow:`0 2px 12px ${t.shadow}44`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:"8px 4px",color:t.tx3,fontSize:10,backdropFilter:"blur(6px)",transition:"color 0.15s"}}
+              onMouseEnter={e=>e.currentTarget.style.color=t.tx} onMouseLeave={e=>e.currentTarget.style.color=t.tx3}>▶</button>
+          )}
         </div>
 
         {/* RIGHT PANEL — VSCode-style vertical tabs on left */}

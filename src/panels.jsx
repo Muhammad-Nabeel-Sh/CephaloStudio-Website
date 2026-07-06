@@ -815,7 +815,7 @@ function ExampleViewerModal({ t, data, onClose }) {
     if (!pts.length) return;
     const sp = { x: pts[0].x * zoom + pan.x, y: pts[0].y * zoom + pan.y };
     const hasDef = !!hp.definition;
-    const tipW = Math.min(340, W - sp.x - 20);
+    const tipW = Math.max(120, Math.min(340, W - sp.x - 20));
     if (tipW < 60) return;
     const lines = []; let line = "";
     if (hasDef) {
@@ -832,7 +832,7 @@ function ExampleViewerModal({ t, data, onClose }) {
     ctx.save();
     ctx.shadowColor = "rgba(0,0,0,0.4)"; ctx.shadowBlur = 10; ctx.shadowOffsetY = 2;
     ctx.fillStyle = t.surf2; ctx.beginPath(); ctx.roundRect(tx, ty, tipW, tipH, 8); ctx.fill();
-    ctx.shadowBlur = 0;
+    ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
     ctx.fillStyle = t.acc; ctx.beginPath(); ctx.roundRect(tx, ty, tipW, 3, { upperLeft: 8, upperRight: 8 }); ctx.fill();
     ctx.fillStyle = t.tx; ctx.font = 'bold 12px "DM Sans",sans-serif';
     ctx.fillText(hp.label, tx + 12, ty + (hasDef ? 20 : 26));
