@@ -494,8 +494,16 @@ export function TemplatesPanel({ t, projection, onLoadTemplate, onImportCepht })
     }
   };
 
+  const toggleLabel = (label) => {
+    setSelectedLabels(prev => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label); else next.add(label);
+      return next;
+    });
+  };
+
   const sections = [];
-  if (selectedTemplate && !editMode) {
+  if (selectedTemplate) {
     if (selectedTemplate.pts?.length > 0) sections.push({ type: "Landmarks", icon: "◉", items: selectedTemplate.pts.map(pt => ({ label: pt.l, def: pt.def, color: pt.color, type: "point" })) });
     if (selectedTemplate.lines?.length > 0) sections.push({ type: "Lines", icon: "⟋", items: selectedTemplate.lines.map(ln => ({ label: ln.l, def: ln.def, color: ln.color, type: "line" })) });
     if (selectedTemplate.angles?.length > 0) sections.push({ type: "Angles", icon: "∠", items: selectedTemplate.angles.map(ang => ({ label: ang.l, def: ang.def, color: ang.color, type: "angle" })) });
@@ -552,17 +560,23 @@ export function TemplatesPanel({ t, projection, onLoadTemplate, onImportCepht })
                 <span style={{ fontSize: 9, color: t.tx3, background: t.surf2, padding: "1px 6px", borderRadius: 4 }}>{sec.items.length}</span>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {sec.items.map((item, i) => (
-                  <div key={i} style={{ padding: 12, borderRadius: 8, background: t.surf2, border: `1px solid ${item.color || t.bdr}44` }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                      <div style={{ width: 10, height: 10, borderRadius: item.type === "angle" || item.type === "angle3" || item.type === "angle4" ? "2px" : "50%", background: item.color || t.acc, flexShrink: 0 }} />
-                      <div style={{ fontSize: 13, fontWeight: 700, color: t.tx, fontFamily: "'DM Mono',monospace" }}>{item.label}</div>
-                      {item.refs && <span style={{ fontSize: 9, color: t.tx3, fontFamily: "'DM Mono',monospace" }}>({item.refs})</span>}
-                      {item.norm && <span style={{ fontSize: 9, color: t.ok, background: t.ok + "18", padding: "1px 5px", borderRadius: 3, marginLeft: "auto" }}>norm {item.norm}</span>}
+                {sec.items.map((item, i) => {
+                  const canToggle = editMode && selectedLabels && selectedTemplate.pts?.some(pt => pt.l === item.label);
+                  const isSelected = canToggle ? selectedLabels.has(item.label) : true;
+                  return (
+                    <div key={i} onClick={() => { if (canToggle) toggleLabel(item.label); }}
+                      style={{ padding: 12, borderRadius: 8, background: t.surf2, border: `1px solid ${canToggle && !isSelected ? t.bdr : item.color || t.bdr}44`, cursor: canToggle ? "pointer" : "default", opacity: isSelected ? 1 : 0.45, transition: "all 0.15s" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                        {canToggle && <span style={{ fontSize: 12, color: isSelected ? t.acc : t.tx3, flexShrink: 0, lineHeight: 1 }}>{isSelected ? "☑" : "☐"}</span>}
+                        <div style={{ width: 10, height: 10, borderRadius: item.type === "angle" || item.type === "angle3" || item.type === "angle4" ? "2px" : "50%", background: item.color || t.acc, flexShrink: 0 }} />
+                        <div style={{ fontSize: 13, fontWeight: 700, color: t.tx, fontFamily: "'DM Mono',monospace" }}>{item.label}</div>
+                        {item.refs && <span style={{ fontSize: 9, color: t.tx3, fontFamily: "'DM Mono',monospace" }}>({item.refs})</span>}
+                        {item.norm && <span style={{ fontSize: 9, color: t.ok, background: t.ok + "18", padding: "1px 5px", borderRadius: 3, marginLeft: "auto" }}>norm {item.norm}</span>}
+                      </div>
+                      <div style={{ fontSize: 11, color: t.tx2, lineHeight: 1.5 }}>{item.def || "—"}</div>
                     </div>
-                    <div style={{ fontSize: 11, color: t.tx2, lineHeight: 1.5 }}>{item.def || "—"}</div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           ))}
