@@ -1253,7 +1253,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       <input ref={importRef} type="file" accept=".cephx" style={{display:"none"}} onChange={e=>{if(e.target.files[0])onImport(e.target.files[0]);e.target.value="";}}/>
 
       {/* TOP BAR */}
-      <div style={{display:"flex",alignItems:"center",gap:6,padding:"0 10px",height:isMobile?42:46,background:t.surf,flexShrink:0,overflowX:"auto"}}>
+      <div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 10px 5px",height:isMobile?42:46,background:t.surf,flexShrink:0,overflowX:"auto"}}>
         <button onClick={onHome} title="Back to Home" style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:4,padding:"4px 8px",borderRadius:6,flexShrink:0,color:t.tx}}>
           <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M240-200h120v-240h240v240h120v-360L480-740 240-560v360Zm-80 80v-480l320-240 320 240v480H520v-240h-80v240H160Zm320-350Z"/></svg>
         </button>
@@ -1409,7 +1409,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           {loadingImages&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:t.bg+"cc",zIndex:10}}>
             <div style={{textAlign:"center"}}><div style={{width:28,height:28,border:`3px solid ${t.bdr}`,borderTopColor:t.acc,borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto 10px"}}/><div style={{fontSize:13,color:t.tx2}}>Loading images…</div></div>
           </div>}
-          {!isMobile&&<div style={{position:"absolute",bottom:isMobile?60:8,left:8,display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+          {!isMobile&&<div style={{position:"absolute",bottom:isMobile?60:8,left:30,display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
             {mousePos&&<div style={{background:t.surf+"ee",border:`1px solid ${t.bdr}`,borderRadius:6,padding:"3px 10px",fontSize:11,color:t.tx2,fontFamily:"'DM Mono',monospace"}}>
               {(()=>{const ip=toImage(mousePos.x,mousePos.y);return`${ip.x.toFixed(1)}, ${ip.y.toFixed(1)} px${calibration.done?` · (${(ip.x/calibration.pxPerMm).toFixed(1)}, ${(ip.y/calibration.pxPerMm).toFixed(1)} mm)`:""}`})()}
             </div>}

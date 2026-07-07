@@ -182,12 +182,12 @@ export function MeasurementsPanel({ allMeas, formulaMeas, t, calibration, norms,
 
       {!hasMeas ? <div style={{ color: t.tx3, fontSize: 12, textAlign: "center", paddingTop: 20 }}>Place lines, angles, or polygons.</div>
         : <>
-          {allMeas.map(({ m, meas }) => {
+          {[...allMeas].sort((a, b) => (a.m.type === "point" ? 1 : 0) - (b.m.type === "point" ? 1 : 0)).map(({ m, meas }) => {
             const relNorms = (norms || []).filter(n => n.markupLabel === m.label);
             return (
               <div key={m.id} style={{ marginBottom: 10, padding: 10, background: t.surf2, borderRadius: 8, border: `1px solid ${t.bdr}` }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: m.color || t.acc, marginBottom: 6, display: "flex", justifyContent: "space-between" }}><span>{m.label || m.type}</span><Tag color={m.color || t.acc}>{m.type}</Tag></div>
-                {Object.entries(meas).map(([k, v]) => {
+                {Object.entries(meas).filter(([k]) => m.type === "point" || (k !== "x" && k !== "y")).map(([k, v]) => {
                   const norm = relNorms.find(n => n.measureType === k);
                   const dev = norm ? normDeviation(v, norm) : null;
                   return (
