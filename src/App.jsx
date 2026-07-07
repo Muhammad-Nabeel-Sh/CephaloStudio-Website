@@ -598,7 +598,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     const ctx=canvas.getContext("2d");ctx.clearRect(0,0,canvas.width,canvas.height);
     ctx.fillStyle=t.bg;ctx.fillRect(0,0,canvas.width,canvas.height);
     
-    if(sessionImage.length===0){
+    if(sessionImage.length===0 && markups.length===0){
       ctx.fillStyle=t.surf;ctx.fillRect(pan.x,pan.y,600*zoom,500*zoom);ctx.strokeStyle=t.bdr;ctx.lineWidth=1;ctx.strokeRect(pan.x,pan.y,600*zoom,500*zoom);
       ctx.fillStyle=t.tx3;ctx.font=`15px "DM Sans",sans-serif`;ctx.textAlign="center";ctx.fillText("Drop or open a cephalogram image",pan.x+300*zoom,pan.y+240*zoom);ctx.fillText("Open Image  •  drag & drop",pan.x+300*zoom,pan.y+265*zoom);ctx.textAlign="left";
     } else {
