@@ -150,6 +150,15 @@ export function LongitudinalConfig({ study, sessions, onUpdateStudy, t, project 
         </select>
       </div>
 
+      {/* Minimum time separation between timepoints */}
+      <div>
+        <div style={{ fontSize: 9, fontWeight: 600, color: t.tx3, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 4 }}>Min. Time Separation (days)</div>
+        <input type="number" min={1} value={config.minTimeSeparation ?? 30}
+          onChange={e => update({ minTimeSeparation: Math.max(1, Number(e.target.value)) })}
+          style={{ width: "100%", padding: "4px 6px", borderRadius: 4, border: `1px solid ${t.bdr}`, background: t.surf, color: t.tx, fontSize: 10 }} />
+        <div style={{ fontSize: 8, color: t.tx3, marginTop: 2 }}>Subjects whose consecutive timepoints are closer than this are flagged at run time.</div>
+      </div>
+
       {/* Timepoints */}
       <div>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>

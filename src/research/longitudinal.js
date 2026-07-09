@@ -1,4 +1,5 @@
 import { computeMeasurements, mean, stdev, variance, tTestPaired, fCDF, chi2CDF, tDistributeCDF, clamp } from "../utils.js";
+import { checkLongitudinalTimeSeparation } from "./validation.js";
 
 // ─── Matrix helpers ─────────────────────────────────────────────────────────
 function sum(arr) {
@@ -493,6 +494,15 @@ export function runLongitudinalAll(sessions, config, calibration) {
   const nTp = timepoints?.length || 0;
   if (nSubj < 10) results.warnings.push(`Only ${nSubj} subjects — RM-ANOVA results are exploratory. For adequate power (≥80% to detect a medium effect), ≥ 10-20 subjects per timepoint are recommended.`);
   if (nTp < 3) results.warnings.push(`Only ${nTp} timepoints — sphericity testing and correction are not available (requires ≥ 3 timepoints).`);
+
+  // Enforce minimum time separation between timepoints (was never checked).
+  const timeSep = checkLongitudinalTimeSeparation(sessions, subjects, timepoints, config.minTimeSeparation);
+  if (timeSep.checked) {
+    results.timeSeparation = timeSep;
+    for (const v of timeSep.violations) {
+      results.warnings.push(`Time-separation violation: subject "${v.subjectLabel}" ${v.from}→${v.to} are ${v.gapDays} days apart (minimum required: ${v.minDays}). Consecutive timepoints too close undermine the longitudinal design — widen the interval or drop this subject.`);
+    }
+  }
 
   // Per-label analysis — only run on labels with sufficient complete data
   for (const [label, ld] of Object.entries(byLabel)) {

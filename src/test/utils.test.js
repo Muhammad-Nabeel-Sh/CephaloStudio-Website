@@ -631,3 +631,55 @@ describe("getMissingVars", () => {
     expect(getMissingVars("", {})).toEqual([]);
   });
 });
+
+// ═════════════════════════════════════════════════════════════════
+// Formula sandbox hardening (P7). User-authored expressions must NOT be able
+// to reach mathjs surfaces that touch non-math globals (import, evaluate,
+// property access, assignment, function definition, blocks).
+// ═════════════════════════════════════════════════════════════════
+describe("evalFormula — sandbox hardening", () => {
+  it("evaluates legitimate arithmetic and allowed functions", () => {
+    expect(evalFormula("SNA + 2", { SNA: 82 })).toBe(84);
+    expect(evalFormula("sqrt(ANB^2 + 1)", { ANB: 3 })).toBeCloseTo(Math.sqrt(10), 6);
+    expect(evalFormula("sin(pi/2)", {})).toBeCloseTo(1, 6);
+    expect(evalFormula("max(SNA, SNB)", { SNA: 82, SNB: 80 })).toBe(82);
+  });
+
+  it("supports conditional expressions", () => {
+    expect(evalFormula("ANB > 2 ? 1 : 0", { ANB: 3 })).toBe(1);
+    expect(evalFormula("ANB > 2 ? 1 : 0", { ANB: 1 })).toBe(0);
+  });
+
+  it("returns null for missing variables", () => {
+    expect(evalFormula("SNA + SNB", { SNA: 82 })).toBeNull();
+  });
+
+  it("rejects mathjs import() (code import surface)", () => {
+    expect(evalFormula('import({"x":1})', {})).toBeNull();
+  });
+
+  it("rejects mathjs evaluate() (nested eval surface)", () => {
+    expect(evalFormula('evaluate("1+1")', {})).toBeNull();
+  });
+
+  it("rejects property access (prototype pollution surface)", () => {
+    expect(evalFormula("(1).constructor", {})).toBeNull();
+    expect(evalFormula("sin.constructor", {})).toBeNull();
+  });
+
+  it("rejects assignment / function definition / blocks", () => {
+    expect(evalFormula("a=1", { a: 5 })).toBeNull();
+    expect(evalFormula("f(x)=x+1", {})).toBeNull();
+    expect(evalFormula("1;2", {})).toBeNull();
+  });
+
+  it("rejects disallowed functions (e.g. map, forEach, typed)", () => {
+    expect(evalFormula("map([1,2], x)")).toBeNull();
+  });
+
+  it("does not leak scope symbols to mathjs globals", () => {
+    // A scope var named like a mathjs global must resolve to the scope value,
+    // not the mathjs function.
+    expect(evalFormula("e + 1", { e: 5 })).toBe(6);
+  });
+});

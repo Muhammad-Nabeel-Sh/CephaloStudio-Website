@@ -146,11 +146,17 @@ function computeZScore(value, norm) {
 }
 
 // ─── Built-in reference norms ────────────────────────────────────────────
-// WARNING: These norms are NOT stratified by age, sex, or ethnicity. Cephalometric
-// norms vary substantially by growth stage (pre-pubertal vs. post-pubertal) and
-// population. Applying a single adult Caucasian value to a growing patient or a
-// different ethnic group will systematically misclassify skeletal pattern. Use
-// the `stratification` field to display a warning in the UI.
+// Cephalometric norms vary substantially by growth stage (pre-pubertal vs.
+// post-pubertal), sex, and population. Two mechanisms guard against the
+// previous silent misclassification (one adult value applied to a 9y-o and a
+// 45y-o):
+//   1. `strata`: an optional array of { group, ageMin, ageMax, sex, values }
+//      strata. When present, selectNormStratum() picks the age/sex-matched
+//      stratum and its values override the top-level `values` for any label
+//      the stratum defines.
+//   2. Mismatch warning: when no stratum matches and the patient's age falls
+//      outside the norm's `ageRange`, a warning is attached to the z-score
+//      so the UI can flag a likely-misapplied norm.
 export const PREDEFINED_NORMS = [
   {
     id: "steiner",
@@ -161,7 +167,7 @@ export const PREDEFINED_NORMS = [
     },
     source: "Steiner CC. Cephalometrics in clinical practice. Angle Orthod. 1959;29(1):8-29.",
     population: "Caucasian (North American)",
-    ageRange: "Adult (not specified in source)",
+    ageRange: "Adult",
     sex: "Pooled (male + female)",
     stratification: "Not stratified by age, sex, or ethnicity. Applies a single adult value to all patients.",
   },
@@ -177,28 +183,85 @@ export const PREDEFINED_NORMS = [
     },
     source: "Downs WB. Variations in facial relationships: their significance in treatment and prognosis. Am J Orthod. 1948;34(10):812-840.",
     population: "Caucasian (North American)",
-    ageRange: "12-17 years (adolescent)",
+    ageRange: "Adolescent (12-17y)",
     sex: "Pooled (male + female)",
     stratification: "Not stratified by age, sex, or ethnicity. Based on adolescent subjects — may not apply to adults.",
   },
   {
     id: "mcnamara",
     label: "McNamara",
+    // Age-stable angular measurements live at the top level.
     values: {
       "Maxillary Depth": { mean: 90, sd: 3 },
       "Facial Depth": { mean: 88, sd: 3 },
       "ANB": { mean: 2, sd: 2 },
     },
-    source: "McNamara JA. A method of cephalometric evaluation. Am J Orthod. 1984;86(6):449-469.",
+    // Linear effective-length measurements are age/sex-stratified. Stratum
+    // values override the top level for any label they define.
+    strata: [
+      { group: "Child (9y) — male",   ageMin: 7,  ageMax: 10, sex: "male",   values: { "Effective Mandibular Length (Co-Gn)": { mean: 117, sd: 6 }, "Effective Maxillary Length (Co-A)": { mean: 90, sd: 4 } } },
+      { group: "Child (9y) — female", ageMin: 7,  ageMax: 10, sex: "female", values: { "Effective Mandibular Length (Co-Gn)": { mean: 115, sd: 6 }, "Effective Maxillary Length (Co-A)": { mean: 88, sd: 4 } } },
+      { group: "Adolescent (12y) — male",   ageMin: 11, ageMax: 13, sex: "male",   values: { "Effective Mandibular Length (Co-Gn)": { mean: 125, sd: 6 }, "Effective Maxillary Length (Co-A)": { mean: 94, sd: 4 } } },
+      { group: "Adolescent (12y) — female", ageMin: 11, ageMax: 13, sex: "female", values: { "Effective Mandibular Length (Co-Gn)": { mean: 120, sd: 6 }, "Effective Maxillary Length (Co-A)": { mean: 92, sd: 4 } } },
+      { group: "Adolescent (15y) — male",   ageMin: 14, ageMax: 17, sex: "male",   values: { "Effective Mandibular Length (Co-Gn)": { mean: 132, sd: 6 }, "Effective Maxillary Length (Co-A)": { mean: 97, sd: 4 } } },
+      { group: "Adolescent (15y) — female", ageMin: 14, ageMax: 17, sex: "female", values: { "Effective Mandibular Length (Co-Gn)": { mean: 125, sd: 6 }, "Effective Maxillary Length (Co-A)": { mean: 94, sd: 4 } } },
+      { group: "Adult (≥18y) — male",   ageMin: 18, ageMax: 120, sex: "male",   values: { "Effective Mandibular Length (Co-Gn)": { mean: 138, sd: 6 }, "Effective Maxillary Length (Co-A)": { mean: 99, sd: 4 } } },
+      { group: "Adult (≥18y) — female", ageMin: 18, ageMax: 120, sex: "female", values: { "Effective Mandibular Length (Co-Gn)": { mean: 128, sd: 6 }, "Effective Maxillary Length (Co-A)": { mean: 95, sd: 4 } } },
+    ],
+    source: "McNamara JA. A method of cephalometric evaluation. Am J Orthod. 1984;86(6):449-469. Linear age/sex-stratified values reproduced from McNamara & Brudon, Orthodontic and Orthopedic Cephalometry.",
     population: "Caucasian (North American)",
-    ageRange: "Mixed (children and adults, not separated)",
-    sex: "Pooled (male + female)",
-    stratification: "Not stratified by age, sex, or ethnicity. Combines growing and non-growing subjects.",
+    ageRange: "Stratified (7y through adult)",
+    sex: "Stratified (male / female)",
+    stratification: "Angular measurements (Maxillary Depth, Facial Depth, ANB) are age-stable and shared across strata. Linear effective-length measurements (Co-Gn, Co-A) are stratified by age and sex. Means are approximate and vary slightly by source (±1-2 mm); verify against a population-matched reference before clinical use.",
   },
 ];
 
 // Generic warning for any normative comparison
-export const NORM_WARNING = "Reference norms are population-specific. These values are not stratified by age, sex, or ethnicity and may not apply to the patient being analyzed. Interpret z-scores with caution and consider using population-matched norms.";
+export const NORM_WARNING = "Reference norms are population-specific. Values not stratified by age, sex, or ethnicity may not apply to the patient being analyzed. Interpret z-scores with caution and consider using population-matched norms.";
+
+// ─── Age/sex-aware norm stratum selection ─────────────────────────────────
+// Given a norm (which may carry a `strata` array) and the patient's age/sex,
+// pick the matching stratum and merge its values over the top-level values.
+// Returns { values, stratum, warning } where `warning` is non-null when the
+// patient context is missing or falls outside the norm's applicability.
+export function selectNormStratum(norm, patientAge, patientSex) {
+  const base = { ...(norm.values || {}) };
+  if (!norm.strata || norm.strata.length === 0) {
+    return { values: base, stratum: null, warning: ageRangeMismatch(norm.ageRange, patientAge, norm.sex) };
+  }
+  let matched = null;
+  if (patientAge != null) {
+    const byAge = norm.strata.filter(s => patientAge >= (s.ageMin ?? -Infinity) && patientAge <= (s.ageMax ?? Infinity));
+    if (byAge.length > 0) {
+      matched = byAge.find(s => patientSex && s.sex === patientSex) || byAge.find(s => !s.sex || s.sex === "pooled") || byAge[0];
+    }
+  }
+  if (!matched) matched = norm.strata.find(s => /adult/i.test(s.group || "")) || norm.strata[0];
+  const merged = { ...base, ...(matched.values || {}) };
+  let warning = null;
+  if (patientAge == null) {
+    warning = `No patient age provided — using the "${matched.group}" stratum. Enter the patient age for an age-matched comparison.`;
+  } else if (patientSex && matched.sex && matched.sex !== patientSex) {
+    warning = `No stratum for sex "${patientSex}" at age ${patientAge}; using "${matched.group}".`;
+  }
+  return { values: merged, stratum: matched, warning };
+}
+
+function ageRangeMismatch(ageRange, patientAge, sexField) {
+  if (patientAge == null || !ageRange) return null;
+  const ar = String(ageRange).toLowerCase();
+  if (/adult/.test(ar) && patientAge < 16) {
+    return `Patient age ${patientAge} is below the adult range of this norm ("${ageRange}"). Applying adult values to a growing patient can systematically misclassify skeletal pattern.`;
+  }
+  if (/adolescent/.test(ar) && (patientAge < 11 || patientAge > 17)) {
+    return `Patient age ${patientAge} is outside the adolescent range of this norm ("${ageRange}").`;
+  }
+  if (/child/.test(ar) && patientAge > 12) {
+    return `Patient age ${patientAge} is above the child range of this norm ("${ageRange}").`;
+  }
+  if (sexField && /male/.test(sexField) && patientAge != null) return null;
+  return null;
+}
 
 // ─── Collect measurement values per label from sessions ──────────────────
 function collectMeasurements(sessions, labelIds, calibration) {
@@ -292,17 +355,33 @@ export function runDescriptiveAll(sessions, config, calibration) {
   // Compute z-scores against reference norms
   if (referenceNorms && referenceNorms.length > 0) {
     results.zScores = {};
+    // Patient context for age/sex-aware norm stratum selection. Prefer an
+    // explicit config value; otherwise infer from session meta if all sessions
+    // agree (e.g. a single-patient study).
+    let patientAge = config.patientAge != null ? Number(config.patientAge) : null;
+    let patientSex = config.patientSex || null;
+    if (patientAge == null || !patientSex) {
+      const ages = sessions.map(s => s.meta?.age).filter(a => a != null && a !== "");
+      const sexes = sessions.map(s => s.meta?.sex).filter(sx => sx != null && sx !== "");
+      if (patientAge == null && ages.length > 0 && new Set(ages).size === 1) patientAge = Number(ages[0]);
+      if (!patientSex && sexes.length > 0 && new Set(sexes).size === 1) patientSex = sexes[0];
+    }
+    results.patientContext = { age: patientAge, sex: patientSex };
     for (const norm of referenceNorms) {
       results.zScores[norm.id] = {};
+      const sel = selectNormStratum(norm, patientAge, patientSex);
       for (const [label, data] of Object.entries(results.combined)) {
-        const normVal = norm.values?.[label];
+        const normVal = sel.values?.[label];
         if (normVal) {
           results.zScores[norm.id][label] = {
             norm: normVal,
-            zScore: computeZScore(data.stats?.mean, normVal),
+            zScore: computeZScore(data.stats?.mean, { ...normVal, label }),
+            stratum: sel.stratum ? sel.stratum.group : null,
+            ageSexWarning: sel.warning,
           };
         }
       }
+      if (sel.warning) results.zScores[norm.id]._stratumWarning = sel.warning;
     }
   }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { runDescriptiveAll } from "../research/descriptive.js";
+import { runDescriptiveAll, selectNormStratum, PREDEFINED_NORMS } from "../research/descriptive.js";
 
 function makeSession(id, markups, opts = {}) {
   return {
@@ -49,5 +49,94 @@ describe("runDescriptiveAll", () => {
     const config = { sessionIds: ["s1"], labelIds: ["NONEXISTENT"] };
     const result = runDescriptiveAll(sessions, config, { done: true, pxPerMm: 1 });
     expect(result).not.toBeNull();
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════
+// Age/sex-aware norm stratum selection (S11).
+// Guards against silently applying adult norms to children.
+// ═════════════════════════════════════════════════════════════════
+describe("selectNormStratum", () => {
+  const mcnamara = PREDEFINED_NORMS.find(n => n.id === "mcnamara");
+  const steiner = PREDEFINED_NORMS.find(n => n.id === "steiner");
+
+  it("picks the age/sex-matched stratum for McNamara linear measures", () => {
+    const sel = selectNormStratum(mcnamara, 12, "male");
+    expect(sel.stratum).toBeTruthy();
+    expect(sel.stratum.group).toMatch(/12y.*male/i);
+    const coGn = sel.values["Effective Mandibular Length (Co-Gn)"];
+    expect(coGn.mean).toBe(125); // adolescent 12y male
+  });
+
+  it("falls back to the adult stratum when age is missing", () => {
+    const sel = selectNormStratum(mcnamara, null, null);
+    expect(sel.stratum).toBeTruthy();
+    expect(sel.stratum.group).toMatch(/adult/i);
+    expect(sel.warning).toMatch(/no patient age/i);
+  });
+
+  it("keeps age-stable angular values available across all strata", () => {
+    const child = selectNormStratum(mcnamara, 9, "female");
+    const adult = selectNormStratum(mcnamara, 30, "male");
+    expect(child.values["ANB"].mean).toBe(2);
+    expect(adult.values["ANB"].mean).toBe(2);
+    expect(child.values["Maxillary Depth"].mean).toBe(90);
+  });
+
+  it("stratum linear value overrides differ by age/sex", () => {
+    const boy9 = selectNormStratum(mcnamara, 9, "male").values["Effective Mandibular Length (Co-Gn)"].mean;
+    const girl9 = selectNormStratum(mcnamara, 9, "female").values["Effective Mandibular Length (Co-Gn)"].mean;
+    const man30 = selectNormStratum(mcnamara, 30, "male").values["Effective Mandibular Length (Co-Gn)"].mean;
+    expect(boy9).toBeLessThan(man30);
+    expect(girl9).toBeLessThan(boy9);
+  });
+
+  it("warns when an adult-only norm (Steiner) is applied to a child", () => {
+    const sel = selectNormStratum(steiner, 9, null);
+    expect(sel.stratum).toBeNull();
+    expect(sel.warning).toMatch(/below the adult range/i);
+  });
+
+  it("does not warn when an adult norm is applied to an adult", () => {
+    const sel = selectNormStratum(steiner, 30, null);
+    expect(sel.warning).toBeNull();
+  });
+});
+
+describe("runDescriptiveAll — z-score stratum + warning propagation", () => {
+  function makeSession(id, markups, opts = {}) {
+    return { id, markups, calibration: { done: true, pxPerMm: 1 }, meta: { group: "", timepoint: "", ...opts.meta }, ...opts };
+  }
+  function makePoint(label, x, y) { return { type: "point", label, points: [{ x, y }], visible: true, placed: true, id: label }; }
+
+  it("records the matched stratum and an age-mismatch warning on z-scores", () => {
+    const sessions = [makeSession("s1", [makePoint("ANB", 4, 0)], { meta: { age: "9", sex: "female" } })];
+    const mcnamara = PREDEFINED_NORMS.find(n => n.id === "mcnamara");
+    const config = { labelIds: ["ANB"], referenceNorms: [{ ...mcnamara, id: "test-mc" }], patientAge: "9", patientSex: "female" };
+    const result = runDescriptiveAll(sessions, config, { done: true, pxPerMm: 1 });
+    expect(result.zScores).toBeDefined();
+    const entry = result.zScores["test-mc"]?.ANB;
+    expect(entry).toBeDefined();
+    expect(entry.stratum).toMatch(/9y.*female/i);
+    expect(result.patientContext.age).toBe(9);
+    expect(result.patientContext.sex).toBe("female");
+  });
+
+  it("emits an adult-norm-on-child warning for Steiner", () => {
+    const sessions = [makeSession("s1", [makePoint("SNA", 82, 0)], { meta: { age: "9" } })];
+    const steiner = PREDEFINED_NORMS.find(n => n.id === "steiner");
+    const config = { labelIds: ["SNA"], referenceNorms: [{ ...steiner, id: "test-st" }], patientAge: "9" };
+    const result = runDescriptiveAll(sessions, config, { done: true, pxPerMm: 1 });
+    expect(result.zScores["test-st"]._stratumWarning).toMatch(/below the adult range/i);
+  });
+
+  it("auto-derives patient age/sex from session meta when not in config", () => {
+    const sessions = [makeSession("s1", [makePoint("ANB", 4, 0)], { meta: { age: "30", sex: "male" } })];
+    const mcnamara = PREDEFINED_NORMS.find(n => n.id === "mcnamara");
+    const config = { labelIds: ["ANB"], referenceNorms: [{ ...mcnamara, id: "test-mc2" }] };
+    const result = runDescriptiveAll(sessions, config, { done: true, pxPerMm: 1 });
+    expect(result.patientContext.age).toBe(30);
+    expect(result.patientContext.sex).toBe("male");
+    expect(result.zScores["test-mc2"].ANB.stratum).toMatch(/adult.*male/i);
   });
 });

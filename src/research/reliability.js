@@ -1,4 +1,5 @@
 import { computeMeasurements, tDistributeCDF } from "../utils.js";
+import { checkReliabilityTimeSeparation } from "./validation.js";
 
 // ─── Statistical helpers ──────────────────────────────────────────────────
 function fCritical(p, df1, df2) {
@@ -406,6 +407,14 @@ export function runReliabilityAll(sessions, config, calibration) {
   if (nRaters < 2) warnings.push("Need ≥ 2 raters/occasions for reliability analysis.");
   if (nCases >= 2 && nCases < 30) warnings.push(`ICC CI with ${nCases} subjects is wide — consider ≥ 30 subjects for a precise ICC estimate (Walter et al. 1998).`);
 
+  // Enforce minimum time separation between occasions (was configured but never checked).
+  const timeSep = checkReliabilityTimeSeparation(sessions, cases, config.minTimeSeparation);
+  if (timeSep.checked) {
+    for (const v of timeSep.violations) {
+      warnings.push(`Time-separation violation: case "${v.caseName}" occasions ${v.from}→${v.to} are ${v.gapDays} days apart (minimum required: ${v.minDays}). Reliability estimates may be inflated by memory effect — increase the interval or exclude this case.`);
+    }
+  }
+
   return {
     measurements: mRows.length,
     sessions: sessions.length,
@@ -419,5 +428,6 @@ export function runReliabilityAll(sessions, config, calibration) {
     },
     landmarkMap,
     warnings,
+    timeSeparation: timeSep,
   };
 }

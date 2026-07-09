@@ -20,7 +20,10 @@ import ResearchPanel from "./research/ResearchPanel.jsx";
 import InterpretationPanel from "./panels/InterpretationPanel.jsx";
 import NormogramPanel from "./panels/NormogramPanel.jsx";
 import { mkProject, updateSessionInProject } from "./model/project.js";
-import { storeImageBlob, getImageDataUrl } from "./storage/imageStore.js";
+import { storeImageBlob, getImageDataUrl, clearImageBlobs } from "./storage/imageStore.js";
+import { encryptJSON, decryptJSON, clearSecureStorage, secureStorageAvailable } from "./storage/secureStorage.js";
+import { anonymizeProject, hasUnanonymizedPHI } from "./anonymize.js";
+import { logError, logWarn } from "./logger.js";
 
 import { INITIAL_UI, Actions, useWorkspaceStore } from "./state/workspaceStore.js";
 
@@ -137,7 +140,7 @@ function exportCephx(project) {
 }
 function importCephx(file,onLoad){
   const reader=new FileReader();
-  reader.onload=e=>{try{const d=JSON.parse(e.target.result);if(d.format==="cephx"&&d.project)onLoad(d.project);else alert("Invalid .cephx file");}catch(err){console.error("Cephx import error:",err);alert("Cannot parse file");}};
+  reader.onload=e=>{try{const d=JSON.parse(e.target.result);if(d.format==="cephx"&&d.project)onLoad(d.project);else alert("Invalid .cephx file");}catch(err){logError("Cephx import error:",err);alert("Cannot parse file");}};
   reader.readAsText(file);
 }
 function exportCepht(template,version="1.0"){
@@ -975,7 +978,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
                 return;
               }
             }
-          } catch(e) { console.error("Silhouette handle error", e); }
+          } catch(e) { logError("Silhouette handle error", e); }
           isDragging.current=true;dragMid.current=hit;dragStartState.current=JSON.stringify(markups);
           dragPtIdx.current=-1;dragStart.current=ip;
           return;
@@ -1521,7 +1524,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
                           points: p.points.map(pt => ({ ...pt })),
                         })),
                       });
-                    } catch(e) { console.error("Silhouette insert error:", e); }
+                    } catch(e) { logError("Silhouette insert error:", e); }
                   }}/>}
                   {rightPanel==="templates"&&<TemplatesPanel t={t} projection={project.projection} onLoadTemplate={loadTemplate} onImportCepht={data=>{
           const err=validateCepht(data);if(err){alert(err);return;}
@@ -1551,7 +1554,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       {showCalib&&<Modal t={t} title="Calibration" onClose={()=>dispatch({type:"SET",payload:{showCalib:false}})}><CalibModal t={t} calibration={calibration} onFinish={finalizeCalib}/></Modal>}
       {showExport&&<Modal t={t} title="Export" onClose={()=>dispatch({type:"SET",payload:{showExport:false}})}><div style={{display:"flex",flexDirection:"column",gap:10}}>
         <Btn t={t} onClick={()=>{exportCSV();dispatch({type:"SET",payload:{showExport:false}});}}>Measurements CSV</Btn>
-        <Btn t={t} onClick={()=>{onSave?.(project);dispatch({type:"SET",payload:{showExport:false}});}}>Full Project .cephx</Btn>
+        <Btn t={t} onClick={async()=>{const anon=await anonymizeProject(project,{reason:"export"});onSave?.(anon);dispatch({type:"SET",payload:{showExport:false}});}}>Anonymized .cephx (recommended)</Btn>
+        <Btn t={t} danger={hasUnanonymizedPHI(project)} onClick={()=>{if(hasUnanonymizedPHI(project)&&!window.confirm("This project still contains patient identifiers (name, DOB, age, etc.). Exporting a FULL project file will include them. Continue? Consider exporting an Anonymized .cephx instead."))return;onSave?.(project);dispatch({type:"SET",payload:{showExport:false}});}}>{hasUnanonymizedPHI(project)?"⚠ Full Project .cephx (contains PHI)":"Full Project .cephx"}</Btn>
         <Btn t={t} onClick={()=>{setReportSections({...defaultSections});setShowReportOptions(true);}}>PDF Report</Btn>
         <Btn t={t} onClick={()=>{const name=window.prompt("Template name:",project.name);if(name){exportTemplateAsCepht(project,name);dispatch({type:"SET",payload:{showExport:false}});}}}>Template .cepht (definitions only)</Btn>
         <Btn t={t} onClick={()=>{const name=window.prompt("Template name:",project.name+" (placed)");if(name){exportTemplateAsCepht(project,name,true);dispatch({type:"SET",payload:{showExport:false}});}}}>Template .cepht (with placements)</Btn>
@@ -1582,7 +1586,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
                 const interp = generateInterpretation(allMeas, norms);
                 const fv = {}; formulas.forEach(f => { const v = evalFormula(f.expression, measScope); if (v !== null) fv[f.id] = v; });
                 await generateReport({ project, session: activeSession, allMeas, norms, formulas, formulaValues: fv, originalImageDataUrl: origUrl, markupImageDataUrl: markupUrl, interpretation: interp, sections: reportSections });
-              } catch (e) { console.error("PDF generation failed:", e); }
+              } catch (e) { logError("PDF generation failed:", e); }
             }} style={{flex:1}}>Generate PDF</Btn>
             <Btn t={t} onClick={()=>setShowReportOptions(false)} style={{flex:1}} ghost>Cancel</Btn>
           </div>
@@ -1607,52 +1611,93 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
 // ═══════════════════════════════════════════════════════════════════════════════
 const STORAGE_KEY = "cephalometry_projects";
 
-function loadProjects() {
+// Async load with legacy-plaintext migration. Old autosaves were a bare
+// JSON array in localStorage; new autosaves are an {enc, iv, ct} (or fallback
+// {enc:false, plaintext}) envelope. Both shapes are handled so existing users
+// don't lose their projects on upgrade.
+async function loadProjects() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {
-    console.warn("Failed to load projects from localStorage:", e);
-  }
-  return [];
-}
-function saveProjects(projects) {
-  try {
-    const imageBatch = [];
-    const stripped = projects.map(p => ({
-      ...p,
-      sessions: p.sessions?.map(s => ({
-        ...s,
-        images: s.images?.map(img => {
-          if (img.dataUrl) {
-            imageBatch.push({ id: img.id, dataUrl: img.dataUrl });
-            return { ...img, dataUrl: null };
-          }
-          return { ...img, dataUrl: null };
-        })
-      }))
-    }));
-    if (imageBatch.length > 0) {
-      Promise.all(imageBatch.map(({ id, dataUrl }) => storeImageBlob(id, dataUrl))).catch(() => {});
+    if (!raw) return [];
+    let parsed;
+    try { parsed = JSON.parse(raw); } catch { return []; }
+    if (Array.isArray(parsed)) return parsed; // legacy plaintext projects array
+    if (parsed && typeof parsed === "object") {
+      const dec = await decryptJSON(parsed);
+      if (dec != null) return dec;
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(stripped));
+    return [];
   } catch (e) {
-    if (e.name === "QuotaExceededError" || e.name === "NS_ERROR_DOM_QUOTA_REACHED") {
-      alert("Storage is full. Your projects could not be saved.\n\nExport your project files (.cephx) to preserve your data, then clear browser storage or remove unused projects.");
-    } else {
-      console.warn("Failed to save projects:", e);
-    }
+    logWarn("Failed to load projects from storage:", e);
+    return [];
   }
 }
 
-const loadedProjects = loadProjects();
+// Serialize concurrent saves so rapid project edits can't write envelopes out
+// of order (encryption is async). The last call always wins.
+let _saveChain = Promise.resolve();
+function saveProjects(projects) {
+  _saveChain = _saveChain.then(async () => {
+    try {
+      const imageBatch = [];
+      const stripped = projects.map(p => ({
+        ...p,
+        sessions: p.sessions?.map(s => ({
+          ...s,
+          images: s.images?.map(img => {
+            if (img.dataUrl) {
+              imageBatch.push({ id: img.id, dataUrl: img.dataUrl });
+              return { ...img, dataUrl: null };
+            }
+            return { ...img, dataUrl: null };
+          })
+        }))
+      }));
+      if (imageBatch.length > 0) {
+        Promise.all(imageBatch.map(({ id, dataUrl }) => storeImageBlob(id, dataUrl))).catch(() => {});
+      }
+      const envelope = await encryptJSON(stripped);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
+    } catch (e) {
+      if (e.name === "QuotaExceededError" || e.name === "NS_ERROR_DOM_QUOTA_REACHED") {
+        alert("Storage is full. Your projects could not be saved.\n\nExport your project files (.cephx) to preserve your data, then clear browser storage or remove unused projects.");
+      } else {
+        logWarn("Failed to save projects:", e);
+      }
+    }
+  });
+  return _saveChain;
+}
+
+// Wipe ALL local data: encrypted autosave, the encryption key store, and the
+// image blob IDB. Called only from the explicit "Clear all local data" action.
+async function clearAllLocalData() {
+  await clearSecureStorage(STORAGE_KEY);
+  await clearImageBlobs();
+}
 
 export default function CephalometryStudio(){
   const[theme,setTheme]=useState("bluish");const t=useMemo(()=>({...THEMES[theme],id:theme}),[theme]);
-  const[projects,setProjects]=useState(loadedProjects);const[activeId,setActiveId]=useState(loadedProjects.length>0?loadedProjects[0].id:null);
+  // Start empty and async-load the encrypted autosave so the PHI blob is never
+  // held in plaintext localStorage. `loaded` guards the save effect so the
+  // initial empty state can't clobber the just-decrypted projects.
+  const[projects,setProjects]=useState([]);const[activeId,setActiveId]=useState(null);
+  const[loaded,setLoaded]=useState(false);
   const dirtyRef=useRef(false);
 
-  useEffect(()=>{saveProjects(projects);},[projects]);
+  useEffect(()=>{
+    let cancelled=false;
+    (async()=>{
+      const lp=await loadProjects();
+      if(cancelled)return;
+      setProjects(lp);
+      setActiveId(lp.length>0?lp[0].id:null);
+      setLoaded(true);
+    })();
+    return ()=>{cancelled=true;};
+  },[]);
+
+  useEffect(()=>{if(loaded)saveProjects(projects);},[projects,loaded]);
 
   useEffect(()=>{
     const handler=e=>{if(dirtyRef.current){e.preventDefault();e.returnValue="";}};
@@ -1663,6 +1708,14 @@ export default function CephalometryStudio(){
   const activeProject=projects.find(p=>p.id===activeId);
 
   const updateProject=(id,patch)=>{dirtyRef.current=true;setProjects(prev=>prev.map(p=>p.id===id?{...p,...patch,modified:Date.now()}:p));};
+
+  const handleClearLocalData=async()=>{
+    if(!window.confirm("Clear ALL local data?\n\nThis permanently deletes every project, image, and patient identifier stored in this browser. This cannot be undone. Export any project you want to keep as a .cephx file first."))return;
+    await clearAllLocalData();
+    dirtyRef.current=false;
+    setProjects([]);
+    setActiveId(null);
+  };
 
   const createProject=(projection,result)=>{
     const p={...mkProject(projection),name:result.name};
@@ -1707,7 +1760,8 @@ export default function CephalometryStudio(){
   return(
     <ErrorBoundary t={t}>
       <div style={{background:t.bg,minHeight:"100vh"}}>
-        {!activeId&&<HomePage t={t} theme={theme} setTheme={setTheme} projects={projects} onOpen={id=>setActiveId(id)} onCreate={createProject} onImport={importCephxFile}/>}
+        {!activeId&&!loaded&&<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",color:t.tx3,fontSize:12}}>Loading your projects…</div>}
+        {!activeId&&loaded&&<HomePage t={t} theme={theme} setTheme={setTheme} projects={projects} onOpen={id=>setActiveId(id)} onCreate={createProject} onImport={importCephxFile} storageEncrypted={secureStorageAvailable()} onClearLocalData={handleClearLocalData}/>}
         {activeId&&activeProject&&(
           <Workspace key={activeId} project={activeProject}
             onUpdateProject={patch=>updateProject(activeId,patch)}

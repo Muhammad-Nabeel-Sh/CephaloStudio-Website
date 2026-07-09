@@ -1,4 +1,5 @@
 import { collectMeasurements, pivotMeasurements } from "./collect.js";
+import { chi2CDF } from "../utils.js";
 // ─── Math helpers ────────────────────────────────────────────────────────────
 function normalCDF(x) {
   const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
@@ -20,38 +21,6 @@ function zCritical(alpha) {
     }
   }
   return 3.09;
-}
-
-function logGamma(x) {
-  if (x < 12) return logGamma(x + 1) - Math.log(x);
-  const c = [76.18009173, -86.50532033, 24.01409822, -1.231739516, 0.00120858003, -0.00000536382];
-  let s = 1.00000000019;
-  for (let i = 0; i < 6; i++) s += c[i] / (x + 1 + i);
-  return (x - 0.5) * Math.log(x + 4.5) - (x + 4.5) + Math.log(s * Math.SQRT2 * Math.PI);
-}
-
-function gammaP(a, x) {
-  if (x < a + 1) {
-    let sum = 1 / a, term = 1 / a;
-    for (let n = 1; n < 100; n++) {
-      term *= x / (a + n);
-      sum += term;
-      if (Math.abs(term) < 1e-12) break;
-    }
-    return sum * Math.exp(-x + a * Math.log(x) - logGamma(a));
-  }
-  let sum = 1, term = 1;
-  for (let n = 1; n < 100; n++) {
-    term *= (a - n) / x;
-    sum += term;
-    if (Math.abs(term) < 1e-12) break;
-  }
-  return 1 - sum * Math.exp(-x + a * Math.log(x) - logGamma(a));
-}
-
-function chi2CDF(x, df) {
-  if (x <= 0 || df <= 0) return 0;
-  return gammaP(df / 2, x / 2);
 }
 
 function bonferroniAdjust(pValues) {

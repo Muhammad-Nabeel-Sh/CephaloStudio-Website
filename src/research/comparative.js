@@ -52,11 +52,78 @@ function levenesTest(...groups) {
   return { W, df1, df2, pValue, equalVariance: pValue > 0.05 };
 }
 
+// ─── Exact small-sample distributions for non-parametric tests ─────────────
+// The normal approximation (above) is inaccurate for small n and is invalid for
+// ties in the exact sense. R's wilcox.test uses the exact distribution by default
+// when there are no ties and n is small. These DP recursions compute the exact
+// null distribution counts; the two-sided p = 2·P(statistic ≤ observed) capped at 1
+// (the symmetric conservative convention). Falls back to the normal approximation
+// when ties are present or n exceeds the cap.
+function binom(n, k) {
+  if (k < 0 || k > n) return 0;
+  if (k === 0 || k === n) return 1;
+  k = Math.min(k, n - k);
+  let r = 1;
+  for (let i = 0; i < k; i++) r = (r * (n - i)) / (i + 1);
+  return r;
+}
+// Exact two-sided p for Mann-Whitney U (no ties). Recurrence:
+//   A(u, m, n) = A(u, m, n-1) + A(u-n, m-1, n);  A(0,·,·)=1; A(u,0,·)=A(u,·,0)=δ_{u0}
+// Rolling 2-layer DP over n; iterate m over the smaller group to bound memory.
+export function mannWhitneyExactP(n1in, n2in, Uobs) {
+  let n1 = n1in, n2 = n2in;
+  if (n1 > n2) { const t = n1; n1 = n2; n2 = t; } // distribution symmetric in (n1,n2)
+  const maxU = n1 * n2;
+  if (Uobs < 0 || Uobs > maxU) return null;
+  let prev = Array.from({ length: n1 + 1 }, () => { const a = new Float64Array(maxU + 1); a[0] = 1; return a; });
+  for (let n = 1; n <= n2; n++) {
+    const cur = Array.from({ length: n1 + 1 }, () => new Float64Array(maxU + 1));
+    cur[0][0] = 1;
+    for (let m = 1; m <= n1; m++) {
+      const pm1 = cur[m - 1], pm = prev[m], cm = cur[m];
+      for (let u = 0; u <= maxU; u++) {
+        let v = pm[u];
+        if (u - n >= 0) v += pm1[u - n];
+        cm[u] = v;
+      }
+    }
+    prev = cur;
+  }
+  const counts = prev[n1];
+  const total = binom(n1 + n2, n1);
+  let pLow = 0;
+  for (let u = 0; u <= Uobs; u++) pLow += counts[u];
+  const p = (2 * pLow) / total;
+  return p > 1 ? 1 : p;
+}
+// Exact two-sided p for Wilcoxon signed-rank W (no ties in |diff|). Recurrence:
+//   g(w, k) = g(w, k-1) + g(w-k, k-1);  g(0,0)=1.  Total sign assignments = 2^n.
+export function wilcoxonExactP(n, Wobs) {
+  const maxW = (n * (n + 1)) / 2;
+  if (Wobs < 0 || Wobs > maxW) return null;
+  let prev = new Float64Array(maxW + 1);
+  prev[0] = 1;
+  for (let k = 1; k <= n; k++) {
+    const cur = new Float64Array(maxW + 1);
+    for (let w = 0; w <= maxW; w++) {
+      let v = prev[w];
+      if (w - k >= 0) v += prev[w - k];
+      cur[w] = v;
+    }
+    prev = cur;
+  }
+  const total = 2 ** n;
+  let pLow = 0;
+  for (let w = 0; w <= Wobs; w++) pLow += prev[w];
+  const p = (2 * pLow) / total;
+  return p > 1 ? 1 : p;
+}
+
 // Mann-Whitney U test with tie correction (variance inflation) and continuity
 // correction. The previous variance formula `n1·n2·(n1+n2+1)/12` assumes no ties; with
 // ties (common when cephalometric values are rounded) the variance is over-estimated,
 // inflating p-values. The continuity correction (±0.5) improves the normal approx.
-function mannWhitneyU(arr1, arr2) {
+export function mannWhitneyU(arr1, arr2) {
   const n1 = arr1.length, n2 = arr2.length;
   if (n1 < 2 || n2 < 2) return null;
   const combined = [...arr1, ...arr2];
@@ -73,18 +140,22 @@ function mannWhitneyU(arr1, arr2) {
   const N = n1 + n2;
   let tieTerm = 0;
   for (const t of Object.values(tieCounts)) if (t > 1) tieTerm += t ** 3 - t;
+  const hasTies = tieTerm > 0;
   const sU = Math.sqrt((n1 * n2 / 12) * ((N + 1) - tieTerm / (N * (N - 1))));
   if (sU === 0) return null;
   // Continuity correction: |U - mU| - 0.5 (U is the smaller tail, so use mU - U)
   const z = (mU - U - 0.5) / sU;
-  const pValue = 2 * (1 - normalCdf(Math.abs(z)));
-  return { U, U1, U2, z, pValue, significant: pValue < 0.05 };
+  // Exact distribution for small, tie-free samples; else normal approximation.
+  const useExact = !hasTies && n1 <= 50 && n2 <= 50;
+  const exactP = useExact ? mannWhitneyExactP(n1, n2, U) : null;
+  const pValue = exactP != null ? exactP : 2 * (1 - normalCdf(Math.abs(z)));
+  return { U, U1, U2, z, pValue, method: exactP != null ? "exact" : "normal approximation", significant: pValue < 0.05 };
 }
 
 // Wilcoxon signed-rank test with tie correction for the variance. Ties in |diff| get
 // average ranks; zero differences are excluded. Effect size uses the number of non-zero
 // differences (not the original group size).
-function wilcoxonSignedRank(arr1, arr2) {
+export function wilcoxonSignedRank(arr1, arr2) {
   if (arr1.length !== arr2.length || arr1.length < 2) return null;
   const diffs = arr1.map((v, i) => v - arr2[i]);
   const nonZero = diffs.filter(d => d !== 0);
@@ -103,11 +174,15 @@ function wilcoxonSignedRank(arr1, arr2) {
   for (const d of absDiffs) tieCounts[d.abs] = (tieCounts[d.abs] || 0) + 1;
   let tieAdj = 0;
   for (const t of Object.values(tieCounts)) if (t > 1) tieAdj += t * (t * t - 1);
+  const hasTies = tieAdj > 0;
   const sW = Math.sqrt((nR * (nR + 1) * (2 * nR + 1)) / 24 - tieAdj / 48);
   if (sW === 0) return null;
   const z = (mW - W - 0.5) / sW; // continuity-corrected
-  const pValue = 2 * (1 - normalCdf(Math.abs(z)));
-  return { W, Wplus, Wminus, z, n: nR, pValue, significant: pValue < 0.05 };
+  // Exact distribution for small, tie-free samples; else normal approximation.
+  const useExact = !hasTies && nR <= 25;
+  const exactP = useExact ? wilcoxonExactP(nR, W) : null;
+  const pValue = exactP != null ? exactP : 2 * (1 - normalCdf(Math.abs(z)));
+  return { W, Wplus, Wminus, z, n: nR, pValue, method: exactP != null ? "exact" : "normal approximation", significant: pValue < 0.05 };
 }
 
 // Kruskal-Wallis H test. The previous version used `1 - fCDF(H, df, 1e5)` as a χ²
@@ -571,6 +646,60 @@ function jacobiInverseSqrt(E) {
   return out;
 }
 
+// ─── Box's M test for homogeneity of covariance matrices (MANOVA assumption) ─
+// Box (1949). Compares each group's covariance matrix to the pooled within-group
+// covariance. Chi-square approximation per Rencher (2002) §7.3.2:
+//   M = (N−k)·ln|S_pl| − Σ_g (n_g−1)·ln|S_g|
+//   c1 = [(2p²+3p−1)/(6(p+1)(k−1))]·[Σ 1/(n_g−1) − 1/(N−k)]
+//   X² = M·(1 − c1) ~ χ²(df),  df = p(p+1)(k−1)/2
+// Previously absent: MANOVA ran blind to its key covariance-homogeneity assumption.
+function _logDetSym(S) {
+  const ev = jacobiEigenSym(S);
+  if (ev.some(v => v <= 0)) return -Infinity;
+  return ev.reduce((s, v) => s + Math.log(v), 0);
+}
+function _sampleCov(mat, p) {
+  const n = mat.length;
+  const mu = Array(p).fill(0);
+  for (const row of mat) for (let j = 0; j < p; j++) mu[j] += row[j];
+  for (let j = 0; j < p; j++) mu[j] /= n;
+  const C = Array.from({ length: p }, () => Array(p).fill(0));
+  for (const row of mat) for (let r = 0; r < p; r++) for (let c = 0; c < p; c++) C[r][c] += (row[r] - mu[r]) * (row[c] - mu[c]);
+  for (let r = 0; r < p; r++) for (let c = 0; c < p; c++) C[r][c] /= Math.max(n - 1, 1);
+  return C;
+}
+export function boxMTest(matrices, p) {
+  const k = matrices.length;
+  const ns = matrices.map(m => m.length);
+  const N = ns.reduce((a, b) => a + b, 0);
+  const withinDf = N - k;
+  if (withinDf <= 0 || ns.some(n => n - 1 < p)) {
+    return { skipped: true, reason: "Box's M requires n_g > p in every group (covariance non-singular)." };
+  }
+  const groupCovs = matrices.map(mat => _sampleCov(mat, p));
+  // Pooled within covariance = Σ_g (n_g−1)·S_g / (N−k)  (== E / (N−k) computed independently here)
+  const pooled = Array.from({ length: p }, () => Array(p).fill(0));
+  for (let g = 0; g < k; g++) {
+    const w = ns[g] - 1;
+    for (let r = 0; r < p; r++) for (let c = 0; c < p; c++) pooled[r][c] += w * groupCovs[g][r][c];
+  }
+  for (let r = 0; r < p; r++) for (let c = 0; c < p; c++) pooled[r][c] /= withinDf;
+  const logDetPooled = _logDetSym(pooled);
+  const logDetGroups = groupCovs.map(_logDetSym);
+  if (!isFinite(logDetPooled) || logDetGroups.some(ld => !isFinite(ld))) {
+    return { skipped: true, reason: "Box's M: a group covariance matrix is singular." };
+  }
+  const M = withinDf * logDetPooled - ns.reduce((acc, n, g) => acc + (n - 1) * logDetGroups[g], 0);
+  const t = ns.reduce((acc, n) => acc + 1 / (n - 1), 0) - 1 / withinDf;
+  const c1 = (2 * p * p + 3 * p - 1) / (6 * (p + 1) * (k - 1)) * t;
+  const df = p * (p + 1) * (k - 1) / 2;
+  const chi2 = M * (1 - c1);
+  const pValue = 1 - chi2CDF(chi2, df);
+  const warnings = [];
+  if (c1 > 0.1) warnings.push("Box's M correction c1 is large; the χ² approximation may be liberal (small/unbalanced groups).");
+  return { test: "Box's M (χ² approx.)", M, chi2, df, pValue, significant: pValue < 0.05, correction: c1, warnings };
+}
+
 function runMANOVA(groups, measurements) {
   const groupKeys = Object.keys(groups);
   const k = groupKeys.length;
@@ -624,6 +753,7 @@ function runMANOVA(groups, measurements) {
     significant: fApprox ? fApprox.pValue < 0.05 : false,
     eigenvalues: eigenvals,
     nGroups: k, nDVs: p, N,
+    boxM: boxMTest(matrices, p),
   };
 }
 

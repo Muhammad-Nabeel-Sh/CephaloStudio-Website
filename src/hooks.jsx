@@ -3,38 +3,34 @@
 // HOOKS - Custom React hooks
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
+// KaTeX is now BUNDLED from the npm package (was loaded at runtime from
+// cdnjs.cloudflare.com with no integrity/SRI — a supply-chain and offline
+// risk for a clinical tool). Bundling ships the matched CSS+JS from the same
+// origin as the app, so a CDN compromise or offline clinic can't break or
+// hijack rendering. The version now tracks package.json (^0.16.44) instead of
+// the previously-hardcoded 0.16.8 CDN path.
+import katex from "katex";
+import "katex/dist/katex.min.css";
 
+// Kept for API compatibility. KaTeX is available synchronously now, so there is
+// no async load step — always reports loaded.
 export function useKatex() {
-  const [loaded, setLoaded] = useState(!!window.katex);
-  useEffect(() => {
-    if (!document.getElementById("katex-css")) {
-      const l = document.createElement("link");
-      l.id = "katex-css"; l.rel = "stylesheet";
-      l.href = "https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css";
-      document.head.appendChild(l);
-    }
-    if (!document.getElementById("katex-js")) {
-      const s = document.createElement("script");
-      s.id = "katex-js";
-      s.src = "https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.js";
-      s.onload = () => setLoaded(true);
-      document.head.appendChild(s);
-    }
-  }, []);
-  return loaded;
+  return true;
 }
 
 export function KatexSpan({ latex, block = false, large = false, fontSize }) {
-  const loaded = useKatex();
+  useKatex();
   const ref = useRef(null);
   useEffect(() => {
-    if (!loaded || !ref.current || !window.katex) return;
-    window.katex.render(latex, ref.current, {
-      throwOnError: false, displayMode: block,
-      output: "html",
-    });
-  }, [latex, block, loaded]);
+    if (!ref.current || !katex) return;
+    try {
+      katex.render(latex, ref.current, {
+        throwOnError: false, displayMode: block,
+        output: "html",
+      });
+    } catch { /* ignore KaTeX render errors */ }
+  }, [latex, block]);
   const size = fontSize ? `${fontSize}pt` : (large ? "2.4rem" : "inherit");
   return (
     <span ref={ref}

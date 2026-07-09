@@ -1,4 +1,5 @@
 import { Component } from "react";
+import { logError } from "./logger.js";
 
 export default class ErrorBoundary extends Component {
   constructor(props) {
@@ -11,7 +12,8 @@ export default class ErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
-    console.error("[ErrorBoundary]", error, info);
+    // `info` (component stack) can include PHI-bearing props — only logged in dev.
+    logError("[ErrorBoundary]", error, info);
   }
 
   render() {

@@ -37,7 +37,7 @@ function NewCaseForm({t,onSubmit,onCancel}){
   );
 }
 
-export default function HomePage({t,theme,setTheme,projects,onOpen,onCreate,onImport}){
+export default function HomePage({t,theme,setTheme,projects,onOpen,onCreate,onImport,storageEncrypted,onClearLocalData}){
   const[hov,setHov]=useState(null);
   // flow: null | {proj, phase:"form"} | {proj, phase:"wizard", caseData:{name,meta}}
   const[flow,setFlow]=useState(null);
@@ -174,6 +174,18 @@ export default function HomePage({t,theme,setTheme,projects,onOpen,onCreate,onIm
           <p style={{fontSize:11,color:t.tx3,lineHeight:1.6,margin:0}}>
             Cephalometry Studio is intended for research and educational purposes only. It is not approved or cleared for clinical diagnosis or treatment planning. <br /> Clinical decisions should not be made solely on the basis of measurements produced by this software.
           </p>
+          {/* PHI storage notice + clear-all-local-data (P1) */}
+          <p style={{fontSize:11,color:storageEncrypted?t.tx3:t.warn,lineHeight:1.6,margin:"12px 0 0"}}>
+            {storageEncrypted
+              ? "Patient identifiers in your projects are stored locally in this browser and encrypted at rest. They are not uploaded. Use a private device, anonymize before sharing, and clear local data when done."
+              : "⚠ This browser does not support secure storage (requires HTTPS + a modern browser). Patient identifiers in your projects are stored UNENCRYPTED locally. Do not enter real PHI on a shared device."}
+          </p>
+          {onClearLocalData && (
+            <button onClick={onClearLocalData}
+              style={{marginTop:12,padding:"6px 14px",borderRadius:6,border:`1px solid ${t.bdr}`,background:"transparent",color:t.tx2,fontSize:11,fontWeight:600,cursor:"pointer"}}>
+              Clear all local data
+            </button>
+          )}
         </div>
       </div>
     </div>

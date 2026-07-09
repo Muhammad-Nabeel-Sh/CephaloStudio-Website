@@ -568,6 +568,39 @@ function MANOVAView({ results, t }) {
           {m.nGroups} groups × {m.nDVs} dependent variables, N={m.N}
         </div>
       </div>
+      <BoxMView boxM={m.boxM} t={t} />
+    </div>
+  );
+}
+
+// ─── Box's M (covariance homogeneity) View ─────────────────────────────────
+function BoxMView({ boxM, t }) {
+  if (!boxM) return null;
+  if (boxM.skipped) {
+    return (
+      <div style={{ padding: "8px 10px", background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44`, fontSize: 10, color: t.tx3 }}>
+        <span style={{ fontWeight: 700, color: t.tx2 }}>Box's M test: </span>{boxM.reason}
+      </div>
+    );
+  }
+  return (
+    <div style={{ padding: 10, background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: t.tx, marginBottom: 4 }}>Box's M Test — Covariance Homogeneity</div>
+      <div style={{ fontSize: 10, fontFamily: "'DM Mono',monospace", color: t.tx2, display: "flex", gap: 16, flexWrap: "wrap" }}>
+        <span>M = <b style={{ color: t.tx }}>{boxM.M.toFixed(3)}</b></span>
+        <span>χ² = <b style={{ color: t.tx }}>{boxM.chi2.toFixed(3)}</b></span>
+        <span>df = <b style={{ color: t.tx }}>{boxM.df}</b></span>
+        <span>p = <b style={{ color: boxM.pValue < 0.05 ? t.err : t.ok }}>{fmtP(boxM.pValue)}</b></span>
+        <span>c₁ = <b style={{ color: t.tx }}>{boxM.correction.toFixed(4)}</b></span>
+      </div>
+      <div style={{ fontSize: 9, color: boxM.pValue < 0.05 ? t.warn : t.tx3, marginTop: 4 }}>
+        {boxM.pValue < 0.05
+          ? "Covariance homogeneity rejected (p < 0.05). MANOVA is robust to mild violations but consider Pillai's Trace (most robust) over Wilks' Lambda if groups are unbalanced."
+          : "Covariance homogeneity assumption met (p ≥ 0.05)."}
+      </div>
+      {boxM.warnings?.map((w, i) => (
+        <div key={i} style={{ fontSize: 9, color: t.warn, marginTop: 2 }}>⚠ {w}</div>
+      ))}
     </div>
   );
 }

@@ -419,6 +419,10 @@ for (const a of PREDEFINED.photofrontal) {
 export const PREDEFINED_NORMS = {
   Steiner: {
     source: "Steiner, 1953 / Am J Orthod",
+    population: "Caucasian (North American)",
+    ageRange: "Adult",
+    sex: "Pooled (male + female)",
+    stratification: "Not stratified by age, sex, or ethnicity. Single adult value — do not apply to growing patients.",
     norms: [
       { label: "SNA", mean: 82, sd: 2, type: "angle" },
       { label: "SNB", mean: 80, sd: 2, type: "angle" },
@@ -436,6 +440,10 @@ export const PREDEFINED_NORMS = {
   },
   Ricketts: {
     source: "Ricketts, 1960 / Am J Orthod",
+    population: "Caucasian (North American)",
+    ageRange: "Mixed (growing and adult)",
+    sex: "Pooled (male + female)",
+    stratification: "Not stratified by age or sex in this table. Ricketts' original norms are age-stratified — verify against age-matched source.",
     norms: [
       { label: "Facial axis", mean: 90, sd: 3, type: "angle" },
       { label: "Facial depth", mean: 87, sd: 3, type: "angle" },
@@ -452,6 +460,10 @@ export const PREDEFINED_NORMS = {
   },
   Downs: {
     source: "Downs, 1948 / Am J Orthod",
+    population: "Caucasian (North American)",
+    ageRange: "Adolescent (12-17y)",
+    sex: "Pooled (male + female)",
+    stratification: "Not stratified by age, sex, or ethnicity. Based on adolescent subjects — may not apply to adults.",
     norms: [
       { label: "Facial angle", mean: 87.8, sd: 3.6, type: "angle" },
       { label: "Convexity", mean: 0, sd: 5.9, type: "angle" },
@@ -465,6 +477,10 @@ export const PREDEFINED_NORMS = {
   },
   "McNamara": {
     source: "McNamara, 1984 / Am J Orthod",
+    population: "Caucasian (North American)",
+    ageRange: "Mixed (children and adults, not separated)",
+    sex: "Pooled (male + female)",
+    stratification: "Not stratified in this table. McNamara's linear measurements are age/sex-stratified in the source — verify against age/sex-matched reference.",
     norms: [
       { label: "N-A", mean: 1, sd: 2, type: "length" },
       { label: "N-B", mean: 4, sd: 3, type: "length" },
@@ -475,6 +491,10 @@ export const PREDEFINED_NORMS = {
   },
   "Bjork-Jarabak": {
     source: "Jarabak, 1972",
+    population: "Caucasian (Scandinavian)",
+    ageRange: "Mixed (growing and adult)",
+    sex: "Pooled (male + female)",
+    stratification: "Not stratified by age or sex in this table. Björk-Jarabak proportions are growth-stage sensitive — verify against age-matched source.",
     norms: [
       { label: "Sum of angles", mean: 396, sd: 6, type: "angle" },
       { label: "N-S-Ar", mean: 123, sd: 5, type: "angle" },
@@ -486,6 +506,10 @@ export const PREDEFINED_NORMS = {
   },
   "Tweed": {
     source: "Tweed, 1954",
+    population: "Caucasian (North American)",
+    ageRange: "Adult",
+    sex: "Pooled (male + female)",
+    stratification: "Not stratified by age, sex, or ethnicity. Single adult value — do not apply to growing patients.",
     norms: [
       { label: "FMA", mean: 25, sd: 3, type: "angle" },
       { label: "FMIA", mean: 65, sd: 3, type: "angle" },

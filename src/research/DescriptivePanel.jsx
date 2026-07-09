@@ -104,6 +104,22 @@ export function DescriptiveConfig({ study, sessions, onUpdateStudy, t }) {
         </select>
       </div>
 
+      {/* Patient context for age/sex-aware norm comparison */}
+      <div>
+        <div style={{ fontSize: 9, fontWeight: 600, color: t.tx3, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 4 }}>Patient Context (for norm comparison)</div>
+        <div style={{ display: "flex", gap: 6 }}>
+          <input type="number" placeholder="Age" value={config.patientAge ?? ""} onChange={e => update({ patientAge: e.target.value === "" ? null : e.target.value })}
+            style={{ width: 70, padding: "4px 6px", borderRadius: 4, border: `1px solid ${t.bdr}`, background: t.surf, color: t.tx, fontSize: 10 }} />
+          <select value={config.patientSex || ""} onChange={e => update({ patientSex: e.target.value || null })}
+            style={{ flex: 1, padding: "4px 6px", borderRadius: 4, border: `1px solid ${t.bdr}`, background: t.surf, color: t.tx, fontSize: 10 }}>
+            <option value="">Sex (any)</option>
+            <option value="male">Male</option>
+            <option value="female">Female</option>
+          </select>
+        </div>
+        <div style={{ fontSize: 8, color: t.tx3, marginTop: 2 }}>Used to pick the age/sex-matched norm stratum and warn on mismatch. Leave blank to auto-derive from session meta.</div>
+      </div>
+
       {/* Measurements */}
       <div>
         <div style={{ fontSize: 9, fontWeight: 600, color: t.tx3, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 4 }}>Measurements</div>
@@ -416,52 +432,67 @@ function ZScoreTable({ results, labels, t }) {
   if (norms.length === 0) return <EmptyDetail message="No reference norms configured. Add norms and re-run." t={t} />;
 
   const validLabels = labels.filter(l => norms.some(n => zScores[n.id]?.[l]?.zScore));
+  const ctx = results.patientContext;
+  const warnings = norms.map(n => zScores[n.id]?._stratumWarning).filter(Boolean);
 
   return (
-    <div style={{ overflowX: "auto" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10, fontFamily: "'DM Mono',monospace" }}>
-        <thead>
-          <tr style={{ background: t.surf2 }}>
-            <th style={{ padding: "4px 6px", textAlign: "left", color: t.tx, fontSize: 8, textTransform: "uppercase", letterSpacing: 0.3 }}>Label</th>
-            {norms.map(n => (
-              <th key={n.id} colSpan={2} style={{ padding: "4px 6px", textAlign: "center", color: t.tx, fontSize: 8, textTransform: "uppercase", letterSpacing: 0.3 }}>
-                {n.label}
-              </th>
-            ))}
-          </tr>
-          <tr style={{ background: t.surf2 }}>
-            <th></th>
-            {norms.map(n => (
-              <Fragment key={n.id}>
-                <th style={{ padding: "4px 6px", textAlign: "left", color: t.tx, fontSize: 7 }}>Z</th>
-                <th style={{ padding: "4px 6px", textAlign: "left", color: t.tx, fontSize: 7 }}>%ile</th>
-              </Fragment>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {validLabels.map(l => (
-            <tr key={l} style={{ borderBottom: `1px solid ${t.bdr}22` }}>
-              <td style={{ padding: "5px 6px", color: t.tx, fontWeight: 600 }}>{l}</td>
-              {norms.map(n => {
-                const z = zScores[n.id]?.[l]?.zScore;
-                const zVal = z?.z;
-                const pctVal = z?.percentileRank;
-                return (
-                  <Fragment key={n.id}>
-                    <td style={{ padding: "5px 6px", color: z ? zColor(zVal) : t.tx3 }}>
-                      {zVal != null && isFinite(zVal) ? zVal.toFixed(3) : "\u2014"}
-                    </td>
-                    <td style={{ padding: "5px 6px", color: t.tx2 }}>
-                      {pctVal != null && isFinite(pctVal) ? pctVal.toFixed(1) : "\u2014"}
-                    </td>
-                  </Fragment>
-                );
-              })}
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {ctx && (ctx.age != null || ctx.sex) && (
+        <div style={{ fontSize: 9, color: t.tx3, fontFamily: "'DM Mono',monospace" }}>
+          Patient context: {ctx.age != null ? `age ${ctx.age}` : "age —"}{ctx.sex ? `, ${ctx.sex}` : ""}
+        </div>
+      )}
+      {warnings.map((w, i) => (
+        <div key={i} style={{ fontSize: 9, color: t.warn, background: t.warn + "14", border: `1px solid ${t.warn}33`, borderRadius: 4, padding: "4px 6px" }}>⚠ {w}</div>
+      ))}
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10, fontFamily: "'DM Mono',monospace" }}>
+          <thead>
+            <tr style={{ background: t.surf2 }}>
+              <th style={{ padding: "4px 6px", textAlign: "left", color: t.tx, fontSize: 8, textTransform: "uppercase", letterSpacing: 0.3 }}>Label</th>
+              {norms.map(n => (
+                <th key={n.id} colSpan={2} style={{ padding: "4px 6px", textAlign: "center", color: t.tx, fontSize: 8, textTransform: "uppercase", letterSpacing: 0.3 }}>
+                  {n.label}
+                  {zScores[n.id]?.[validLabels[0]]?.stratum && (
+                    <div style={{ fontSize: 7, color: t.tx3, textTransform: "none", fontWeight: 400, marginTop: 2 }}>{zScores[n.id]?.[validLabels[0]]?.stratum}</div>
+                  )}
+                </th>
+              ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+            <tr style={{ background: t.surf2 }}>
+              <th></th>
+              {norms.map(n => (
+                <Fragment key={n.id}>
+                  <th style={{ padding: "4px 6px", textAlign: "left", color: t.tx, fontSize: 7 }}>Z</th>
+                  <th style={{ padding: "4px 6px", textAlign: "left", color: t.tx, fontSize: 7 }}>%ile</th>
+                </Fragment>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {validLabels.map(l => (
+              <tr key={l} style={{ borderBottom: `1px solid ${t.bdr}22` }}>
+                <td style={{ padding: "5px 6px", color: t.tx, fontWeight: 600 }}>{l}</td>
+                {norms.map(n => {
+                  const z = zScores[n.id]?.[l]?.zScore;
+                  const zVal = z?.z;
+                  const pctVal = z?.percentileRank;
+                  return (
+                    <Fragment key={n.id}>
+                      <td style={{ padding: "5px 6px", color: z ? zColor(zVal) : t.tx3 }}>
+                        {zVal != null && isFinite(zVal) ? zVal.toFixed(3) : "\u2014"}
+                      </td>
+                      <td style={{ padding: "5px 6px", color: t.tx2 }}>
+                        {pctVal != null && isFinite(pctVal) ? pctVal.toFixed(1) : "\u2014"}
+                      </td>
+                    </Fragment>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

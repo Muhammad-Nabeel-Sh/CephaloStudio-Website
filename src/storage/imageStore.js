@@ -2,6 +2,8 @@ const DB_NAME = "CephaloStudio";
 const DB_VERSION = 1;
 const STORE_NAME = "images";
 
+import { logWarn } from "../logger.js";
+
 let dbPromise = null;
 
 function getDB() {
@@ -59,7 +61,7 @@ export async function storeImageBlob(id, dataUrl) {
       tx.onerror = () => reject(tx.error);
     });
   } catch (e) {
-    console.warn("IDB store failed:", e);
+    logWarn("IDB store failed:", e);
   }
 }
 
@@ -75,7 +77,7 @@ export async function getImageDataUrl(id) {
     if (!blob) return null;
     return blobToDataUrl(blob);
   } catch (e) {
-    console.warn("IDB load failed:", e);
+    logWarn("IDB load failed:", e);
     return null;
   }
 }
@@ -90,7 +92,7 @@ export async function deleteImageBlob(id) {
       tx.onerror = () => reject(tx.error);
     });
   } catch (e) {
-    console.warn("IDB delete failed:", e);
+    logWarn("IDB delete failed:", e);
   }
 }
 
@@ -104,6 +106,6 @@ export async function clearImageBlobs() {
       tx.onerror = () => reject(tx.error);
     });
   } catch (e) {
-    console.warn("IDB clear failed:", e);
+    logWarn("IDB clear failed:", e);
   }
 }

@@ -1,6 +1,7 @@
 import { useState, useRef, useMemo, useCallback } from "react";
 import { Modal } from "./Modal.jsx";
 import { Btn } from "../ui.jsx";
+import { logError } from "../logger.js";
 import { mkSession } from "../model/session.js";
 import { mkSubject, addSubject, addSession } from "../model/project.js";
 import { parseCsv } from "../model/csv.js";
@@ -105,7 +106,7 @@ export default function BatchImportModal({ t, project, onUpdateProject, onClose 
       });
       onUpdateProject(proj);
       onClose();
-    } catch (e) { console.error("Batch import error:", e); }
+    } catch (e) { logError("Batch import error:", e); }
     setBusy(false);
   };
 

@@ -230,8 +230,52 @@ export function buildScope(markups, calibration) {
 
 const _builtins = new Set(["sin","cos","tan","asin","acos","atan","atan2","abs","sqrt","exp","log","log2","log10","ceil","floor","round","min","max","pow","pi","e","i","true","false","Infinity","NaN"]);
 
+// ─── Formula sandbox (P7) ───────────────────────────────────────────────────
+// User-authored expressions are evaluated with mathjs. The previous gate was a
+// regex token allowlist (`\b[a-zA-Z_]\w*\b`) plus an empty-scope evaluate —
+// robust for flat expressions but bypass-prone via property access / assignment
+// / function-definition nodes that the regex doesn't model. We now PARSE the
+// expression to an AST and reject every node that isn't on an explicit allowlist
+// (constants, operators, allowed functions/symbols). This blocks `import`,
+// `evaluate`, `map`, property access (`x.constructor`), assignment, function
+// definition, and block statements — the mathjs surfaces that could reach
+// non-math globals. Numeric scope values are substituted inline first, so no
+// user symbol ever reaches mathjs's global resolver.
+const _ALLOWED_FUNCS = new Set([
+  "sin","cos","tan","asin","acos","atan","atan2","abs","sqrt","cbrt","exp",
+  "log","log2","log10","ceil","floor","round","min","max","pow","sign","hypot",
+]);
+const _ALLOWED_CONSTS = new Set(["pi","PI","e","E","i","tau","true","false","Infinity","NaN"]);
+const _ALLOWED_NODE_TYPES = new Set([
+  "ConstantNode","OperatorNode","UnaryNode","ParenthesisNode","ConditionalNode",
+  "SymbolNode","FunctionNode",
+]);
+
+function _validateFormulaAst(node) {
+  if (!_ALLOWED_NODE_TYPES.has(node.type)) return false;
+  if (node.type === "SymbolNode") return _ALLOWED_CONSTS.has(node.name);
+  if (node.type === "FunctionNode") {
+    // The function name lives on `.fn` (a SymbolNode) — authorize it by name
+    // against the function allowlist, then recurse into the ARGUMENTS only.
+    // (Descending into `.fn` would re-test the name as a const and reject it.)
+    const name = (node.fn && node.fn.name) || node.name;
+    if (!_ALLOWED_FUNCS.has(name)) return false;
+    for (const a of (node.args || [])) if (!_validateFormulaAst(a)) return false;
+    return true;
+  }
+  // Other allowed node types (OperatorNode, UnaryNode, ParenthesisNode,
+  // ConditionalNode) — recurse over their children via mathjs's `.forEach`,
+  // which is stable across node property-name differences.
+  let ok = true;
+  node.forEach((child) => { if (ok && !_validateFormulaAst(child)) ok = false; });
+  return ok;
+}
+
 export function evalFormula(expr, scope) {
   try {
+    // Inline-substitute numeric scope values so the residual expression contains
+    // only numbers + allowed math symbols/functions (no user symbols reach the
+    // mathjs global resolver).
     let s = expr; const keys = Object.keys(scope).sort((a,b)=>b.length-a.length);
     const used = new Set();
     for (const k of keys) {
@@ -241,10 +285,15 @@ export function evalFormula(expr, scope) {
         if (re.test(s)) { re.lastIndex = 0; s = s.replace(re, `(${v})`); used.add(k); }
       }
     }
+    // Reject any user variable that wasn't substituted (missing data) BEFORE the
+    // AST gate so the error is "missing var", not "disallowed symbol".
     const tokens = (expr.match(/\b[a-zA-Z_]\w*\b/g)||[]).filter(w=>!/^\d+$/.test(w)&&!_builtins.has(w));
     const missing = tokens.filter(w=>!used.has(w));
     if (missing.length > 0) return null;
-    const c = math.compile(s), r = c.evaluate({});
+    // AST sandbox: parse and reject any non-allowlisted node/type/function.
+    const ast = math.parse(s);
+    if (!_validateFormulaAst(ast)) return null;
+    const r = ast.compile().evaluate({});
     return typeof r === "number" && isFinite(r) ? r : null;
   } catch { return null; }
 }

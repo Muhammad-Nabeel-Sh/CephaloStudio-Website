@@ -70,6 +70,7 @@ export function mkStudy(type, opts = {}) {
     ];
     base.config.sphericityCorrection = opts.config?.sphericityCorrection || "greenhouse-geisser";
     base.config.modelType = opts.config?.modelType || "rm_anova";
+    base.config.minTimeSeparation = opts.config?.minTimeSeparation ?? 30;
   }
 
   return base;

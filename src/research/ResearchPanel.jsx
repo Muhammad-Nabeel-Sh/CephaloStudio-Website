@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { STUDY_TYPES, mkStudy } from "./studyModel.js";
-import { runStudy } from "./engine.js";
+import { runStudyAsync } from "./engineClient.js";
 import { ReliabilityConfig, ReliabilityResults } from "./ReliabilityPanel.jsx";
 import { DescriptiveConfig, DescriptiveResults } from "./DescriptivePanel.jsx";
 import { ComparativeConfig, ComparativeResults } from "./ComparativePanel.jsx";
@@ -16,6 +16,9 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
   const [selectedType, setSelectedType] = useState("reliability");
   const [selectedId, setSelectedId] = useState(null);
   const [dialogStudy, setDialogStudy] = useState(null);
+  const [runningId, setRunningId] = useState(null);
+  const [progress, setProgress] = useState({ p: 0, label: "" });
+  const abortRef = useRef(null);
 
   const handleCreate = () => {
     const study = mkStudy(selectedType, {
@@ -32,13 +35,45 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
 
   const handleRun = (studyId) => {
     const study = studies.find(s => s.id === studyId);
-    if (!study) return;
-    const updated = runStudy(study, sessions, calibration);
+    if (!study || runningId) return;
+    // Mark running immediately so the UI reflects the state change.
     onUpdateProject({
       ...project,
-      researchStudies: studies.map(s => s.id === studyId ? updated : s),
+      researchStudies: studies.map(s => s.id === studyId ? { ...s, status: "running" } : s),
     });
-    setDialogStudy(updated);
+    setRunningId(studyId);
+    setProgress({ p: 0, label: "starting" });
+    const controller = new AbortController();
+    abortRef.current = controller;
+    runStudyAsync(study, sessions, calibration, {
+      onProgress: (p, label) => setProgress({ p, label: label || "" }),
+      signal: controller.signal,
+    }).then(updated => {
+      onUpdateProject({
+        ...project,
+        researchStudies: (project?.researchStudies || []).map(s => s.id === studyId ? updated : s),
+      });
+      setDialogStudy(updated);
+    }).catch(err => {
+      // AbortError → revert to previous status; other errors → record on the study.
+      const isAbort = err?.name === "AbortError";
+      onUpdateProject({
+        ...project,
+        researchStudies: (project?.researchStudies || []).map(s => {
+          if (s.id !== studyId) return s;
+          if (isAbort) return { ...s, status: s.results ? "completed" : "configured" };
+          return { ...s, status: "error", results: { error: err?.message || String(err), timestamp: Date.now() } };
+        }),
+      });
+    }).finally(() => {
+      setRunningId(null);
+      setProgress({ p: 0, label: "" });
+      abortRef.current = null;
+    });
+  };
+
+  const handleCancelRun = () => {
+    try { abortRef.current?.abort(); } catch { /* abort is best-effort */ }
   };
 
   const handleRemove = (studyId) => {
@@ -201,12 +236,26 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
                       </div>
                     )}
 
-                    {/* Run button — always available */}
-                    {s.status !== "running" && (
+                    {/* Run button + progress/cancel */}
+                    {s.id !== runningId && s.status !== "running" && (
                       <button onClick={() => handleRun(s.id)}
                         style={{ width: "100%", marginTop: s.status === "configured" && (s.type === "reliability" || s.type === "descriptive") ? 8 : s.status === "completed" ? 12 : 0, padding: "8px 12px", borderRadius: 6, border: "none", background: t.acc, color: t.bg, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
                         {s.status === "completed" ? "Re-run Analysis" : "Run Analysis"}
                       </button>
+                    )}
+                    {s.id === runningId && (
+                      <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+                        <div style={{ fontSize: 10, color: t.tx2, fontFamily: "'DM Mono',monospace" }}>
+                          Running… {progress.label ? `${progress.label} ` : ""}{Math.round(progress.p * 100)}%
+                        </div>
+                        <div style={{ height: 6, borderRadius: 3, background: t.surf3, overflow: "hidden" }}>
+                          <div style={{ height: "100%", width: `${Math.round(progress.p * 100)}%`, background: t.acc, transition: "width 0.15s" }} />
+                        </div>
+                        <button onClick={handleCancelRun}
+                          style={{ width: "100%", padding: "6px 12px", borderRadius: 6, border: `1px solid ${t.err}66`, background: t.err + "12", color: t.err, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                          Cancel
+                        </button>
+                      </div>
                     )}
                   </div>
                 )}

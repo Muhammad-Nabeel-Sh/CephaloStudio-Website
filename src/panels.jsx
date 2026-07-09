@@ -1,5 +1,6 @@
 ﻿import { useState, useRef, useMemo, useEffect, useCallback } from "react";
 import { uid, computeMeasurements, normDeviation, deviationColor, evalFormula, onEnter } from "./utils.js";
+import { logWarn } from "./logger.js";
 import { LUT_PRESETS, PREDEFINED, PREDEFINED_NORMS } from "./constants.js";
 import { SILHOUETTES, getSilhouettesByCategory } from "./silhouettes.js";
 import { drawMarkup } from "./markups.jsx";
@@ -442,7 +443,7 @@ function loadImportedTemplates() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { return []; }
 }
 function saveImportedTemplates(list) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch(e) { console.warn("Failed to save templates:", e); }
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); } catch(e) { logWarn("Failed to save templates:", e); }
 }
 
 function measTypeLabel(type) {
