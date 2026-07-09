@@ -1,4 +1,4 @@
-import { computeMeasurements } from "../utils.js";
+import { computeMeasurements, tDistributeCDF } from "../utils.js";
 
 // ─── Statistical helpers ──────────────────────────────────────────────────
 function fCritical(p, df1, df2) {
@@ -34,20 +34,22 @@ function simpleRegression(x, y) {
   if (n < 3) return { slope: 0, intercept: 0, r: 0, pValue: 1 };
   const mx = x.reduce((a, b) => a + b, 0) / n;
   const my = y.reduce((a, b) => a + b, 0) / n;
-  let num = 0, den = 0, sy = 0;
+  let sxy = 0, sxx = 0, syy = 0;
   for (let i = 0; i < n; i++) {
     const dx = x[i] - mx, dy = y[i] - my;
-    num += dx * dy;
-    den += dx * dx;
-    sy += dy * dy;
+    sxy += dx * dy; sxx += dx * dx; syy += dy * dy;
   }
-  const slope = den !== 0 ? num / den : 0;
+  const slope = sxx !== 0 ? sxy / sxx : 0;
   const intercept = my - slope * mx;
-  const r = Math.sqrt(den * sy) !== 0 ? num / Math.sqrt(den * sy) : 0;
-  const se = n > 2 ? Math.sqrt((sy - slope * num) / (n - 2)) : 0;
-  const t = se !== 0 && den > 0 ? slope / (se / Math.sqrt(den)) : 0;
-  const pValue = n > 2 ? 2 * (1 - stdNormalCdf(Math.abs(t) * (1 - 0.5 / (n - 2)))) : 1;
-  return { slope, intercept, r, pValue };
+  const r = Math.sqrt(sxx * syy) !== 0 ? sxy / Math.sqrt(sxx * syy) : 0;
+  // Use the t-distribution (n-2 df) for the slope p-value, not a normal CDF with an
+  // ad-hoc correction factor. The previous `2*(1 - stdNormalCdf(|t|*(1 - 0.5/(n-2))))`
+  // was neither a valid t-test nor a valid z-test.
+  const sse = syy - slope * sxy;
+  const seSlope = sxx > 0 ? Math.sqrt(sse / (n - 2) / sxx) : 0;
+  const t = seSlope > 0 ? slope / seSlope : 0;
+  const pValue = n > 2 ? 2 * (1 - tDistributeCDF(Math.abs(t), n - 2)) : 1;
+  return { slope, intercept, r, pValue, t, seSlope };
 }
 
 // ─── ICC (Shrout & Fleiss / McGraw & Wong) ──────────────────────────────
@@ -124,14 +126,25 @@ function iccShroutFleiss(data, k, type) {
 }
 
 // ─── Bland-Altman ─────────────────────────────────────────────────────────
+// For 3+ occasions, the previous version silently dropped all but the first two
+// readings per case (the `if (paired[key].length < 2) paired[key].push(s.value)` guard
+// capped at 2). We now pair ALL combinations of readings per case, preserving all data.
 function runBlandAltman(samples) {
-  const paired = {};
+  // Group all readings per case (was capped at 2 — dropped 3rd+ occasions silently)
+  const byCase = {};
   for (const s of samples) {
-    const key = `${s.caseId}::${s.operatorId}`;
-    if (!paired[key]) paired[key] = [];
-    if (paired[key].length < 2) paired[key].push(s.value);
+    if (!byCase[s.caseId]) byCase[s.caseId] = [];
+    byCase[s.caseId].push(s.value);
   }
-  const pairs = Object.values(paired).filter(p => p.length >= 2);
+  // Generate ALL pairs from each case's readings
+  const pairs = [];
+  for (const vals of Object.values(byCase)) {
+    for (let i = 0; i < vals.length; i++) {
+      for (let j = i + 1; j < vals.length; j++) {
+        pairs.push([vals[i], vals[j]]);
+      }
+    }
+  }
   if (pairs.length < 2) return {};
 
   const means = pairs.map(p => (p[0] + p[1]) / 2);
@@ -140,42 +153,59 @@ function runBlandAltman(samples) {
 
   const meanDiff = diffs.reduce((a, b) => a + b, 0) / n;
   const sdDiff = Math.sqrt(diffs.reduce((s, d) => s + (d - meanDiff) ** 2, 0) / (n - 1));
+  // Use the t-distribution for the LoA CI (was z=1.96, which underestimates the CI for
+  // small n). The SE of the LoA limits is sqrt(3·sd²/n).
   const seLoA = Math.sqrt(3 * sdDiff * sdDiff / n);
-  const z = 1.96;
+  const df = n - 1;
+  let tCrit = 1.96;
+  if (df > 0) {
+    const target = 0.975;
+    let lo = 1.5, hi = 5.0;
+    for (let it = 0; it < 50; it++) {
+      const mid = (lo + hi) / 2;
+      const p = tDistributeCDF(mid, df);
+      if (p < target) lo = mid; else hi = mid;
+    }
+    tCrit = (lo + hi) / 2;
+  }
 
   const reg = simpleRegression(means, diffs);
 
   return {
     meanDiff, sdDiff, n,
-    loaUpper: meanDiff + z * sdDiff,
-    loaLower: meanDiff - z * sdDiff,
-    loaUpperCi: [meanDiff + z * sdDiff - seLoA * z, meanDiff + z * sdDiff + seLoA * z],
-    loaLowerCi: [meanDiff - z * sdDiff - seLoA * z, meanDiff - z * sdDiff + seLoA * z],
-    meanDiffCi: [meanDiff - z * sdDiff / Math.sqrt(n), meanDiff + z * sdDiff / Math.sqrt(n)],
-    proportionalBias: { detected: reg.pValue < 0.05, slope: reg.slope, r: reg.r, pValue: reg.pValue },
+    loaUpper: meanDiff + 1.96 * sdDiff,
+    loaLower: meanDiff - 1.96 * sdDiff,
+    loaUpperCi: [meanDiff + 1.96 * sdDiff - tCrit * seLoA, meanDiff + 1.96 * sdDiff + tCrit * seLoA],
+    loaLowerCi: [meanDiff - 1.96 * sdDiff - tCrit * seLoA, meanDiff - 1.96 * sdDiff + tCrit * seLoA],
+    meanDiffCi: [meanDiff - tCrit * sdDiff / Math.sqrt(n), meanDiff + tCrit * sdDiff / Math.sqrt(n)],
+    proportionalBias: { detected: reg.pValue < 0.05, slope: reg.slope, r: reg.r, pValue: reg.pValue, t: reg.t },
     points: means.map((m, i) => ({ mean: m, diff: diffs[i], outlier: Math.abs(diffs[i] - meanDiff) > 2 * sdDiff })),
+    nPairs: n,
+    nCases: Object.keys(byCase).length,
   };
 }
 
 // ─── Dahlberg / SEM / MDC ─────────────────────────────────────────────────
+// Use ALL pairs from 3+ occasions (was capped at 2 readings per case).
 function runDahlbergSEM(samples) {
-  const paired = {};
+  const byCase = {};
   for (const s of samples) {
-    const key = `${s.caseId}::${s.operatorId}`;
-    if (!paired[key]) paired[key] = [];
-    if (paired[key].length < 2) paired[key].push(s.value);
+    if (!byCase[s.caseId]) byCase[s.caseId] = [];
+    byCase[s.caseId].push(s.value);
   }
-  const pairs = Object.values(paired).filter(p => p.length >= 2);
-  if (pairs.length < 2) return {};
-
   let sumSqDiff = 0, count = 0;
   const allVals = [];
-  for (const p of pairs) {
-    const d = p[0] - p[1];
-    sumSqDiff += d * d;
-    count++;
-    allVals.push(p[0], p[1]);
+  for (const vals of Object.values(byCase)) {
+    for (let i = 0; i < vals.length; i++) {
+      for (let j = i + 1; j < vals.length; j++) {
+        const d = vals[i] - vals[j];
+        sumSqDiff += d * d;
+        count++;
+        allVals.push(vals[i], vals[j]);
+      }
+    }
   }
+  if (count < 2) return {};
 
   const dahlberg = Math.sqrt(sumSqDiff / (2 * count));
   const grandMean = allVals.reduce((a, b) => a + b, 0) / allVals.length;
@@ -183,14 +213,21 @@ function runDahlbergSEM(samples) {
   const sem = dahlberg;
   const mdc = 1.96 * Math.sqrt(2) * sem;
 
-  return { dahlberg, sem, cv, mdc, n: count };
+  return { dahlberg, sem, cv, mdc, n: count, nCases: Object.keys(byCase).length };
 }
 
 // ─── Landmark coordinate error mapping ────────────────────────────────────
-function collectLandmarkCoords(sessions, labelIds) {
+// Coordinates are collected in PIXELS. The error map must convert to mm using the
+// session's calibration (pxPerMm) so that errors are comparable across sessions
+// captured at different resolutions. The previous version reported errors in raw
+// pixels without labeling them as such, leading clinicians to misread the numbers
+// as millimeters.
+function collectLandmarkCoords(sessions, labelIds, calibration) {
   const rows = [];
   for (const s of sessions) {
     if (!s) continue;
+    const cal = s.calibration?.done ? s.calibration : calibration || { done: false, pxPerMm: 1 };
+    const ppm = cal?.pxPerMm || 1;
     const markups = s.markups || [];
     for (const m of markups) {
       if (!m.label) continue;
@@ -198,7 +235,8 @@ function collectLandmarkCoords(sessions, labelIds) {
       if (m.type === "ruler" || m.type === "silhouette" || m.type === "line" || m.type === "angle3") continue;
       if (!m.visible || !m.placed) continue;
       for (const p of (m.points || [])) {
-        rows.push({ sessionId: s.id, label: m.label, x: p.x, y: p.y });
+        // Convert pixel coordinates to mm
+        rows.push({ sessionId: s.id, label: m.label, x: p.x / ppm, y: p.y / ppm, unit: "mm" });
       }
     }
   }
@@ -241,10 +279,12 @@ function runLandmarkErrorMap(coords) {
       meanError,
       maxError,
       sdError,
+      unit: "mm",
       ellipse: {
         major: Math.sqrt(5.991) * Math.sqrt(Math.max(eig1, 0)),
         minor: Math.sqrt(5.991) * Math.sqrt(Math.max(eig2, 0)),
         angle,
+        unit: "mm",
       },
     };
   }
@@ -333,7 +373,8 @@ export function runReliabilityAll(sessions, config, calibration) {
       continue;
     }
 
-    const iccResult = iccShroutFleiss(iccData, k, "icc2");
+    const iccType = config.iccModel || "icc2";
+    const iccResult = iccShroutFleiss(iccData, k, iccType);
     const baResult = runBlandAltman(samples);
     const dsResult = runDahlbergSEM(samples);
 
@@ -353,9 +394,17 @@ export function runReliabilityAll(sessions, config, calibration) {
     });
   }
 
-  // Landmark error map
-  const coords = collectLandmarkCoords(sessions, labelIds);
+  // Landmark error map (now calibrated to mm)
+  const coords = collectLandmarkCoords(sessions, labelIds, calibration);
   const landmarkMap = runLandmarkErrorMap(coords);
+
+  // Minimum-sample-size warnings
+  const warnings = [];
+  const nCases = cases?.length || 0;
+  const nRaters = [...new Set(mRows.map(r => config.design === "intra" ? `occ${r.occasion}` : r.operatorId))].length;
+  if (nCases < 10) warnings.push(`Only ${nCases} cases — ICC estimates with < 10 subjects have wide confidence intervals and should be interpreted as preliminary.`);
+  if (nRaters < 2) warnings.push("Need ≥ 2 raters/occasions for reliability analysis.");
+  if (nCases >= 2 && nCases < 30) warnings.push(`ICC CI with ${nCases} subjects is wide — consider ≥ 30 subjects for a precise ICC estimate (Walter et al. 1998).`);
 
   return {
     measurements: mRows.length,
@@ -369,5 +418,6 @@ export function runReliabilityAll(sessions, config, calibration) {
       occasions: protocol?.occasions || 2,
     },
     landmarkMap,
+    warnings,
   };
 }

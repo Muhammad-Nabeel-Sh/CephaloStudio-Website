@@ -84,45 +84,73 @@ function referenceInterval(values, coverage = 0.95) {
   const lower = stats.mean - z * stats.sd;
   const upper = stats.mean + z * stats.sd;
 
-  // CI for limits (Reed method approximation)
+  // CI for limits (Reed method approximation). The previous version used tCritical(0.95)
+  // which gives a 90% two-sided CI mislabeled as "95%". Use t(0.975) for a proper 95% CI.
   const seLimit = stats.sd * Math.sqrt(1 / n + z * z / (2 * n));
-  const tC = tCritical(0.95, n - 1);
+  const tC = tCritical(0.975, n - 1);
   const lowerCi = [lower - tC * seLimit, lower + tC * seLimit];
   const upperCi = [upper - tC * seLimit, upper + tC * seLimit];
 
-  // Non-parametric (order statistics)
+  // Non-parametric (order statistics). CLSI/IFCC recommends n ≥ 120 for stable
+  // non-parametric reference intervals; warn when below this threshold.
   const sorted = [...values].sort((a, b) => a - b);
   const alpha = 1 - coverage;
   const rankLo = Math.max(0, Math.round(n * alpha / 2) - 1);
   const rankHi = Math.min(n - 1, Math.round(n * (1 - alpha / 2)) - 1);
+  const npWarning = n < 120 ? `Non-parametric RI requires n ≥ 120 for stable limits (CLSI EP28-A3c); current n = ${n}. Treat the non-parametric limits with caution.` : null;
 
   return {
     coverage,
     method: stats.isNormal ? "parametric" : "non-parametric",
     parametric: { lower, upper, lowerCi, upperCi },
     nonParametric: { lower: sorted[rankLo], upper: sorted[rankHi] },
+    nonParametricWarning: npWarning,
     recommendedLower: stats.isNormal ? lower : sorted[rankLo],
     recommendedUpper: stats.isNormal ? upper : sorted[rankHi],
   };
 }
 
 // ─── Z-score computation ─────────────────────────────────────────────────
+// Direction-aware severity: in cephalometrics, a value above and below the norm
+// have different clinical meanings (e.g. ANB +3 = Class II, ANB −3 = Class III).
+// The previous version used only |z| with generic labels (Mild/Moderate/Severe)
+// that ignored direction. We now report direction-specific interpretation.
 function computeZScore(value, norm) {
   if (!norm || norm.sd === 0 || value == null) return null;
   const z = (value - norm.mean) / norm.sd;
   const percentileRank = stdNormalCdf(z) * 100;
-
   const abs = Math.abs(z);
+  const direction = z > 0 ? "above" : z < 0 ? "below" : "at";
+
+  // Standard SD-based severity banding (direction-agnostic magnitude)
   let level, clinical;
   if (abs < 1) { level = "Within 1 SD"; clinical = "Normal"; }
-  else if (abs < 2) { level = "1–2 SD"; clinical = "Mild"; }
-  else if (abs < 3) { level = "2–3 SD"; clinical = "Moderate"; }
-  else { level = ">3 SD"; clinical = "Severe"; }
+  else if (abs < 2) { level = "1–2 SD"; clinical = "Mild deviation"; }
+  else if (abs < 3) { level = "2–3 SD"; clinical = "Moderate deviation"; }
+  else { level = ">3 SD"; clinical = "Severe deviation"; }
 
-  return { z, percentileRank, level, clinical, direction: z > 0 ? "above" : "below" };
+  // Direction-specific clinical note for well-known cephalometric measures
+  let directionNote = null;
+  if (norm.label === "ANB" || norm.label === "ANB") {
+    if (z > 2) directionNote = "Class II skeletal pattern (ANB above norm)";
+    else if (z < -2) directionNote = "Class III skeletal pattern (ANB below norm)";
+  } else if (norm.label === "SNA") {
+    if (z > 2) directionNote = "Maxillary prognathism (SNA above norm)";
+    else if (z < -2) directionNote = "Maxillary retrognathism (SNA below norm)";
+  } else if (norm.label === "SNB") {
+    if (z > 2) directionNote = "Mandibular prognathism (SNB above norm)";
+    else if (z < -2) directionNote = "Mandibular retrognathism (SNB below norm)";
+  }
+
+  return { z, percentileRank, level, clinical, direction, directionNote };
 }
 
 // ─── Built-in reference norms ────────────────────────────────────────────
+// WARNING: These norms are NOT stratified by age, sex, or ethnicity. Cephalometric
+// norms vary substantially by growth stage (pre-pubertal vs. post-pubertal) and
+// population. Applying a single adult Caucasian value to a growing patient or a
+// different ethnic group will systematically misclassify skeletal pattern. Use
+// the `stratification` field to display a warning in the UI.
 export const PREDEFINED_NORMS = [
   {
     id: "steiner",
@@ -131,6 +159,11 @@ export const PREDEFINED_NORMS = [
       SNA: { mean: 82, sd: 3 }, SNB: { mean: 80, sd: 3 }, ANB: { mean: 2, sd: 2 },
       "SN-MP": { mean: 32, sd: 4 }, "FMA": { mean: 25, sd: 4 }, "IMPA": { mean: 90, sd: 5 },
     },
+    source: "Steiner CC. Cephalometrics in clinical practice. Angle Orthod. 1959;29(1):8-29.",
+    population: "Caucasian (North American)",
+    ageRange: "Adult (not specified in source)",
+    sex: "Pooled (male + female)",
+    stratification: "Not stratified by age, sex, or ethnicity. Applies a single adult value to all patients.",
   },
   {
     id: "downs",
@@ -142,6 +175,11 @@ export const PREDEFINED_NORMS = [
       "Mandibular Plane": { mean: 22, sd: 4 },
       "Y-Axis": { mean: 59, sd: 3 },
     },
+    source: "Downs WB. Variations in facial relationships: their significance in treatment and prognosis. Am J Orthod. 1948;34(10):812-840.",
+    population: "Caucasian (North American)",
+    ageRange: "12-17 years (adolescent)",
+    sex: "Pooled (male + female)",
+    stratification: "Not stratified by age, sex, or ethnicity. Based on adolescent subjects — may not apply to adults.",
   },
   {
     id: "mcnamara",
@@ -151,8 +189,16 @@ export const PREDEFINED_NORMS = [
       "Facial Depth": { mean: 88, sd: 3 },
       "ANB": { mean: 2, sd: 2 },
     },
+    source: "McNamara JA. A method of cephalometric evaluation. Am J Orthod. 1984;86(6):449-469.",
+    population: "Caucasian (North American)",
+    ageRange: "Mixed (children and adults, not separated)",
+    sex: "Pooled (male + female)",
+    stratification: "Not stratified by age, sex, or ethnicity. Combines growing and non-growing subjects.",
   },
 ];
+
+// Generic warning for any normative comparison
+export const NORM_WARNING = "Reference norms are population-specific. These values are not stratified by age, sex, or ethnicity and may not apply to the patient being analyzed. Interpret z-scores with caution and consider using population-matched norms.";
 
 // ─── Collect measurement values per label from sessions ──────────────────
 function collectMeasurements(sessions, labelIds, calibration) {

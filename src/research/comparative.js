@@ -1,4 +1,4 @@
-import { computeMeasurements, mean, stdev, variance, shapiroWilk, oneWayAnova, tTestPaired, tDistributeCDF, fCDF, gammaLn } from "../utils.js";
+import { computeMeasurements, mean, stdev, variance, shapiroWilk, oneWayAnova, tTestPaired, tDistributeCDF, fCDF, chi2CDF } from "../utils.js";
 
 // ─── Statistical helpers ──────────────────────────────────────────────────
 function rankArray(arr) {
@@ -52,7 +52,10 @@ function levenesTest(...groups) {
   return { W, df1, df2, pValue, equalVariance: pValue > 0.05 };
 }
 
-// Mann-Whitney U test
+// Mann-Whitney U test with tie correction (variance inflation) and continuity
+// correction. The previous variance formula `n1·n2·(n1+n2+1)/12` assumes no ties; with
+// ties (common when cephalometric values are rounded) the variance is over-estimated,
+// inflating p-values. The continuity correction (±0.5) improves the normal approx.
 function mannWhitneyU(arr1, arr2) {
   const n1 = arr1.length, n2 = arr2.length;
   if (n1 < 2 || n2 < 2) return null;
@@ -61,16 +64,26 @@ function mannWhitneyU(arr1, arr2) {
   const rank1 = ranks.slice(0, n1);
   const R1 = sum(rank1);
   const U1 = n1 * n2 + (n1 * (n1 + 1)) / 2 - R1;
-  const U = U1;
+  const U2 = n1 * n2 - U1;
+  const U = Math.min(U1, U2);
   const mU = n1 * n2 / 2;
-  const sU = Math.sqrt(n1 * n2 * (n1 + n2 + 1) / 12);
+  // Tie-corrected variance: Var(U) = (n1 n2 /12) · [(n+1) - Σt(t²-1)/(n(n-1))], n=n1+n2
+  const tieCounts = {};
+  for (const v of combined) tieCounts[v] = (tieCounts[v] || 0) + 1;
+  const N = n1 + n2;
+  let tieTerm = 0;
+  for (const t of Object.values(tieCounts)) if (t > 1) tieTerm += t ** 3 - t;
+  const sU = Math.sqrt((n1 * n2 / 12) * ((N + 1) - tieTerm / (N * (N - 1))));
   if (sU === 0) return null;
-  const z = (U - mU) / sU;
+  // Continuity correction: |U - mU| - 0.5 (U is the smaller tail, so use mU - U)
+  const z = (mU - U - 0.5) / sU;
   const pValue = 2 * (1 - normalCdf(Math.abs(z)));
-  return { U, z, pValue, significant: pValue < 0.05 };
+  return { U, U1, U2, z, pValue, significant: pValue < 0.05 };
 }
 
-// Wilcoxon signed-rank test
+// Wilcoxon signed-rank test with tie correction for the variance. Ties in |diff| get
+// average ranks; zero differences are excluded. Effect size uses the number of non-zero
+// differences (not the original group size).
 function wilcoxonSignedRank(arr1, arr2) {
   if (arr1.length !== arr2.length || arr1.length < 2) return null;
   const diffs = arr1.map((v, i) => v - arr2[i]);
@@ -84,14 +97,23 @@ function wilcoxonSignedRank(arr1, arr2) {
   const W = Math.min(Wplus, Wminus);
   const nR = absDiffs.length;
   const mW = nR * (nR + 1) / 4;
-  const sW = Math.sqrt(nR * (nR + 1) * (2 * nR + 1) / 24);
+  // Tie-corrected variance: nR(nR+1)(2nR+1)/24 - Σt(t-1)(t-2) ... standard form:
+  // Var(W) = nR(nR+1)(2nR+1)/24 - Σ t(t²-1)/48 for each tie group in |diff|
+  const tieCounts = {};
+  for (const d of absDiffs) tieCounts[d.abs] = (tieCounts[d.abs] || 0) + 1;
+  let tieAdj = 0;
+  for (const t of Object.values(tieCounts)) if (t > 1) tieAdj += t * (t * t - 1);
+  const sW = Math.sqrt((nR * (nR + 1) * (2 * nR + 1)) / 24 - tieAdj / 48);
   if (sW === 0) return null;
-  const z = (W - mW) / sW;
+  const z = (mW - W - 0.5) / sW; // continuity-corrected
   const pValue = 2 * (1 - normalCdf(Math.abs(z)));
   return { W, Wplus, Wminus, z, n: nR, pValue, significant: pValue < 0.05 };
 }
 
-// Kruskal-Wallis H test
+// Kruskal-Wallis H test. The previous version used `1 - fCDF(H, df, 1e5)` as a χ²
+// proxy, which is conceptually wrong (F(·, df, ∞) = χ²(df)/df, not χ²(df)) AND relied on
+// the broken fCDF. Use the χ² distribution directly. Includes the standard tie
+// correction for H.
 function kruskalWallis(groups, labels) {
   if (groups.length < 2) return null;
   const groupData = groups.map((g, i) => ({ vals: g, label: labels?.[i] || `Group ${i + 1}`, n: g.length }));
@@ -104,15 +126,22 @@ function kruskalWallis(groups, labels) {
     return { ...g, rankSum: sum(r), meanRank: mean(r) };
   });
   const N = flat.length;
+  // Tie correction: 1 - Σt(t²-1)/(N³-N)
+  const tieCounts = {};
+  for (const v of flat) tieCounts[v] = (tieCounts[v] || 0) + 1;
+  let tieTerm = 0;
+  for (const t of Object.values(tieCounts)) if (t > 1) tieTerm += t ** 3 - t;
+  const C = 1 - tieTerm / (N ** 3 - N);
   const H12 = 12 / (N * (N + 1));
   const Hsum = sum(groupRanks.map(g => g.rankSum ** 2 / g.n));
-  const H = H12 * Hsum - 3 * (N + 1);
+  const H = (H12 * Hsum - 3 * (N + 1)) / (C || 1);
   const df = groups.length - 1;
-  const pValue = 1 - fCDF(H, df, 100000);
-  return { H, df, pValue, significant: pValue < 0.05, groupRanks };
+  const pValue = 1 - chi2CDF(H, df);
+  return { H, df, pValue, significant: pValue < 0.05, groupRanks, tieCorrection: C };
 }
 
 // ─── Friedman test (non-parametric repeated measures, 3+ groups) ────────
+// Use χ² approximation for Q (was using the broken fCDF-as-χ² proxy).
 function friedmanTest(groups, labels) {
   const n = groups[0].length;
   if (groups.some(g => g.length !== n) || n < 2) return null;
@@ -131,14 +160,15 @@ function friedmanTest(groups, labels) {
   const ss = rankSums.reduce((s, rj) => s + (rj - n * meanRank) ** 2, 0);
   const Q = 12 / (n * k * (k + 1)) * ss;
   const df = k - 1;
-  // Friedman's Q ≈ χ² on df
-  let pValue = 1 - fCDF(Q, df, 100000);
-  // Correct for small n using exact F-approximation
-  if (n < 10) {
-    const F_approx = ( (n - 1) * Q ) / ( n * (k - 1) - Q );
+  // Friedman's Q is asymptotically χ²(df). The previous code used `1 - fCDF(Q, df, 1e5)`
+  // which is wrong. Use the χ² CDF directly; keep the small-n F-approximation as a
+  // refinement (this one IS a real F statistic, so fCDF is appropriate here).
+  let pValue = 1 - chi2CDF(Q, df);
+  if (n < 10 && k > 2) {
+    const F_approx = ((n - 1) * Q) / (n * (k - 1) - Q);
     const df1 = k - 1;
     const df2 = (n - 1) * (k - 1);
-    if (F_approx > 0) pValue = 1 - fCDF(F_approx, df1, df2);
+    if (F_approx > 0 && df2 > 0) pValue = 1 - fCDF(F_approx, df1, df2);
   }
   // Kendall's W (effect size for Friedman)
   const totalSS = (n * k * (k + 1) * (k - 1)) / 12;
@@ -274,8 +304,10 @@ function independentTTest(arr1, arr2, welch = false) {
     const dfNum = (v1 / n1 + v2 / n2) ** 2;
     const dfDen = (v1 / n1) ** 2 / (n1 - 1) + (v2 / n2) ** 2 / (n2 - 1);
     const df = dfDen === 0 ? Math.min(n1 - 1, n2 - 1) : dfNum / dfDen;
-    const pValue = 2 * (1 - tDistributeCDF(Math.abs(t), Math.round(df)));
-    return { t, df: Math.round(df), pValue, significant: pValue < 0.05, method: "Welch's t-test" };
+    // Welch-Satterthwaite df is fractional by construction; rounding it loses precision
+    // and is unnecessary since the t CDF accepts non-integer df.
+    const pValue = 2 * (1 - tDistributeCDF(Math.abs(t), df));
+    return { t, df, pValue, significant: pValue < 0.05, method: "Welch's t-test" };
   }
   const sp2 = ((n1 - 1) * v1 + (n2 - 1) * v2) / (n1 + n2 - 2);
   const se = Math.sqrt(sp2 * (1 / n1 + 1 / n2));
@@ -286,28 +318,63 @@ function independentTTest(arr1, arr2, welch = false) {
   return { t, df, pValue, significant: pValue < 0.05, method: "Independent t-test" };
 }
 
-// Studentized range distribution (approximate)
+// Studentized range distribution CDF: P(q ≤ Q) where Q = range/k · ... is the
+// distribution of (max mean − min mean)/s with k means and df error df.
+// Integrand: ∫₀^∞ [Φ(q·x/√2)]^(k−1) · 2·f_df(x) dx, where the previous version raised
+// Φ to only (k−1) and used a single Φ factor — that misses the k-th order statistic
+// structure. The correct density integrates the probability that k−1 N(0,1) draws are
+// all below q·x/√2 AND the remaining one is the maximum, giving the standard form
+// P(q) = √(df/π) · Γ(df/2) / Γ((df+1)/2) · ∫₀^∞ [Φ(qx) − Φ(−qx)]^(k−1) · x·... .
+// We use the standard Glidden form (Φ(qx)−Φ(−qx))^(k-1) integrated over the chi
+// distribution.
 function studentizedRangeCDF(q, k, df) {
   if (q <= 0 || k < 2 || df < 1) return 0;
-  let p = 0;
-  const steps = 80;
+  const steps = 200;
   const dHalf = df / 2;
+  // Log density of Y = sqrt(chi²_df/df) (chi distribution scaled): f(y) ∝ y^{df-1} e^{-df y²/2}
+  // logF = (df-1)·ln(y) - df·y²/2 + const (const folded into weight, cancels in normalized sum)
+  let p = 0;
+  const maxX = 6 + q / 2; // upper limit; grows with q since the integrand depends on q·x
   for (let i = 0; i <= steps; i++) {
-    const x = 0.001 + (8 - 0.001) * i / steps;
-    let inner = 1;
-    for (let j = 0; j < k - 1; j++) {
-      inner *= normalCdf(q * x / Math.sqrt(2));
-    }
+    const x = (maxX * i) / steps;
+    // Probability that all of k-1 independent N(0,1) are within [-qx/√2, qx/√2] given Y=x
+    const z = q * x / Math.SQRT2;
+    const inner = Math.pow(normalCdf(z) - normalCdf(-z), k - 1);
     const w = (i === 0 || i === steps) ? 1 : (i % 2 === 1 ? 4 : 2);
-    // PDF of Y = sqrt(chi^2_df / df) — compute ln-scale
-    const logF = dHalf * Math.log(df) - (dHalf - 1) * Math.log(2) - gammaLn(dHalf) + (df - 1) * Math.log(x) - df * x * x / 2;
-    p += w * inner * Math.exp(logF) * (8 - 0.001) / (3 * steps);
+    const logF = (df - 1) * Math.log(Math.max(x, 1e-9)) - dHalf * x * x; // -df·x²/2, df/2=x²·(df/2)
+    p += w * inner * Math.exp(logF);
   }
-  return Math.min(1, Math.max(0, p));
+  p = p * (maxX / (3 * steps));
+  // Normalise so the CDF at q→∞ is 1 (the integral of the chi density over [0,∞) is the
+  // normalising constant). Compute that constant with the same quadrature but inner=1.
+  let norm = 0;
+  for (let i = 0; i <= steps; i++) {
+    const x = (maxX * i) / steps;
+    const w = (i === 0 || i === steps) ? 1 : (i % 2 === 1 ? 4 : 2);
+    const logF = (df - 1) * Math.log(Math.max(x, 1e-9)) - dHalf * x * x;
+    norm += w * Math.exp(logF);
+  }
+  norm = norm * (maxX / (3 * steps));
+  if (norm <= 0) return 0;
+  return Math.min(1, Math.max(0, p / norm));
 }
 
+// Tukey's HSD with the q-critical value obtained by inverting the studentized range CDF
+// (binary search) instead of the crude linear guess `3.6 + (k-2)*0.5` that ignored dfError
+// and was far too conservative for small k.
 function tukeysHSD(groups, labels, mse, dfError) {
   const results = [];
+  const k = groups.length;
+  // Solve studentizedRangeCDF(qCrit, k, dfError) = 1 - alpha (alpha=0.05 → 0.95)
+  const target = 0.95;
+  let lo = 1.0, hi = 12.0, qCrit = hi;
+  for (let it = 0; it < 60; it++) {
+    const mid = (lo + hi) / 2;
+    const cdf = studentizedRangeCDF(mid, k, dfError);
+    if (cdf < target) lo = mid; else hi = mid;
+    if (Math.abs(cdf - target) < 1e-4) { qCrit = mid; break; }
+  }
+  if (qCrit > 11.9) qCrit = 3.6 + (k - 2) * 0.5; // fallback if inversion fails
   for (let i = 0; i < groups.length; i++) {
     for (let j = i + 1; j < groups.length; j++) {
       const ni = groups[i].length, nj = groups[j].length;
@@ -316,14 +383,12 @@ function tukeysHSD(groups, labels, mse, dfError) {
       const se = Math.sqrt(mse * (1 / ni + 1 / nj) / 2);
       if (se === 0) continue;
       const q = Math.abs(diff) / se;
-      const k = groups.length;
-      const dfE = dfError;
-      const p = 1 - studentizedRangeCDF(q, k, dfE);
-      const qCrit = 3.6 + (k - 2) * 0.5;
+      const p = 1 - studentizedRangeCDF(q, k, dfError);
       results.push({
         groupA: labels[i], groupB: labels[j],
-        meanDiff: diff, se, q, pValue: Math.min(1, p),
+        meanDiff: diff, se, q, pValue: Math.min(1, Math.max(0, p)),
         significant: q > qCrit,
+        qCritical: qCrit,
         ci95: [diff - qCrit * se, diff + qCrit * se],
       });
     }
@@ -340,25 +405,53 @@ function bonferroniAdjust(pValues, alpha = 0.05) {
   }));
 }
 
+// Benjamini-Hochberg with enforced monotonicity. The adjusted p-value for rank r is
+// min over all ranks ≥ r of (p_r · m / r), then cumulatively-min'd from the top so the
+// adjusted values never increase as the original p decreases (the previous version
+// returned non-monotonic adjusted p's — only the step-up significance flag was correct).
 function benjaminiHochberg(pValues, alpha = 0.05) {
   const m = pValues.length;
+  if (m === 0) return [];
   const indexed = pValues.map((p, i) => ({ p, i })).sort((a, b) => a.p - b.p);
+  // raw adjusted = p * m / rank
+  for (let rank = 0; rank < m; rank++) {
+    indexed[rank].rawAdj = Math.min(indexed[rank].p * m / (rank + 1), 1);
+  }
+  // enforce monotonicity from the largest p downward (BH adjusted p-values must be
+  // non-decreasing as the original p increases; the previous version skipped this and
+  // could emit non-monotonic adjusted p-values).
+  let prev = 1;
+  for (let rank = m - 1; rank >= 0; rank--) {
+    prev = Math.min(prev, indexed[rank].rawAdj);
+    indexed[rank].adjusted = prev;
+  }
+  // step-up significance: largest rank whose p <= (rank+1)/m * alpha
   let lastSig = -1;
   for (let rank = 0; rank < m; rank++) {
     if (indexed[rank].p <= ((rank + 1) / m) * alpha) lastSig = rank;
   }
   return indexed.map((item, rank) => ({
-    ...item, adjusted: item.p * m / (rank + 1),
-    significant: rank <= lastSig,
+    original: item.p, adjusted: item.adjusted, significant: rank <= lastSig, i: item.i,
   })).sort((a, b) => a.i - b.i);
 }
 
-// Approx F from Wilks' lambda
+// Approximate F from Wilks' lambda. Guard against NaN when the sphericity-ish
+// discriminant `p²(k-1)² − 4` is non-positive (e.g., p=2,k=2); fall back to the
+// exact 2-DV / 2-group Rao F form in those cases.
 function fFromWilks(lambda, p, k, N) {
   const df1 = p * (k - 1);
-  const t = Math.sqrt((p ** 2 * (k - 1) ** 2 - 4) / (p ** 2 + (k - 1) ** 2 - 5));
-  const df2 = t * (N - (p + k) / 2 + 0.5) - (p * (k - 1) - 2) / 2;
-  const F = ((1 - lambda ** (1 / t)) / (lambda ** (1 / t))) * (df2 / df1);
+  const disc = p * p * (k - 1) ** 2 - 4;
+  let df2, F;
+  if (disc <= 0) {
+    // Exact small-case form: F = ((1-Λ)/Λ) · (df2/df1), df2 = N - p - k + 1
+    df2 = N - p - k + 1;
+    F = df2 > 0 && lambda > 0 ? ((1 - lambda) / lambda) * (df2 / df1) : 0;
+  } else {
+    const t = Math.sqrt(disc / (p * p + (k - 1) ** 2 - 5));
+    df2 = t * (N - (p + k) / 2 + 0.5) - (p * (k - 1) - 2) / 2;
+    F = ((1 - lambda ** (1 / t)) / (lambda ** (1 / t))) * (df2 / df1);
+  }
+  if (!isFinite(F) || !isFinite(df2) || df2 <= 0 || df1 <= 0) return null;
   const pValue = 1 - fCDF(F, df1, df2);
   return { F, df1: Math.round(df1), df2: Math.round(df2), pValue };
 }
@@ -401,6 +494,83 @@ function eigenvalues2x2(A) {
   return [(tr + sqrtD) / 2, (tr - sqrtD) / 2];
 }
 
+// Jacobi eigenvalue iteration for a SYMMETRIC matrix (returns eigenvalues, all real).
+// Used for MANOVA: the canonical roots are the eigenvalues of E^{-1/2} H E^{-1/2},
+// which is symmetric (H and E are symmetric, E positive-definite). The previous code
+// returned the placeholder [1] for >2 DVs, making Wilks/Pillai/Hotelling/Roy and the
+// Rao-F meaningless for 3+ measurement variables.
+function jacobiEigenSym(A, maxIter = 100, tol = 1e-12) {
+  const n = A.length;
+  const M = A.map(row => row.slice());
+  for (let sweep = 0; sweep < maxIter; sweep++) {
+    let off = 0;
+    for (let r = 0; r < n; r++) for (let c = r + 1; c < n; c++) off += M[r][c] * M[r][c];
+    if (off < tol) break;
+    for (let p = 0; p < n - 1; p++) {
+      for (let q = p + 1; q < n; q++) {
+        if (Math.abs(M[p][q]) < 1e-18) continue;
+        const app = M[p][p], aqq = M[q][q], apq = M[p][q];
+        const theta = (aqq - app) / (2 * apq);
+        const t = Math.sign(theta || 1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
+        const c = 1 / Math.sqrt(t * t + 1), s = t * c;
+        for (let i = 0; i < n; i++) {
+          const mip = M[i][p], miq = M[i][q];
+          M[i][p] = c * mip - s * miq; M[i][q] = s * mip + c * miq;
+        }
+        for (let i = 0; i < n; i++) {
+          const mpi = M[p][i], mqi = M[q][i];
+          M[p][i] = c * mpi - s * mqi; M[q][i] = s * mpi + c * mqi;
+        }
+      }
+    }
+  }
+  return M.map((row, i) => row[i]);
+}
+
+// E^{-1/2} for a symmetric positive-definite E, via Jacobi eigendecomposition.
+// E = V · diag(λ) · V^T  →  E^{-1/2} = V · diag(1/√λ) · V^T.
+function jacobiInverseSqrt(E) {
+  const n = E.length;
+  let V = Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => i === j ? 1 : 0));
+  const M = E.map(row => row.slice());
+  for (let sweep = 0; sweep < 100; sweep++) {
+    let off = 0;
+    for (let r = 0; r < n; r++) for (let c = r + 1; c < n; c++) off += M[r][c] * M[r][c];
+    if (off < 1e-14) break;
+    for (let p = 0; p < n - 1; p++) {
+      for (let q = p + 1; q < n; q++) {
+        if (Math.abs(M[p][q]) < 1e-18) continue;
+        const app = M[p][p], aqq = M[q][q], apq = M[p][q];
+        const theta = (aqq - app) / (2 * apq);
+        const t = Math.sign(theta || 1) / (Math.abs(theta) + Math.sqrt(theta * theta + 1));
+        const c = 1 / Math.sqrt(t * t + 1), s = t * c;
+        for (let i = 0; i < n; i++) {
+          const vip = V[i][p], viq = V[i][q];
+          V[i][p] = c * vip - s * viq; V[i][q] = s * vip + c * viq;
+        }
+        for (let i = 0; i < n; i++) {
+          const mip = M[i][p], miq = M[i][q];
+          M[i][p] = c * mip - s * miq; M[i][q] = s * mip + c * miq;
+        }
+        for (let i = 0; i < n; i++) {
+          const mpi = M[p][i], mqi = M[q][i];
+          M[p][i] = c * mpi - s * mqi; M[q][i] = s * mpi + c * mqi;
+        }
+      }
+    }
+  }
+  const eigVals = M.map((row, i) => row[i]);
+  const dInv = eigVals.map(l => 1 / Math.sqrt(Math.max(l, 1e-12)));
+  // E^{-1/2} = V · diag(dInv) · V^T
+  const out = Array.from({ length: n }, () => Array(n).fill(0));
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+    let s = 0;
+    for (let k = 0; k < n; k++) s += V[i][k] * dInv[k] * V[j][k];
+    out[i][j] = s;
+  }
+  return out;
+}
+
 function runMANOVA(groups, measurements) {
   const groupKeys = Object.keys(groups);
   const k = groupKeys.length;
@@ -431,18 +601,27 @@ function runMANOVA(groups, measurements) {
   }
   const Einv = matInverse(E);
   if (!Einv) return null;
-  const EinvH = matMul(Einv, H);
-  const eigenvals = p === 2 ? eigenvalues2x2(EinvH) : [1];
-  const wilksLambda = eigenvals.reduce((prod, ev) => prod * 1 / (1 + ev), 1);
+  // Canonical roots = eigenvalues of E^{-1/2} H E^{-1/2} (symmetric → real roots via Jacobi).
+  // For p === 2 keep the closed-form (exact, fast); for p > 2 use the general symmetric
+  // path (previously stubbed to [1], which made all four MANOVA statistics meaningless).
+  let eigenvals;
+  if (p === 2) {
+    eigenvals = eigenvalues2x2(matMul(Einv, H));
+  } else {
+    const EinvSqrt = jacobiInverseSqrt(E);
+    const M = matMul(EinvSqrt, matMul(H, EinvSqrt));
+    eigenvals = jacobiEigenSym(M).map(v => Math.max(0, v));
+  }
+  const wilksLambda = eigenvals.reduce((prod, ev) => prod / (1 + ev), 1);
   const pillaiTrace = eigenvals.reduce((sum, ev) => sum + ev / (1 + ev), 0);
   const fApprox = fFromWilks(wilksLambda, p, k, N);
   return {
     wilksLambda, pillaiTrace,
     hotellingsTrace: eigenvals.reduce((a, e) => a + e, 0),
     roysLargestRoot: Math.max(...eigenvals),
-    F: fApprox.F, df1: fApprox.df1, df2: fApprox.df2,
-    pValue: fApprox.pValue,
-    significant: fApprox.pValue < 0.05,
+    F: fApprox ? fApprox.F : null, df1: fApprox ? fApprox.df1 : null, df2: fApprox ? fApprox.df2 : null,
+    pValue: fApprox ? fApprox.pValue : null,
+    significant: fApprox ? fApprox.pValue < 0.05 : false,
     eigenvalues: eigenvals,
     nGroups: k, nDVs: p, N,
   };
@@ -587,7 +766,15 @@ export function runComparativeAll(sessions, config, calibration) {
     groupData: {},
     alpha: alpha || 0.05,
     mcCorrection: mcCorrection || "bonferroni",
+    warnings: [],
   };
+
+  // Minimum-sample-size warnings
+  const groupSizes = groups.map(g => (g.caseIds || []).length);
+  const minGroupN = Math.min(...groupSizes);
+  if (minGroupN < 10) results.warnings.push(`Smallest group has ${minGroupN} cases — parametric tests (t-test, ANOVA) require ≥ 5-10 per group for adequate normality approximation. Results may be unreliable.`);
+  const totalN = groupSizes.reduce((a, b) => a + b, 0);
+  if (totalN < 30 && groups.length >= 3) results.warnings.push(`Total N = ${totalN} across ${groups.length} groups — post-hoc tests (Tukey HSD) have low power at this sample size.`);
 
   // Per-label test results
   for (const label of allLabels) {

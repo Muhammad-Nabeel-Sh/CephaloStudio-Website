@@ -42,8 +42,20 @@ export function runStudy(study, sessions, calibration) {
         results = { note: "Unknown study type" };
     }
   } catch (e) {
-    if (import.meta.env.DEV) console.error("Study run error:", e);
-    return { ...study, status: "error", results: { error: e.message } };
+    // Always surface errors (was gated on `import.meta.env.DEV`, so production errors
+    // were silently swallowed — the user saw a generic "error" status with no message
+    // to debug from). Log unconditionally and capture the stack for diagnostics.
+    console.error("Study run error:", e);
+    return {
+      ...study,
+      status: "error",
+      results: {
+        error: e.message,
+        stack: e.stack || null,
+        studyType: study.type,
+        timestamp: Date.now(),
+      },
+    };
   }
 
   return {

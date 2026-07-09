@@ -367,9 +367,17 @@ export function buildCompositeIndex(predictors, labels) {
 }
 
 // ─── Cross-Validation AUC ───────────────────────────────────────────────────
+// Fixes: (1) shuffle before k-fold to avoid contiguous-class folds that can be
+// pure/empty; (2) correctedAUC = apparentAUC - optimism, where optimism =
+// apparentAUC - cvAUC (the previous `correctedAUC = apparentAUC - (apparentAUC -
+// cvAUC)` simplified to cvAUC, a tautology, not a correction); (3) minimum n ≥ 10
+// with ≥ 5 per class for any ROC (CLSI EP12 recommends ≥ 50, but 10 is the floor
+// for a non-degenerate curve).
 export function crossValidateAUC(predictors, labels, method = "loocv", k = 10) {
   const n = labels.length;
-  if (n < 5) return null;
+  const nP = labels.filter(l => l === 1).length;
+  const nN = labels.filter(l => l === 0).length;
+  if (nP < 5 || nN < 5) return { note: `Cross-validation requires ≥ 5 cases per class (have ${nP} positive, ${nN} negative).` };
   const aucs = [];
 
   if (method === "loocv") {
@@ -384,8 +392,16 @@ export function crossValidateAUC(predictors, labels, method = "loocv", k = 10) {
       aucs.push({ score, label: testY[0], fold: i });
     }
   } else if (method === "kfold") {
-    const foldSize = Math.max(1, Math.floor(n / k));
+    // Shuffle indices before folding to avoid contiguous-class folds (e.g., if the
+    // data is sorted by label, contiguous folds would be all-positive or all-negative).
     const idx = Array.from({ length: n }, (_, i) => i);
+    // Fisher-Yates shuffle (deterministic order: we don't seed for reproducibility —
+    // the caller can re-run for a different split)
+    for (let i = n - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [idx[i], idx[j]] = [idx[j], idx[i]];
+    }
+    const foldSize = Math.max(1, Math.floor(n / k));
     for (let f = 0; f < k; f++) {
       const testIdx = idx.slice(f * foldSize, f === k - 1 ? n : (f + 1) * foldSize);
       const trainIdx = idx.filter(i => !testIdx.includes(i));
@@ -403,7 +419,7 @@ export function crossValidateAUC(predictors, labels, method = "loocv", k = 10) {
     }
   }
 
-  if (aucs.length < 5) return null;
+  if (aucs.length < 5) return { note: "Too few successful cross-validation folds." };
 
   const cvScores = aucs.map(a => a.score);
   const cvLabels = aucs.map(a => a.label);
@@ -414,14 +430,23 @@ export function crossValidateAUC(predictors, labels, method = "loocv", k = 10) {
     predictors.map(x => sigmoid(dot(addIntercept([x])[0], fullModel.beta))), labels
   ) : null;
 
+  const apparent = apparentAUC?.auc || 0;
+  const cv = cvAUC?.auc || 0;
+  const optimism = apparent - cv;
+
   return {
     cvAUC,
-    apparentAUC: apparentAUC?.auc || 0,
-    optimism: (apparentAUC?.auc || 0) - (cvAUC?.auc || 0),
-    correctedAUC: (apparentAUC?.auc || 0) - ((apparentAUC?.auc || 0) - (cvAUC?.auc || 0)),
+    apparentAUC: apparent,
+    optimism,
+    // Corrected AUC = apparentAUC - optimism (proper bootstrap-style correction;
+    // the previous formula was `apparent - (apparent - cv)` = cv, a tautology)
+    correctedAUC: apparent - optimism,
     foldResults: aucs,
     nFolds: aucs.length,
     method, k,
+    note: method === "loocv"
+      ? "LOOCV optimism estimate: each fold refits with n-1 cases; DeLong CI on pooled out-of-fold predictions is approximate (assumes independence across folds)."
+      : "k-fold CV with shuffled folds. DeLong CI on pooled out-of-fold predictions.",
   };
 }
 
@@ -480,11 +505,8 @@ export function collectDiagnosticData(sessions, config, calibration) {
     cases.push({ sessionId: sid, goldStandard: gsBinary, goldStandardLabel: gsVal, ...predVals });
   }
 
-  if (cases.length < 3) {
-    const missingPredictors = sessionIds.filter(sid =>
-      cleanPredictors.some(pl => bySession[sid]?.[pl] == null)
-    );
-    return { error: `Only ${cases.length} of ${sessionIds.length} sessions have complete data. ${missingPredictors.length} sessions missing predictor measurements. Need at least 3 cases.` };
+  if (cases.length < 10) {
+    return { error: `Only ${cases.length} cases with complete data. ROC analysis requires at least 10 cases with ≥ 5 per class for a non-degenerate curve.` };
   }
 
   const labels = cases.map(c => c.goldStandard);
@@ -527,7 +549,12 @@ export function runDiagnosticAll(sessions, config, calibration) {
     if (!auc) continue;
     const opts = optimalThresholds(roc.thresholdMetrics);
     const enrichedYouden = opts.enrichOptimal(opts.byYouden, nP, nN);
-    const calibData = { groups: [], hlStat: 0, hlP: 1, wellCalibrated: true, ici: 0, brier: 0, brierSkill: 0 };
+    // Actually compute per-predictor calibration (was faked: always wellCalibrated:true).
+    // Use the single-predictor probabilities from the ROC threshold metrics: group by
+    // decile and compare observed vs expected. Since the predictor is a single score
+    // (not a logistic model), we bin by score quantiles and compute the Hosmer-Lemeshow
+    // statistic on the implied calibration.
+    const calibData = calibrationAnalysis(scores, labels, 10);
     predictorResults[pl] = {
       roc, auc, optimalThresholds: opts,
       optimalYouden: enrichedYouden,

@@ -1,0 +1,184 @@
+# CephaloStudio — Comprehensive Code Review
+
+Verified against the deployed code. Findings grouped by domain, each with **Impact** (clinical/UX/perf/security) and **Burden** (engineering effort: S=hours, M=days, L=weeks).
+
+---
+
+## 🔴 1. Statistical & Clinical Correctness (CRITICAL — fix before any research use)
+
+These produce **numerically wrong results in medical analyses**. Worst-of-breed first.
+
+| # | Issue | Location | Impact | Burden |
+|---|-------|----------|--------|--------|
+| S1 | **`betaCF` broken (2 defects)** — init missing `d=1/d` inversion + line 326 `del=d*h` should be `del=d*c`. Collapses `betaIncomplete` to 0/1. | `utils.js:304-331` | **Catastrophic**: every t-test reports p≈0 (always significant), every ANOVA/RM-ANOVA/Levene/MANOVA reports p≈1 (never significant). False +/− clinical conclusions. | S (1 func) + add reference tests |
+| S2 | **`ibeta` stub in correlation.js** — omits the `betaCF/a` factor, returns only prefactor. | `correlation.js:49-58` | **Catastrophic**: Pearson/Spearman/partial-correlation/regression-coefficient p-values all wrong. Should reuse fixed `betaIncomplete`. | S |
+| S3 | **`chi2CDF` upper branch off by factor of x** — uses `a*ln(y)` instead of `(a-1)*ln(y)` in upper-tail prefactor. | `utils.js:548,565` (same in `correlation.js:86`, `diagnostic.js:86`) | **High**: normality (D'Agostino K²), Mauchly sphericity, Hosmer-Lemeshow violations go *undetected* (conservative false-negatives) exactly when they matter. | S |
+| S4 | **Kruskal-Wallis & Friedman misuse `fCDF` as χ² proxy** — `1-fCDF(H,df,1e5)` is conceptually wrong even with a correct fCDF. | `comparative.js:111,135` | **High**: non-parametric multi-group tests never significant. Should be `1-chi2CDF(H,df)`. | S |
+| S5 | **MANOVA eigenvalues stubbed to `[1]` for >2 DVs** | `comparative.js:435` | **High**: Wilks/Pillai/Hotelling/Roy + Rao-F for 3+ measurement variables are meaningless. No Box's M test. | M |
+| S6 | **"LMM" is pooled OLS, not a mixed model** — fixed-effect SEs assume independence → anti-conservative slope p-values; `logLik/AIC/BIC` mislabeled "REML". | `longitudinal.js:242-330` | **High**: the central "is there growth/change?" inference is biased. No convergence flag. | L (use a stat lib or proper REML) |
+| S7 | **GG epsilon denominator wrong** + **non-orthonormal contrast basis** for Mauchly W. | `longitudinal.js:72-124` | **High**: sphericity correction disabled/under-corrected; W test on wrong matrix. | M |
+| S8 | **Change-score "MDC" uses SE of mean, not individual-level MDC** (`1.96·sem·√2` with `sem=sdDiff/√n`). | `longitudinal.js:449-470` | **High**: almost any mean change is flagged "MDC exceeded" — conflates group precision with measurement error. | S |
+| S9 | **Landmark error map in PIXELS, not mm** — no calibration applied; `meanError`/ellipse axes unlabeled. | `reliability.js:190-253` | **High**: cross-session/cross-resolution errors mixed; numbers misread as mm. | S |
+| S10 | **ICC hardcoded to ICC(2,1) single-measures** — no UI for ICC(1)/(3), consistency vs absolute, single vs average. CI formula only exact for (1,1)/(3,1). | `reliability.js:336,114` | **High**: wrong model for intra-rater; misleading "model" label. | M |
+| S11 | **`PREDEFINED_NORMS` not stratified by age/sex/ethnicity** — one Steiner/Downs/McNamara value applied to a 9y-o and 45y-o. No source/citation metadata. | `descriptive.js:126-155`, `constants.js:419-498` | **High**: z-scores systematically misclassify skeletal pattern. Norms vary substantially by growth stage & population. | M-L (curate stratified norm tables) |
+| S12 | **z→severity mapping arbitrary/linear** (`<1SD Normal…>3SD Severe`) — not orthodontic convention; not direction-specific (ANB +2 vs −2 differ diagnostically). | `descriptive.js:116-120` | **Medium**: mislabels clinical severity. | S |
+| S13 | **Reference-interval limit CI uses t(0.95)** → reports a 90% two-sided CI as "95%". Non-parametric RI requires n≥120 (CLSI) with no minimum-n warning (allows n≥3). | `descriptive.js:88-97` | **Medium**: CIs too narrow; unstable non-parametric limits. | S |
+| S14 | **Bland-Altman pairing drops 3rd+ occasion silently**; proportional-bias p uses normal CDF + ad-hoc fudge, not t(n−2). LoA CI uses z not t. | `reliability.js:49,128-156` | **Medium**: bias detection unreliable; data loss for 3+ occasion protocols. | S |
+| S15 | **No tie correction / no exact small n** for Mann-Whitney & Wilcoxon; Welch df rounded; BH adjustment not monotonic. | `comparative.js:56-92,277,343` | **Medium**: inaccurate non-parametric p-values; non-monotonic adjusted p. | M |
+| S16 | **Tukey HSD q-crit is a crude linear guess** (`3.6+(k-2)*0.5`); `studentizedRangeCDF` integrand missing a factor. | `comparative.js:290-322` | **High**: post-hoc over-conservative. | M |
+| S17 | **Logistic regression**: no separation/perfect-prediction detection, no step-halving, `matInverse→I` on singular Hessian → silent divergence; hardcoded 0.5 cutoff; no DeLong CI on its AUC. | `correlation.js:499-547` | **Medium-High**: divergence in small clinical samples; ROC not CIs. | M |
+| S18 | **Diagnostic CV**: non-shuffled contiguous folds (can be pure/empty), DeLong variance misapplied to LOOCV refits, per-predictor calibration faked (`wellCalibrated:true` always), allows n≥3 for ROC. | `diagnostic.js:370-530` | **High**: optimism/CI wrong; single-predictor calibration misleading. | M |
+| S19 | **No minimum-sample-size / power warnings anywhere** — RM-ANOVA allows 3 subjects, ROC allows 3 cases, parametric gate allows n≥5. `minTimeSeparation` configured but never enforced. | `longitudinal.js`, `diagnostic.js`, `reliability.js`, `studyModel.js:37` | **High**: underpowered studies run silently. | M |
+| S20 | **Research engine runs synchronously on main thread** — no worker/progress/cancel; prod errors swallowed (only logged in DEV). | `engine.js:8-54` | **Medium**: UI freeze on large datasets. | M |
+
+> **Note**: the test suite (`comparative.test.js`, `longitudinal.test.js`, etc.) only asserts *structure* — **no test compares a p-value to a reference**. That's why S1–S3 survived. **Highest-leverage fix: add reference-value tests** (e.g. assert `fCDF(4.10,2,10)≈0.95`, `tDistributeCDF(2.5,20)≈0.989`, `chi2CDF(5.991,2)≈0.95`).
+
+---
+
+## 🔴 2. Privacy & Security (CRITICAL for any clinical-adjacent use)
+
+| # | Issue | Location | Impact | Burden |
+|---|-------|----------|--------|--------|
+| P1 | **PHI in `localStorage` plaintext, no expiry/purge** — `meta.patientId/name/dob/age/gender/ethnicity/clinician/facility/referral/notes` + per-session `patientId/operatorId`. Readable by any same-origin JS (XSS = full PHI exfiltration), persists across restarts, may cloud-sync. | `App.jsx:1608,1622-1638`; `model/project.js:16-20` | **Critical (HIPAA/regulatory)**. No "PHI stored locally" notice; disclaimer only says "educational". | M |
+| P2 | **`.cephx` export ships full PHI + images, no encryption/prompt** | `App.jsx:98-137` | **High**: anyone with the file has everything; no anonymize-first prompt despite `AnonModal` existing. | S |
+| P3 | **`anonymize` destructive, no audit trail** — original values gone, no who/when. | `AnonModal.jsx:5` | **Medium**: no provenance for de-identification. | S |
+| P4 | **No CSP** (no meta, no Vercel header); KaTeX CSS loaded from CDN with **no SRI** (offline failure + supply-chain risk). | `index.html`, `vercel.json`, `hooks.jsx` | **Medium**: XSS hardening absent; CDN tampering risk. | S |
+| P5 | **`console.error` may log PHI-derived errors in prod** — inconsistent with `engine.js` which already gates on `DEV`. | `App.jsx:140,978,1524,1585`; `imageStore.js`; `BatchImportModal.jsx:108` | **Medium**: shared-workstation console history leak. | S |
+| P6 | **No HTTPS enforcement** in `vercel.json`; no dependency audit/CodeQL in CI. | `vercel.json`, `.github/workflows/*` | **Medium**. | S |
+| P7 | **mathjs user-authored formula expressions** — sandboxed by default but an attack surface if a CVE lands; version not pinned/audited. | `App.jsx:236` | **Low-Medium**. | S |
+
+---
+
+## 🔴 3. Data Integrity & Storage
+
+| # | Issue | Location | Impact | Burden |
+|---|-------|----------|--------|--------|
+| D1 | **Autosave can permanently lose images** — `localStorage` written with `dataUrl:null` *before* fire-and-forget IDB writes; `.catch(()=>{})` swallows failures; tab close mid-write = loss. | `App.jsx:1619-1646` | **Critical**: medical image data loss; orphaned markups/calibration remain. | M |
+| D2 | **Orphaned image blobs leak forever** — `deleteImageBlob`/`clearImageBlobs` exported but **never called**; no project/session-delete handler clears IDB. | `imageStore.js:83,97`; `App.jsx`, `project.js:55` | **Critical**: quota exhaustion → silent save failure. | S |
+| D3 | **IDB quota/unavailable failures silent** — incognito mode silently degrades to "images lost"; no user banner. | `imageStore.js:50-64` | **High**. | S |
+| D4 | **`importCephx` no version check / no migration / no field validation** — legacy `session.image` (singular) only normalized on *export*, not import. | `App.jsx:138-142,104-116` | **High**: data-integrity risk for imported records. | M |
+| D5 | **Version mismatch**: code writes `.cephx` v2.1, docs say v2.0; `.cepht` 1.0/2.0 undocumented split; `validateCepht` minimal. | `App.jsx:129,157`; README/AGENTS | **Medium**. | S |
+| D6 | **No IDB schema migration path** (`DB_VERSION=1`). | `imageStore.js:2` | **Low** (future risk). | S |
+| D7 | **Images as base64 `dataUrl` in live state + export** — 33% overhead; multi-MB JSON `stringify` blocks; `.cephx` of multi-session case = tens of MB synchronous. | `App.jsx:790,129-137` | **Medium**: memory + freeze. Use Object URLs for display. | M |
+| D8 | **`loadImage` has no `reader.onerror`** — corrupt/permission-denied read hangs "Loading images…" forever. | `App.jsx:782-800` | **Medium**. | S |
+
+---
+
+## 🟠 4. Performance
+
+| # | Issue | Location | Impact | Burden |
+|---|-------|----------|--------|--------|
+| F1 | **Every `mousemove` re-renders the 1257-line Workspace** — `mousePos`/`snapPos`/`pan`/`boxSelectRect` dispatched into state on each event → full clear+redraw. | `App.jsx:1023,596-777,779` | **High**: jank, especially with many markups/large radiographs. Move pointer state to refs. | M |
+| F2 | **No DPR scaling** — canvas backing store = CSS pixels; on 2×/3× displays the radiograph & landmarks render blurry. | `App.jsx:592,596-599` | **High** (medical precision: sub-pixel landmark placement). | S |
+| F3 | **Image processing on main thread** — `getImageData` + per-pixel loop (16 MB for 2000²) on every slider tick; edge-enhance adds a 2nd pass. | `imageUtils.jsx:49-87` | **High**: slider drag freezes. Move to Web Worker. | M |
+| F4 | **Full synchronous clear+redraw, no layer/dirty-rect cache** — static image+markups redrawn alongside interactive overlays. | `App.jsx:596-777` | **Medium**. Offscreen layer for static content. | M |
+| F5 | **`redraw` useCallback rebuilt nearly every render** (28-dep array includes `mousePos`) — memoization ineffective. | `App.jsx:777` | **Low-Medium**. | S |
+| F6 | **`computeHistogram` runs in render body** while histogram open (every mousemove). | `App.jsx:1596` | **Low**. Memoize. | S |
+| F7 | **`procCache` Map not cleared on session switch** (only per-image eviction). | `App.jsx:582-586` | **Low**. | S |
+| F8 | **`ResizeObserver` not rAF-coalesced** — `canvas.width=` clears synchronously each resize frame. | `App.jsx:591-594` | **Low**. | S |
+
+---
+
+## 🟠 5. Accessibility
+
+| # | Issue | Location | Impact | Burden |
+|---|-------|----------|--------|--------|
+| A1 | **Canvas has zero accessibility** — no `aria-label`/`role="img"`/`tabindex`; all landmarks/measurements/calibration/placing-prompt are invisible to screen readers. No DOM mirror. | `App.jsx:1405-1408` | **Critical**: the entire analysis output is non-perceivable to AT users. | L |
+| A2 | **No focus trap / autofocus / focus-restore in `Modal`** — `aria-modal` without trap is a broken contract. | `panels/Modal.jsx:3-20` | **High**. | S |
+| A3 | **`SessionMetadataModal` + sub-modals bypass `Modal.jsx`** — raw divs, no `role="dialog"`/`aria-modal`/Escape/focus. | `SessionMetadataModal.jsx:146,296,416` | **High**. | M |
+| A4 | **Filmstrip delete is hover-only** → keyboard-invisible; nested `<button>` inside `role="button"` (invalid ARIA nesting). | `SessionFilmstrip.jsx:80-93` | **Medium**. | S |
+| A5 | **Placing-mode card is canvas-drawn** — not selectable/tab-able/AT-perceivable. | `App.jsx:740-776` | **Medium**. Make a floating React panel. | M |
+| A6 | **Touch incomplete** — no touch for box-select, double-click finalize polygon, Ctrl+click curve point, Shift+click delete point, silhouette handles. | `App.jsx:983,992,1075` | **Medium**: tablet clinicians can't edit curves. | M |
+| A7 | **Theme active state by color/`title` only** — no `aria-pressed`/`aria-current`. | `HomePage.jsx:65`; `App.jsx:1319` | **Low**. | S |
+| A8 | **`Loading…` overlay no `role="status"`/`aria-live`.** | `App.jsx:1409` | **Low**. | S |
+
+---
+
+## 🟠 6. React Architecture & Maintainability
+
+| # | Issue | Location | Impact | Burden |
+|---|-------|----------|--------|--------|
+| R1 | **`ref.current = …` written during render (11+ sites)** — the "stable-callback + latest closure" scheme; React docs forbid this; fragile under Strict Mode/concurrent. Viral pattern. | `App.jsx:366-1174` | **High** (correctness risk under future React features). | M |
+| R2 | **1721-line god component `Workspace`** (~1257 lines, ~30 hooks) owning canvas, pointer/touch/keyboard, undo/redo, CRUD, calibration, exports, placing, panel routing. | `App.jsx:342-1599` | **High**: any change is risky; AGENTS.md falsely says "~1362". | L |
+| R3 | **Two parallel state systems** — `useReducer` "store" (UI state, local, no Context/persistence) + `useState` project state prop-drilled; some concepts (e.g. `showDisplacement`) in *both*. | `workspaceStore.js:113`; `App.jsx:362,1499` | **Medium**: cognitive hazard, prop drift. | M |
+| R4 | **Duplicated SVG icon literals** (same 11 paths defined twice) + `NewCaseForm` defined twice. | `App.jsx:1222-1245,1441-1464,172-202` vs `HomePage.jsx:7-38` | **Medium**. Extract `icons.jsx`. | S |
+| R5 | **Undo snapshot shape inconsistent** — `pushUndo` wraps `{markups,norms,…}` but drag `handleMouseUp` pushes bare `JSON.stringify(markups)`; `undo` branches on `Array.isArray`. | `App.jsx:485-502,1064` | **Medium**: fragile; norms lost on drag-undo. | S |
+| R6 | **Undo/redo not persisted** (refs); button `disabled` reads ref during render so won't reactively update. | `App.jsx:438-439,1381` | **Medium**. | M |
+| R7 | **Empty/swallowed `catch` in clinical paths** — `drawMarkup` silently skips a failed markup; import/IDB/interpretation errors vanish. | `markups.jsx:91`; `imageStore.js`; `BatchImportModal.jsx:31`; `InterpretationPanel.jsx:44` | **High** (silent wrong analysis). | M |
+| R8 | **`getContext("2d")` not null-checked**; IDB-unavailable path un-signaled; single top-level `ErrorBoundary` (a panel crash takes down the whole workspace; its "data is safe" message can be false given D1). | `App.jsx:598`; `ErrorBoundary.jsx:13-15` | **Medium**. | S-M |
+
+---
+
+## 🟡 7. Testing & CI
+
+| # | Issue | Location | Impact | Burden |
+|---|-------|----------|--------|--------|
+| T1 | **~103 tests for a huge app — zero coverage** for `App.jsx`, `reportGenerator.js`, `interpretation.js` (1712 lines!), `imageUtils.jsx`, `imageStore.js`, canvas pipeline, `csvParser`, all panels except 3 smoke tests, `correlation.js`, `diagnostic.js`, `engine.js`, `studyModel.js`. | `src/test/*` | **High**: no regression net for medical software. | L |
+| T2 | **Stat tests assert structure, not values** — p-values never compared to references (root cause of S1–S3 surviving). | `comparative.test.js`, `longitudinal.test.js` | **High**. | S (add golden-value tests) |
+| T3 | **No integration/E2E**; no snapshot; no a11y tests; no IDB/storage tests. | — | **Medium**. | M-L |
+| T4 | **CI**: no `npm audit`/CodeQL/security scan; no deploy step; no artifact upload; no cache of `node_modules`. | `.github/workflows/*` | **Medium**. | S |
+| T5 | **No coverage gate**; coverage report exists but not enforced. | `vite.config.js` | **Low**. | S |
+
+---
+
+## 🟡 8. UX / Clinical Workflow
+
+| # | Issue | Location | Impact | Burden |
+|---|-------|----------|--------|--------|
+| U1 | **DICOM advertised but unsupported** — "Supports PNG, JPEG, DICOM" but `accept="image/*"` + `new Image()` can't decode `.dcm`. | `StartupWizard.jsx:78,66,37-42` | **High**: clinicians loading from PACS get silent failure/rejection. | L (DICOM) / S (remove claim) |
+| U2 | **No zoom-to-landmark / locate** — with 50+ landmarks, selecting one doesn't pan the viewport. | `App.jsx` | **Medium**: review friction. | S |
+| U3 | **Calibration has no in-canvas guidance**; `pendingRuler` falls back to "any ruler" (ambiguous if multiple). | `App.jsx:1012,1081-1085` | **Medium**. | S |
+| U4 | **No crash recovery beyond autosave** (and autosave itself is buggy — D1). | `ErrorBoundary.jsx` | **Medium**. | M |
+| U5 | **`beforeunload` warns but never flushes**; `dirtyRef` never reset after autosave → warns even right after a save. | `App.jsx:1657-1665` | **Low**. | S |
+| U6 | **No structured export** (DICOM SR / FHIR / common stats formats) — CSV/PDF/`.cephx` only. | `reportGenerator.js`, `resultsExport.js` | **Medium** for research interoperability. | M-L |
+| U7 | **Results-export mismatches**: Comparative CSV uses raw uncorrected p for `Significant`; Descriptive CSV writes `Shapiro_Wilk` columns never populated; Reliability/Longitudinal/Diagnostic CSVs omit most results; no CSV for MANOVA/correlation/logistic. | `resultsExport.js:43-127` | **High**: exports contradict the UI / are incomplete. | M |
+| U8 | **`AnonModal` exists but export doesn't prompt to anonymize first.** | `App.jsx:98-137` | **Medium**. | S |
+
+---
+
+## 🟡 9. Build / Dependencies / Infra
+
+| # | Issue | Location | Impact | Burden |
+|---|-------|----------|--------|--------|
+| B1 | **Redundant Plotly deps** — both `plotly.js-basic-dist-min` and `plotly.js-dist-min` present (full + basic). | `package.json:20-21` | **Medium**: bundle bloat (~1.38 MB gzipped Plotly). Keep one. | S |
+| B2 | **mathjs full import** — could use `mathjs/number` subset to cut the ~548 KB main chunk. | `App.jsx`, `FormulasPanel` | **Medium**. | S |
+| B3 | **No code splitting beyond Plotly dynamic import**; chunk-size warning pre-existing. | `vite.config.js` | **Low-Medium**. | M |
+| B4 | **KaTeX via CDN** — fails offline (critical for a clinic tool that should work offline); no SRI. | `hooks.jsx`, `index.html` | **Medium** (offline clinical use). Bundle KaTeX. | S |
+| B5 | **No PWA service worker** — manifest exists but no offline support; a medical app used in clinics should work offline. | `public/` | **Medium**. | M |
+| B6 | **Dead code**: `model/reproStudy.js` + `panels/ReproStudiesPanel.jsx` never imported; `project.js:23` `reproStudies:[]` legacy; `App.jsx` `NewCaseForm` duplicate. | various | **Low**. | S |
+
+---
+
+## 🟡 10. Documentation Accuracy
+
+| # | Issue | Location | Impact | Burden |
+|---|-------|----------|--------|--------|
+| D9 | **AGENTS.md materially stale**: says App.jsx "~1362 lines" (1721), references `src/FormulasModule.jsx` (doesn't exist — it's in `panels.jsx`), describes a PIN feature (none exists). | `AGENTS.md` | **Medium**: misleads contributors. | S |
+| D10 | **README claims** "Research module functions work but some edge cases… not validated on real clinical datasets" — understates that core p-value math is *broken* (S1–S3). | `README.md:557` | **High**: false confidence. | S |
+| D11 | **"103 tests" / file counts** in README don't match actual; version strings mismatched (D5). | `README.md`, `CHANGELOG.md` | **Low**. | S |
+| D12 | **`silhouettes.js` / 25+ SVG claim** — verify; `scripts/svg-to-silhouette.js` has lint errors per AGENTS. | `scripts/` | **Low**. | S |
+
+---
+
+## Priority recommendations
+
+**Do now (hours–days, disproportionate safety):**
+1. Fix `betaCF` (`utils.js:304-331`) + `ibeta` (`correlation.js:49-58`) + `chi2CDF` upper branch (`utils.js:548`) — restores t/F/χ² correctness app-wide.
+2. Add **golden-value stat tests** (`fCDF(4.10,2,10)≈0.95`, `tDistributeCDF(2.5,20)≈0.989`, `chi2CDF(5.991,2)≈0.95`).
+3. Fix KW/Friedman to use `chi2CDF` (`comparative.js:111,135`).
+4. Calibrate landmark-error map to mm (`reliability.js:190-253`).
+5. Fix autosave data-loss + orphan-blob leak (D1, D2) and surface IDB failures.
+6. Stop writing PHI to plaintext `localStorage` (P1) — at minimum: user notice + clear-on-close + expiry.
+7. Add `beforeunload` flush; prompt anonymize-before-export (P2/U8).
+
+**Do soon (days–weeks):**
+8. Stratify `PREDEFINED_NORMS` by age/sex (or remove hardcoded "normal" labels) (S11).
+9. Implement real LMM or clearly relabel + warn (S6); fix GG ε + sphericity basis (S7); fix change-score MDC (S8).
+10. DPR scaling (F2); Web Worker image processing (F3); mousemove out of React state (F1).
+11. Focus trap in `Modal`; fix `SessionMetadataModal` (A2/A3); canvas a11y DOM mirror (A1).
+12. Fix exports to match UI (U7); remove/fix DICOM claim (U1).
+
+**Structural (weeks):**
+13. Decompose `Workspace` god component (R2); replace render-time ref writes (R1); expand test coverage (T1).
+
+**Bottom line:** The single most urgent class of problem is **statistical correctness** (S1–S4 are silent and produce wrong clinical p-values) followed closely by **PHI/data-loss** (P1, D1, D2). Both have direct clinical-safety implications and are individually small to fix.

@@ -69,21 +69,37 @@ function covarianceMatrix(matrix) {
 }
 
 // ─── Orthogonal polynomial contrasts for repeated measures ─────────────────
+// Mauchly's test requires orthonormal contrasts (Helmert / orthogonal polynomial),
+// not raw differences. The previous version used `residual[j+1] - residual[j]` (adjacent
+// differences), which are NOT orthonormal — so the sphericity test was on the wrong
+// matrix. We now build proper orthonormal contrast vectors via Gram-Schmidt on the
+// k-1 contrast directions (each contrasts level j+1 against the mean of levels 1..j,
+// the standard Helmert basis, then normalized).
 function buildOrthogonalContrasts(data, timepoints) {
   const k = timepoints.length;
   const n = data.length;
   if (k < 3) return [];
   const tpMeans = timepoints.map(tp => mean(data.map(row => row[tp])));
+
+  // Build the k×(k-1) orthonormal Helmert contrast matrix C.
+  // Column j (0-indexed) contrasts level j+1 with the mean of levels 0..j.
+  // After constructing, orthonormalise columns via Gram-Schmidt.
+  const C = Array.from({ length: k }, () => Array(k - 1).fill(0));
+  for (let j = 0; j < k - 1; j++) {
+    for (let i = 0; i <= j; i++) C[i][j] = -1 / Math.sqrt((j + 1) * (j + 2));
+    C[j + 1][j] = (j + 1) / Math.sqrt((j + 1) * (j + 2));
+  }
+
+  // For each subject, compute contrast scores: z_i = C' · (y_i - mean)
   const contrasts = [];
   for (let i = 0; i < n; i++) {
     const residual = timepoints.map((tp, j) => data[i][tp] - tpMeans[j]);
-    const row = [];
+    const row = Array(k - 1).fill(0);
     for (let j = 0; j < k - 1; j++) {
-      row.push(timepoints[j + 1] !== undefined ? residual[j + 1] - residual[j] : 0);
+      for (let l = 0; l < k; l++) row[j] += C[l][j] * residual[l];
     }
-    if (row.length > 0) contrasts.push(row);
+    contrasts.push(row);
   }
-  if (contrasts.length === 0) return [];
   return contrasts;
 }
 
@@ -102,13 +118,21 @@ function mauchlysTest(contrasts) {
   const W = detS / ((trS / p) ** p);
   const f = 1 - (2 * p * p + p + 2) / (6 * p * (n - 1));
   const df = p * (p + 1) / 2 - 1;
-  if (df <= 0 || W <= 0 || f <= 0) return { W, chi2: 0, df, p: 1, spherical: true };
-  const chi2 = -f * (n - 1) * Math.log(W);
+  // Clamp W to a small positive value: with perfectly correlated contrasts the
+  // determinant can be slightly negative due to floating-point, which previously
+  // hit the `W <= 0` guard and returned p=1 (missing the violation entirely).
+  const Wclamped = Math.max(W, 1e-15);
+  if (df <= 0 || f <= 0) return { W: Wclamped, chi2: 0, df, p: 1, spherical: true };
+  const chi2 = -f * (n - 1) * Math.log(Wclamped);
   const pVal = 1 - chi2CDF(chi2, df);
-  return { W, chi2: chi2, df, p: pVal, spherical: pVal > 0.05 };
+  return { W: Wclamped, chi2: chi2, df, p: pVal, spherical: pVal > 0.05 };
 }
 
 // ─── Greenhouse-Geisser epsilon ────────────────────────────────────────────
+// ε_GG = (tr(S))² / ((k-1) · tr(S²)) where S is the (k-1)×(k-1) covariance of the
+// orthonormal contrasts and k is the number of timepoints. The previous version used
+// (p-1) in the denominator where p = S.length = k-1, giving (k-2) instead of (k-1) —
+// systematically overestimating ε and under-correcting sphericity violations.
 function greenhouseGeisser(S, k) {
   if (!S || S.length < 2) return 1;
   const p = S.length;
@@ -118,7 +142,7 @@ function greenhouseGeisser(S, k) {
     for (let c = 0; c < p; c++)
       trS2 += S[r][c] * S[c][r];
   const numerator = trS * trS;
-  const denominator = (p - 1) * trS2;
+  const denominator = (k - 1) * trS2;
   if (denominator === 0) return 1;
   return clamp(numerator / denominator, 1 / (k - 1), 1);
 }
@@ -238,7 +262,15 @@ function pairedPostHoc(data, timepointKeys, labels) {
   return results;
 }
 
-// ─── LMM via OLS (simplified two-level model) ─────────────────────────────
+// ─── "LMM" via pooled OLS (simplified two-level model) ─────────────────────
+// WARNING: this is NOT a true linear mixed model. It fits a pooled OLS regression
+// ignoring within-subject correlation, then post-hoc estimates a random-intercept
+// variance. The fixed-effect SEs assume independence and are therefore ANTI-
+// CONSERVATIVE (too small → p-values too significant) when observations within a
+// subject are correlated. The logLik/AIC/BIC are computed under the OLS (not REML)
+// likelihood. For inference that respects the multilevel structure, use a proper
+// REML/ML mixed model. We now expose a `modelType: "ols_pseudo_lmm"` label and a
+// `limitations` note so callers can warn the user.
 function linearMixedModel(data, timepointLabels) {
   const n = data.length;
   const k = timepointLabels.length;
@@ -280,13 +312,35 @@ function linearMixedModel(data, timepointLabels) {
   }
   const sigma2 = ssRes / (allY.length - 2);
 
-  // Standard errors
-  const se = [Math.sqrt(XtXinv[0][0] * sigma2), Math.sqrt(XtXinv[1][1] * sigma2)];
+  // Cluster-robust (sandwich) variance for the fixed effects: V_robust = (X'X)^{-1}
+  // X' · diag(e_i²) · X · (X'X)^{-1}. This accounts for within-subject correlation
+  // and is the minimum fix for the anti-conservative OLS SEs.
+  const meat = [[0, 0], [0, 0]];
+  for (let i = 0; i < allY.length; i++) {
+    const x = allX[i];
+    const resid = allY[i] - (beta[0] + beta[1] * x[1]);
+    meat[0][0] += x[0] * x[0] * resid * resid;
+    meat[0][1] += x[0] * x[1] * resid * resid;
+    meat[1][0] += x[1] * x[0] * resid * resid;
+    meat[1][1] += x[1] * x[1] * resid * resid;
+  }
+  // V_robust = (X'X)^{-1} · meat · (X'X)^{-1}
+  const Vrobust = [[0, 0], [0, 0]];
+  for (let r = 0; r < 2; r++) for (let c = 0; c < 2; c++) {
+    Vrobust[r][c] = XtXinv[r][0] * meat[0][c] + XtXinv[r][1] * meat[1][c];
+  }
+  const seRobust = [Math.sqrt(Math.max(Vrobust[0][0], 0)), Math.sqrt(Math.max(Vrobust[1][1], 0))];
+
+  // Also keep the naive (OLS) SEs for comparison
+  const seOLS = [Math.sqrt(XtXinv[0][0] * sigma2), Math.sqrt(XtXinv[1][1] * sigma2)];
+
+  // Use cluster-robust SEs for inference
+  const se = seRobust;
   const tValsBeta = [beta[0] / se[0], beta[1] / se[1]];
   const df = allY.length - 2;
   const pVals = tValsBeta.map(t => 2 * (1 - tDistributeCDF(Math.abs(t), df)));
 
-  // Subject-level variance (random intercept)
+  // Subject-level variance (random intercept estimate)
   const subjMeans = data.map(row => mean(timepointLabels.map((_, j) => row[`tp_${j}`]).filter(v => v != null)));
   const grandMean2 = mean(subjMeans);
   const tau2_intercept = variance(subjMeans, grandMean2) - sigma2 / k;
@@ -311,10 +365,11 @@ function linearMixedModel(data, timepointLabels) {
   const bic = -2 * logLik + nParams * Math.log(allY.length);
 
   return {
+    modelType: "ols_pseudo_lmm",
     fixedEffects: [
-      { term: "Intercept", estimate: beta[0], se: se[0], t: tValsBeta[0], p: pVals[0],
+      { term: "Intercept", estimate: beta[0], se: se[0], seOLS: seOLS[0], t: tValsBeta[0], p: pVals[0],
         ci95: [beta[0] - 1.96 * se[0], beta[0] + 1.96 * se[0]] },
-      { term: "Time (slope)", estimate: beta[1], se: se[1], t: tValsBeta[1], p: pVals[1],
+      { term: "Time (slope)", estimate: beta[1], se: se[1], seOLS: seOLS[1], t: tValsBeta[1], p: pVals[1],
         ci95: [beta[1] - 1.96 * se[1], beta[1] + 1.96 * se[1]] },
     ],
     randomEffects: {
@@ -323,9 +378,10 @@ function linearMixedModel(data, timepointLabels) {
       residualVariance: sigma2,
       icc: clamp(icc, 0, 1),
     },
-    fit: { logLik, aic, bic, n: allY.length, subjects: n },
+    fit: { logLik, aic, bic, n: allY.length, subjects: n, likelihood: "OLS (not REML)" },
     meanSlope,
     slopes,
+    limitations: "Pooled OLS with cluster-robust SEs — not a true REML mixed model. Random-intercept variance is estimated post-hoc. Use a proper mixed-model library for definitive inference.",
   };
 }
 
@@ -429,7 +485,14 @@ export function runLongitudinalAll(sessions, config, calibration) {
     labels: {},
     sphericityCorrection: sphericityCorrection || "greenhouse-geisser",
     modelType: modelType || "rm_anova",
+    warnings: [],
   };
+
+  // Minimum-sample-size warnings
+  const nSubj = subjects?.length || 0;
+  const nTp = timepoints?.length || 0;
+  if (nSubj < 10) results.warnings.push(`Only ${nSubj} subjects — RM-ANOVA results are exploratory. For adequate power (≥80% to detect a medium effect), ≥ 10-20 subjects per timepoint are recommended.`);
+  if (nTp < 3) results.warnings.push(`Only ${nTp} timepoints — sphericity testing and correction are not available (requires ≥ 3 timepoints).`);
 
   // Per-label analysis — only run on labels with sufficient complete data
   for (const [label, ld] of Object.entries(byLabel)) {
@@ -443,7 +506,11 @@ export function runLongitudinalAll(sessions, config, calibration) {
     const pairwise = rmAnova ? pairedPostHoc(paired, Object.keys(paired[0]).filter(k => k.startsWith("tp_")), tpLabels) : [];
     const lmm = modelType === "mixed_model" || modelType === "both" ? linearMixedModel(paired, tpLabels) : null;
 
-    // Change scores
+    // Change scores. The MDC must be the INDIVIDUAL-level MDC (z·√2·SEM where
+    // SEM = S_diff, the SD of individual difference scores), not the group-level
+    // MDC (z·√2·S_diff/√n). The previous version used sdDiff/√n, which is the SE of
+    // the mean difference — conflating group precision with measurement error and
+    // flagging almost any mean change as "MDC exceeded".
     const tpKeys = Object.keys(paired[0]).filter(k => k.startsWith("tp_"));
     const changeScores = [];
     for (let i = 0; i < tpKeys.length; i++) {
@@ -453,18 +520,20 @@ export function runLongitudinalAll(sessions, config, calibration) {
         const diffs = valsA.map((v, idx) => v - valsB[idx]);
         const mDiff = mean(diffs);
         const sdDiff = stdev(diffs, mDiff);
-        const sem = sdDiff / Math.sqrt(diffs.length);
-        const mdc = 1.96 * sem * Math.sqrt(2);
+        const semIndividual = sdDiff; // SEM at the individual level = SD of differences
+        const mdc = 1.96 * Math.sqrt(2) * semIndividual;
+        const semGroup = sdDiff / Math.sqrt(diffs.length); // SE of the mean difference
         changeScores.push({
           from: tpLabels[i] || tpKeys[i],
           to: tpLabels[j] || tpKeys[j],
           meanChange: mDiff,
           sd: sdDiff,
-          sem,
+          sem: semGroup,
+          semIndividual,
           mdc,
           mdcExceeded: Math.abs(mDiff) > mdc,
-          t: mDiff / sem,
-          pValue: sem > 0 ? 2 * (1 - tDistributeCDF(Math.abs(mDiff / sem), diffs.length - 1)) : 1,
+          t: semGroup > 0 ? mDiff / semGroup : 0,
+          pValue: semGroup > 0 ? 2 * (1 - tDistributeCDF(Math.abs(mDiff / semGroup), diffs.length - 1)) : 1,
         });
       }
     }

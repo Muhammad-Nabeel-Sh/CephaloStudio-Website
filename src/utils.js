@@ -301,29 +301,35 @@ export const betaIncomplete = (a, b, x) => {
   return 1 - bt * betaCF(b, a, 1 - x) / b;
 };
 
+// Lentz continued fraction for the incomplete beta function (Numerical Recipes 3rd ed.).
+// Previous version had two defects: the initializer omitted the `d = 1/d` step and set
+// `h` directly, and the per-iteration `del` used `d * h` instead of `d * c`. Both collapsed
+// betaIncomplete to 0/1 extremes, which silently broke EVERY t-test and F-test p-value.
 export const betaCF = (a, b, x) => {
-  const maxIter = 100, eps = 3e-14;
+  const maxIter = 100, eps = 3e-14, fpm = 1e-30;
   let m, m2, aa, c, d, del, h;
   const qab = a + b, qap = a + 1, qam = a - 1;
   c = 1;
-  d = 1;
-  h = 1 - qab * x / (a + 1);
+  d = 1 - qab * x / qap;
+  if (Math.abs(d) < fpm) d = fpm;
+  d = 1 / d;
+  h = d;
   for (m = 1; m <= maxIter; m++) {
     m2 = 2 * m;
     aa = m * (b - m) * x / ((qam + m2) * (a + m2));
     d = 1 + aa * d;
-    if (Math.abs(d) < 1e-30) d = 1e-30;
+    if (Math.abs(d) < fpm) d = fpm;
     c = 1 + aa / c;
-    if (Math.abs(c) < 1e-30) c = 1e-30;
+    if (Math.abs(c) < fpm) c = fpm;
     d = 1 / d;
     h *= d * c;
     aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
     d = 1 + aa * d;
+    if (Math.abs(d) < fpm) d = fpm;
     c = 1 + aa / c;
-    if (Math.abs(d) < 1e-30) d = 1e-30;
-    if (Math.abs(c) < 1e-30) c = 1e-30;
+    if (Math.abs(c) < fpm) c = fpm;
     d = 1 / d;
-    del = d * h;
+    del = d * c;
     h *= del;
     if (Math.abs(del - 1) < eps) break;
   }
@@ -536,34 +542,61 @@ export function oneWayAnova(...groups) {
   return { F, dfBetween, dfWithin, msBetween, msWithin, ssBetween, ssWithin, pValue, significant: pValue < 0.05 };
 }
 
+// F-distribution CDF: P(F ≤ f) = I_{d1·f/(d1·f+d2)}(d1/2, d2/2).
+// Previous version used x = d2/(d2+d1·f) with swapped beta params, which computed
+// I_{d1·f/(...)}(d2/2, d1/2) — a different distribution — so every F-based p-value
+// (ANOVA, Levene, RM-ANOVA, MANOVA, …) was wrong even after betaCF was fixed.
 export function fCDF(f, d1, d2) {
-  if (f <= 0) return 0;
-  const x = d2 / (d2 + d1 * f);
-  return 1 - betaIncomplete(d1 / 2, d2 / 2, x);
+  if (f <= 0 || d1 <= 0 || d2 <= 0) return 0;
+  const x = (d1 * f) / (d1 * f + d2);
+  return betaIncomplete(d1 / 2, d2 / 2, x);
 }
 
+// Chi-square CDF = regularized lower incomplete gamma P(df/2, x/2).
+// Lower branch (y < a+1): convergent series (NR gser). Upper branch (y >= a+1): Lentz
+// continued fraction for Q(a,y)=1-P(a,y) (NR gcf). The previous implementation used an
+// asymptotic series for the upper branch that diverges for moderate y (terms oscillate
+// and grow, never reaching the 1e-14 break), producing NaN/0 — so normality, sphericity
+// and Hosmer-Lemeshow violations went undetected exactly when they matter.
+function _gserLowerGamma(a, x) {
+  const eps = 1e-14, maxIter = 300;
+  const logBase = -x + a * Math.log(x) - gammaLn(a);
+  let ap = a, sum = 1 / a, del = sum;
+  for (let n = 1; n <= maxIter; n++) {
+    ap += 1;
+    del *= x / ap;
+    sum += del;
+    if (Math.abs(del) < Math.abs(sum) * eps) break;
+  }
+  return sum * Math.exp(logBase);
+}
+function _gcfUpperGamma(a, x) {
+  const eps = 3e-14, fpm = 1e-30, maxIter = 300;
+  const logBase = -x + a * Math.log(x) - gammaLn(a);
+  let b = x + 1 - a;
+  let c = 1 / fpm;
+  let d = 1 / b;
+  let h = d;
+  for (let i = 1; i <= maxIter; i++) {
+    const an = -i * (i - a);
+    b += 2;
+    d = an * d + b;
+    if (Math.abs(d) < fpm) d = fpm;
+    c = b + an / c;
+    if (Math.abs(c) < fpm) c = fpm;
+    d = 1 / d;
+    const del = d * c;
+    h *= del;
+    if (Math.abs(del - 1) < eps) break;
+  }
+  return Math.exp(logBase) * h;
+}
 export function chi2CDF(x, df) {
   if (x <= 0 || df <= 0) return 0;
   const a = df / 2, y = x / 2;
-  const logBase = -y + a * Math.log(y) - gammaLn(a);
-  let p;
-  if (y < a + 1) {
-    let sum = 1 / a, term = 1 / a;
-    for (let n = 1; n < 200; n++) {
-      term *= y / (a + n);
-      sum += term;
-      if (Math.abs(term) < 1e-14) break;
-    }
-    p = sum * Math.exp(logBase);
-  } else {
-    let sum = 1, term = 1;
-    for (let n = 1; n < 200; n++) {
-      term *= (a - n) / y;
-      sum += term;
-      if (Math.abs(term) < 1e-14) break;
-    }
-    p = 1 - sum * Math.exp(logBase);
-  }
+  if (y < a + 1) return _gserLowerGamma(a, y);
+  const q = _gcfUpperGamma(a, y);
+  const p = 1 - q;
   return p > 1 ? 1 : p < 0 ? 0 : p;
 }
 

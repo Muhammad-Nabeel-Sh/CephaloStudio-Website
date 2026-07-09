@@ -1,5 +1,6 @@
 import { collectMeasurements, pivotMeasurements } from "./collect.js";
-import { shapiroWilk as swFromUtils } from "../utils.js";
+import { shapiroWilk as swFromUtils, tDistributeCDF, fCDF, chi2CDF } from "../utils.js";
+import { delongAUC_CI } from "./diagnostic.js";
 
 function mean(arr) {
   if (arr.length === 0) return 0;
@@ -38,25 +39,6 @@ function spearmanRho(x, y) {
   return pearsonR(rank(x), rank(y));
 }
 
-function logGamma(z) {
-  if (z < 12) return logGamma(z + 1) - Math.log(z);
-  const c = [76.18009173, -86.50532033, 24.01409822, -1.231739516, 0.00120858003, -0.00000536382];
-  let s = 1.00000000019;
-  for (let i = 0; i < 6; i++) s += c[i] / (z + 1 + i);
-  return (z - 0.5) * Math.log(z + 4.5) - (z + 4.5) + Math.log(s * Math.SQRT2 * Math.PI);
-}
-
-function ibeta(x, a, b) {
-  if (x === 0 || x === 1) return x;
-  const useSmall = x < (a + 1) / (a + b + 2);
-  const x1 = useSmall ? x : 1 - x;
-  const a1 = useSmall ? a : b;
-  const b1 = useSmall ? b : a;
-  const logBt = a1 * Math.log(x1) + b1 * Math.log(1 - x1) + logGamma(a1 + b1) - logGamma(a1) - logGamma(b1) - Math.log(a1);
-  const bt = Math.exp(logBt);
-  return useSmall ? bt : 1 - bt;
-}
-
 function normalCdf(x) {
   if (x < -8) return 0;
   if (x > 8) return 1;
@@ -65,45 +47,6 @@ function normalCdf(x) {
   const t = 1 / (1 + p * Math.abs(x) / Math.SQRT2);
   const y = 1 - (((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t) * Math.exp(-x * x / 2);
   return 0.5 * (1 + sign * y);
-}
-
-function gammaP(a, x) {
-  if (x < a + 1) {
-    let sum = 1 / a, term = 1 / a;
-    for (let n = 1; n < 100; n++) {
-      term *= x / (a + n);
-      sum += term;
-      if (Math.abs(term) < 1e-12) break;
-    }
-    return sum * Math.exp(-x + a * Math.log(x) - logGamma(a));
-  }
-  let sum = 1, term = 1;
-  for (let n = 1; n < 100; n++) {
-    term *= (a - n) / x;
-    sum += term;
-    if (Math.abs(term) < 1e-12) break;
-  }
-  return 1 - sum * Math.exp(-x + a * Math.log(x) - logGamma(a));
-}
-
-function chi2CDF(x, df) {
-  if (x <= 0 || df <= 0) return 0;
-  return gammaP(df / 2, x / 2);
-}
-
-function tCdf(t, df) {
-  const x = df / (df + t * t);
-  let p = 0.5;
-  if (df % 2 === 1) {
-    p = 1 - Math.atan2(1, Math.sqrt(df)) / Math.PI;
-  }
-  if (x < (df + 1) / (df + 2)) {
-    p = 0.5 * ibeta(x, df / 2, 0.5);
-  } else {
-    p = 1 - 0.5 * ibeta(1 - x, 0.5, df / 2);
-  }
-  p = Math.max(0, Math.min(1, p));
-  return t >= 0 ? 1 - p : p;
 }
 
 function benjaminiHochberg(pValues) {
@@ -123,25 +66,29 @@ function benjaminiHochberg(pValues) {
   return result;
 }
 
-function fPval(F, df1, df2) {
-  if (F <= 0 || df1 <= 0 || df2 <= 0) return 1;
-  const x = df1 * F / (df1 * F + df2);
-  return 1 - ibeta(x, df1 / 2, df2 / 2);
-}
-
+// Koenker's studentized Breusch-Pagan: regress g = e²/σ² on X (with intercept), then
+// LM = n·R²_aux ~ χ²(k-1). The previous version did not fit a proper auxiliary OLS
+// (it used β = X'g/n with no X'X inverse), so the heteroscedasticity diagnostic was
+// invalid.
 function breuschPagan(residuals, X) {
   const n = residuals.length, k = X[0].length;
   const sigma2 = residuals.reduce((s, r) => s + r * r, 0) / n;
   const g = residuals.map(r => r * r / sigma2);
   const gMean = mean(g);
-  const ssr = g.reduce((s, gi, i) => {
-    const diff = gi - gMean;
-    const fit = X[i].reduce((a, xj, j) => a + xj * (g.reduce((s2, gk, k) => s2 + X[k][j] * (gk - gMean), 0) / n), 0);
-    return s + diff * fit;
-  }, 0);
-  const bp = ssr / 2;
-  const p = 1 - chi2CDF(bp, k - 1);
-  return { statistic: bp, df: k - 1, p };
+  const sstG = g.reduce((s, gi) => s + (gi - gMean) ** 2, 0);
+  if (sstG === 0) return { statistic: 0, df: k - 1, p: 1 };
+  const Xt = transposeMatrix(X);
+  const XtX = matMul(Xt, X);
+  const XtXi = matInverse(XtX);
+  if (!XtXi) return { statistic: 0, df: k - 1, p: 1 };
+  const Xtg = matVecMul(Xt, g);
+  const beta = matVecMul(XtXi, Xtg);
+  const fitted = X.map(row => dot(row, beta));
+  const sseG = g.reduce((s, gi, i) => s + (gi - fitted[i]) ** 2, 0);
+  const r2 = Math.max(0, Math.min(1, 1 - sseG / sstG));
+  const lm = n * r2;
+  const p = 1 - chi2CDF(lm, k - 1);
+  return { statistic: lm, df: k - 1, p };
 }
 
 function addIntercept(X) {
@@ -179,7 +126,10 @@ function matInverse(M) {
       if (Math.abs(aug[row][col]) > Math.abs(aug[maxRow][col])) maxRow = row;
     [aug[col], aug[maxRow]] = [aug[maxRow], aug[col]];
     if (Math.abs(aug[col][col]) < 1e-12) {
-      return Array.from({ length: n }, (_, i) => Array.from({ length: n }, (_, j) => i === j ? 1 : 0));
+      // Previously returned the identity matrix on singularity, which silently produced
+      // nonsense betas/zero SEs for collinear predictors. Return null so callers can flag
+      // the failure (separation / perfect prediction) instead of emitting garbage.
+      return null;
     }
     const pivot = aug[col][col];
     for (let j = 0; j < 2 * n; j++) aug[col][j] /= pivot;
@@ -196,24 +146,42 @@ function logit(x) {
   return 1 / (1 + Math.exp(-x));
 }
 
-function logisticRegressionNewton(X, y, maxIter = 50, tol = 1e-8) {
+// Newton-Raphson for logistic regression with separation detection and step-halving.
+// Without these guards, perfectly-separated clinical predictors (common in small samples)
+// drive the Hessian singular and the old `matInverse -> identity` fallback silently
+// diverged. We now (1) detect quasi-separation via a huge initial gradient, (2) fall
+// back to step-halving when a full Newton step overshoots, and (3) bail out cleanly
+// (returning {beta:null}) if the Hessian is singular.
+function logisticRegressionNewton(X, y, maxIter = 100, tol = 1e-8) {
   const p = X[0].length;
   let beta = Array(p).fill(0);
   for (let iter = 0; iter < maxIter; iter++) {
-    const pi = X.map(row => {
-      const z = dot(row, beta);
-      return logit(z);
-    });
+    const pi = X.map(row => logit(dot(row, beta)));
     const W = pi.map(pi_i => pi_i * (1 - pi_i));
     const Xt = transposeMatrix(X);
     const XtW = Xt.map(row => row.map((v, i) => v * W[i]));
     const H = matMul(XtW, X);
     const grad = Xt.map(row => row.reduce((s, v, i) => s + v * (y[i] - pi[i]), 0));
-    const delta = matVecMul(matInverse(H), grad);
-    beta = beta.map((b, j) => b + delta[j]);
-    if (Math.sqrt(delta.reduce((s, d) => s + d * d, 0)) < tol) break;
+    const gradNorm = Math.sqrt(grad.reduce((s, g) => s + g * g, 0));
+    if (gradNorm > 1e6) return { beta: null, converged: false, separated: true };
+    const Hinv = matInverse(H);
+    if (!Hinv) return { beta: null, converged: false, singular: true };
+    const delta = matVecMul(Hinv, grad);
+    // Step-halving: if the full Newton step increases deviance, shrink it until it
+    // stabilises (prevents divergence under separation).
+    let step = 1;
+    const devOld = y.reduce((s, yi, i) => s - (yi * Math.log(Math.max(pi[i], 1e-15)) + (1 - yi) * Math.log(Math.max(1 - pi[i], 1e-15))), 0);
+    while (step > 1e-6) {
+      const trialBeta = beta.map((b, j) => b + step * delta[j]);
+      const trialPi = X.map(row => logit(dot(row, trialBeta)));
+      const devNew = y.reduce((s, yi, i) => s - (yi * Math.log(Math.max(trialPi[i], 1e-15)) + (1 - yi) * Math.log(Math.max(1 - trialPi[i], 1e-15))), 0);
+      if (devNew <= devOld + 1e-8) break;
+      step *= 0.5;
+    }
+    beta = beta.map((b, j) => b + step * delta[j]);
+    if (Math.sqrt(delta.reduce((s, d) => s + d * d, 0)) * step < tol) return { beta, converged: true };
   }
-  return beta;
+  return { beta, converged: false };
 }
 
 export function runCorrelationAll(sessions, config, calibration) {
@@ -272,7 +240,7 @@ export function runCorrelationAll(sessions, config, calibration) {
 
       const t = r * Math.sqrt((n - 2) / (1 - r * r));
       const df = n - 2;
-      const p = 2 * (1 - tCdf(Math.abs(t), df));
+      const p = 2 * (1 - tDistributeCDF(Math.abs(t), df));
 
       matrix[v1][v2] = { r, p, ci95, t, df, n };
 
@@ -318,7 +286,7 @@ export function runCorrelationAll(sessions, config, calibration) {
         const r = pearsonR(xRes, yRes) || 0;
         const df = n - 2 - covVars.length;
         const t = r * Math.sqrt(df / (1 - r * r));
-        const p = df > 0 ? 2 * (1 - tCdf(Math.abs(t), df)) : 1;
+        const p = df > 0 ? 2 * (1 - tDistributeCDF(Math.abs(t), df)) : 1;
         result.partial[v1][v2] = { r, t, df, p };
       }
     }
@@ -334,6 +302,7 @@ function residualize(y, predictors) {
   const Xt = transposeMatrix(X);
   const XtX = matMul(Xt, X);
   const XtXi = matInverse(XtX);
+  if (!XtXi) return y; // collinear covariates — can't residualize, return raw y
   const Xty = matVecMul(Xt, y);
   const beta = matVecMul(XtXi, Xty);
   const fitted = X.map(row => dot(row, beta));
@@ -381,6 +350,7 @@ export function runRegression(sessions, config, calibration) {
   const XtM = transposeMatrix(Xm);
   const XtX = matMul(XtM, Xm);
   const XtXi = matInverse(XtX);
+  if (!XtXi) return { note: "Predictor matrix is singular (perfect multicollinearity). Remove a collinear predictor and retry." };
   const Xty = matVecMul(XtM, yClean);
   const beta = matVecMul(XtXi, Xty);
 
@@ -393,7 +363,7 @@ export function runRegression(sessions, config, calibration) {
   const se = varBeta.map((row, i) => Math.sqrt(Math.abs(row[i])));
 
   const tStats = beta.map((b, i) => b / se[i]);
-  const pVals = tStats.map(ti => 2 * (1 - tCdf(Math.abs(ti), n2 - p)));
+  const pVals = tStats.map(ti => 2 * (1 - tDistributeCDF(Math.abs(ti), n2 - p)));
 
   const yMean = mean(yClean);
   const sst = yClean.reduce((a, yi) => a + (yi - yMean) ** 2, 0);
@@ -403,7 +373,7 @@ export function runRegression(sessions, config, calibration) {
   const msReg = (sst - sse) / (p - 1);
   const mse = sse / (n2 - p);
   const F = mse > 0 ? msReg / mse : 0;
-  const pF = fPval(F, p - 1, n2 - p);
+  const pF = 1 - fCDF(F, p - 1, n2 - p);
 
   const logLik = sigma2 > 0 ? -n2 / 2 * Math.log(2 * Math.PI * sigma2) - sse / (2 * sigma2) : 0;
   const aic = -2 * logLik + 2 * p;
@@ -422,6 +392,7 @@ export function runRegression(sessions, config, calibration) {
     const oXt = transposeMatrix(otherXm);
     const oXtX = matMul(oXt, otherXm);
     const oXtXi = matInverse(oXtX);
+    if (!oXtXi) { vif.push(Infinity); continue; } // collinear with other predictors
     const oXty = matVecMul(oXt, thisY);
     const oBeta = matVecMul(oXtXi, oXty);
     const oFitted = otherXm.map(row => dot(row, oBeta));
@@ -497,8 +468,20 @@ export function runLogisticRegression(sessions, config, calibration) {
   const X = rawX.map(col => validIdx.map(i => col[i]));
   const Xt = addIntercept(transposeMatrix(X));
 
-  const beta = logisticRegressionNewton(Xt, y, 100);
+  const solver = logisticRegressionNewton(Xt, y, 100);
   const terms = ["Intercept", ...predictorVars];
+  if (!solver.beta) {
+    return {
+      note: solver.separated
+        ? "Logistic model did not converge: the outcome is perfectly (or quasi-) separated by a predictor — collect more data or drop the separating predictor."
+        : "Logistic model did not converge (singular information matrix — likely perfect multicollinearity).",
+      separated: !!solver.separated,
+      singular: !!solver.singular,
+      n: y.length, nPos: y.reduce((s, yi) => s + yi, 0), nNeg: y.length - y.reduce((s, yi) => s + yi, 0),
+    };
+  }
+  const beta = solver.beta;
+  const converged = solver.converged;
 
   const pi = Xt.map(row => logit(dot(row, beta)));
   const logLik = y.reduce((s, yi, i) => s + yi * Math.log(Math.max(pi[i], 1e-15)) + (1 - yi) * Math.log(Math.max(1 - pi[i], 1e-15)), 0);
@@ -508,7 +491,12 @@ export function runLogisticRegression(sessions, config, calibration) {
   const aic = -2 * logLik + 2 * beta.length;
   const bic = -2 * logLik + beta.length * Math.log(y.length);
 
-  const XtXinv = matInverse(matMul(transposeMatrix(Xt), Xt));
+  // Covariance of beta = (X'WX)^-1 with W = diag(pi(1-pi)).
+  const W = pi.map(p => p * (1 - p));
+  const XtW = transposeMatrix(Xt).map(row => row.map((v, i) => v * W[i]));
+  const info = matMul(XtW, Xt);
+  const infoInv = matInverse(info);
+  const XtXinv = infoInv || matMul(transposeMatrix(Xt), Xt).map(r => r.map(() => NaN));
   const oddsRatios = beta.map(b => Math.exp(b));
   const se = XtXinv.map((row, i) => Math.sqrt(Math.abs(row[i])));
   const zStats = beta.map((b, i) => b / se[i]);
@@ -518,32 +506,56 @@ export function runLogisticRegression(sessions, config, calibration) {
     return [Math.exp(lo), Math.exp(hi)];
   });
 
-  const predicted = pi.map(p => p >= 0.5 ? 1 : 0);
+  // Use the Youden-optimal threshold (max Sensitivity + Specificity − 1) instead of a
+  // hardcoded 0.5 — a 0.5 cutoff is not clinically calibrated and misreports sensitivity/
+  // specificity for skewed or shifted logistic models.
+  const nP = y.reduce((s, yi) => s + yi, 0);
+  const nN = y.length - nP;
+  const cutoffCandidates = [...pi].sort((a, b) => a - b);
+  let bestJ = -Infinity, bestCut = 0.5;
+  for (const c of cutoffCandidates) {
+    let tp2 = 0, fp2 = 0, fn2 = 0, tn2 = 0;
+    for (let i = 0; i < y.length; i++) {
+      if (pi[i] >= c) { if (y[i] === 1) tp2++; else fp2++; }
+      else { if (y[i] === 1) fn2++; else tn2++; }
+    }
+    const sens = tp2 / Math.max(tp2 + fn2, 1);
+    const spec = tn2 / Math.max(tn2 + fp2, 1);
+    const J = sens + spec - 1;
+    if (J > bestJ) { bestJ = J; bestCut = c; }
+  }
+  const cutoff = bestCut;
+
+  const predicted = pi.map(p => p >= cutoff ? 1 : 0);
   const accuracy = y.reduce((s, yi, i) => s + (yi === predicted[i] ? 1 : 0), 0) / y.length;
   const tp = y.reduce((s, yi, i) => s + (yi === 1 && predicted[i] === 1 ? 1 : 0), 0);
   const fp = y.reduce((s, yi, i) => s + (yi === 0 && predicted[i] === 1 ? 1 : 0), 0);
   const tn = y.reduce((s, yi, i) => s + (yi === 0 && predicted[i] === 0 ? 1 : 0), 0);
   const fn = y.reduce((s, yi, i) => s + (yi === 1 && predicted[i] === 0 ? 1 : 0), 0);
-  const sensitivity = tp / (tp + fn) || 0;
-  const specificity = tn / (tn + fp) || 0;
+  const sensitivity = tp / Math.max(tp + fn, 1);
+  const specificity = tn / Math.max(tn + fp, 1);
 
-  const sorted = pi.map((p, i) => ({ p, y: y[i] })).sort((a, b) => b.p - a.p);
+  // ROC + AUC with a DeLong 95% CI (previously no CI, so the AUC was reported
+  // without any measure of uncertainty — misleading in small clinical samples).
+  const aucResult = delongAUC_CI(pi, y, 0.05);
   const roc = [];
-  let rocTp = 0, rocFp = 0;
-  const totalPos = y.filter(yi => yi === 1).length;
-  const totalNeg = y.length - totalPos;
-  let prevP = 1;
-  for (const s of sorted) {
-    if (s.p !== prevP) {
-      roc.push({ fpr: rocFp / totalNeg, tpr: rocTp / totalPos, threshold: prevP });
-      prevP = s.p;
-    }
-    if (s.y === 1) rocTp++; else rocFp++;
-  }
-  roc.push({ fpr: 1, tpr: 1, threshold: sorted[sorted.length - 1]?.p || 0 });
   let auc = 0;
-  for (let i = 1; i < roc.length; i++) {
-    auc += (roc[i].fpr - roc[i - 1].fpr) * (roc[i].tpr + roc[i - 1].tpr) / 2;
+  if (nP > 0 && nN > 0) {
+    const sorted = pi.map((p, i) => ({ p, y: y[i] })).sort((a, b) => b.p - a.p);
+    let rocTp = 0, rocFp = 0;
+    let prevP = Infinity;
+    roc.push({ fpr: 0, tpr: 0, threshold: Infinity });
+    for (const s of sorted) {
+      if (s.p !== prevP) {
+        roc.push({ fpr: rocFp / nN, tpr: rocTp / nP, threshold: s.p, tp: rocTp, fp: rocFp, tn: nN - rocFp, fn: nP - rocTp });
+        prevP = s.p;
+      }
+      if (s.y === 1) rocTp++; else rocFp++;
+    }
+    roc.push({ fpr: 1, tpr: 1, threshold: -Infinity });
+    for (let i = 1; i < roc.length; i++) {
+      auc += (roc[i].fpr - roc[i - 1].fpr) * (roc[i].tpr + roc[i - 1].tpr) / 2;
+    }
   }
 
   return {
@@ -553,10 +565,13 @@ export function runLogisticRegression(sessions, config, calibration) {
     terms,
     logLik, logLikNull, pseudoR2, aic, bic,
     accuracy, sensitivity, specificity,
+    cutoff,
     confusionMatrix: { tp, fp, tn, fn },
     predicted, pi,
     roc, auc,
-    n: y.length,
+    aucCI: aucResult ? { ci95: aucResult.ci95, seAUC: aucResult.seAUC, p: aucResult.p } : null,
+    converged,
+    n: y.length, nPos: nP, nNeg: nN,
     dependentVar, predictorVars, threshold,
   };
 }
