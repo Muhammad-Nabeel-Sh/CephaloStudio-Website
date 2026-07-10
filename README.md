@@ -163,8 +163,9 @@ Project
 
 ### File Formats
 
-- **`.cephx`**: `{ format: "cephx", version: "2.0", exported, project }`
-- **`.cepht`** (v2.0): `{ format: "cepht", version: "2.0", name, points: [{ label, type, def, color, coords }], measurements, validation }`
+- **`.cephx`**: `{ format: "cephx", version: "2.1", exported, project }`
+- **`.cepht`** (v1.0): `{ format: "cepht", version: "1.0", name, markups: [{ label, type, def, color }], formulas, norms }` — definitions only, no point coordinates
+- **`.cepht`** (v2.0): `{ format: "cepht", version: "2.0", name, markups: [{ label, type, def, color, points, placed }], formulas, norms }` — definitions + placed point coordinates
 
 ---
 

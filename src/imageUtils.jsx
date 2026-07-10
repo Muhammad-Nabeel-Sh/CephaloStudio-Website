@@ -59,6 +59,28 @@ export function applyEdgeKernel(idata, strength) {
   return new ImageData(out, width, height);
 }
 
+// ─── Web Worker singleton for F3 ───────────────────────────────────────────
+// When available, heavy per-pixel processing runs off the main thread so
+// slider drags don't freeze the UI. Falls back to synchronous processing if
+// the Worker constructor is unavailable (e.g. some test environments).
+let _procWorker = null;
+let _workerId = 0;
+const _workerCallbacks = new Map();
+
+function getProcWorker() {
+  if (_procWorker) return _procWorker;
+  try {
+    _procWorker = new Worker(new URL("./imageProcessor.worker.js", import.meta.url), { type: "module" });
+    _procWorker.onmessage = (e) => {
+      const { id, data } = e.data;
+      const cb = _workerCallbacks.get(id);
+      if (cb) { _workerCallbacks.delete(id); cb(data); }
+    };
+    _procWorker.onerror = () => { _procWorker = null; }; // graceful fallback
+  } catch { _procWorker = null; }
+  return _procWorker;
+}
+
 export function processImageToCanvas(img, proc, lutMode, lutInvert) {
   if (!img) return null;
   const nw = img.naturalWidth || img.width || 600, nh = img.naturalHeight || img.height || 500;
@@ -69,6 +91,24 @@ export function processImageToCanvas(img, proc, lutMode, lutInvert) {
   ctx.drawImage(img, 0, 0);
   const { brightness = 0, contrast = 0, windowWidth = 0, windowCenter = 128, edgeEnhance = 0 } = proc;
   if (!brightness && !contrast && !windowWidth && !edgeEnhance && lutMode === "gray" && !lutInvert) return oc;
+  // F3: try offloading to Web Worker
+  const worker = getProcWorker();
+  if (worker) {
+    const idata = ctx.getImageData(0, 0, nw, nh);
+    const id = ++_workerId;
+    _workerCallbacks.set(id, (processedPixels) => {
+      const result = ctx.createImageData(nw, nh);
+      result.data.set(processedPixels);
+      ctx.putImageData(result, 0, 0);
+      // Signal that processing completed — the cache entry is already set to
+      // the "in-progress" canvas, so we just need a redraw to pick up the
+      // updated pixels.  The redraw trigger lives in App.jsx (procCache update).
+      if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("cephalostudio:image-processed"));
+    });
+    worker.postMessage({ id, pixels: new Uint8ClampedArray(idata.data), width: nw, height: nh, proc: { brightness, contrast, windowWidth, windowCenter, edgeEnhance }, lutMode, lutInvert });
+    return oc; // return canvas immediately — worker will update it async
+  }
+  // Fallback: synchronous processing (no Worker available)
   let idata = ctx.getImageData(0, 0, nw, nh);
   if (edgeEnhance > 0) idata = applyEdgeKernel(idata, edgeEnhance);
   const d = idata.data, cf = (contrast + 100) / 100;
@@ -78,9 +118,7 @@ export function processImageToCanvas(img, proc, lutMode, lutInvert) {
     v = clamp(v + brightness, 0, 255);
     v = clamp((v - 128) * cf + 128, 0, 255);
     const [lr, lg, lb] = getLUTColor(v, lutMode, lutInvert);
-    d[i] = lr;
-    d[i + 1] = lg;
-    d[i + 2] = lb;
+    d[i] = lr; d[i + 1] = lg; d[i + 2] = lb;
   }
   ctx.putImageData(idata, 0, 0);
   return oc;

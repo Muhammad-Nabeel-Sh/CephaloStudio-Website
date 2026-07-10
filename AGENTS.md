@@ -166,8 +166,10 @@ Each analysis has `{ name, pts: [{ l, def, color }] }`
 ---
 
 ## File Format
-- Projects exported as `.cephx` JSON files with `format: "cephx", version: "2.0"`
-- Templates exported as `.cepht` JSON files with `format: "cepht", version: "1.0"`
+- Projects exported as `.cephx` JSON files with `format: "cephx", version: "2.1"`
+- Templates exported as `.cepht` JSON files with `format: "cepht"` — two versions:
+  - `version: "1.0"` — definitions only (labels, types, colours, no point coordinates)
+  - `version: "2.0"` — definitions + placed point coordinates (full template)
 
 ---
 
@@ -234,6 +236,12 @@ Recommended settings for `.vscode/settings.json`:
 - **Session Filmstrip**: floating bottom-center horizontal thumbnail bar
 - **Batch Import**: multi-image + CSV sidecar parsing
 - **App.jsx refactored**: removed dead database mode code, simplified to ~1362 lines
+- **Data Integrity & Storage (D1-D8)**:
+  - `saveProjects` rewritten: IDB writes awaited before localStorage; failed images kept in envelope (D1); orphan GC on every save (D2); IDB-unavailable / quota banner via custom event (D3)
+  - `cephxFormat.js` (new): import validation, v2.0→v2.1 migration, `normalizeSessionImages` shared by import + export (D4); version constants + enhanced `validateCepht` (D5)
+  - `loadImage` + `importCephx` reader.onerror paths (D8)
+  - Session filmstrip uses Object URLs for thumbnails, not inline base64 (D7)
+  - `imageStore.js`: `idbAvailable()` gate, `{ok, error}` return from `storeImageBlob`, `deleteOrphanBlobs` (warm diff + cold scan), `getAllImageKeys`, schema-migration scaffolding in `onupgradeneeded` (D2/D3/D6)
 
 ### Build Status
 - `npm run build` — OK (chunk size warning is pre-existing, mathjs is large)

@@ -20,7 +20,8 @@ import ResearchPanel from "./research/ResearchPanel.jsx";
 import InterpretationPanel from "./panels/InterpretationPanel.jsx";
 import NormogramPanel from "./panels/NormogramPanel.jsx";
 import { mkProject, updateSessionInProject } from "./model/project.js";
-import { storeImageBlob, getImageDataUrl, clearImageBlobs } from "./storage/imageStore.js";
+import { storeImageBlob, getImageDataUrl, clearImageBlobs, deleteOrphanBlobs, idbAvailable } from "./storage/imageStore.js";
+import { importCephxPayload, validateCepht, CEPHX_FORMAT, CEPHX_VERSION, normalizeSessionImages } from "./storage/cephxFormat.js";
 import { encryptJSON, decryptJSON, clearSecureStorage, secureStorageAvailable } from "./storage/secureStorage.js";
 import { anonymizeProject, hasUnanonymizedPHI } from "./anonymize.js";
 import { logError, logWarn } from "./logger.js";
@@ -104,18 +105,10 @@ function exportCephx(project) {
   let cleaned = { ...project };
   if (cleaned.images) cleaned.images = undefined;
   
-  // Normalize session images: ensure session.image → session.images[] for all sessions
+  // Normalize session images via the shared import/export helper so the two
+  // paths can't drift (D4). Coerces legacy session.image → session.images[].
   if (cleaned.sessions) {
-    cleaned.sessions = cleaned.sessions.map(s => {
-      if (!s.images || s.images.length === 0) {
-        const oldImg = s.image || null;
-        if (oldImg) {
-          const entry = oldImg.id ? oldImg : { id: uid(), name: "Imported", dataUrl: oldImg.dataUrl || oldImg, dx: 0, dy: 0, opacity: 1, blendMode: "normal", visible: true, color: "none", transform: { tx: 0, ty: 0, rot: 0, scale: 1 } };
-          return { ...s, images: [entry], image: undefined };
-        }
-      }
-      return s;
-    });
+    cleaned.sessions = cleaned.sessions.map(s => normalizeSessionImages(s));
   }
   
   // Sanitize research study results (strip any session objects with image data)
@@ -129,7 +122,7 @@ function exportCephx(project) {
     };
   }
   
-  const payload = { format: "cephx", version: "2.1", exported: Date.now(), project: cleaned };
+  const payload = { format: CEPHX_FORMAT, version: CEPHX_VERSION, exported: Date.now(), project: cleaned };
   const json = JSON.stringify(payload);
   
   const blob = new Blob([json], { type: "application/json" });
@@ -140,7 +133,18 @@ function exportCephx(project) {
 }
 function importCephx(file,onLoad){
   const reader=new FileReader();
-  reader.onload=e=>{try{const d=JSON.parse(e.target.result);if(d.format==="cephx"&&d.project)onLoad(d.project);else alert("Invalid .cephx file");}catch(err){logError("Cephx import error:",err);alert("Cannot parse file");}};
+  reader.onload=e=>{
+    let parsed;
+    try{ parsed=JSON.parse(e.target.result); }
+    catch(err){ logError("Cephx import error:",err); alert("Cannot parse file — it is not valid JSON."); return; }
+    const res=importCephxPayload(parsed);
+    if(!res.ok){ alert(res.error); return; }
+    onLoad(res.project);
+    if(res.warnings&&res.warnings.length){
+      setTimeout(()=>alert("Imported with notes:\n• "+res.warnings.join("\n• ")),60);
+    }
+  };
+  reader.onerror=()=>{ logError("Cephx file read failed:",reader.error); alert("Could not read the file."); };
   reader.readAsText(file);
 }
 function exportCepht(template,version="1.0"){
@@ -161,12 +165,6 @@ function exportTemplateAsCepht(project,name,includeCoord){
 }
 function hasPlacedCoords(markups){
   return markups.some(m=>m.points&&m.points.length>0&&!m.points.every(p=>Math.abs((p.x||0)+99999)<1&&Math.abs((p.y||0)+99999)<1));
-}
-function validateCepht(data){
-  if(!data||typeof data!=="object")return "Invalid file format.";
-  if(data.format!=="cepht")return "Not a valid .cepht template file.";
-  if(!data.markups||!Array.isArray(data.markups))return "Template must contain a markups array.";
-  return null;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -345,6 +343,15 @@ function FormulaEditor({t,formula,scope,onSave,onClose}){
 function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImport}){
   const canvasRef=useRef(null);const containerRef=useRef(null);
   const procCache=useRef(new Map());const imgRefs=useRef({});const rafRef=useRef(null);
+  // F1: pointer state lives in refs (not reducer state) so mousemove skips React re-render
+  const mousePosRef=useRef(null);const snapPosRef=useRef(null);
+  const boxSelectRectRef=useRef(null);const panRef=useRef({x:40,y:40});
+  // F2: device-pixel-ratio for crisp HiDPI rendering
+  const dprRef=useRef(window.devicePixelRatio||1);
+  // F4: offscreen canvas for static content (image+markups) — blitted on mousemove
+  const staticDirtyRef=useRef(true);
+  // F8: rAF handle for ResizeObserver coalescing
+  const resizeRafRef=useRef(null);
 
   // file input refs
   const openImgRef=useRef(null);const stackImgRef=useRef(null);const importRef=useRef(null);
@@ -352,7 +359,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const{ui,dispatch,setSelectedId,setActiveTool,setRightPanel,
     setPlacingQueue,setShowMobilePanel,
     setShowLUT,setShowScaleBar,setShowHistogram,setShowDisplacement,setDisplacementOverlay,setRefLandmark1,setRefLandmark2,setOverlayBlend}=useWorkspaceStore();
-  const{zoom,pan,mousePos,snapPos,selectedId,selectedIds,boxSelectRect,replacingId,currentDraw,
+  const{zoom,pan,selectedId,selectedIds,replacingId,currentDraw,
     activeTool,snapEnabled,showScaleBar,showDefTooltips,
     showLUT,showHistogram,showAnnotations,annotationSize,showDisplacement,rightPanel,showCalib,pendingRuler,
     showExport,showAnon,showNormogram,
@@ -396,7 +403,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       const el=containerRef.current;
       if(el){
         const c=canvasRef.current;
-        if(c){c.width=el.clientWidth;c.height=el.clientHeight;canvasSize.current={w:el.clientWidth,h:el.clientHeight};scheduleRedraw();}
+        if(c){const dpr=dprRef.current;c.width=el.clientWidth*dpr;c.height=el.clientHeight*dpr;c.style.width=el.clientWidth+"px";c.style.height=el.clientHeight+"px";
+          canvasSize.current={w:el.clientWidth,h:el.clientHeight};staticDirtyRef.current=true;scheduleRedraw();}
       }
     },300);
   };
@@ -585,21 +593,55 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const getProcessed=useCallback(imgEntry=>{
     const key=`${imgEntry.id}-${JSON.stringify(processing)}-${lutMode}-${lutInvert}`;
     if(!procCache.current.has(key)){for(const k of procCache.current.keys())if(k.startsWith(imgEntry.id+"-")&&k!==key)procCache.current.delete(k);procCache.current.set(key,processImageToCanvas(imgRefs.current[imgEntry.id],processing,lutMode,lutInvert));}
+    staticDirtyRef.current=true; // F4: processing changed → rebuild static cache
     return procCache.current.get(key);
   },[processing,lutMode,lutInvert]);
 
-  const toImage=useCallback((sx,sy)=>({x:(sx-pan.x)/zoom,y:(sy-pan.y)/zoom}),[pan,zoom]);
+  // F7: clear processed-image cache when switching sessions
+  useEffect(()=>{procCache.current.clear();},[activeSession?.id]);
+
+  // F6: memoize histogram computation — avoid re-running on every render while histogram is open
+  const histImgRef=sessionImage[0]?imgRefs.current[sessionImage[0].id]:null;
+  const histData=useMemo(()=>computeHistogram(histImgRef),[histImgRef]);
+
+  const toImage=useCallback((sx,sy)=>({x:(sx-panRef.current.x)/zoom,y:(sy-panRef.current.y)/zoom}),[zoom]);
   const getCanvasPos=useCallback(e=>{const r=canvasRef.current.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};},[]);
 
+  // F2+F8: ResizeObserver with DPR scaling and rAF coalescing
   useEffect(()=>{
-    const obs=new ResizeObserver(()=>{if(skipResizeRef.current)return;const el=containerRef.current;if(!el)return;const c=canvasRef.current;if(!c)return;c.width=el.clientWidth;c.height=el.clientHeight;canvasSize.current={w:el.clientWidth,h:el.clientHeight};scheduleRedraw();});
+    const obs=new ResizeObserver(()=>{
+      if(skipResizeRef.current)return;
+      // F8: coalesce multiple resize frames into one rAF
+      if(resizeRafRef.current)cancelAnimationFrame(resizeRafRef.current);
+      resizeRafRef.current=requestAnimationFrame(()=>{
+        resizeRafRef.current=null;
+        const el=containerRef.current;if(!el)return;const c=canvasRef.current;if(!c)return;
+        const dpr=dprRef.current;
+        c.width=el.clientWidth*dpr;c.height=el.clientHeight*dpr;
+        c.style.width=el.clientWidth+"px";c.style.height=el.clientHeight+"px";
+        canvasSize.current={w:el.clientWidth,h:el.clientHeight};
+        staticDirtyRef.current=true; // F4: canvas resized → rebuild static cache
+        scheduleRedraw();
+      });
+    });
     if(containerRef.current)obs.observe(containerRef.current);return()=>obs.disconnect();
   },[]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const redraw=useCallback(()=>{
     const canvas=canvasRef.current;if(!canvas)return;
-    const ctx=canvas.getContext("2d");ctx.clearRect(0,0,canvas.width,canvas.height);
-    ctx.fillStyle=t.bg;ctx.fillRect(0,0,canvas.width,canvas.height);
+    const ctx=canvas.getContext("2d");
+    // F2: DPR-aware coordinate space — all drawing in CSS pixels
+    const dpr=dprRef.current;
+    ctx.save();ctx.scale(dpr,dpr);
+    const W=canvas.width/dpr,H=canvas.height/dpr;
+    // F1: read hot pointer state from refs (not React state) — avoids re-render on mousemove
+    const mousePos=mousePosRef.current;
+    const snapPos=snapPosRef.current;
+    const boxSelectRect=boxSelectRectRef.current;
+    const pan=panRef.current;
+
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle=t.bg;ctx.fillRect(0,0,W,H);
     
     if(sessionImage.length===0 && markups.length===0){
       ctx.fillStyle=t.surf;ctx.fillRect(pan.x,pan.y,600*zoom,500*zoom);ctx.strokeStyle=t.bdr;ctx.lineWidth=1;ctx.strokeRect(pan.x,pan.y,600*zoom,500*zoom);
@@ -663,7 +705,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         const vp=vpts(hp);
         if(vp.length){
           const sp={x:vp[0].x*zoom+pan.x,y:vp[0].y*zoom+pan.y};
-          const tipW=Math.max(120,Math.min(340,canvas.width-sp.x-20));
+          const tipW=Math.max(120,Math.min(340,W-sp.x-20));
           ctx.font=`11px "DM Sans",sans-serif`;
           const lines=[];let line="";
           for(const word of hp.definition.split(" ")){
@@ -673,8 +715,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           if(line)lines.push(line);
           const tipH=Math.max(54,38+lines.length*18);
           let tx=sp.x+14,ty=sp.y-10;
-          if(tx+tipW>canvas.width-8)tx=sp.x-tipW-14;
-          if(ty+tipH>canvas.height-8)ty=canvas.height-tipH-8;
+          if(tx+tipW>W-8)tx=sp.x-tipW-14;
+          if(ty+tipH>H-8)ty=H-tipH-8;
           if(ty<8)ty=8;
           ctx.save();
           ctx.shadowColor="rgba(0,0,0,0.4)";ctx.shadowBlur=10;ctx.shadowOffsetY=2;
@@ -738,14 +780,14 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         ctx.restore();
       }
     }
-    if(showScaleBar)drawScaleBar(ctx,zoom,drawCalibration,canvas.width,canvas.height);
-    if(showLUT&&lutMode!=="gray")drawLUTLegend(ctx,lutMode,lutInvert,canvas.width,canvas.height,t);
+    if(showScaleBar)drawScaleBar(ctx,zoom,drawCalibration,W,H);
+    if(showLUT&&lutMode!=="gray")drawLUTLegend(ctx,lutMode,lutInvert,W,H,t);
     if(placingMode&&placingQueue.length>0&&placingIdx<placingQueue.length){
       const m=drawMarkups.find(x=>x.id===placingQueue[placingIdx]);
       if(m){
-        const cw=canvas.width;
+        const cw=W;
         const cardW=Math.min(520,cw-32), cardH=110;
-        const cardX=(cw-cardW)/2, cardY=canvas.height-cardH-20;
+        const cardX=(cw-cardW)/2, cardY=H-cardH-20;
         ctx.save();
         // Shadow
         ctx.shadowColor="rgba(0,0,0,0.5)";ctx.shadowBlur=16;ctx.shadowOffsetY=4;
@@ -777,10 +819,22 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         ctx.restore();
       }
     }
-  },[markups,selectedId,selectedIds,boxSelectRect,zoom,pan,sessionImage,calibration,t,currentDraw,mousePos,snapEnabled,snapPos,showScaleBar,showDefTooltips,showLUT,showAnnotations,annotationSize,placingMode,placingQueue,placingIdx,showDisplacement,compareSession,getProcessed,angleMode,lutMode,lutInvert,activeTool,displacementOverlay,overlayBlend,refLandmark1,refLandmark2]);
+    // F1: draw coordinates on canvas (replaces DOM overlay — no React re-render needed)
+    if(mousePos){
+      const ip={x:(mousePos.x-pan.x)/zoom,y:(mousePos.y-pan.y)/zoom};
+      const coordTxt=`${ip.x.toFixed(1)}, ${ip.y.toFixed(1)} px${calibration.done?` · (${(ip.x/calibration.pxPerMm).toFixed(1)}, ${(ip.y/calibration.pxPerMm).toFixed(1)} mm)`:""}`;
+      ctx.font=`11px "DM Mono",monospace`;
+      const tw=ctx.measureText(coordTxt).width;
+      ctx.fillStyle=t.surf+"ee";ctx.strokeStyle=t.bdr;ctx.lineWidth=1;
+      ctx.beginPath();ctx.roundRect(22,H-30,tw+16,22,6);ctx.fill();ctx.stroke();
+      ctx.fillStyle=t.tx2;ctx.fillText(coordTxt,30,H-14);
+    }
+    ctx.restore(); // F2: end DPR scale
+  },[markups,selectedId,selectedIds,zoom,sessionImage,calibration,t,currentDraw,snapEnabled,showScaleBar,showDefTooltips,showLUT,showAnnotations,annotationSize,placingMode,placingQueue,placingIdx,showDisplacement,compareSession,getProcessed,angleMode,lutMode,lutInvert,activeTool,displacementOverlay,overlayBlend,refLandmark1,refLandmark2]);
 
   useEffect(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});});
   const scheduleRedraw=useCallback(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});},[redraw]);
+  const scheduleRedrawRef=useRef(scheduleRedraw);scheduleRedrawRef.current=scheduleRedraw;
 
   const loadImage=(file,addToStack=false)=>{
     if(!file||!file.type.startsWith("image/"))return;
@@ -798,9 +852,16 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           updSession({images: [entry]});
         }
         dispatch({type:"SET",payload:{loadingImages:false}});
-        if(!addToStack){const cw=canvasSize.current.w-80,ch=canvasSize.current.h-80;const sc=Math.min(cw/(img.naturalWidth||600),ch/(img.naturalHeight||500),1);dispatch({type:"SET",payload:{zoom:sc}});dispatch({type:"SET",payload:{pan:{x:40,y:40}}});}
-      };img.src=dataUrl;
-    };reader.readAsDataURL(file);
+        if(!addToStack){const cw=canvasSize.current.w-80,ch=canvasSize.current.h-80;const sc=Math.min(cw/(img.naturalWidth||600),ch/(img.naturalHeight||500),1);dispatch({type:"SET",payload:{zoom:sc}});panRef.current={x:40,y:40};dispatch({type:"SET",payload:{pan:{x:40,y:40}}});}
+      };
+      // D8: a corrupt/permission-denied image decode used to hang the
+      // "Loading images…" overlay forever. Clear it and tell the user.
+      img.onerror=()=>{ dispatch({type:"SET",payload:{loadingImages:false}}); logError("Image decode failed:",null); alert(`Could not decode "${file?.name||"image"}". The file may be corrupt or in an unsupported format.`); };
+      img.src=dataUrl;
+    };
+    // D8: same for the FileReader itself (file unreadable / revoked).
+    reader.onerror=()=>{ dispatch({type:"SET",payload:{loadingImages:false}}); logError("File read failed:",reader.error); alert(`Could not read "${file?.name||"file"}".`); };
+    reader.readAsDataURL(file);
   };
 
   const handleDrop=e=>{e.preventDefault();const files=Array.from(e.dataTransfer.files).filter(f=>f.type.startsWith("image/"));files.forEach((f,i)=>loadImage(f,i>0));};
@@ -810,7 +871,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA")return;
       if((e.ctrlKey||e.metaKey)&&e.key==="z"){undo();return;}
       if((e.ctrlKey||e.metaKey)&&e.key==="y"){redo();return;}
-      if(e.key==="Escape"){dispatch({type:"SET",payload:{currentDraw:null,selectedId:null,selectedIds:[],boxSelectRect:null}});if(placingMode){if(placingIdx<placingQueue.length-1)dispatch({type:"SET",payload:{placingIdx:placingIdx+1}});else{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}}return;}
+      if(e.key==="Escape"){boxSelectRectRef.current=null;dispatch({type:"SET",payload:{currentDraw:null,selectedId:null,selectedIds:[]}});if(placingMode){if(placingIdx<placingQueue.length-1)dispatch({type:"SET",payload:{placingIdx:placingIdx+1}});else{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}}return;}
       const tool=TOOLS.filter(Boolean).find(t2=>t2.key===e.key.toLowerCase());
       if(tool){dispatch({type:"SET",payload:{activeTool:tool.id}});dispatch({type:"SET",payload:{currentDraw:null}});return;}
       if(e.key==="Backspace"&&placingMode&&placingQueue.length>0){if(placingIdx>0)dispatch({type:"SET",payload:{placingIdx:placingIdx-1}});else{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}return;}
@@ -823,7 +884,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       }
       if(e.key==="+"||e.key==="=")dispatch({type:"SET",payload:{zoom:z=>clamp(z*1.15,0.05,15)}});
       if(e.key==="-")dispatch({type:"SET",payload:{zoom:z=>clamp(z/1.15,0.05,15)}});
-      if(e.key==="0"){dispatch({type:"SET",payload:{zoom:1}});dispatch({type:"SET",payload:{pan:{x:40,y:40}}});}
+      if(e.key==="0"){dispatch({type:"SET",payload:{zoom:1}});panRef.current={x:40,y:40};dispatch({type:"SET",payload:{pan:{x:40,y:40}}});}
     };
     window.addEventListener("keydown",fn);return()=>window.removeEventListener("keydown",fn);
   },[selectedId,selectedIds,placingMode,placingIdx,placingQueue,markups,delMarkup,redo,undo,dispatch,pushUndo,refreshAutoMeas,updSession]);
@@ -856,7 +917,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     if(activeTool==="select"){
       const hit=hitTest(markups,ip,zoom);
       if(!hit){
-        dispatch({type:"SET",payload:{selectedIds:[],selectedId:null,boxSelectRect:{x1:ip.x,y1:ip.y,x2:ip.x,y2:ip.y}}});
+        boxSelectRectRef.current={x1:ip.x,y1:ip.y,x2:ip.x,y2:ip.y};
+        dispatch({type:"SET",payload:{selectedIds:[],selectedId:null}});
         return;
       }
       setSelectedId(hit);
@@ -1023,13 +1085,15 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   },[activeTool,markups,zoom,pan,snapEnabled,currentDraw,selectedMarkup,selectedIds,placingMode,placingQueue,placingIdx,replacingId,setSelectedId,updMarkup,addMarkup,finalizeMarkup,toImage,getCanvasPos,t,analysisTemplate,autoCreateMeasurements,dispatch,norms,pushUndo,refreshAutoMeas,updSession]);
 
   const handleMouseMove=useCallback(e=>{
-    const sp=getCanvasPos(e);dispatch({type:"SET",payload:{mousePos:sp}});
-    if(snapEnabled&&activeTool!=="select"&&activeTool!=="pan"){const ip=toImage(sp.x,sp.y);const sn=snapPoint(ip,markups,12/zoom,snapEnabled);dispatch({type:"SET",payload:{snapPos:(Math.abs(sn.x-ip.x)>0.1||Math.abs(sn.y-ip.y)>0.1)?sn:null}});}else dispatch({type:"SET",payload:{snapPos:null}});
-    if(activeTool==="select"&&!isDragging.current&&!silhouetteAction.current){const ip=toImage(sp.x,sp.y);let best=null,bd=Infinity;const ptThr=8/zoom;for(const m2 of markups){if(m2.locked||m2.visible===false)continue;if(m2.type==="point"){const vp=vpts(m2);if(vp.length){const d=dist(ip,vp[0]);if(d<bd&&d<ptThr){bd=d;best={type:"point",mid:m2.id};}}}if(m2.type==="silhouette"){const paths=m2.paths||SILHOUETTES[m2.silhouetteType]?.paths;if(!paths)continue;const rot=m2.rotation||0;const sc=m2.scale||1;const pos=m2.position||{x:0,y:0};const cosR=Math.cos(rot);const sinR=Math.sin(rot);paths.forEach((path,pi)=>{path.points.forEach((p,ptI)=>{const sx=p.x*sc*100;const sy=p.y*sc*100;const rx=sx*cosR-sy*sinR;const ry=sx*sinR+sy*cosR;const d=dist(ip,{x:rx+pos.x,y:ry+pos.y});if(d<bd&&d<ptThr){bd=d;best={type:"silhouette",mid:m2.id,pathIdx:pi,ptIdx:ptI};}});});if(m2.id===selectedId){try{const h=getSilhouetteHandlesImage(m2,zoom);const rotThr=Math.max(10,22*Math.sqrt(zoom))/zoom;if(h.rotCenter&&isFinite(h.rotCenter.x)){const d=dist(ip,h.rotCenter);if(d<rotThr&&d<bd){bd=d;best={type:"rotate",mid:m2.id};}}const cornerThr=Math.max(8,12*Math.sqrt(zoom))/zoom;h.corners.forEach((c,ci)=>{if(isFinite(c.x)){const d=dist(ip,c);if(d<cornerThr&&d<bd){bd=d;best={type:"corner",mid:m2.id,cornerIdx:ci};}}});}catch{/*silent*/}}}else if(m2.type==="curve"||m2.type==="polygon"){(m2.points||[]).forEach((p,i)=>{const d=dist(ip,p);if(d<bd&&d<ptThr){bd=d;best={type:"path",mid:m2.id,ptIdx:i};}});}}hoveredPtRef.current=best;}else{hoveredPtRef.current=null;}
-    if(boxSelectRect){const ip=toImage(sp.x,sp.y);dispatch({type:"SET",payload:{boxSelectRect:{...boxSelectRect,x2:ip.x,y2:ip.y}}});return;}
-    if(isPanning.current&&panStart.current)dispatch({type:"SET",payload:{pan:{x:panStart.current.px+(e.clientX-panStart.current.mx),y:panStart.current.py+(e.clientY-panStart.current.my)}}});
-    if(isDragging.current&&multiDragIdsRef.current){const ip=toImage(sp.x,sp.y);const dx=ip.x-dragStart.current.x,dy=ip.y-dragStart.current.y;const ids=multiDragIdsRef.current;updMarkups(ms=>ms.map(m=>{if(!ids.includes(m.id))return m;if(m.type==="silhouette")return{...m,position:{x:(m.position?.x||0)+dx,y:(m.position?.y||0)+dy}};return{...m,points:(m.points||[]).map(p=>p.x>-9000?{x:p.x+dx,y:p.y+dy}:p)};}));dragStart.current=ip;return;}
-    if(isDragging.current&&dragMid.current){const ip=toImage(sp.x,sp.y);const dx=ip.x-dragStart.current.x,dy=ip.y-dragStart.current.y;const m=markups.find(x=>x.id===dragMid.current);if(!m)return;if(m.type==="silhouette"){if(typeof dragPtIdx.current==="object"&&dragPtIdx.current!==null){const sc=m.scale||1;const rot=m.rotation||0;const cosR=Math.cos(rot);const sinR=Math.sin(rot);const baseSize=100;const dnx=(cosR*dx+sinR*dy)/(sc*baseSize);const dny=(-sinR*dx+cosR*dy)/(sc*baseSize);const{pathIdx,ptIdx}=dragPtIdx.current;updMarkup(dragMid.current,{paths:(m.paths||[]).map((path,pi)=>({...path,points:path.points.map((p,ptI)=>pi===pathIdx&&ptI===ptIdx?{x:p.x+dnx,y:p.y+dny}:p)}))});}else{updMarkup(dragMid.current,{position:{x:(m.position?.x||0)+dx,y:(m.position?.y||0)+dy}});}}else{updMarkup(dragMid.current,{points:(m.points||[]).map((p,i)=>i===dragPtIdx.current?{x:p.x+dx,y:p.y+dy}:p)});}dragStart.current=ip;}
+    const sp=getCanvasPos(e);
+    // F1: write pointer state to refs — no dispatch, no React re-render
+    mousePosRef.current=sp;
+    if(snapEnabled&&activeTool!=="select"&&activeTool!=="pan"){const ip=toImage(sp.x,sp.y);const sn=snapPoint(ip,markups,12/zoom,snapEnabled);snapPosRef.current=(Math.abs(sn.x-ip.x)>0.1||Math.abs(sn.y-ip.y)>0.1)?sn:null;}else snapPosRef.current=null;
+    if(activeTool==="select"&&!isDragging.current&&!silhouetteAction.current){const ip=toImage(sp.x,sp.y);let best=null,bd=Infinity;const ptThr=8/zoom;for(const m2 of markups){if(m2.locked||m2.visible===false)continue;if(m2.type==="point"){const vp=vpts(m2);if(vp.length){const d=dist(ip,vp[0]);if(d<bd&&d<ptThr){bd=d;best={type:"point",mid:m2.id};}}}if(m2.type==="silhouette"){const paths=m2.paths||SILHOUETTES[m2.silhouetteType]?.paths;if(!paths)continue;const rot=m2.rotation||0;const sc=m2.scale||1;const pos=m2.position||{x:0,y:0};const cosR=Math.cos(rot);const sinR=Math.sin(rot);paths.forEach((path,pi)=>{path.points.forEach((p,ptI)=>{const sx=p.x*sc*100;const sy=p.y*100;const rx=sx*cosR-sy*sinR;const ry=sx*sinR+sy*cosR;const d=dist(ip,{x:rx+pos.x,y:ry+pos.y});if(d<bd&&d<ptThr){bd=d;best={type:"silhouette",mid:m2.id,pathIdx:pi,ptIdx:ptI};}});});if(m2.id===selectedId){try{const h=getSilhouetteHandlesImage(m2,zoom);const rotThr=Math.max(10,22*Math.sqrt(zoom))/zoom;if(h.rotCenter&&isFinite(h.rotCenter.x)){const d=dist(ip,h.rotCenter);if(d<rotThr&&d<bd){bd=d;best={type:"rotate",mid:m2.id};}}const cornerThr=Math.max(8,12*Math.sqrt(zoom))/zoom;h.corners.forEach((c,ci)=>{if(isFinite(c.x)){const d=dist(ip,c);if(d<cornerThr&&d<bd){bd=d;best={type:"corner",mid:m2.id,cornerIdx:ci};}}});}catch{/*silent*/}}}else if(m2.type==="curve"||m2.type==="polygon"){(m2.points||[]).forEach((p,i)=>{const d=dist(ip,p);if(d<bd&&d<ptThr){bd=d;best={type:"path",mid:m2.id,ptIdx:i};}});}}hoveredPtRef.current=best;}else{hoveredPtRef.current=null;}
+    if(boxSelectRectRef.current){const ip=toImage(sp.x,sp.y);boxSelectRectRef.current={...boxSelectRectRef.current,x2:ip.x,y2:ip.y};scheduleRedrawRef.current();return;}
+    if(isPanning.current&&panStart.current){panRef.current={x:panStart.current.px+(e.clientX-panStart.current.mx),y:panStart.current.py+(e.clientY-panStart.current.my)};scheduleRedrawRef.current();return;}
+    if(isDragging.current&&multiDragIdsRef.current){const ip=toImage(sp.x,sp.y);const dx=ip.x-dragStart.current.x,dy=ip.y-dragStart.current.y;const ids=multiDragIdsRef.current;updMarkups(ms=>ms.map(m=>{if(!ids.includes(m.id))return m;if(m.type==="silhouette")return{...m,position:{x:(m.position?.x||0)+dx,y:(m.position?.y||0)+dy}};return{...m,points:(m.points||[]).map(p=>p.x>-9000?{x:p.x+dx,y:p.y+dy}:p)};}));dragStart.current=ip;scheduleRedrawRef.current();return;}
+    if(isDragging.current&&dragMid.current){const ip=toImage(sp.x,sp.y);const dx=ip.x-dragStart.current.x,dy=ip.y-dragStart.current.y;const m=markups.find(x=>x.id===dragMid.current);if(!m)return;if(m.type==="silhouette"){if(typeof dragPtIdx.current==="object"&&dragPtIdx.current!==null){const sc=m.scale||1;const rot=m.rotation||0;const cosR=Math.cos(rot);const sinR=Math.sin(rot);const baseSize=100;const dnx=(cosR*dx+sinR*dy)/(sc*baseSize);const dny=(-sinR*dx+cosR*dy)/(sc*baseSize);const{pathIdx,ptIdx}=dragPtIdx.current;updMarkup(dragMid.current,{paths:(m.paths||[]).map((path,pi)=>({...path,points:path.points.map((p,ptI)=>pi===pathIdx&&ptI===ptIdx?{x:p.x+dnx,y:p.y+dny}:p)}))});}else{updMarkup(dragMid.current,{position:{x:(m.position?.x||0)+dx,y:(m.position?.y||0)+dy}});}}else{updMarkup(dragMid.current,{points:(m.points||[]).map((p,i)=>i===dragPtIdx.current?{x:p.x+dx,y:p.y+dy}:p)});}dragStart.current=ip;scheduleRedrawRef.current();}
     if(silhouetteAction.current){
       try {
         const ip=toImage(sp.x,sp.y);const sa=silhouetteAction.current;
@@ -1045,14 +1109,15 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           const s=Math.atan2(sa.startIp.y-sa.center.y,sa.startIp.x-sa.center.x);
           updMarkup(sa.markupId,{rotation:sa.initialRotation+(a-s)});
         }
+        scheduleRedrawRef.current();
       } catch { silhouetteAction.current=null; /*silent*/ }
     }
-  },[activeTool,markups,zoom,snapEnabled,selectedId,boxSelectRect,updMarkup,updMarkups,toImage,getCanvasPos,dispatch]);
+  },[activeTool,markups,zoom,snapEnabled,selectedId,updMarkup,updMarkups,toImage,getCanvasPos]);
 
   const handleMouseUp=()=>{
-    if(boxSelectRect){
-      const{x1,y1,x2,y2}=boxSelectRect;
-      dispatch({type:"SET",payload:{boxSelectRect:null}});
+    if(boxSelectRectRef.current){
+      const{x1,y1,x2,y2}=boxSelectRectRef.current;
+      boxSelectRectRef.current=null;
       const minX=Math.min(x1,x2),maxX=Math.max(x1,x2);
       const minY=Math.min(y1,y2),maxY=Math.max(y1,y2);
       const inside=markups.filter(m=>{
@@ -1076,9 +1141,9 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     isPanning.current=false;isDragging.current=false;silhouetteAction.current=null;multiDragIdsRef.current=null;
   };
   const handleDblClick=()=>{if((activeTool==="polygon"||activeTool==="curve")&&currentDraw?.points.length>=2){finalizeMarkup(currentDraw);dispatch({type:"SET",payload:{currentDraw:null}});}};
-  useEffect(()=>{const c=canvasRef.current;if(!c)return;const onWheel=e=>{if(Math.abs(e.deltaY)>0.1||Math.abs(e.deltaX)>0.1){e.preventDefault();e.stopPropagation();const sp=getCanvasPos(e),f=e.deltaY>0?0.9:1.1,nz=clamp(zoom*f,0.05,15);dispatch({type:"SET",payload:{pan:prev=>({x:sp.x-(sp.x-prev.x)*(nz/zoom),y:sp.y-(sp.y-prev.y)*(nz/zoom)})}});dispatch({type:"SET",payload:{zoom:nz}});}};c.addEventListener("wheel",onWheel,{passive:false});return()=>c.removeEventListener("wheel",onWheel);},[zoom,dispatch,getCanvasPos]);
+  useEffect(()=>{const c=canvasRef.current;if(!c)return;const onWheel=e=>{if(Math.abs(e.deltaY)>0.1||Math.abs(e.deltaX)>0.1){e.preventDefault();e.stopPropagation();const sp=getCanvasPos(e),f=e.deltaY>0?0.9:1.1,nz=clamp(zoom*f,0.05,15);const prev=panRef.current;panRef.current={x:sp.x-(sp.x-prev.x)*(nz/zoom),y:sp.y-(sp.y-prev.y)*(nz/zoom)};dispatch({type:"SET",payload:{pan:panRef.current}});dispatch({type:"SET",payload:{zoom:nz}});}};c.addEventListener("wheel",onWheel,{passive:false});return()=>c.removeEventListener("wheel",onWheel);},[zoom,dispatch,getCanvasPos]);
   const handleTouchStart=e=>{e.preventDefault();if(e.touches.length===1){const t2=e.touches[0];handleMouseDown({button:0,clientX:t2.clientX,clientY:t2.clientY});}if(e.touches.length===2)lastTouchDist.current=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);};
-  const handleTouchMove=e=>{e.preventDefault();if(e.touches.length===1){const t2=e.touches[0];handleMouseMove({clientX:t2.clientX,clientY:t2.clientY});}if(e.touches.length===2&&lastTouchDist.current){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);const f=d/lastTouchDist.current,nz=clamp(zoom*f,0.05,15);const cx=(e.touches[0].clientX+e.touches[1].clientX)/2,cy=(e.touches[0].clientY+e.touches[1].clientY)/2;const r=canvasRef.current.getBoundingClientRect();const sp={x:cx-r.left,y:cy-r.top};dispatch({type:"SET",payload:{pan:prev=>({x:sp.x-(sp.x-prev.x)*(nz/zoom),y:sp.y-(sp.y-prev.y)*(nz/zoom)})}});dispatch({type:"SET",payload:{zoom:nz}});lastTouchDist.current=d;}};
+  const handleTouchMove=e=>{e.preventDefault();if(e.touches.length===1){const t2=e.touches[0];handleMouseMove({clientX:t2.clientX,clientY:t2.clientY});}if(e.touches.length===2&&lastTouchDist.current){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);const f=d/lastTouchDist.current,nz=clamp(zoom*f,0.05,15);const cx=(e.touches[0].clientX+e.touches[1].clientX)/2,cy=(e.touches[0].clientY+e.touches[1].clientY)/2;const r=canvasRef.current.getBoundingClientRect();const sp={x:cx-r.left,y:cy-r.top};const prev=panRef.current;panRef.current={x:sp.x-(sp.x-prev.x)*(nz/zoom),y:sp.y-(sp.y-prev.y)*(nz/zoom)};dispatch({type:"SET",payload:{pan:panRef.current}});dispatch({type:"SET",payload:{zoom:nz}});lastTouchDist.current=d;}};
   const handleTouchEnd=()=>{handleMouseUp();lastTouchDist.current=null;};
 
   const finalizeCalib=(mm,manualPpm)=>{
@@ -1391,7 +1456,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
               </div>
               {/* Row 11: Fit to Window */}
               <div style={{display:"flex",justifyContent:"center"}}>
-                <button onClick={()=>{dispatch({type:"SET",payload:{zoom:1}});dispatch({type:"SET",payload:{pan:{x:40,y:40}}});}} aria-label="Fit to Window" style={{width:38,height:32,borderRadius:6,border:"none",background:"transparent",color:t.tx2,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Fit to Window (⊙)">⊙</button>
+                <button onClick={()=>{dispatch({type:"SET",payload:{zoom:1}});panRef.current={x:40,y:40};dispatch({type:"SET",payload:{pan:{x:40,y:40}}});}} aria-label="Fit to Window" style={{width:38,height:32,borderRadius:6,border:"none",background:"transparent",color:t.tx2,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Fit to Window (⊙)">⊙</button>
               </div>
               {/* Separator */}
               <div style={{width:"100%",height:1,background:t.bdr,margin:"4px 0"}}/>
@@ -1413,9 +1478,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
             <div style={{textAlign:"center"}}><div style={{width:28,height:28,border:`3px solid ${t.bdr}`,borderTopColor:t.acc,borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto 10px"}}/><div style={{fontSize:13,color:t.tx2}}>Loading images…</div></div>
           </div>}
           {!isMobile&&<div style={{position:"absolute",bottom:isMobile?60:8,left:30,display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
-            {mousePos&&<div style={{background:t.surf+"ee",border:`1px solid ${t.bdr}`,borderRadius:6,padding:"3px 10px",fontSize:11,color:t.tx2,fontFamily:"'DM Mono',monospace"}}>
-              {(()=>{const ip=toImage(mousePos.x,mousePos.y);return`${ip.x.toFixed(1)}, ${ip.y.toFixed(1)} px${calibration.done?` · (${(ip.x/calibration.pxPerMm).toFixed(1)}, ${(ip.y/calibration.pxPerMm).toFixed(1)} mm)`:""}`})()}
-            </div>}
+            {/* F1: coordinates now drawn on canvas in redraw() — no DOM element needed */}
             {currentDraw&&<div style={{background:t.acc+"22",border:`1px solid ${t.acc}`,borderRadius:6,padding:"3px 10px",fontSize:11,color:t.acc,fontFamily:"'DM Mono',monospace"}}>
               {["polygon","curve"].includes(activeTool)?`${currentDraw.points.length} pts · dbl-click done`:(()=>{const n={line:2,angle3:3,angle4:4,perp:3,ruler:2}[activeTool];return`${currentDraw.points.length}/${n}`;})()}
             </div>}
@@ -1597,7 +1660,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       {showNormogram&&<Modal t={t} title="Cephalometric Normogram" wide onClose={()=>dispatch({type:"SET",payload:{showNormogram:false}})}><NormogramPanel allMeas={allMeas} norms={norms} t={t} formatAngle={formatAngle}/></Modal>}
 
       {showFormulaEditor&&<Modal t={t} title={editFormulaId?"Edit Formula":"New Formula"} onClose={()=>dispatch({type:"SET",payload:{showFormulaEditor:false}})}><FormulaEditor t={t} formula={editFormulaId?formulas.find(f=>f.id===editFormulaId):null} scope={measScope} onSave={f=>{const newFs=editFormulaId?formulas.map(x=>x.id===editFormulaId?f:x):[...formulas,f];updSession({formulas:newFs});dispatch({type:"SET",payload:{showFormulaEditor:false}});}} onClose={()=>dispatch({type:"SET",payload:{showFormulaEditor:false}})}/></Modal>}
-      {showHistogram&&<FloatingHistogram hist={computeHistogram(sessionImage[0]?imgRefs.current[sessionImage[0].id]:null)} t={t} lutMode={lutMode} lutInvert={lutInvert} processing={processing} onProcessingChange={p=>updSession({processing:p})} onClose={()=>dispatch({type:"SET",payload:{showHistogram:false}})}/>}
+      {showHistogram&&<FloatingHistogram hist={histData} t={t} lutMode={lutMode} lutInvert={lutInvert} processing={processing} onProcessingChange={p=>updSession({processing:p})} onClose={()=>dispatch({type:"SET",payload:{showHistogram:false}})}/>}
     </div>
   );
 }
@@ -1614,19 +1677,43 @@ const STORAGE_KEY = "cephalometry_projects";
 // Async load with legacy-plaintext migration. Old autosaves were a bare
 // JSON array in localStorage; new autosaves are an {enc, iv, ct} (or fallback
 // {enc:false, plaintext}) envelope. Both shapes are handled so existing users
-// don't lose their projects on upgrade.
+// don't lose their projects on upgrade. Sessions are normalized to the
+// canonical `session.images[]` shape here too (D4) and the referenced image-id
+// baseline is captured for orphan GC (D2).
+let _knownImageIds = new Set();
+
+function collectReferencedImageIds(projects) {
+  const ids = new Set();
+  for (const p of projects) {
+    for (const s of p.sessions || []) {
+      for (const img of s.images || []) {
+        if (img && img.id) ids.add(img.id);
+      }
+    }
+  }
+  return ids;
+}
+
 async function loadProjects() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     let parsed;
     try { parsed = JSON.parse(raw); } catch { return []; }
-    if (Array.isArray(parsed)) return parsed; // legacy plaintext projects array
-    if (parsed && typeof parsed === "object") {
-      const dec = await decryptJSON(parsed);
-      if (dec != null) return dec;
+    let projects = null;
+    if (Array.isArray(parsed)) projects = parsed; // legacy plaintext projects array
+    else if (parsed && typeof parsed === "object") {
+      projects = await decryptJSON(parsed);
     }
-    return [];
+    if (!projects) return [];
+    // Normalize legacy session.image → session.images[] on load so the GC
+    // baseline (and the rest of the app) sees the canonical shape.
+    projects = projects.map(p => ({
+      ...p,
+      sessions: (p.sessions || []).map(s => normalizeSessionImages(s)),
+    }));
+    _knownImageIds = collectReferencedImageIds(projects);
+    return projects;
   } catch (e) {
     logWarn("Failed to load projects from storage:", e);
     return [];
@@ -1636,31 +1723,92 @@ async function loadProjects() {
 // Serialize concurrent saves so rapid project edits can't write envelopes out
 // of order (encryption is async). The last call always wins.
 let _saveChain = Promise.resolve();
+let _idbQuotaWarned = false;
+
+// Surface a storage problem to the UI via a decoupled custom event (D3). The
+// root component listens and renders a dismissible banner; saveProjects stays
+// outside React so it can't call setState directly.
+function emitStorageWarning(kind, message) {
+  try {
+    window.dispatchEvent(new CustomEvent("cephalostudio:storage-warning", { detail: { kind, message } }));
+  } catch { /* best-effort */ }
+}
+
 function saveProjects(projects) {
   _saveChain = _saveChain.then(async () => {
     try {
-      const imageBatch = [];
+      // 1. Gather images that carry an in-memory dataUrl (just loaded/imported)
+      //    and need persisting to IDB before they're stripped from localStorage.
+      const toStore = [];
+      for (const p of projects) {
+        for (const s of p.sessions || []) {
+          for (const img of s.images || []) {
+            if (img && img.dataUrl) toStore.push({ id: img.id, dataUrl: img.dataUrl });
+          }
+        }
+      }
+
+      // 2. D1: persist to IDB FIRST and await the result. Only strip the dataUrl
+      //    from the localStorage payload for images whose blob was actually
+      //    stored. Failed / unavailable images keep their dataUrl in localStorage
+      //    so the radiograph isn't lost (localStorage may hit quota, but silent
+      //    image loss in a medical app is worse). Previously the order was
+      //    reversed — localStorage was written with dataUrl:null BEFORE a
+      //    fire-and-forget IDB write whose .catch(()=>{}) swallowed failures, so
+      //    a failed/aborted IDB write permanently lost the image.
+      const failedIds = new Set();
+      let hadIdbQuota = false;
+      let hadIdbUnavailable = false;
+      if (toStore.length > 0) {
+        const results = await Promise.all(
+          toStore.map(({ id, dataUrl }) => storeImageBlob(id, dataUrl))
+        );
+        results.forEach((r, i) => {
+          if (!r || !r.ok) {
+            failedIds.add(toStore[i].id);
+            if (r && r.error === "quota") hadIdbQuota = true;
+            if (r && r.error === "unavailable") hadIdbUnavailable = true;
+          }
+        });
+      }
+      if (hadIdbQuota && !_idbQuotaWarned) {
+        _idbQuotaWarned = true;
+        emitStorageWarning("idb-quota", "Image storage is full. Some new images could not be saved locally — export your project as .cephx to keep them, then clear local data.");
+      }
+      if (hadIdbUnavailable && !idbAvailable()) {
+        emitStorageWarning("idb-unavailable", "Image storage is unavailable in this browser/session (e.g. private mode). Images won't persist across sessions — export your work as .cephx to keep it.");
+      }
+
+      // 3. Build the stripped payload: null dataUrl for stored images, keep
+      //    dataUrl for the failures so they survive in the (encrypted) envelope.
       const stripped = projects.map(p => ({
         ...p,
         sessions: p.sessions?.map(s => ({
           ...s,
-          images: s.images?.map(img => {
-            if (img.dataUrl) {
-              imageBatch.push({ id: img.id, dataUrl: img.dataUrl });
-              return { ...img, dataUrl: null };
-            }
-            return { ...img, dataUrl: null };
-          })
+          images: s.images?.map(img => ({
+            ...img,
+            dataUrl: (img && failedIds.has(img.id)) ? img.dataUrl : null,
+          }))
         }))
       }));
-      if (imageBatch.length > 0) {
-        Promise.all(imageBatch.map(({ id, dataUrl }) => storeImageBlob(id, dataUrl))).catch(() => {});
+
+      // 4. D2: garbage-collect orphaned blobs — sessions/images/projects that
+      //    were removed since the last save. Diff against the known-id baseline
+      //    (cheap); on a cold baseline this falls back to a full IDB scan.
+      const referencedIds = collectReferencedImageIds(projects);
+      try {
+        await deleteOrphanBlobs(referencedIds, _knownImageIds);
+      } catch (e) {
+        logWarn("Orphan blob GC failed:", e);
       }
+      _knownImageIds = referencedIds;
+
+      // 5. Write the encrypted envelope to localStorage.
       const envelope = await encryptJSON(stripped);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
     } catch (e) {
-      if (e.name === "QuotaExceededError" || e.name === "NS_ERROR_DOM_QUOTA_REACHED") {
-        alert("Storage is full. Your projects could not be saved.\n\nExport your project files (.cephx) to preserve your data, then clear browser storage or remove unused projects.");
+      if (e && (e.name === "QuotaExceededError" || e.name === "NS_ERROR_DOM_QUOTA_REACHED")) {
+        emitStorageWarning("ls-quota", "Local storage is full. Your projects could not be saved. Export your project files (.cephx) to preserve your data, then clear browser storage or remove unused projects.");
       } else {
         logWarn("Failed to save projects:", e);
       }
@@ -1674,6 +1822,10 @@ function saveProjects(projects) {
 async function clearAllLocalData() {
   await clearSecureStorage(STORAGE_KEY);
   await clearImageBlobs();
+  // Reset the orphan-GC baseline so a subsequent save doesn't try to diff
+  // against ids that no longer exist (D2), and re-arm the quota warning.
+  _knownImageIds = new Set();
+  _idbQuotaWarned = false;
 }
 
 export default function CephalometryStudio(){
@@ -1684,6 +1836,11 @@ export default function CephalometryStudio(){
   const[projects,setProjects]=useState([]);const[activeId,setActiveId]=useState(null);
   const[loaded,setLoaded]=useState(false);
   const dirtyRef=useRef(false);
+  // D3: surface IDB-unavailable / storage-quota failures as a dismissible banner
+  // instead of silently degrading (incognito mode, full storage). The autosave
+  // emits `cephalostudio:storage-warning` events; this listens + seeds the
+  // persistent "IDB unavailable" warning on mount.
+  const[storageWarn,setStorageWarn]=useState(null);
 
   useEffect(()=>{
     let cancelled=false;
@@ -1695,6 +1852,15 @@ export default function CephalometryStudio(){
       setLoaded(true);
     })();
     return ()=>{cancelled=true;};
+  },[]);
+
+  useEffect(()=>{
+    if(!idbAvailable()){
+      setStorageWarn({kind:"idb-unavailable",message:"Image storage is unavailable in this browser/session (e.g. private mode). Images won't persist across sessions — export your work as .cephx to keep it."}); // eslint-disable-line react-hooks/set-state-in-effect
+    }
+    const onWarn=e=>setStorageWarn((e&&e.detail)||null);
+    window.addEventListener("cephalostudio:storage-warning",onWarn);
+    return ()=>window.removeEventListener("cephalostudio:storage-warning",onWarn);
   },[]);
 
   useEffect(()=>{if(loaded)saveProjects(projects);},[projects,loaded]);
@@ -1760,6 +1926,12 @@ export default function CephalometryStudio(){
   return(
     <ErrorBoundary t={t}>
       <div style={{background:t.bg,minHeight:"100vh"}}>
+        {storageWarn&&(
+          <div role="alert" aria-live="polite" style={{background:t.warn+"22",borderBottom:`1px solid ${t.warn}`,color:t.tx,fontSize:12,padding:"8px 16px",display:"flex",alignItems:"center",gap:10,zIndex:40}}>
+            <span style={{flex:1,lineHeight:1.4}}>⚠ {storageWarn.message}</span>
+            <button onClick={()=>setStorageWarn(null)} aria-label="Dismiss warning" style={{background:"none",border:`1px solid ${t.bdr}`,borderRadius:4,color:t.tx2,cursor:"pointer",fontSize:13,padding:"1px 7px",lineHeight:1}}>×</button>
+          </div>
+        )}
         {!activeId&&!loaded&&<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",color:t.tx3,fontSize:12}}>Loading your projects…</div>}
         {!activeId&&loaded&&<HomePage t={t} theme={theme} setTheme={setTheme} projects={projects} onOpen={id=>setActiveId(id)} onCreate={createProject} onImport={importCephxFile} storageEncrypted={secureStorageAvailable()} onClearLocalData={handleClearLocalData}/>}
         {activeId&&activeProject&&(

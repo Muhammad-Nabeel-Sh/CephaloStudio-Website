@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { mkSession } from "../model/session.js";
 import { addSession, removeSession } from "../model/project.js";
 import { onEnter } from "../utils.js";
@@ -62,13 +62,7 @@ export default function SessionFilmstrip({ project, t, onUpdateProject }) {
                 background: t.surf3, display: "flex", alignItems: "center",
                 justifyContent: "center", flexShrink: 0,
               }}>
-                {(s.images && s.images[0]?.dataUrl) ? (
-                  <img src={s.images[0].dataUrl} alt="" draggable={false}
-                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                  />
-                ) : (
-                  <span style={{ fontSize: 14, opacity: 0.25, lineHeight: 1 }}>⊞</span>
-                )}
+                <SessionThumb dataUrl={s.images?.[0]?.dataUrl} />
               </div>
               <div style={{
                 fontSize: 8, color: isActive ? t.acc : t.tx2, textAlign: "center",
@@ -110,5 +104,40 @@ export default function SessionFilmstrip({ project, t, onUpdateProject }) {
         >+</button>
       </div>
     </div>
+  );
+}
+
+// ─── Session thumbnail (D7) ──────────────────────────────────────────────────
+// The filmstrip renders one thumb per session. Previously each `<img src>` held
+// the full base64 dataUrl in the DOM attribute — for a multi-session case that's
+// N copies of a multi-MB string living in the DOM. Here the dataUrl is decoded
+// to a Blob once and displayed via a short `blob:` object URL that is revoked on
+// change/unmount, so the DOM only ever holds the small reference. The base64
+// still lives in React state (needed for save/export) but is no longer mirrored
+// into every thumbnail's DOM attribute.
+function SessionThumb({ dataUrl }) {
+  const [objectUrl, setObjectUrl] = useState(null);
+  useEffect(() => {
+    if (!dataUrl) { setObjectUrl(null); return; }  // eslint-disable-line react-hooks/set-state-in-effect
+    let url = null;
+    try {
+      const [meta, b64] = dataUrl.split(",");
+      const mime = (meta && meta.match(/:(.*?);/) && meta.match(/:(.*?);/)[1]) || "image/png";
+      const bin = atob(b64 || "");
+      const arr = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      url = URL.createObjectURL(new Blob([arr], { type: mime }));
+    } catch { url = null; }
+    setObjectUrl(url);
+    // Revoke the object URL when the dataUrl changes or the component unmounts
+    // (Strict-Mode-safe: each effect run owns its own URL and cleans it up).
+    return () => { if (url) URL.revokeObjectURL(url); };
+  }, [dataUrl]);
+  if (!objectUrl) {
+    return <span style={{ fontSize: 14, opacity: 0.25, lineHeight: 1 }}>⊞</span>;
+  }
+  return (
+    <img src={objectUrl} alt="" draggable={false}
+      style={{ width: "100%", height: "100%", objectFit: "cover" }} />
   );
 }

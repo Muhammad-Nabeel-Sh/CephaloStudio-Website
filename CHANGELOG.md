@@ -104,8 +104,8 @@
   — Startup Wizard
   — Recent cases grid with summary stats
   — Project import via `.cephx` drag-and-drop / file picker
-- Project export/import (`.cephx` format v2.0)
-- Template system (`.cepht` format v2.0)
+- Project export/import (`.cephx` format v2.1)
+- Template system (`.cepht` format v1.0 / v2.0)
   — Template library from predefined analyses
   — Import/export `.cepht` files
   — Subset editing (select/deselect points)
