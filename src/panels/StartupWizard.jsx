@@ -75,7 +75,7 @@ function StepImage({ t, initialPreview, onImage, onNext }) {
           <div style={{ color: t.tx3, fontSize: 14 }}>
             <div style={{ fontSize: 40, marginBottom: 8 }}>+</div>
             <div style={{ fontWeight: 600, color: t.tx2, marginBottom: 4 }}>Click or drop image here</div>
-            <div style={{ fontSize: 11 }}>Supports PNG, JPEG, DICOM</div>
+            <div style={{ fontSize: 11 }}>Supports PNG and JPEG</div>
           </div>
         )}
       </div>
