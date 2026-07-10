@@ -1,4 +1,5 @@
 import { computeMeasurements, chi2CDF } from "../utils.js";
+import { logError } from "../logger.js";
 
 // ─── Statistical helpers ──────────────────────────────────────────────────
 function stdNormalCdf(x) {
@@ -290,7 +291,7 @@ function collectMeasurements(sessions, labelIds, calibration) {
               byLabel[m.label].push({ value: first, key: "value", sessionId: s.id });
             }
           }
-        } catch { /* skip */ }
+        } catch (e) { logError("descriptive/collect", e); }
     }
   }
   return byLabel;

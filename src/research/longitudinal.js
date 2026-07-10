@@ -1,5 +1,6 @@
 import { computeMeasurements, mean, stdev, variance, tTestPaired, fCDF, chi2CDF, tDistributeCDF, clamp } from "../utils.js";
 import { checkLongitudinalTimeSeparation } from "./validation.js";
+import { logError } from "../logger.js";
 
 // ─── Matrix helpers ─────────────────────────────────────────────────────────
 function sum(arr) {
@@ -396,7 +397,7 @@ function getMeasurementForLabel(session, label, calibration) {
       const vals = computeMeasurements(m, cal);
       const num = Object.values(vals).find(v => typeof v === "number" && isFinite(v));
       if (num != null) return num;
-    } catch { /* skip */ }
+    } catch (e) { logError("longitudinal/value", e); }
   }
   return null;
 }

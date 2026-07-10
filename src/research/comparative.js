@@ -1,4 +1,5 @@
 import { computeMeasurements, mean, stdev, variance, shapiroWilk, oneWayAnova, tTestPaired, tDistributeCDF, fCDF, chi2CDF } from "../utils.js";
+import { logError } from "../logger.js";
 
 // ─── Statistical helpers ──────────────────────────────────────────────────
 function rankArray(arr) {
@@ -867,7 +868,7 @@ function collectGroupedMeasurements(sessions, groups, labelIds, calibration) {
             if (!byLabel[m.label]) byLabel[m.label] = [];
             byLabel[m.label].push(firstNum);
           }
-        } catch { /* skip */ }
+        } catch (e) { logError("comparative/label", e); }
       }
     }
     byGroup[g.label] = { group: g, sessions: gSessions, byLabel };
@@ -995,7 +996,7 @@ export function runComparativeAll(sessions, config, calibration) {
             try {
               const v = Object.values(computeMeasurements(m, cal)).find(x => typeof x === "number" && isFinite(x));
               if (v != null) { val = v; break; }
-            } catch { /* skip */ }
+        } catch (e) { logError("comparative/collect", e); }
           }
           if (val == null) { valid = false; break; }
           entry[label] = val;

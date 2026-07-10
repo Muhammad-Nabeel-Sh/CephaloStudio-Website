@@ -168,39 +168,7 @@ function hasPlacedCoords(markups){
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// NEW CASE FORM
-// ═══════════════════════════════════════════════════════════════════════════════
-function NewCaseForm({t,onCreate,onCancel}){
-  const[d,setD]=useState({name:"Case 001",patientId:"",patientName:"",dob:"",age:"",gender:"",ethnicity:"",clinician:"",facility:"",referral:"",notes:""});
-  const upd=(k,v)=>setD(prev=>({...prev,[k]:v}));
-  return(
-    <div>
-      <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:18,color:t.tx,marginBottom:20}}>New Case</div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
-        {[["name","Case Name *",""],["patientId","Patient ID",""],["patientName","Patient Name",""],["dob","Date of Birth","date"],["age","Age","number"],["gender","","select-gender"],["ethnicity","Ethnicity",""],["clinician","Clinician",""],["facility","Facility",""],["referral","Referral",""],].map(([k,label,type])=>(
-          <div key={k}>
-            <div style={{fontSize:11,color:t.tx2,marginBottom:3}}>{label||k.charAt(0).toUpperCase()+k.slice(1)}</div>
-            {type==="select-gender"?(
-              <select value={d[k]} onChange={e=>upd(k,e.target.value)} style={{background:t.surf3,border:`1px solid ${t.bdr}`,borderRadius:4,padding:"4px 8px",color:t.tx,fontSize:12,width:"100%",fontFamily:"inherit"}}>
-                <option value="">Select gender…</option>
-                {["Male","Female"].map(g=><option key={g} value={g}>{g}</option>)}
-              </select>
-            ):(
-              <input type={type||"text"} value={d[k]} onChange={e=>upd(k,e.target.value)}
-                style={{background:t.surf3,border:`1px solid ${t.bdr}`,borderRadius:4,padding:"4px 8px",color:t.tx,fontSize:12,width:"100%",fontFamily:"inherit",boxSizing:"border-box"}}/>
-            )}
-          </div>
-        ))}
-      </div>
-      <div style={{marginBottom:16}}>
-        <div style={{fontSize:11,color:t.tx2,marginBottom:3}}>Notes</div>
-        <textarea value={d.notes} onChange={e=>upd("notes",e.target.value)} rows={2}
-          style={{background:t.surf3,border:`1px solid ${t.bdr}`,borderRadius:4,padding:"4px 8px",color:t.tx,fontSize:12,width:"100%",fontFamily:"inherit",resize:"vertical",boxSizing:"border-box"}}/>
-      </div>
-      <div style={{display:"flex",gap:8}}><Btn t={t} onClick={()=>onCreate(d.name||"New Case",d)} disabled={!d.name} style={{flex:1}}>Create Case →</Btn><Btn t={t} onClick={onCancel} style={{flex:1}}>Cancel</Btn></div>
-    </div>
-  );
-}
+
 
 
 
@@ -448,9 +416,11 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const dragMid=useRef(null);const dragPtIdx=useRef(null);
   const multiDragIdsRef=useRef(null);
   const silhouetteAction=useRef(null);const hoveredPtRef=useRef(null);
-  const canvasSize=useRef({w:800,h:600});const lastTouchDist=useRef(null);
+  const canvasSize=useRef({w:800,h:600});const lastTouchDist=useRef(null);const lastTapRef=useRef(0);
   const undoStackRef=useRef([]);
   const redoStackRef=useRef([]);
+  const snapshotRef=useRef();
+  const [undoVersion,setUndoVersion]=useState(0);
 
   const activeSession=project.sessions?.find(s=>s.id===project.activeSessionId)||project.sessions?.[0];
   const markups=useMemo(()=>activeSession?.markups||[],[activeSession?.markups]);
@@ -495,11 +465,13 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const redoRef=useRef();
   const updMarkupRef=useRef();
   const delMarkupRef=useRef();
+  snapshotRef.current=()=>JSON.stringify({markups,norms,placingMode,placingIdx,placingQueue});
   const pushUndoRef=useRef();
   pushUndoRef.current=()=>{
-    undoStackRef.current.push(JSON.stringify({markups,norms,placingMode,placingIdx,placingQueue}));
+    undoStackRef.current.push(snapshotRef.current());
     if(undoStackRef.current.length>50)undoStackRef.current.shift();
     redoStackRef.current=[];
+    setUndoVersion(v=>v+1);
   };
   const pushUndo=useCallback(()=>pushUndoRef.current(),[]);
   undoRef.current=()=>{
@@ -513,13 +485,15 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       updSession({markups:parsed.markups,norms:parsed.norms});
       dispatch({type:"SET",payload:{placingMode:parsed.placingMode,placingIdx:parsed.placingIdx,placingQueue:parsed.placingQueue}});
     }
+    setUndoVersion(v=>v+1);
   };
   const undo=useCallback(()=>undoRef.current(),[]);
   redoRef.current=()=>{
     if(redoStackRef.current.length===0)return;
-    undoStackRef.current.push(JSON.stringify(markups));
+    undoStackRef.current.push(snapshotRef.current());
     const next=redoStackRef.current.pop();
     if(next)updSession({markups:JSON.parse(next)});
+    setUndoVersion(v=>v+1);
   };
   const redo=useCallback(()=>redoRef.current(),[]);
   const refreshAutoMeasRef=useRef();
@@ -814,43 +788,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     }
     if(showScaleBar)drawScaleBar(ctx,zoom,drawCalibration,W,H);
     if(showLUT&&lutMode!=="gray")drawLUTLegend(ctx,lutMode,lutInvert,W,H,t);
-    if(placingMode&&placingQueue.length>0&&placingIdx<placingQueue.length){
-      const m=drawMarkups.find(x=>x.id===placingQueue[placingIdx]);
-      if(m){
-        const cw=W;
-        const cardW=Math.min(520,cw-32), cardH=110;
-        const cardX=(cw-cardW)/2, cardY=H-cardH-20;
-        ctx.save();
-        // Shadow
-        ctx.shadowColor="rgba(0,0,0,0.5)";ctx.shadowBlur=16;ctx.shadowOffsetY=4;
-        ctx.fillStyle=t.surf;ctx.beginPath();ctx.roundRect(cardX,cardY,cardW,cardH,10);ctx.fill();
-        ctx.shadowBlur=0;ctx.shadowOffsetY=0;
-        // Border accent top
-        ctx.fillStyle=t.acc;ctx.beginPath();ctx.roundRect(cardX,cardY,cardW,4,{upperLeft:10,upperRight:10});ctx.fill();
-        // Header row — icon + label + progress
-        ctx.fillStyle=t.tx;ctx.font=`bold 15px "DM Sans",sans-serif`;
-        ctx.fillText(`📍 ${m.label}`,cardX+16,cardY+30);
-        ctx.fillStyle=t.tx3;ctx.font=`11px "DM Sans",sans-serif`;
-        ctx.textAlign="right";ctx.fillText(`${placingIdx+1}/${placingQueue.length}`,cardX+cardW-16,cardY+30);ctx.textAlign="left";
-        // Definition text (wrapped)
-        ctx.fillStyle=t.tx2;ctx.font=`13px "DM Sans",sans-serif`;
-        const defText=m.definition||"No definition available";
-        const maxW=cardW-36;let line="",lineY=cardY+54;
-        for(const word of defText.split(" ")){
-          const test=line?line+" "+word:word;
-          if(ctx.measureText(test).width>maxW&&line){ctx.fillText(line,cardX+16,lineY);line=word;lineY+=18;}
-          else line=test;
-        }
-        if(line)ctx.fillText(line,cardX+16,lineY);
-        // Footer hints
-        const hintY=cardY+cardH-10;
-        ctx.fillStyle=t.tx3;ctx.font=`10px "DM Mono",monospace`;
-        ctx.fillText(`🖱 Click to place`,cardX+16,hintY);
-        const hints=[{t:"Esc skip",x:cardX+140},{t:"⌫ Back",x:cardX+260},{t:"🔄 Pause",x:cardX+340}];
-        hints.forEach(h=>ctx.fillText(h.t,h.x,hintY));
-        ctx.restore();
-      }
-    }
+    // A5: Placing-mode card moved to floating React panel — no longer drawn on canvas
     // F1: draw coordinates on canvas (replaces DOM overlay — no React re-render needed)
     if(mousePos){
       const ip={x:(mousePos.x-pan.x)/zoom,y:(mousePos.y-pan.y)/zoom};
@@ -862,7 +800,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       ctx.fillStyle=t.tx2;ctx.fillText(coordTxt,30,H-14);
     }
     ctx.restore(); // F2: end DPR scale
-  },[markups,selectedId,selectedIds,zoom,sessionImage,calibration,t,currentDraw,snapEnabled,showScaleBar,showDefTooltips,showLUT,showAnnotations,annotationSize,placingMode,placingQueue,placingIdx,showDisplacement,compareSession,getProcessed,angleMode,lutMode,lutInvert,activeTool,displacementOverlay,overlayBlend,refLandmark1,refLandmark2,showCalib,pendingRuler]);
+  },[markups,selectedId,selectedIds,zoom,sessionImage,calibration,t,currentDraw,snapEnabled,showScaleBar,showDefTooltips,showLUT,showAnnotations,annotationSize,showDisplacement,compareSession,getProcessed,angleMode,lutMode,lutInvert,activeTool,displacementOverlay,overlayBlend,refLandmark1,refLandmark2,showCalib,pendingRuler]);
 
   useEffect(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});});
   const scheduleRedraw=useCallback(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});},[redraw]);
@@ -958,7 +896,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       }
       setSelectedId(hit);
       const isMulti=selectedIds.length&&selectedIds.includes(hit);
-      if(isMulti){multiDragIdsRef.current=[...selectedIds];dragStart.current=ip;isDragging.current=true;dragStartState.current=JSON.stringify(markups);return;}
+      if(isMulti){multiDragIdsRef.current=[...selectedIds];dragStart.current=ip;isDragging.current=true;dragStartState.current=snapshotRef.current();return;}
       if(selectedIds.length)dispatch({type:"SET",payload:{selectedIds:[]}});
       const m=markups.find(x=>x.id===hit);
       if(m?.locked){isDragging.current=false;return;}
@@ -972,7 +910,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
                 initialRotation: m.rotation || 0,
                 center: { x: (handles.bbox.minX + handles.bbox.maxX) / 2, y: (handles.bbox.minY + handles.bbox.maxY) / 2 },
               };
-              dragStartState.current=JSON.stringify(markups);
+              dragStartState.current=snapshotRef.current();
               return;
             }
             if (m.paths) {
@@ -997,7 +935,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
               if (bestDist < ptThr && !e.ctrlKey && !e.shiftKey) {
                 isDragging.current = true;
                 dragMid.current = hit;
-                dragStartState.current = JSON.stringify(markups);
+                dragStartState.current = snapshotRef.current();
                 dragPtIdx.current = { pathIdx: bestPathIdx, ptIdx: bestPtIdx };
                 dragStart.current = ip;
                 return;
@@ -1071,12 +1009,12 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
                   center: { x: cx, y: cy },
                   initialDist: dist(ip, { x: cx, y: cy }),
                 };
-                dragStartState.current=JSON.stringify(markups);
+                dragStartState.current=snapshotRef.current();
                 return;
               }
             }
           } catch(e) { logError("Silhouette handle error", e); }
-          isDragging.current=true;dragMid.current=hit;dragStartState.current=JSON.stringify(markups);
+          isDragging.current=true;dragMid.current=hit;dragStartState.current=snapshotRef.current();
           dragPtIdx.current=-1;dragStart.current=ip;
           return;
         }
@@ -1096,7 +1034,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           if(bestIdx>=0&&vp.length>2){const newPoints=m.points.filter((_,i)=>i!==bestIdx);updMarkup(hit,{points:newPoints});}
           return;
         }
-        isDragging.current=true;dragMid.current=hit;dragStartState.current=JSON.stringify(markups);
+        isDragging.current=true;dragMid.current=hit;dragStartState.current=snapshotRef.current();
         let bi=0,bd=Infinity;(m.points||[]).forEach((p,i)=>{const d=dist(p,ip);if(d<bd){bd=d;bi=i;}});
         if(bd>8/zoom)bi=-1;
         dragPtIdx.current=bi;dragStart.current=ip;
@@ -1165,11 +1103,12 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       multiDragIdsRef.current=null;
     }
     if((isDragging.current||silhouetteAction.current)&&dragStartState.current){
-      const currentState=JSON.stringify(markups);
+      const currentState=snapshotRef.current();
       if(dragStartState.current!==currentState){
         undoStackRef.current.push(dragStartState.current);
         if(undoStackRef.current.length>50)undoStackRef.current.shift();
         redoStackRef.current=[];
+        setUndoVersion(v=>v+1);
       }
       dragStartState.current=null;
     }
@@ -1177,9 +1116,9 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   };
   const handleDblClick=()=>{if((activeTool==="polygon"||activeTool==="curve")&&currentDraw?.points.length>=2){finalizeMarkup(currentDraw);dispatch({type:"SET",payload:{currentDraw:null}});}};
   useEffect(()=>{const c=canvasRef.current;if(!c)return;const onWheel=e=>{if(Math.abs(e.deltaY)>0.1||Math.abs(e.deltaX)>0.1){e.preventDefault();e.stopPropagation();const sp=getCanvasPos(e),f=e.deltaY>0?0.9:1.1,nz=clamp(zoom*f,0.05,15);const prev=panRef.current;panRef.current={x:sp.x-(sp.x-prev.x)*(nz/zoom),y:sp.y-(sp.y-prev.y)*(nz/zoom)};dispatch({type:"SET",payload:{pan:panRef.current}});dispatch({type:"SET",payload:{zoom:nz}});}};c.addEventListener("wheel",onWheel,{passive:false});return()=>c.removeEventListener("wheel",onWheel);},[zoom,dispatch,getCanvasPos]);
-  const handleTouchStart=e=>{e.preventDefault();if(e.touches.length===1){const t2=e.touches[0];handleMouseDown({button:0,clientX:t2.clientX,clientY:t2.clientY});}if(e.touches.length===2)lastTouchDist.current=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);};
+  const handleTouchStart=e=>{e.preventDefault();if(e.touches.length===1){const t2=e.touches[0];const now=Date.now();if(now-lastTapRef.current<300){handleDblClick();lastTapRef.current=0;}else{lastTapRef.current=now;handleMouseDown({button:0,clientX:t2.clientX,clientY:t2.clientY});}}if(e.touches.length===2){lastTouchDist.current=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);if((activeTool==="curve"||activeTool==="polygon")&&currentDraw?.points.length>=2){handleMouseDown({button:0,clientX:(e.touches[0].clientX+e.touches[1].clientX)/2,clientY:(e.touches[0].clientY+e.touches[1].clientY)/2,ctrlKey:true});}}};
   const handleTouchMove=e=>{e.preventDefault();if(e.touches.length===1){const t2=e.touches[0];handleMouseMove({clientX:t2.clientX,clientY:t2.clientY});}if(e.touches.length===2&&lastTouchDist.current){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);const f=d/lastTouchDist.current,nz=clamp(zoom*f,0.05,15);const cx=(e.touches[0].clientX+e.touches[1].clientX)/2,cy=(e.touches[0].clientY+e.touches[1].clientY)/2;const r=canvasRef.current.getBoundingClientRect();const sp={x:cx-r.left,y:cy-r.top};const prev=panRef.current;panRef.current={x:sp.x-(sp.x-prev.x)*(nz/zoom),y:sp.y-(sp.y-prev.y)*(nz/zoom)};dispatch({type:"SET",payload:{pan:panRef.current}});dispatch({type:"SET",payload:{zoom:nz}});lastTouchDist.current=d;}};
-  const handleTouchEnd=()=>{handleMouseUp();lastTouchDist.current=null;};
+  const handleTouchEnd=e=>{handleMouseUp();lastTouchDist.current=null;if(e.touches.length===0)lastTapRef.current=0;};
 
   const finalizeCalib=(mm,manualPpm)=>{
     if(manualPpm){updSession({calibration:{done:true,pxPerMm:manualPpm,knownMm:mm}});dispatch({type:"SET",payload:{showCalib:false}});return;}
@@ -1480,11 +1419,12 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
               </div>
               {/* Separator */}
               <div style={{width:"100%",height:1,background:t.bdr,margin:"4px 0"}}/>
-              {/* Row 9: Undo | Redo */}
+              {/* Row 9: Undo | Redo — undoVersion forces re-render on stack changes */}
+              {(()=>{const canUndo=undoVersion>=0&&undoStackRef.current.length>0,canRedo=undoVersion>=0&&redoStackRef.current.length>0;return(
               <div style={{display:"flex",gap:1}}>
-                <button onClick={undo} disabled={undoStackRef.current.length===0} aria-label="Undo (Ctrl+Z)" style={{flex:1,height:32,borderRadius:6,border:"none",background:activeTool==="select"?"transparent":"transparent",color:undoStackRef.current.length>0?t.tx2:t.bdr,cursor:undoStackRef.current.length>0?"pointer":"not-allowed",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Undo (Ctrl+Z)">↶</button>
-                <button onClick={redo} disabled={redoStackRef.current.length===0} aria-label="Redo (Ctrl+Y)" style={{flex:1,height:32,borderRadius:6,border:"none",background:activeTool==="select"?"transparent":"transparent",color:redoStackRef.current.length>0?t.tx2:t.bdr,cursor:redoStackRef.current.length>0?"pointer":"not-allowed",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Redo (Ctrl+Y)">↷</button>
-              </div>
+                <button onClick={undo} disabled={!canUndo} aria-label="Undo (Ctrl+Z)" style={{flex:1,height:32,borderRadius:6,border:"none",background:"transparent",color:canUndo?t.tx2:t.bdr,cursor:canUndo?"pointer":"not-allowed",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Undo (Ctrl+Z)">↶</button>
+                <button onClick={redo} disabled={!canRedo} aria-label="Redo (Ctrl+Y)" style={{flex:1,height:32,borderRadius:6,border:"none",background:"transparent",color:canRedo?t.tx2:t.bdr,cursor:canRedo?"pointer":"not-allowed",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Redo (Ctrl+Y)">↷</button>
+              </div>);})()}
               {/* Row 10: Zoom in | Zoom out */}
               <div style={{display:"flex",gap:1}}>
                 <button onClick={()=>dispatch({type:"SET",payload:{zoom:z=>clamp(z*1.3,0.05,15)}})} aria-label="Zoom In" style={{flex:1,height:32,borderRadius:6,border:"none",background:"transparent",color:t.tx2,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Zoom In">＋</button>
@@ -1513,6 +1453,26 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           {loadingImages&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:t.bg+"cc",zIndex:10}}>
             <div style={{textAlign:"center"}}><div style={{width:28,height:28,border:`3px solid ${t.bdr}`,borderTopColor:t.acc,borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto 10px"}}/><div style={{fontSize:13,color:t.tx2}}>Loading images…</div></div>
           </div>}
+          {/* A5: Placing-mode card — floating React panel (was canvas-drawn) */}
+          {placingMode&&placingQueue.length>0&&placingIdx<placingQueue.length&&(markups.find(x=>x.id===placingQueue[placingIdx]))&&(()=>{
+            const m=markups.find(x=>x.id===placingQueue[placingIdx]);
+            const defText=m.definition||"No definition available";
+            return(
+              <div role="status" aria-label={`Place ${m.label}: ${defText}`} style={{position:"absolute",bottom:20,left:"50%",transform:"translateX(-50%)",width:"min(520px,calc(100% - 32px))",background:t.surf,borderRadius:10,boxShadow:`0 4px 16px rgba(0,0,0,0.5)`,overflow:"hidden",zIndex:8}}>
+                <div style={{height:4,background:t.acc,borderRadius:"10px 10px 0 0"}}/>
+                <div style={{padding:"12px 16px 10px"}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                    <span style={{fontWeight:"bold",fontSize:15,color:t.tx,fontFamily:"'DM Sans',sans-serif"}}>{m.label}</span>
+                    <span style={{fontSize:11,color:t.tx3,fontFamily:"'DM Sans',sans-serif"}}>{placingIdx+1}/{placingQueue.length}</span>
+                  </div>
+                  <div style={{fontSize:13,color:t.tx2,fontFamily:"'DM Sans',sans-serif",marginBottom:8,lineHeight:1.4}}>{defText}</div>
+                  <div style={{display:"flex",gap:16,fontSize:10,color:t.tx3,fontFamily:"'DM Mono',monospace"}}>
+                    <span>Click to place</span><span>Esc skip</span><span>Backspace back</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
           {!isMobile&&<div style={{position:"absolute",bottom:isMobile?60:8,left:30,display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
             {/* F1: coordinates now drawn on canvas in redraw() — no DOM element needed */}
             {currentDraw&&<div style={{background:t.acc+"22",border:`1px solid ${t.acc}`,borderRadius:6,padding:"3px 10px",fontSize:11,color:t.acc,fontFamily:"'DM Mono',monospace"}}>
@@ -1735,7 +1695,7 @@ async function loadProjects() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     let parsed;
-    try { parsed = JSON.parse(raw); } catch { return []; }
+    try { parsed = JSON.parse(raw); } catch (e) { logError("loadProjects/parse", e); return []; }
     let projects = null;
     if (Array.isArray(parsed)) projects = parsed; // legacy plaintext projects array
     else if (parsed && typeof parsed === "object") {

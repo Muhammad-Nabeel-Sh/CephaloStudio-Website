@@ -1,4 +1,5 @@
 import { computeMeasurements } from "../utils.js";
+import { logError } from "../logger.js";
 
 const _collectCache = new WeakMap();
 
@@ -35,7 +36,7 @@ export function collectMeasurements(sessions, labelIds, calibration, angleMode) 
             type: m.type,
           });
         }
-      } catch { /* skip problematic markup */ }
+      } catch (e) { logError("collect/markup", e); }
     }
   }
   _collectCache.set(sessions, { key: cacheKey, result: rows });

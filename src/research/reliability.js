@@ -1,5 +1,6 @@
 import { computeMeasurements, tDistributeCDF } from "../utils.js";
 import { checkReliabilityTimeSeparation } from "./validation.js";
+import { logError } from "../logger.js";
 
 // ─── Statistical helpers ──────────────────────────────────────────────────
 function fCritical(p, df1, df2) {
@@ -338,7 +339,7 @@ export function runReliabilityAll(sessions, config, calibration) {
             unit: key.includes("angle") || key.includes("deg") ? "°" : "mm",
           });
         }
-      } catch { /* skip problematic markup */ }
+      } catch (e) { logError("reliability/markup", e); }
     }
   }
 
