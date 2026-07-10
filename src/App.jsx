@@ -1135,7 +1135,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     if(e.touches.length===1){const t2=e.touches[0];handleMouseMove({clientX:t2.clientX,clientY:t2.clientY});}
     if(e.touches.length===2&&lastTouchDist.current){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);const f=d/lastTouchDist.current,nz=clamp(zoom*f,0.05,15);const cx=(e.touches[0].clientX+e.touches[1].clientX)/2,cy=(e.touches[0].clientY+e.touches[1].clientY)/2;const r=canvasRef.current.getBoundingClientRect();const sp={x:cx-r.left,y:cy-r.top};const prev=panRef.current;panRef.current={x:sp.x-(sp.x-prev.x)*(nz/zoom),y:sp.y-(sp.y-prev.y)*(nz/zoom)};dispatch({type:"SET",payload:{pan:panRef.current}});dispatch({type:"SET",payload:{zoom:nz}});lastTouchDist.current=d;}
   };
-  touchEndRef.current=e=>{handleMouseUp();lastTouchDist.current=null;if(e.touches.length===0)lastTapRef.current=0;};
+  touchEndRef.current=()=>{handleMouseUp();lastTouchDist.current=null;};
   useEffect(()=>{const c=canvasRef.current;if(!c)return;const opts={passive:false};const onStart=e=>{e.preventDefault();touchStartRef.current(e);};const onMove=e=>{e.preventDefault();touchMoveRef.current(e);};const onEnd=e=>{touchEndRef.current(e);};c.addEventListener("touchstart",onStart,opts);c.addEventListener("touchmove",onMove,opts);c.addEventListener("touchend",onEnd,opts);return()=>{c.removeEventListener("touchstart",onStart);c.removeEventListener("touchmove",onMove);c.removeEventListener("touchend",onEnd);};},[]);
 
   const finalizeCalib=(mm,manualPpm)=>{
@@ -1367,10 +1367,10 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
             <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}>
             <path d="M480-120q-151 0-255.5-46.5T120-280v-400q0-66 105.5-113T480-840q149 0 254.5 47T840-680v400q0 67-104.5 113.5T480-120Zm0-479q89 0 179-25.5T760-679q-11-29-100.5-55T480-760q-91 0-178.5 25.5T200-679q14 30 101.5 55T480-599Zm0 199q42 0 81-4t74.5-11.5q35.5-7.5 67-18.5t57.5-25v-120q-26 14-57.5 25t-67 18.5Q600-528 561-524t-81 4q-42 0-82-4t-75.5-11.5Q287-543 256-554t-56-25v120q25 14 56 25t66.5 18.5Q358-408 398-404t82 4Zm0 200q46 0 93.5-7t87.5-18.5q40-11.5 67-26t32-29.5v-98q-26 14-57.5 25t-67 18.5Q600-328 561-324t-81 4q-42 0-82-4t-75.5-11.5Q287-343 256-354t-56-25v99q5 15 31.5 29t66.5 25.5q40 11.5 88 18.5t94 7Z"/></svg>
           </Btn>}
-        {!isMobile&&<Btn ghost t={t} small title="Export" onClick={()=>dispatch({type:"SET",payload:{showExport:true}})}>
+        {<Btn ghost t={t} small title="Export" onClick={()=>dispatch({type:"SET",payload:{showExport:true}})}>
           <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M160-80v-80h640v80H160Zm320-160L200-600h160v-280h240v280h160L480-240Zm0-130 116-150h-76v-280h-80v280h-76l116 150Zm0-150Z"/></svg>
           </Btn>}
-        {!isMobile&&<Btn ghost t={t} small title="Normogram" onClick={()=>dispatch({type:"SET",payload:{showNormogram:true}})}>
+        {<Btn ghost t={t} small title="Normogram" onClick={()=>dispatch({type:"SET",payload:{showNormogram:true}})}>
           <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M200-120q-33 0-56.5-23.5T120-200v-640h80v640h640v80H200Zm40-120v-360h160v360H240Zm200 0v-560h160v560H440Zm200 0v-200h160v200H640Z"/></svg>
           </Btn>}
         {!isMobile&&<Btn ghost t={t} small title="Anonymize" onClick={()=>dispatch({type:"SET",payload:{showAnon:true}})}>
@@ -1467,16 +1467,14 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           const canUndo=undoVersion>=0&&undoStackRef.current.length>0;
           const canRedo=undoVersion>=0&&redoStackRef.current.length>0;
           const primaryTools=[
-            {id:"select",icon:"⊹",label:"Select"},{id:"point",icon:"◉",label:"Landmark"},
-            {id:"line",icon:"⟋",label:"Line"},{id:"ruler",icon:"⟺",label:"Ruler"},
+            {id:"select",icon:"⊹",label:"Select"},{id:"pan",icon:"⊕",label:"Pan"},{id:"point",icon:"◉",label:"Landmark"},
+            {id:"line",icon:"⟋",label:"Line"},{id:"angle3",icon:"∠",label:"Angle 3"},{id:"ruler",icon:"⟺",label:"Ruler"},{id:"arrow",icon:"→",label:"Arrow"}
           ];
           const secondaryTools=[
-            [{id:"pan",icon:"⊕",label:"Pan"},{id:"midpoint",icon:"◈",label:"Midpoint"}],
+            [{id:"midpoint",icon:"◈",label:"Midpoint"},{id:"angle4",icon:"∡",label:"Angle 4"}],
             [{id:"parallel",icon:"⫿",label:"Parallel"},{id:"perppoint",icon:"⊦",label:"Perp Pt"}],
-            [{id:"perp",icon:"⊥",label:"Perp Dist"},{id:"angle3",icon:"∠",label:"Angle 3"}],
-            [{id:"angle4",icon:"∡",label:"Angle 4"},{id:"polygon",icon:"⬡",label:"Polygon"}],
-            [{id:"curve",icon:"∿",label:"Curve"},{id:"arrow",icon:"→",label:"Arrow"}],
-            [{id:"text",icon:"T",label:"Text"}],
+            [{id:"perp",icon:"⊥",label:"Perp Dist"},{id:"text",icon:"T",label:"Text"}],
+            [{id:"curve",icon:"∿",label:"Curve"},{id:"polygon",icon:"⬡",label:"Polygon"}],
           ];
           return(<>
             {/* Collapsed bar — horizontal scroll row */}
@@ -1493,6 +1491,10 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
               <button onClick={()=>{dispatch({type:"SET",payload:{zoom:1}});panRef.current={x:40,y:40};dispatch({type:"SET",payload:{pan:{x:40,y:40}}});}} aria-label="Fit" style={{width:42,height:42,borderRadius:8,border:"none",background:"transparent",color:t.tx2,cursor:"pointer",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>⊙</button>
               <div style={{width:1,height:28,background:t.bdr,flexShrink:0}}/>
               <button onClick={()=>dispatch({type:"SET",payload:{mobileToolsExpanded:v=>!v}})} aria-label="More tools" style={{width:42,height:42,borderRadius:8,border:"none",background:mobileToolsExpanded?t.acc:t.surf2,color:mobileToolsExpanded?(theme==="light"?"#fff":t.bg):t.tx,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:mobileToolsExpanded?`0 0 0 2px ${t.acc}`:"none"}} title="More tools">⋯</button>
+              {currentDraw&&["polygon","curve"].includes(activeTool)&&(<>
+                <div style={{width:1,height:28,background:t.bdr,flexShrink:0}}/>
+                <button onClick={handleDblClick} aria-label="Finish shape" style={{width:42,height:42,borderRadius:8,border:"none",background:t.ok,color:"#fff",cursor:"pointer",fontSize:16,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Finish">✓</button>
+              </>)}
             </div>
             {/* Expanded bottom sheet — full tool grid */}
             {mobileToolsExpanded&&(<>
@@ -1543,7 +1545,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           {!isMobile&&<div style={{position:"absolute",bottom:isMobile?60:8,left:30,display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
             {/* F1: coordinates now drawn on canvas in redraw() — no DOM element needed */}
             {currentDraw&&<div style={{background:t.acc+"22",border:`1px solid ${t.acc}`,borderRadius:6,padding:"3px 10px",fontSize:11,color:t.acc,fontFamily:"'DM Mono',monospace"}}>
-              {["polygon","curve"].includes(activeTool)?`${currentDraw.points.length} pts · dbl-click done`:(()=>{const n={line:2,angle3:3,angle4:4,perp:3,ruler:2}[activeTool];return`${currentDraw.points.length}/${n}`;})()}
+              {["polygon","curve"].includes(activeTool)?`${currentDraw.points.length} pts · ${isMobile?"double-tap to finish":"dbl-click to finish"}`:(()=>{const n={line:2,angle3:3,angle4:4,perp:3,ruler:2}[activeTool];return`${currentDraw.points.length}/${n}`;})()}
             </div>}
           </div>}
           {/* Floating session filmstrip at bottom — collapsible to the left (desktop only) */}
