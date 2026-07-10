@@ -476,6 +476,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const pushUndo=useCallback(()=>pushUndoRef.current(),[]);
   undoRef.current=()=>{
     if(undoStackRef.current.length===0)return;
+    redoStackRef.current.push(snapshotRef.current());
+    if(redoStackRef.current.length>50)redoStackRef.current.shift();
     const prev=undoStackRef.current.pop();
     if(!prev)return;
     const parsed=JSON.parse(prev);
@@ -491,8 +493,16 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   redoRef.current=()=>{
     if(redoStackRef.current.length===0)return;
     undoStackRef.current.push(snapshotRef.current());
+    if(undoStackRef.current.length>50)undoStackRef.current.shift();
     const next=redoStackRef.current.pop();
-    if(next)updSession({markups:JSON.parse(next)});
+    if(!next)return;
+    const parsed=JSON.parse(next);
+    if(Array.isArray(parsed)){
+      updSession({markups:parsed});
+    }else{
+      updSession({markups:parsed.markups,norms:parsed.norms});
+      dispatch({type:"SET",payload:{placingMode:parsed.placingMode,placingIdx:parsed.placingIdx,placingQueue:parsed.placingQueue}});
+    }
     setUndoVersion(v=>v+1);
   };
   const redo=useCallback(()=>redoRef.current(),[]);
@@ -1116,9 +1126,17 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   };
   const handleDblClick=()=>{if((activeTool==="polygon"||activeTool==="curve")&&currentDraw?.points.length>=2){finalizeMarkup(currentDraw);dispatch({type:"SET",payload:{currentDraw:null}});}};
   useEffect(()=>{const c=canvasRef.current;if(!c)return;const onWheel=e=>{if(Math.abs(e.deltaY)>0.1||Math.abs(e.deltaX)>0.1){e.preventDefault();e.stopPropagation();const sp=getCanvasPos(e),f=e.deltaY>0?0.9:1.1,nz=clamp(zoom*f,0.05,15);const prev=panRef.current;panRef.current={x:sp.x-(sp.x-prev.x)*(nz/zoom),y:sp.y-(sp.y-prev.y)*(nz/zoom)};dispatch({type:"SET",payload:{pan:panRef.current}});dispatch({type:"SET",payload:{zoom:nz}});}};c.addEventListener("wheel",onWheel,{passive:false});return()=>c.removeEventListener("wheel",onWheel);},[zoom,dispatch,getCanvasPos]);
-  const handleTouchStart=e=>{e.preventDefault();if(e.touches.length===1){const t2=e.touches[0];const now=Date.now();if(now-lastTapRef.current<300){handleDblClick();lastTapRef.current=0;}else{lastTapRef.current=now;handleMouseDown({button:0,clientX:t2.clientX,clientY:t2.clientY});}}if(e.touches.length===2){lastTouchDist.current=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);if((activeTool==="curve"||activeTool==="polygon")&&currentDraw?.points.length>=2){handleMouseDown({button:0,clientX:(e.touches[0].clientX+e.touches[1].clientX)/2,clientY:(e.touches[0].clientY+e.touches[1].clientY)/2,ctrlKey:true});}}};
-  const handleTouchMove=e=>{e.preventDefault();if(e.touches.length===1){const t2=e.touches[0];handleMouseMove({clientX:t2.clientX,clientY:t2.clientY});}if(e.touches.length===2&&lastTouchDist.current){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);const f=d/lastTouchDist.current,nz=clamp(zoom*f,0.05,15);const cx=(e.touches[0].clientX+e.touches[1].clientX)/2,cy=(e.touches[0].clientY+e.touches[1].clientY)/2;const r=canvasRef.current.getBoundingClientRect();const sp={x:cx-r.left,y:cy-r.top};const prev=panRef.current;panRef.current={x:sp.x-(sp.x-prev.x)*(nz/zoom),y:sp.y-(sp.y-prev.y)*(nz/zoom)};dispatch({type:"SET",payload:{pan:panRef.current}});dispatch({type:"SET",payload:{zoom:nz}});lastTouchDist.current=d;}};
-  const handleTouchEnd=e=>{handleMouseUp();lastTouchDist.current=null;if(e.touches.length===0)lastTapRef.current=0;};
+  const touchStartRef=useRef();const touchMoveRef=useRef();const touchEndRef=useRef();
+  touchStartRef.current=e=>{
+    if(e.touches.length===1){const t2=e.touches[0];const now=Date.now();if(now-lastTapRef.current<300){handleDblClick();lastTapRef.current=0;}else{lastTapRef.current=now;handleMouseDown({button:0,clientX:t2.clientX,clientY:t2.clientY});}}
+    if(e.touches.length===2){lastTouchDist.current=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);if((activeTool==="curve"||activeTool==="polygon")&&currentDraw?.points.length>=2){handleMouseDown({button:0,clientX:(e.touches[0].clientX+e.touches[1].clientX)/2,clientY:(e.touches[0].clientY+e.touches[1].clientY)/2,ctrlKey:true});}}
+  };
+  touchMoveRef.current=e=>{
+    if(e.touches.length===1){const t2=e.touches[0];handleMouseMove({clientX:t2.clientX,clientY:t2.clientY});}
+    if(e.touches.length===2&&lastTouchDist.current){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);const f=d/lastTouchDist.current,nz=clamp(zoom*f,0.05,15);const cx=(e.touches[0].clientX+e.touches[1].clientX)/2,cy=(e.touches[0].clientY+e.touches[1].clientY)/2;const r=canvasRef.current.getBoundingClientRect();const sp={x:cx-r.left,y:cy-r.top};const prev=panRef.current;panRef.current={x:sp.x-(sp.x-prev.x)*(nz/zoom),y:sp.y-(sp.y-prev.y)*(nz/zoom)};dispatch({type:"SET",payload:{pan:panRef.current}});dispatch({type:"SET",payload:{zoom:nz}});lastTouchDist.current=d;}
+  };
+  touchEndRef.current=e=>{handleMouseUp();lastTouchDist.current=null;if(e.touches.length===0)lastTapRef.current=0;};
+  useEffect(()=>{const c=canvasRef.current;if(!c)return;const opts={passive:false};const onStart=e=>{e.preventDefault();touchStartRef.current(e);};const onMove=e=>{e.preventDefault();touchMoveRef.current(e);};const onEnd=e=>{touchEndRef.current(e);};c.addEventListener("touchstart",onStart,opts);c.addEventListener("touchmove",onMove,opts);c.addEventListener("touchend",onEnd,opts);return()=>{c.removeEventListener("touchstart",onStart);c.removeEventListener("touchmove",onMove);c.removeEventListener("touchend",onEnd);};},[]);
 
   const finalizeCalib=(mm,manualPpm)=>{
     if(manualPpm){updSession({calibration:{done:true,pxPerMm:manualPpm,knownMm:mm}});dispatch({type:"SET",payload:{showCalib:false}});return;}
@@ -1448,8 +1466,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         <div ref={containerRef} style={{flex:1,position:"relative",overflow:"hidden",background:t.bg}} onDrop={handleDrop} onDragOver={e=>e.preventDefault()}>
           <canvas ref={canvasRef} style={{display:"block",cursor:cursorStyle,touchAction:"none",background:"transparent"}}
             onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
-            onDoubleClick={handleDblClick}
-            onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}/>
+            onDoubleClick={handleDblClick}/>
           {loadingImages&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:t.bg+"cc",zIndex:10}}>
             <div style={{textAlign:"center"}}><div style={{width:28,height:28,border:`3px solid ${t.bdr}`,borderTopColor:t.acc,borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto 10px"}}/><div style={{fontSize:13,color:t.tx2}}>Loading images…</div></div>
           </div>}

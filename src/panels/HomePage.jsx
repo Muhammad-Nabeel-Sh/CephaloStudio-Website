@@ -56,7 +56,7 @@ export default function HomePage({t,theme,setTheme,projects,onOpen,onCreate,onIm
       <div style={{position:"fixed",inset:0,opacity:0.04,backgroundImage:`linear-gradient(${t.tx} 1px,transparent 1px),linear-gradient(90deg,${t.tx} 1px,transparent 1px)`,backgroundSize:"40px 40px",pointerEvents:"none"}}/>
       {/* HEADER */}
       <header style={{padding:"18px 28px",display:"flex",alignItems:"center",justifyContent:"space-between",position:"absolute",top:0,left:0,right:0,zIndex:10}} className="home-header">
-        <style>{`@media (max-width: 767px) {.home-header {position:relative !important;padding:12px 16px !important; display:block !important;}}`}</style>
+        <style>{`@media (max-width: 780px) {.home-header {position:relative !important;padding:20px 16px !important; display:flex; flex-direction:column; gap:30px; !important;}}`}</style>
         <div style={{display:"flex",alignItems:"center",gap:12}}>
           <div style={{width:50,height:50,borderRadius:8,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}><img src="/favicon.svg" alt="Website Icon" width="48" height="48"/> </div>
           <div><div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:20,letterSpacing:-0.5,color:t.tx,display:"flex",alignItems:"center",gap:8}}>Cephalometry Studio<span style={{fontSize:9,fontWeight:700,color:t.acc,background:t.accMuted,borderRadius:6,padding:"1px 6px",letterSpacing:0.8}}>BETA</span></div><div style={{fontSize:10,color:t.tx2,letterSpacing:1,textTransform:"uppercase",fontWeight:600}}>Advanced Cephalometric Analysis</div></div>
