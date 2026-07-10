@@ -336,7 +336,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     showExport,showAnon,showNormogram,
     pendingTextPos,showFormulaEditor,editFormulaId,
     placingMode,placingQueue,placingIdx,loadingImages,
-    isMobile,showMobilePanel,
+    isMobile,showMobilePanel,mobileToolsExpanded,
     toolbarPos,toolbarDragging,rightPanelWidth,rightPanelResizing,
     spotlightMode,
     displacementOverlay,refLandmark1,refLandmark2,overlayBlend}=ui;
@@ -854,7 +854,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA")return;
       if((e.ctrlKey||e.metaKey)&&e.key==="z"){undo();return;}
       if((e.ctrlKey||e.metaKey)&&e.key==="y"){redo();return;}
-      if(e.key==="Escape"){boxSelectRectRef.current=null;dispatch({type:"SET",payload:{currentDraw:null,selectedId:null,selectedIds:[]}});if(placingMode){if(placingIdx<placingQueue.length-1)dispatch({type:"SET",payload:{placingIdx:placingIdx+1}});else{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}}return;}
+      if(e.key==="Escape"){boxSelectRectRef.current=null;dispatch({type:"SET",payload:{currentDraw:null,selectedId:null,selectedIds:[]}});if(mobileToolsExpanded)dispatch({type:"SET",payload:{mobileToolsExpanded:false}});else if(placingMode){if(placingIdx<placingQueue.length-1)dispatch({type:"SET",payload:{placingIdx:placingIdx+1}});else{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}}return;}
       const tool=TOOLS.filter(Boolean).find(t2=>t2.key===e.key.toLowerCase());
       if(tool){dispatch({type:"SET",payload:{activeTool:tool.id}});dispatch({type:"SET",payload:{currentDraw:null}});return;}
       if(e.key==="Backspace"&&placingMode&&placingQueue.length>0){if(placingIdx>0)dispatch({type:"SET",payload:{placingIdx:placingIdx-1}});else{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}return;}
@@ -870,7 +870,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       if(e.key==="0"){dispatch({type:"SET",payload:{zoom:1}});panRef.current={x:40,y:40};dispatch({type:"SET",payload:{pan:{x:40,y:40}}});}
     };
     window.addEventListener("keydown",fn);return()=>window.removeEventListener("keydown",fn);
-  },[selectedId,selectedIds,placingMode,placingIdx,placingQueue,markups,delMarkup,redo,undo,dispatch,pushUndo,refreshAutoMeas,updSession]);
+  },[selectedId,selectedIds,placingMode,placingIdx,placingQueue,markups,delMarkup,redo,undo,dispatch,pushUndo,refreshAutoMeas,updSession,mobileToolsExpanded]);
 
   const autoCreateMeasurementsRef=useRef();
   const autoCreateMeasurements=useCallback((markups,templateName)=>autoCreateMeasurementsRef.current(markups,templateName),[]);
@@ -1324,7 +1324,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         <div style={{width:1,height:20,background:t.bdr,flexShrink:0}}/>
         <Tag color={t.acc}>{project.projection?.toUpperCase()}</Tag>
         {project.meta?.anonymized&&<Tag color={t.ok}>🔒 Anon</Tag>}
-        {calibration.done&&<Tag color={t.ok}>⟺ {calibration.pxPerMm.toFixed(2)}px/mm</Tag>}
+        {calibration.done&&<Tag color={t.ok}>⟺{"\u00A0"}{calibration.pxPerMm.toFixed(2)}px/mm</Tag>}
         {placingMode&&<Tag color={t.warn}>📍 {placingIdx+1}/{placingQueue.length}</Tag>}
         <div style={{flex:1}}/>
         {!isMobile&&<>
@@ -1387,10 +1387,9 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
 
       {/* BODY */}
       <div style={{flex:1,display:"flex",overflow:"hidden",position:"relative"}}>
-        {/* TOOL SIDEBAR */}
-        {(!isMobile||!showMobilePanel)&&(
-          <div style={isMobile?{position:"fixed",bottom:0,left:0,right:0,height:52,display:"flex",flexDirection:"row",alignItems:"center",justifyContent:"center",borderTop:`1px solid ${t.bdr}`,zIndex:20,background:t.surf,padding:"0 4px",gap:2}:{width:88,background:t.surf,display:"flex",flexDirection:"column",alignItems:"center",padding:"8px 4px",gap:1,flexShrink:0,overflowY:"auto",scrollbarWidth:"thin"}}>
-            {/* Two-column tool layout */}
+        {/* TOOL SIDEBAR — desktop */}
+        {!isMobile&&(
+          <div style={{width:88,background:t.surf,display:"flex",flexDirection:"column",alignItems:"center",padding:"8px 4px",gap:1,flexShrink:0,overflowY:"auto",scrollbarWidth:"thin"}}>
             <div style={{display:"flex",flexDirection:"column",gap:1,width:"100%"}}>
               {/* Row 1: Select | Pan */}
               <div style={{display:"flex",gap:1}}>
@@ -1462,8 +1461,59 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           </div>
         )}
 
+        {/* TOOL SIDEBAR — mobile: collapsed horizontal bar + expandable sheet */}
+        {isMobile&&!showMobilePanel&&(()=>{
+          const selTool=(id)=>{dispatch({type:"SET",payload:{activeTool:id}});dispatch({type:"SET",payload:{currentDraw:null}});dispatch({type:"SET",payload:{mobileToolsExpanded:false}});};
+          const canUndo=undoVersion>=0&&undoStackRef.current.length>0;
+          const canRedo=undoVersion>=0&&redoStackRef.current.length>0;
+          const primaryTools=[
+            {id:"select",icon:"⊹",label:"Select"},{id:"point",icon:"◉",label:"Landmark"},
+            {id:"line",icon:"⟋",label:"Line"},{id:"ruler",icon:"⟺",label:"Ruler"},
+          ];
+          const secondaryTools=[
+            [{id:"pan",icon:"⊕",label:"Pan"},{id:"midpoint",icon:"◈",label:"Midpoint"}],
+            [{id:"parallel",icon:"⫿",label:"Parallel"},{id:"perppoint",icon:"⊦",label:"Perp Pt"}],
+            [{id:"perp",icon:"⊥",label:"Perp Dist"},{id:"angle3",icon:"∠",label:"Angle 3"}],
+            [{id:"angle4",icon:"∡",label:"Angle 4"},{id:"polygon",icon:"⬡",label:"Polygon"}],
+            [{id:"curve",icon:"∿",label:"Curve"},{id:"arrow",icon:"→",label:"Arrow"}],
+            [{id:"text",icon:"T",label:"Text"}],
+          ];
+          return(<>
+            {/* Collapsed bar — horizontal scroll row */}
+            <div style={{position:"fixed",bottom:0,left:0,right:0,height:52,display:"flex",alignItems:"center",borderTop:`1px solid ${t.bdr}`,zIndex:20,background:t.surf,padding:"0 4px",gap:2,overflowX:"auto",overflowY:"hidden",scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
+              {primaryTools.map(tool=>(
+                <ToolBtn key={tool.id} tool={tool} active={activeTool===tool.id} onClick={()=>selTool(tool.id)} theme={theme} t={t} style={{flexShrink:0}}/>
+              ))}
+              <div style={{width:1,height:28,background:t.bdr,flexShrink:0}}/>
+              <button onClick={undo} disabled={!canUndo} aria-label="Undo" style={{width:42,height:42,borderRadius:8,border:"none",background:"transparent",color:canUndo?t.tx2:t.bdr,cursor:canUndo?"pointer":"not-allowed",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Undo">↶</button>
+              <button onClick={redo} disabled={!canRedo} aria-label="Redo" style={{width:42,height:42,borderRadius:8,border:"none",background:"transparent",color:canRedo?t.tx2:t.bdr,cursor:canRedo?"pointer":"not-allowed",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Redo">↷</button>
+              <div style={{width:1,height:28,background:t.bdr,flexShrink:0}}/>
+              <button onClick={()=>dispatch({type:"SET",payload:{zoom:z=>clamp(z*1.3,0.05,15)}})} aria-label="Zoom In" style={{width:42,height:42,borderRadius:8,border:"none",background:"transparent",color:t.tx2,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>＋</button>
+              <button onClick={()=>dispatch({type:"SET",payload:{zoom:z=>clamp(z/1.3,0.05,15)}})} aria-label="Zoom Out" style={{width:42,height:42,borderRadius:8,border:"none",background:"transparent",color:t.tx2,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>－</button>
+              <button onClick={()=>{dispatch({type:"SET",payload:{zoom:1}});panRef.current={x:40,y:40};dispatch({type:"SET",payload:{pan:{x:40,y:40}}});}} aria-label="Fit" style={{width:42,height:42,borderRadius:8,border:"none",background:"transparent",color:t.tx2,cursor:"pointer",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>⊙</button>
+              <div style={{width:1,height:28,background:t.bdr,flexShrink:0}}/>
+              <button onClick={()=>dispatch({type:"SET",payload:{mobileToolsExpanded:v=>!v}})} aria-label="More tools" style={{width:42,height:42,borderRadius:8,border:"none",background:mobileToolsExpanded?t.acc:t.surf2,color:mobileToolsExpanded?(theme==="light"?"#fff":t.bg):t.tx,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:mobileToolsExpanded?`0 0 0 2px ${t.acc}`:"none"}} title="More tools">⋯</button>
+            </div>
+            {/* Expanded bottom sheet — full tool grid */}
+            {mobileToolsExpanded&&(<>
+              <div onClick={()=>dispatch({type:"SET",payload:{mobileToolsExpanded:false}})} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.3)",zIndex:19}}/>
+              <div style={{position:"fixed",bottom:52,left:0,right:0,maxHeight:"55vh",background:t.surf,borderTop:`1px solid ${t.bdr}`,borderRadius:"12px 12px 0 0",zIndex:20,overflowY:"auto",padding:"12px 8px 16px",boxShadow:`0 -4px 20px ${t.shadow}`}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,padding:"0 8px"}}>
+                  <span style={{fontSize:13,fontWeight:600,color:t.tx2,fontFamily:"'DM Sans',sans-serif"}}>All Tools</span>
+                  <span style={{fontSize:9,color:t.tx3,fontFamily:"'DM Mono',monospace"}}>{(zoom*100).toFixed(0)}%{calibration.done?` · ⟺${calibration.pxPerMm.toFixed(1)}`:""}</span>
+                </div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}}>
+                  {secondaryTools.map((row)=>row.map(tool=>(
+                    <ToolBtn key={tool.id} tool={tool} active={activeTool===tool.id} onClick={()=>selTool(tool.id)} theme={theme} t={t} style={{flex:1,height:46}}/>
+                  )))}
+                </div>
+              </div>
+            </>)}
+          </>);
+        })()}
+
         {/* CANVAS */}
-        <div ref={containerRef} style={{flex:1,position:"relative",overflow:"hidden",background:t.bg}} onDrop={handleDrop} onDragOver={e=>e.preventDefault()}>
+        <div ref={containerRef} style={{flex:1,position:"relative",overflow:"hidden",background:t.bg,paddingBottom:isMobile&&!showMobilePanel?52:0}} onDrop={handleDrop} onDragOver={e=>e.preventDefault()}>
           <canvas ref={canvasRef} style={{display:"block",cursor:cursorStyle,touchAction:"none",background:"transparent"}}
             onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
             onDoubleClick={handleDblClick}/>
@@ -1496,8 +1546,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
               {["polygon","curve"].includes(activeTool)?`${currentDraw.points.length} pts · dbl-click done`:(()=>{const n={line:2,angle3:3,angle4:4,perp:3,ruler:2}[activeTool];return`${currentDraw.points.length}/${n}`;})()}
             </div>}
           </div>}
-          {/* Floating session filmstrip at bottom — collapsible to the left */}
-          {filmstripOpen ? (
+          {/* Floating session filmstrip at bottom — collapsible to the left (desktop only) */}
+          {!isMobile&&(filmstripOpen ? (
             <div style={{position:"absolute",bottom:8,left:"50%",transform:"translateX(-50%)",zIndex:5,borderRadius:8,background:t.surf+"ee",border:`1px solid ${t.bdr}`,boxShadow:`0 2px 12px ${t.shadow}44`,backdropFilter:"blur(6px)",display:"flex",alignItems:"stretch",overflow:"hidden"}}>
               <SessionFilmstrip project={project} t={t} onUpdateProject={onUpdateProject}/>
               <button onClick={()=>setFilmstripOpen(false)} title="Collapse filmstrip"
@@ -1508,7 +1558,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
             <button onClick={()=>setFilmstripOpen(true)} title="Show filmstrip"
               style={{position:"absolute",left:8,bottom:8,zIndex:5,background:t.surf+"ee",border:`1px solid ${t.bdr}`,borderRadius:6,boxShadow:`0 2px 12px ${t.shadow}44`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:"8px 4px",color:t.tx3,fontSize:10,backdropFilter:"blur(6px)",transition:"color 0.15s"}}
               onMouseEnter={e=>e.currentTarget.style.color=t.tx} onMouseLeave={e=>e.currentTarget.style.color=t.tx3}>▶</button>
-          )}
+          ))}
         </div>
 
         {/* RIGHT PANEL — VSCode-style vertical tabs on left */}
