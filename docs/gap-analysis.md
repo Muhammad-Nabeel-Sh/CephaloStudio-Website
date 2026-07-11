@@ -1,6 +1,6 @@
 # CephaloStudio — Cephalometric Analysis Gap Analysis
 
-> **Date**: 2026-06-06
+> **Date**: 2026-07-11
 > **Purpose**: Identify gaps between our current analysis library and industry-standard cephalometric software (Dolphin, AudaxCeph, WebCeph, NemoCeph, CephX, OnyxCeph, Planmeca Romexis, BCeph, LabCeph).
 
 ---
@@ -114,27 +114,23 @@
 
 ## 5. What's Still Missing
 
-### 🔴 Bugs / Cleanup
-- **8 unnecessary `eslint-disable` comments** in `App.jsx` (lines 571, 643, 649, 671, 695, 721, 741, 779) on plain `const` declarations — rule doesn't apply, comments are cargo-culted
-- **OPG "General Analysis"** — 2 orphan points (Inc-L, Inc-R) with no measurements
-- **No TypeScript** — entire codebase is plain JS, increasing maintenance risk as app grows
-
 ### 🟡 Medium Priority
 - **No true DICOM parser** — app says "Supports DICOM" in the UI but relies on browser's native image rendering for DICOM files (which may not work reliably). No DICOM tag reading, DICOMDIR, or modality detection.
 - **Study model analysis** (Bolton discrepancy, Schwarz arch analysis) — needs different input model
-- **PA naming resolved**: `PA_Ceph.csv` naming mismatch was fixed — `"Ricketts PA"` now correctly merges into the PA Ricketts analysis
 - **OPG orphan points**: Inc-L, Inc-R remain with no auto-created measurements
+- **No PWA service worker** — manifest exists but no offline support; a medical app used in clinics should work offline
+- **No code splitting beyond Plotly** — chunk-size warning on build (mathjs + plotly are large)
+- **No multi-language support** — English only
+- **No structured export** — no DICOM SR / FHIR / common stats formats (CSV/PDF/.cephx only)
 
 ### 🟢 Low Priority (Major Features)
+- **AI auto-landmark detection** — automatic point placement (TensorFlow.js or ONNX runtime)
 - **VTO/Growth prediction** — requires growth forecasting algorithms
 - **CBCT/3D analysis** — volumetric assessment with 3D norms
-- **PDF reporting** — export analysis results to professional PDF
-- **Patient database** — only basic study mode exists
-- **AI auto-landmark detection** — automatic point placement
+- **Patient database with search/analytics** — sessions model exists but no cross-patient search/analytics
 - **Superimposition** — true structural superimposition (Ba-N, S-N) rather than just displacement vectors
-- **Multi-language support**
-- **Touch/tablet optimization**
-- **PWA/offline support** (service worker, manifest)
+- **Research collaboration hub** — multi-center studies, shared protocols
+- **Cloud collaboration** — shared workspaces, multi-user concurrent access
 
 ---
 
@@ -142,21 +138,30 @@
 
 | Change | Description |
 |--------|-------------|
-| **Clinical Interpretation Engine** | 100+ rule-based engine auto-generates plain-English clinical text for skeletal class, growth pattern, dental relationship, soft tissue, airway, asymmetry, TMJ, and growth assessment |
-| **Normogram Panel** | SVG polygon/radar chart + list view showing all measurements on SD-scaled axes with color-coded severity |
-| **Silhouette Overlays** | 4 anatomical silhouettes (cranial/soft-tissue, mandibular, occlusal/dental, airway) rendered as SVG paths with configurable opacity and color |
-| **Version Comparison** | Side-by-side version comparison with displacement vector visualization between markup positions |
+| **Statistical Correctness (Critical)** | Fixed betaCF, chi2CDF, KW/Friedman — p-values now accurate app-wide; golden-value regression tests guard against regression |
+| **Research Modules** | 6 integrated modules: Reliability (ICC, Bland-Altman, Dahlberg, error mapping), Descriptive/Normative, Comparative (auto-test selection, MANOVA), Longitudinal (RM-ANOVA, LMM), Correlation (Pearson/Spearman/logistic), Diagnostic (ROC, AUC, sensitivity/specificity) |
+| **ResultsDialog** | Floating modal with Tables/Charts tabs for all research modules; Plotly-based charts (ICC forest, Bland-Altman, box plots, effect size forest, longitudinal trajectories, etc.) |
+| **Session Model** | Replaced version-based storage with session-based project model; session CRUD, subject/group/timepoint/operator metadata |
+| **Session Filmstrip** | Floating bottom-center horizontal thumbnail bar with image previews, add/delete, keyboard navigation |
+| **Batch Import** | Multi-image import with CSV sidecar parsing for batch data ingestion |
+| **Mobile Toolbar** | Horizontal scroll row (collapsed bar) + expandable bottom sheet (2-col grid) for mobile; double-tap finalize for polygons/curves |
+| **PDF Report Generation** | jsPDF-based PDF export with measurement tables, norms comparison, clinical interpretation |
+| **Data Integrity Fixes** | Autosave IDB-before-LB, orphan GC, IDB-unavailable banner, import validation, v2.0→v2.1 migration |
+| **Privacy/Security** | console.error gated behind DEV in clinical paths, IDB image storage, anonymization module |
+| **Accessibility** | Modal focus trap, filmstrip ARIA, theme aria-pressed, loading role="status", placing-mode floating panel |
+| **Canvas Improvements** | DPR scaling, null-check getContext("2d"), pan via ref, unified undo snapshots |
+| **Test Suite** | 269 tests across 15 files including golden-value stat regression tests; coverage thresholds enforced |
+| **Silhouettes** | 23 SVG anatomical silhouettes across 7 categories (Spine, Craniofacial, Soft Tissue, Mandible, Teeth, Airway, Composite) |
+| **Clinical Interpretation Engine** | 100+ rule-based engine auto-generates plain-English clinical text for 11 diagnostic categories |
+| **Normogram Panel** | SVG polygon/radar/wiggle chart + list view showing all measurements on SD-scaled axes with color-coded severity |
+| **Template System** | .cepht v2.0 with point coordinates, measurement preview, subset editing, localStorage library |
 | **Startup Wizard** | 4-step guided new-case wizard: upload image → select projection → choose analysis → calibration |
-| **Airway Analysis Module** | Pharyngeal airway space analysis with cross-sectional measurements |
+| **Version Comparison** | Side-by-side version comparison with displacement vector visualization between markup positions |
 | **Anonymization Module** | Patient metadata editor with irreversible data wipe |
-| **PA Naming Mismatch Fixed** | `PA_Ceph.csv`'s `"Ricketts PA"` now correctly maps to PA Ricketts analysis instead of lateral |
-| **Orphan Analyses Fixed** | Basis, Cagliari, Chieti, McGann now merge measurements from `AnalysisMeasurements.csv` |
-| **Expanded Analyses** | Steiner, Ricketts, McNamara, Downs, Björk, Tweed all expanded with additional points and measurements |
-| **Reference Planes** | All `Line` type measurements without norms auto-render as infinite dashed lines (SN, FH, N-Bo, Mandibular, Occlusal, Palatal, etc.) |
-| **Property Panel Toggle** | Lines/parallels have "Type" toggle (2-Point / Infinite) and "Dash" dropdown (Solid / Dashed / Dotted) |
-| **Wits Auto-Creation** | Now auto-creates when all 4 points (A, B, APOcc, PPOcc) placed |
+| **Predefined Analyses** | 40+ analyses across Lateral, AP/PA, SMV, OPG, Airway, Photo, Hand-Wrist projections |
+| **Theme System** | 4 themes (Plasticity, GitHub Dark, Paper, GitHub Light) with consistent color tokens |
 | **UI Icons to SVG** | All toolbar and panel icons migrated from text/emoji to inline SVG |
-| **Theme Refinements** | 3 themes (dark, light, bluish) with consistent color tokens |
+| **CI Pipeline** | GitHub Actions: lint→test→build across Node 18/20/22, npm audit, CodeQL security analysis, dependency review |
 
 ---
 
@@ -190,45 +195,56 @@
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Clinical interpretation engine | ✅ | 100+ rules, 11 diagnostic categories |
-| Normogram visualization | ✅ | Radar chart + list view with SD-scaled axes |
-| Silhouette overlays | ✅ | 4 anatomical SVG silhouettes |
-| Version comparison | ✅ | Displacement vectors between versions |
+| Normogram visualization | ✅ | Radar/wiggle/polygon chart + list view with SD-scaled axes |
+| Silhouette overlays | ✅ | 23 SVG anatomical silhouettes across 7 categories |
+| Session model | ✅ | Multi-session per project with subject/group/timepoint/operator metadata |
+| Session filmstrip | ✅ | Floating bottom-center horizontal thumbnail bar |
+| Batch import | ✅ | Multi-image upload with CSV sidecar parsing |
+| Mobile toolbar | ✅ | Horizontal scroll row + expandable bottom sheet; double-tap finalize |
+| PDF report generation | ✅ | jsPDF-based export with measurement tables, norms, interpretation |
 | Startup wizard | ✅ | 4-step guided case setup |
 | Airway analysis | ✅ | Pharyngeal airway measurements |
 | Anonymization | ✅ | Patient data editor + irreversible wipe |
-| Template system (.cepht) | ✅ | Export/import analysis templates |
+| Template system (.cepht) | ✅ | Export/import analysis templates with point coordinates |
 | 13 LUT presets | ✅ | False-color rendering presets |
 | Image histogram | ✅ | Grayscale pixel intensity distribution |
 | Right-click context menu | ✅ | Copy, paste, lock, order, visibility |
 | Keyboard shortcuts | ✅ | Delete, Undo/Redo, tool switching |
-| Undo/Redo | ✅ | Full markup state history |
+| Undo/Redo | ✅ | Full markup state history with unified snapshots |
 | Snap/alignment | ✅ | Grid snap, angle snap, point snap |
 | Floating KaTeX panel | ✅ | LaTeX formula preview |
+| DPR canvas scaling | ✅ | Sharp rendering on 2×/3× displays |
+| Research modules | ✅ | Reliability, Descriptive, Comparative, Longitudinal, Correlation, Diagnostic |
+| Golden-value stat tests | ✅ | 18 regression tests for fCDF, tDistributeCDF, chi2CDF, betaIncomplete |
+| 269 tests | ✅ | 15 test files with coverage thresholds |
+| CI pipeline | ✅ | Lint→test→build, npm audit, CodeQL, dependency review |
+| Focus trap modals | ✅ | Autofocus, Tab cycling, focus restore on unmount |
+| Theme system | ✅ | 4 themes with consistent color tokens and aria-pressed |
 
 ---
 
 ## 9. Future Development Priorities
 
 ### Near-Term
-- Fix 8 unnecessary eslint-disable comments
-- Add measurements for OPG orphan points (Inc-L, Inc-R)
-- PDF report generation (highest-ROI clinical feature)
+- True DICOM parser (patient name, modality, pixel spacing via dicom-parser library)
 - Semi-automated landmarking for reliable points (Nasion, Sella, Porion, Orbitale)
-- Tablet/touch optimization (larger targets, gesture support)
+- PWA support (service worker, offline cache)
+- Code splitting to reduce main bundle size
 
 ### Medium-Term
 - Study model analysis (Bolton discrepancy, Schwarz arch analysis)
 - True superimposition module (structural superimposition)
 - AI landmark pipeline (TensorFlow.js or ONNX runtime)
-- PWA support (service worker, offline cache)
+- Multi-language support
+- Structured export (DICOM SR, FHIR)
 
 ### Long-Term
 - VTO growth prediction
 - CBCT frontal norms / 3D analysis
-- Patient database with search/analytics
+- Patient database with cross-patient search/analytics
 - Research collaboration hub (multi-center studies)
-- Multi-language support
+- Cloud collaboration (shared workspaces)
 
 ---
 
-*Generated by CephaloStudio Development — 2026-06-06*
+*Generated by CephaloStudio Development — 2026-07-11*

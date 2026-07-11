@@ -25,7 +25,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/152</span>
+                <span class='fraction'>0/148</span>
             </div>
         
             
@@ -39,7 +39,7 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/66</span>
+                <span class='fraction'>0/68</span>
             </div>
         
             
@@ -701,12 +701,16 @@
 <a name='L636'></a><a href='#L636'>636</a>
 <a name='L637'></a><a href='#L637'>637</a>
 <a name='L638'></a><a href='#L638'>638</a>
-<a name='L639'></a><a href='#L639'>639</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L639'></a><a href='#L639'>639</a>
+<a name='L640'></a><a href='#L640'>640</a>
+<a name='L641'></a><a href='#L641'>641</a>
+<a name='L642'></a><a href='#L642'>642</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1135,33 +1139,35 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -1340,6 +1346,7 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { useState, useMemo } from "react";
+import PlotlyChart from "./PlotlyChart.jsx";
 &nbsp;
 // ═══════════════════════════════════════════════════════════════════════════════
 // TAB BAR (shared with other panels)
@@ -1771,37 +1778,39 @@ function <span class="fstat-no" title="function not covered" >CalibrationView({<
   const cal = <span class="cstat-no" title="statement not covered" >result.calibration;</span>
 <span class="cstat-no" title="statement not covered" >  if (!cal?.groups?.length) <span class="cstat-no" title="statement not covered" >return &lt;div style={{ fontSize: 11, color: t.tx3, padding: 12, textAlign: "center" }}&gt;Calibration data not available for individual predictors. Use Composite Index tab for calibration.&lt;/div&gt;;</span></span>
 &nbsp;
-  const W = <span class="cstat-no" title="statement not covered" >400, H</span> = <span class="cstat-no" title="statement not covered" >350, p</span>ad = <span class="cstat-no" title="statement not covered" >{ left: 50, right: 30, top: 30, bottom: 45 };</span>
-  const pw = <span class="cstat-no" title="statement not covered" >W - pad.left - pad.right, p</span>h = <span class="cstat-no" title="statement not covered" >H - pad.top - pad.bottom;</span>
-  const <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >xS = v</span> =&gt; <span class="cstat-no" title="statement not covered" >pad.left + v * pw;</span></span>
-  const <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >yS = v</span> =&gt; <span class="cstat-no" title="statement not covered" >pad.top + ph - v * ph;</span></span>
+  const groups = <span class="cstat-no" title="statement not covered" >cal.groups.<span class="fstat-no" title="function not covered" >filter(g</span> =&gt; <span class="cstat-no" title="statement not covered" >g.n &gt; 0);</span></span>
+  const scData = <span class="cstat-no" title="statement not covered" >[{</span>
+    type: "scatter", mode: "markers",
+    x: groups.<span class="fstat-no" title="function not covered" >map(g</span> =&gt; <span class="cstat-no" title="statement not covered" >g.midpoint),</span>
+    y: groups.<span class="fstat-no" title="function not covered" >map(g</span> =&gt; <span class="cstat-no" title="statement not covered" >g.obsProp),</span>
+    error_y: {
+      type: "data", symmetric: false, thickness: 1.5, width: 6,
+      array: groups.<span class="fstat-no" title="function not covered" >map(g</span> =&gt; <span class="cstat-no" title="statement not covered" >1.96 * Math.sqrt(g.obsProp * (1 - g.obsProp) / g.n))</span>,
+      arrayminus: groups.<span class="fstat-no" title="function not covered" >map(g</span> =&gt; <span class="cstat-no" title="statement not covered" >1.96 * Math.sqrt(g.obsProp * (1 - g.obsProp) / g.n))</span>,
+    },
+    marker: { color: t.acc, size: 8, line: { color: "#fff", width: 1 } },
+    hovertemplate: "Predicted: %{x:.3f}&lt;br&gt;Observed: %{y:.3f}&lt;br&gt;n=%{customdata}&lt;extra&gt;&lt;/extra&gt;",
+    customdata: groups.<span class="fstat-no" title="function not covered" >map(g</span> =&gt; <span class="cstat-no" title="statement not covered" >g.n),</span>
+    showlegend: false,
+  }];
+  const idealLine = <span class="cstat-no" title="statement not covered" >{</span>
+    type: "scatter", mode: "lines",
+    x: [0, 1], y: [0, 1],
+    line: { color: t.tx3, width: 1, dash: "dash" },
+    showlegend: false, hoverinfo: "skip",
+  };
+  const scLayout = <span class="cstat-no" title="statement not covered" >{</span>
+    paper_bgcolor: t.surf2, plot_bgcolor: t.surf2,
+    font: { color: t.tx2, family: "'DM Sans','DM Mono',monospace", size: 11 },
+    margin: { l: 50, r: 20, t: 10, b: 50 },
+    xaxis: { title: { text: "Predicted probability", font: { size: 12 } }, range: [0, 1], gridcolor: t.surf3, zeroline: false },
+    yaxis: { title: { text: "Observed proportion", font: { size: 12 } }, range: [0, 1], gridcolor: t.surf3, zeroline: false },
+    width: 400, height: 350,
+  };
 &nbsp;
 <span class="cstat-no" title="statement not covered" >  return (</span>
     &lt;div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}&gt;
-      &lt;svg width={W} height={H} style={{ border: `1px solid ${t.bdr}`, borderRadius: 8, background: t.surf2 }}&gt;
-        &lt;line x1={pad.left} y1={yS(0)} x2={pad.left + pw} y2={yS(0)} stroke={t.bdr} strokeWidth={0.5} /&gt;
-        &lt;line x1={pad.left} y1={yS(1)} x2={pad.left + pw} y2={yS(1)} stroke={t.bdr} strokeWidth={0.5} /&gt;
-        &lt;line x1={xS(0)} y1={yS(0)} x2={xS(1)} y2={yS(1)} stroke={t.tx3} strokeWidth={1} strokeDasharray="4,4" /&gt;
-        {cal.groups.<span class="fstat-no" title="function not covered" >map((g</span>, i) =&gt; {
-          const x = <span class="cstat-no" title="statement not covered" >xS(g.midpoint);</span>
-          const y = <span class="cstat-no" title="statement not covered" >yS(g.obsProp);</span>
-          const err = <span class="cstat-no" title="statement not covered" >1.96 * Math.sqrt(g.obsProp * (1 - g.obsProp) / g.n);</span>
-<span class="cstat-no" title="statement not covered" >          return (</span>
-            &lt;g key={i}&gt;
-              &lt;line x1={x} y1={yS(g.obsProp - err)} x2={x} y2={yS(g.obsProp + err)} stroke={t.acc} strokeWidth={1.5} /&gt;
-              &lt;circle cx={x} cy={y} r={4} fill={t.acc} stroke="#fff" strokeWidth={1} /&gt;
-            &lt;/g&gt;
-          );
-        })}
-        &lt;text x={W / 2} y={H - 4} fill={t.tx3} fontSize={9} textAnchor="middle"&gt;Predicted probability&lt;/text&gt;
-        &lt;text x={8} y={H / 2} fill={t.tx3} fontSize={9} textAnchor="middle" transform={`rotate(-90,8,${H / 2})`}&gt;Observed proportion&lt;/text&gt;
-        {[0, 0.25, 0.5, 0.75, 1].<span class="fstat-no" title="function not covered" >map(v</span> =&gt; (
-<span class="cstat-no" title="statement not covered" >          &lt;g key={v}&gt;</span>
-            &lt;text x={xS(v)} y={H - pad.bottom + 14} fill={t.tx3} fontSize={7} textAnchor="middle"&gt;{v.toFixed(2)}&lt;/text&gt;
-            &lt;text x={pad.left - 8} y={yS(v) + 3} fill={t.tx3} fontSize={7} textAnchor="end"&gt;{v.toFixed(2)}&lt;/text&gt;
-          &lt;/g&gt;
-        ))}
-      &lt;/svg&gt;
+      &lt;PlotlyChart data={[idealLine, ...scData]} layout={scLayout} style={{ width: 400, height: 350, minHeight: 0 }} /&gt;
 &nbsp;
       &lt;div style={{ flex: 1 }}&gt;
         &lt;div style={{ padding: "8px 10px", background: t.surf3, borderRadius: 6, border: `1px solid ${t.bdr}44` }}&gt;
@@ -1984,7 +1993,7 @@ function <span class="fstat-no" title="function not covered" >fmtP(p</span>) {
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-06-22T21:32:11.137Z
+                at 2026-07-11T12:22:24.851Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

@@ -25,28 +25,28 @@
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>0/26</span>
+                <span class='fraction'>0/12</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/17</span>
+                <span class='fraction'>0/12</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/7</span>
+                <span class='fraction'>0/5</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
                 <span class="strong">0% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>0/23</span>
+                <span class='fraction'>0/11</span>
             </div>
         
             
@@ -116,11 +116,7 @@
 <a name='L51'></a><a href='#L51'>51</a>
 <a name='L52'></a><a href='#L52'>52</a>
 <a name='L53'></a><a href='#L53'>53</a>
-<a name='L54'></a><a href='#L54'>54</a>
-<a name='L55'></a><a href='#L55'>55</a>
-<a name='L56'></a><a href='#L56'>56</a>
-<a name='L57'></a><a href='#L57'>57</a>
-<a name='L58'></a><a href='#L58'>58</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<a name='L54'></a><a href='#L54'>54</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -128,20 +124,14 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -153,6 +143,8 @@
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -182,38 +174,34 @@
 // HOOKS - Custom React hooks
 // ═══════════════════════════════════════════════════════════════════════════════
 &nbsp;
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
+// KaTeX is now BUNDLED from the npm package (was loaded at runtime from
+// cdnjs.cloudflare.com with no integrity/SRI — a supply-chain and offline
+// risk for a clinical tool). Bundling ships the matched CSS+JS from the same
+// origin as the app, so a CDN compromise or offline clinic can't break or
+// hijack rendering. The version now tracks package.json (^0.16.44) instead of
+// the previously-hardcoded 0.16.8 CDN path.
+import katex from "katex";
+import "katex/dist/katex.min.css";
 &nbsp;
+// Kept for API compatibility. KaTeX is available synchronously now, so there is
+// no async load step — always reports loaded.
 export function <span class="fstat-no" title="function not covered" >useKatex() {</span>
-  const [loaded, <span class="cstat-no" title="statement not covered" >setLoaded] = useState(!!window.katex);</span>
-<span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >  useEffect(() =&gt; {</span></span>
-<span class="cstat-no" title="statement not covered" >    if (!document.getElementById("katex-css")) {</span>
-      const l = <span class="cstat-no" title="statement not covered" >document.createElement("link");</span>
-<span class="cstat-no" title="statement not covered" >      l.id = "katex-css"; <span class="cstat-no" title="statement not covered" >l</span>.rel = "stylesheet";</span>
-<span class="cstat-no" title="statement not covered" >      l.href = "https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css";</span>
-<span class="cstat-no" title="statement not covered" >      document.head.appendChild(l);</span>
-    }
-<span class="cstat-no" title="statement not covered" >    if (!document.getElementById("katex-js")) {</span>
-      const s = <span class="cstat-no" title="statement not covered" >document.createElement("script");</span>
-<span class="cstat-no" title="statement not covered" >      s.id = "katex-js";</span>
-<span class="cstat-no" title="statement not covered" >      s.src = "https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.js";</span>
-<span class="cstat-no" title="statement not covered" >      s.<span class="fstat-no" title="function not covered" >onload = () =&gt; <span class="cstat-no" title="statement not covered" >s</span>etLoaded(true);</span></span>
-<span class="cstat-no" title="statement not covered" >      document.head.appendChild(s);</span>
-    }
-  }, []);
-<span class="cstat-no" title="statement not covered" >  return loaded;</span>
+<span class="cstat-no" title="statement not covered" >  return true;</span>
 }
 &nbsp;
 export function <span class="fstat-no" title="function not covered" >KatexSpan({</span> latex, block = <span class="branch-0 cbranch-no" title="branch not covered" >false, l</span>arge = <span class="branch-0 cbranch-no" title="branch not covered" >false, f</span>ontSize }) {
-  const loaded = <span class="cstat-no" title="statement not covered" >useKatex();</span>
+<span class="cstat-no" title="statement not covered" >  useKatex();</span>
   const <span class="cstat-no" title="statement not covered" >ref = useRef(null);</span>
 <span class="cstat-no" title="statement not covered" ><span class="fstat-no" title="function not covered" >  useEffect(() =&gt; {</span></span>
-<span class="cstat-no" title="statement not covered" >    if (!loaded || !ref.current || !window.katex) <span class="cstat-no" title="statement not covered" >return;</span></span>
-<span class="cstat-no" title="statement not covered" >    window.katex.render(latex, ref.current, {</span>
-      throwOnError: false, displayMode: block,
-      output: "html",
-    });
-  }, [latex, block, loaded]);
+<span class="cstat-no" title="statement not covered" >    if (!ref.current || !katex) <span class="cstat-no" title="statement not covered" >return;</span></span>
+<span class="cstat-no" title="statement not covered" >    try {</span>
+<span class="cstat-no" title="statement not covered" >      katex.render(latex, ref.current, {</span>
+        throwOnError: false, displayMode: block,
+        output: "html",
+      });
+    } catch { /* ignore KaTeX render errors */ }
+  }, [latex, block]);
   const size = <span class="cstat-no" title="statement not covered" >fontSize ? `${fontSize}pt` : (large ? "2.4rem" : "inherit");</span>
 <span class="cstat-no" title="statement not covered" >  return (</span>
     &lt;span ref={ref}
@@ -241,7 +229,7 @@ export function <span class="fstat-no" title="function not covered" >LatexFloati
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-06-22T21:32:10.856Z
+                at 2026-07-11T12:22:24.348Z
             </div>
         <script src="../prettify.js"></script>
         <script>

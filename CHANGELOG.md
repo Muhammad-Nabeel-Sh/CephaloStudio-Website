@@ -1,5 +1,69 @@
 # Changelog
 
+## [1.1.0] - 2026-07-11
+
+### Fixed — Statistical Correctness (Critical)
+- `betaCF` broken: missing `d=1/d` inversion + wrong `del=d*h` → `del=d*c`. Restored t/F/χ² correctness app-wide.
+- `chi2CDF` upper branch off by factor of x (`a*ln(y)` → `(a-1)*ln(y)`). Normality, Mauchly, Hosmer-Lemeshow now detect violations correctly.
+- Kruskal-Wallis & Friedman: replaced `1-fCDF(H,df,1e5)` with `1-chi2CDF(H,df)`. Non-parametric multi-group tests now significant when appropriate.
+- `correlation.js` / `diagnostic.js`: replaced local `ibeta` stub with fixed `betaIncomplete`. Pearson/Spearman/regression/ROC p-values now correct.
+
+### Fixed — Data Integrity
+- Autosave no longer permanently loses images; IDB writes awaited before localStorage; failed images kept in envelope
+- Orphan image blob GC on every save; `deleteOrphanBlobs` warm-diff + cold-scan
+- IDB quota/unavailable: custom event fires, user-visible banner
+- `importCephx`: version check, field validation, v2.0→v2.1 migration, `normalizeSessionImages` shared by import + export
+- `cephxFormat.js`: comprehensive import validation, enhanced `validateCepht`
+- `loadImage` + `importCephx`: `reader.onerror` paths added
+
+### Fixed — Privacy & Security
+- Auto-save now writes IDB before localStorage to prevent image loss on quota
+- `console.error` gated behind `DEV` in clinical paths (App.jsx, imageStore, BatchImportModal)
+- Session filmstrip uses Object URLs for thumbnails, not inline base64
+
+### Changed — Mobile Toolbar
+- Horizontal scroll row (collapsed bar) + expandable bottom sheet (2-col grid) for mobile
+- Double-tap to place point and double-tap to finalize polygon/curve on mobile
+- Two-finger tap to cancel placing mode
+- Green ✓ "Finish" button in mobile toolbar when drawing polygon/curve
+- Filmstrip hidden on mobile (`!isMobile&&` guard)
+
+### Changed — Accessibility (A2, A4, A5, A7, A8)
+- `Modal.jsx`: autofocus close button on mount, Tab focus trap, restore previous focus on unmount
+- `SessionFilmstrip.jsx`: `role="option"` + `aria-selected` instead of `role="button"`; delete button appears on keyboard focus
+- Theme buttons: `aria-pressed={theme===th.id}` on both App.jsx and HomePage.jsx
+- Loading overlays: `role="status"` + `aria-live="polite"` on spinner and splash
+- Placing-mode card: converted from canvas-drawn to floating React panel with `role="status"`
+
+### Changed — Canvas & Rendering
+- `redraw()` + `captureMarkupImage`: null-check `canvas.getContext("2d")`
+- `pan` variable removed from React state; reads `panRef.current` (local variable shadow in `redraw`)
+- `scheduleRedrawRef` pattern for stable callback from event handlers
+- Undo snapshot shape unified: `pushUndo` and `handleMouseUp` both use `{markups, norms, placingMode, placingIdx, placingQueue}`
+- Undo/redo: `undoVersion` state counter for reactive button state; fixed redo bug (restores full snapshot)
+- `logError()` added to catch blocks in clinical modules
+
+### Changed — Dependencies
+- Removed redundant `plotly.js-dist-min` from package.json (kept `plotly.js-basic-dist-min`)
+- KaTeX bundled from npm (was CDN-loaded)
+
+### Added — Testing
+- `statGoldenValues.test.js`: 18 reference-value regression tests for `fCDF`, `tDistributeCDF`, `chi2CDF`, `betaIncomplete`
+- Test count: 103 → 269 (15 test files)
+- Coverage thresholds added to vitest config (regression floor: 16% statements, 10% branches, 11% functions, 18% lines)
+
+### Added — Documentation
+- CI pipeline: npm audit, CodeQL security analysis, dependency review already present
+- Coverage thresholds enforced in `vite.config.js`
+
+### Changed — Documentation
+- README: updated project structure, component hierarchy, line counts, test table, CI section, limitations
+- CHANGELOG: updated test count to 269, corrected silhouette count to 23
+- AGENTS.md: fixed stale `FormulasModule.jsx` reference → `panels.jsx`, updated test count, corrected line counts
+- Removed stale docs: `Critical_Review.md`, `cephx_review_report.md`, `HONEYDOLIST.md`, `File Structure.md`
+
+---
+
 ## [1.0.0] - 2026-07-03
 
 ### Added
@@ -112,7 +176,7 @@
   — Measurement preview before loading
   — localStorage template library
 - Silhouettes system
-  — 25+ SVG anatomical silhouettes (soft tissue, sella turcica, etc.)
+  — 23 SVG anatomical silhouettes (soft tissue, sella turcica, etc.)
   — Categorized with search
   — Insert as markup objects (positionable, resizable, rotatable)
 - Examples panel with built-in example cases
@@ -198,5 +262,5 @@
 - CSV parser for analysis data import
 - ESLint flat config with React hooks + refresh plugins
 - GitHub Actions CI (Node 18, 20, 22) — lint, test, build
-- Vitest test suite with jsdom environment (103 tests)
-  — Utility tests (88), MarkupsPanel tests, reliability/descriptive/comparative/longitudinal tests
+- Vitest test suite with jsdom environment (269 tests)
+  — Utility tests (97), stat golden-value tests (18), comparative (18), descriptive (12), anonymize (10), validation (9), distributions (27), imageStore (14), MarkupsPanel, reliability, longitudinal, diagnostic, engine, secureStorage, cephxFormat tests

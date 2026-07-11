@@ -48,54 +48,85 @@ Requires ES2020 support, Canvas 2D, and IndexedDB. Not supported in Internet Exp
 ├── Data/                       # CSV reference data
 ├── src/
 │   ├── main.jsx
-│   ├── App.jsx                 # Root component (~1380 lines)
+│   ├── App.jsx                 # Root component (~1925 lines)
 │   ├── constants.js            # Themes, tools, predefined analyses, LUT presets
-│   ├── utils.js                # Math, geometry, statistics (798 lines, 60+ exports)
-│   ├── markups.jsx             # Markup data models, hit-testing, template parsing
-│   ├── panels.jsx              # Side panels
+│   ├── utils.js                # Math, geometry, statistics (863 lines, 60+ exports)
+│   ├── markups.jsx             # Markup rendering, hit-testing, template parsing (1236 lines)
+│   ├── panels.jsx              # Side panels (1079 lines)
 │   ├── ui.jsx                  # UI primitives (Btn, Tag, InfoBox, etc.)
-│   ├── FormulasModule.jsx      # Formula editor, KaTeX rendering
+│   ├── ToolBtn.jsx             # Toolbar button component
 │   ├── imageUtils.jsx          # Image processing (brightness, contrast, LUT)
-│   ├── hooks.jsx               # Custom hooks
+│   ├── hooks.jsx               # Custom hooks (useKatex, etc.)
+│   ├── silhouettes.js          # 23 SVG anatomical silhouettes (auto-generated)
+│   ├── logger.js               # PHI-safe error logging
+│   ├── interpretation.js       # Clinical interpretation generator
+│   ├── reportGenerator.js      # PDF report generation
+│   ├── csvParser.js            # CSV parsing utilities
+│   ├── anonymize.js            # PHI anonymization
+│   ├── examplesData.js         # Built-in example cases
+│   ├── ErrorBoundary.jsx       # React error boundary
 │   ├── model/
-│   │   ├── session.js          # Session data model (mkSession, duplicateSession, mkReliabilitySession)
-│   │   ├── project.js          # Project model with session CRUD, subject CRUD, group/timepoint/operator lists
-│   │   └── ...
+│   │   ├── session.js          # Session data model
+│   │   ├── project.js          # Project model with session CRUD
+│   │   └── csv.js              # CSV model helpers
+│   ├── state/
+│   │   └── workspaceStore.js   # Canvas state reducer
 │   ├── storage/
-│   │   └── imageStore.js       # IndexedDB wrapper for image blob storage
+│   │   ├── imageStore.js       # IndexedDB wrapper for image blobs
+│   │   ├── cephxFormat.js      # Import/export validation, migration
+│   │   └── secureStorage.js    # Encrypted storage utilities
 │   ├── panels/
-│   │   ├── SessionsPanel.jsx   # Session cards, subjects tab, metadata modal trigger
-│   │   ├── SessionMetadataModal.jsx  # Spreadsheet-style metadata editor with batch ops, filename parser
+│   │   ├── Modal.jsx           # Accessible modal with focus trap
+│   │   ├── HomePage.jsx        # Project list, create/import portal
+│   │   ├── SessionsPanel.jsx   # Session cards, subjects tab
+│   │   ├── SessionMetadataModal.jsx  # Spreadsheet-style metadata editor
 │   │   ├── BatchImportModal.jsx
-│   │   └── SessionFilmstrip.jsx
+│   │   ├── SessionFilmstrip.jsx
+│   │   ├── NormogramPanel.jsx
+│   │   ├── InterpretationPanel.jsx
+│   │   └── StartupWizard.jsx
 │   ├── research/
 │   │   ├── studyModel.js       # Study configuration model
 │   │   ├── engine.js           # Research engine orchestrator
+│   │   ├── engine.worker.js    # Web Worker for async research
+│   │   ├── engineClient.js     # Worker client wrapper
+│   │   ├── collect.js          # Measurement collection helpers
+│   │   ├── validation.js       # Research input validation
 │   │   ├── reliability.js      # ICC, Bland-Altman, Dahlberg, error mapping
 │   │   ├── descriptive.js      # Descriptive stats, reference intervals, z-scores
 │   │   ├── comparative.js      # t-tests, ANOVA, MANOVA, post-hoc, test routing
 │   │   ├── longitudinal.js     # RM-ANOVA, LMM, sphericity, change scores
 │   │   ├── correlation.js      # Correlation analysis
 │   │   ├── diagnostic.js       # Diagnostic performance metrics
-│   │   ├── ReliabilityPanel.jsx # Config + results UI + guided data collection workflow
+│   │   ├── ReliabilityPanel.jsx
 │   │   ├── DescriptivePanel.jsx
 │   │   ├── ComparativePanel.jsx
 │   │   ├── LongitudinalPanel.jsx
 │   │   ├── CorrelationPanel.jsx
 │   │   ├── DiagnosticPanel.jsx
-│   │   ├── ResearchPanel.jsx   # Study list, type selector, per-study config/run/results
+│   │   ├── ResearchPanel.jsx
 │   │   ├── ResultsDialog.jsx   # Floating modal with Tables/Charts tabs
-│   │   ├── moduleCharts.jsx    # Chart rendering (ICC forest, Bland-Altman, etc.)
+│   │   ├── PlotlyChart.jsx     # Dynamic Plotly.js loader
+│   │   ├── moduleCharts.jsx    # SVG chart rendering
 │   │   ├── moduleChartsUtils.jsx
 │   │   └── resultsExport.js
 │   └── test/
 │       ├── setup.js
-│       ├── utils.test.js       # 88 tests: geometry, statistics, formulas, ICC
-│       ├── MarkupsPanel.test.jsx
-│       ├── descriptive.test.js
-│       ├── reliability.test.js
-│       ├── comparative.test.js
-│       └── longitudinal.test.js
+│       ├── utils.test.js       # 97 tests
+│       ├── statGoldenValues.test.js  # 18 tests
+│       ├── comparative.test.js # 18 tests
+│       ├── descriptive.test.js # 12 tests
+│       ├── distributions.test.js # 27 tests
+│       ├── cephxFormat.test.js # 40 tests
+│       ├── imageStore.test.js  # 14 tests
+│       ├── anonymize.test.js   # 10 tests
+│       ├── validation.test.js  # 9 tests
+│       ├── diagnostic.test.js  # 5 tests
+│       ├── engine.test.js      # 5 tests
+│       ├── secureStorage.test.js # 5 tests
+│       ├── reliability.test.js # 3 tests
+│       ├── longitudinal.test.js # 3 tests
+│       └── MarkupsPanel.test.jsx # 3 tests
 ```
 
 ### Scripts
@@ -119,19 +150,27 @@ npm run test:coverage  # Test + coverage report
 ```
 App
 ├── HomePage              # Project list, create/import portal
-├── PinGate               # PIN authentication
+├── StartupWizard         # First-use guided setup
 └── Workspace             # Main editor
     ├── Toolbar           # Top bar (tools, save, export, theme)
     ├── ToolSidebar       # Floating tool palette
     ├── Canvas            # Image + markup rendering
-    ├── Filmstrip         # Session thumbnail bar (bottom)
+    ├── SessionFilmstrip  # Session thumbnail bar (bottom, desktop only)
     ├── RightPanel        # Tabbed side panel
     │   ├── MarkupsPanel
-    │   ├── FormulasPanel
-    │   ├── ResearchPanel # Tabbed: Reliability / Descriptive / Comparative / Longitudinal
-    │   └── ResultsDialog # Floating modal with Tables/Charts tabs
+    │   ├── FormulasPanel (via panels.jsx)
+    │   ├── ImagePanel
+    │   ├── LayersPanel
+    │   ├── SessionsPanel
+    │   ├── ResearchPanel # Tabbed: Reliability / Descriptive / Comparative / Longitudinal / Correlation / Diagnostic
+    │   ├── InterpretPanel
+    │   ├── TemplatesPanel
+    │   └── SilhouettesPanel
     ├── CalibModal, TextModal, AnonModal, AlignModal, TransformModal
-    └── BatchImportModal
+    ├── BatchImportModal
+    ├── SessionMetadataModal
+    ├── ResultsDialog     # Floating modal with Tables/Charts tabs
+    └── NormogramPanel    # SVG normogram visualization
 ```
 
 ### State Management
@@ -372,20 +411,33 @@ Floating bottom-center horizontal thumbnail bar showing all sessions. Supports q
 
 ## 14. Testing & CI
 
-### Test Suite (103 tests, 6 files)
+### Test Suite (269 tests, 15 files)
 
 | Test File | Tests | Coverage |
 |-----------|-------|----------|
-| `utils.test.js` | 88 | All geometry, statistics, formulas, ICC, Bland-Altman utilities |
+| `utils.test.js` | 97 | All geometry, statistics, formulas, ICC, Bland-Altman utilities |
+| `statGoldenValues.test.js` | 18 | Reference-value regression guards for fCDF, tDistributeCDF, chi2CDF, betaIncomplete |
+| `comparative.test.js` | 18 | Test selection routing, Mann-Whitney, Wilcoxon, Box's M, multi-group structure |
+| `descriptive.test.js` | 12 | `runDescriptiveAll`, norm stratum selection, predefined norms |
+| `anonymize.test.js` | 10 | PHI anonymization |
+| `validation.test.js` | 9 | Cepht validation |
+| `distributions.test.js` | 27 | Statistical distributions |
+| `imageStore.test.js` | 14 | IDB image storage |
 | `MarkupsPanel.test.jsx` | 3 | Component smoke tests |
-| `descriptive.test.js` | 3 | `runDescriptiveAll` integration |
 | `reliability.test.js` | 3 | ICC computation, Landmark error map |
-| `comparative.test.js` | 3 | Test selection routing, multi-group structure |
 | `longitudinal.test.js` | 3 | RM-ANOVA, error handling |
+| `diagnostic.test.js` | 5 | Diagnostic tests |
+| `engine.test.js` | 5 | Research engine |
+| `secureStorage.test.js` | 5 | Secure storage |
+| `cephxFormat.test.js` | 40 | Import/export format validation |
 
 ### CI Pipeline (`.github/workflows/test.yml`)
 
-Runs on push/PR to main: `npm ci` → `npm run lint` → `npm test` → `npm run build` across Node 18, 20, 22.
+Runs on push/PR to main:
+1. **Test matrix** — `npm ci` → `npm run lint` → `npm test` → `npm run build` across Node 18, 20, 22
+2. **Audit** — `npm audit --omit=dev --audit-level=high` (blocks on high/critical)
+3. **CodeQL** — GitHub semantic security analysis (security-extended queries)
+4. **Dependency Review** — Blocks PRs introducing high/critical vulnerabilities
 
 ### Code Coverage
 
@@ -555,4 +607,4 @@ Chart rendering uses Plotly.js loaded as a dynamic import (not in main bundle).
 - No server-side component — entirely client-side SPA
 - Single-user only, no collaboration features
 - localStorage auto-save has ~5MB browser limit
-- Research module functions (RM-ANOVA, MANOVA) work but some edge cases in repeated-measures data shapes have not been validated on real clinical datasets
+- Research module functions (RM-ANOVA, MANOVA) work but some edge cases in repeated-measures data shapes have not been validated on real clinical datasets; golden-value regression tests now guard core p-value math (fCDF, tDistributeCDF, chi2CDF, betaIncomplete)

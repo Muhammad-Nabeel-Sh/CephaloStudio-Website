@@ -39,14 +39,16 @@ export default function SessionFilmstrip({ project, t, onUpdateProject }) {
           return (
             <div
               key={s.id}
-              role="button"
               tabIndex={0}
+              role="option"
+              aria-selected={isActive}
               aria-label={s.label || s.name || "Session"}
-              aria-current={isActive ? "page" : undefined}
               onClick={() => handleSetActive(s.id)}
               onKeyDown={onEnter(() => handleSetActive(s.id))}
               onMouseEnter={() => setHoveredId(s.id)}
               onMouseLeave={() => setHoveredId(null)}
+              onFocus={() => setHoveredId(s.id)}
+              onBlur={() => setHoveredId(null)}
               style={{
                 display: "flex", flexDirection: "column", alignItems: "center",
                 justifyContent: "center", gap: 2, flexShrink: 0,

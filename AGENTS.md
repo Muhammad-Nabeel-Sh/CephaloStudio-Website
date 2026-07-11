@@ -5,7 +5,7 @@ CephaloStudio is a React + Vite application for cephalometric analysis (medical 
 - **Framework**: React 19 with Vite 8
 - **Styling**: Inline styles (no CSS framework)
 - **Math**: mathjs for formulas, katex for LaTeX rendering
-- **No TypeScript**, **No tests** currently
+- **No TypeScript**, **269 tests (Vitest)**
 
 ---
 
@@ -26,7 +26,7 @@ npm run lint
 
 # Run lint on specific files
 npx eslint src/App.jsx
-npx eslint src/FormulasModule.jsx
+npx eslint src/panels.jsx
 
 # Run lint with auto-fix
 npm run lint -- --fix
@@ -42,7 +42,7 @@ npm run lint -- --fix
 - React components: `.jsx` extension
 - Utility functions: `.js` extension
 - Main app entry: `src/App.jsx`
-- Secondary modules: `src/FormulasModule.jsx`
+- Secondary modules: `src/panels.jsx`
 - Entry point: `src/main.jsx`
 
 ### Imports
@@ -196,7 +196,7 @@ Located in `eslint.config.js`:
 2. Add theme button in header/toolbar
 
 ### Modifying formula system
-1. Formula evaluation in `FormulasModule.jsx`
+1. Formula evaluation in `panels.jsx`
 2. Formula display in `FormulasPanel` component
 3. Scope building in `buildScope()` function
 
@@ -235,7 +235,7 @@ Recommended settings for `.vscode/settings.json`:
 - **Templates**: `.cepht` v2.0 export with point coords, validation, measurement preview, subset editing, localStorage library
 - **Session Filmstrip**: floating bottom-center horizontal thumbnail bar
 - **Batch Import**: multi-image + CSV sidecar parsing
-- **App.jsx refactored**: removed dead database mode code, simplified to ~1362 lines
+- **App.jsx refactored**: removed dead database mode code, simplified to ~2012 lines
 - **Data Integrity & Storage (D1-D8)**:
   - `saveProjects` rewritten: IDB writes awaited before localStorage; failed images kept in envelope (D1); orphan GC on every save (D2); IDB-unavailable / quota banner via custom event (D3)
   - `cephxFormat.js` (new): import validation, v2.0→v2.1 migration, `normalizeSessionImages` shared by import + export (D4); version constants + enhanced `validateCepht` (D5)

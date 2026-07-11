@@ -631,7 +631,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
 
   const redraw=useCallback(()=>{
     const canvas=canvasRef.current;if(!canvas)return;
-    const ctx=canvas.getContext("2d");
+    const ctx=canvas.getContext("2d");if(!ctx)return;
     // F2: DPR-aware coordinate space — all drawing in CSS pixels
     const dpr=dprRef.current;
     ctx.save();ctx.scale(dpr,dpr);
@@ -1250,7 +1250,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     const c = document.createElement("canvas");
     c.width = imgEl.naturalWidth;
     c.height = imgEl.naturalHeight;
-    const ctx = c.getContext("2d");
+    const ctx = c.getContext("2d");if(!ctx)return null;
     ctx.drawImage(imgEl, 0, 0);
     const visible = markups.filter(m => m.visible !== false);
     const cs = { w: c.width, h: c.height };
@@ -1378,7 +1378,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           </Btn>}
         <div style={{width:1,height:20,background:t.bdr,flexShrink:0}}/>
         {Object.values(THEMES).map(th=>(
-          <button key={th.id} onClick={()=>setTheme(th.id)} title={th.name} aria-label={th.name} style={{width:22,height:22,borderRadius:6,border:theme===th.id?`2px solid ${t.acc}`:`1px solid ${t.bdr}`,background:th.bg,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <button key={th.id} onClick={()=>setTheme(th.id)} title={th.name} aria-label={th.name} aria-pressed={theme===th.id} style={{width:22,height:22,borderRadius:6,border:theme===th.id?`2px solid ${t.acc}`:`1px solid ${t.bdr}`,background:th.bg,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
             <div style={{width:10,height:10,borderRadius:3,background:th.acc}}/>
           </button>
         ))}
@@ -1519,7 +1519,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           <canvas ref={canvasRef} style={{display:"block",cursor:cursorStyle,touchAction:"none",background:"transparent"}}
             onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
             onDoubleClick={handleDblClick}/>
-          {loadingImages&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:t.bg+"cc",zIndex:10}}>
+          {loadingImages&&<div role="status" aria-live="polite" style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:t.bg+"cc",zIndex:10}}>
             <div style={{textAlign:"center"}}><div style={{width:28,height:28,border:`3px solid ${t.bdr}`,borderTopColor:t.acc,borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto 10px"}}/><div style={{fontSize:13,color:t.tx2}}>Loading images…</div></div>
           </div>}
           {/* A5: Placing-mode card — floating React panel (was canvas-drawn) */}
@@ -1997,7 +1997,7 @@ export default function CephalometryStudio(){
             <button onClick={()=>setStorageWarn(null)} aria-label="Dismiss warning" style={{background:"none",border:`1px solid ${t.bdr}`,borderRadius:4,color:t.tx2,cursor:"pointer",fontSize:13,padding:"1px 7px",lineHeight:1}}>×</button>
           </div>
         )}
-        {!activeId&&!loaded&&<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",color:t.tx3,fontSize:12}}>Loading your projects…</div>}
+        {!activeId&&!loaded&&<div role="status" aria-live="polite" style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",color:t.tx3,fontSize:12}}>Loading your projects…</div>}
         {!activeId&&loaded&&<HomePage t={t} theme={theme} setTheme={setTheme} projects={projects} onOpen={id=>setActiveId(id)} onCreate={createProject} onImport={importCephxFile} storageEncrypted={secureStorageAvailable()} onClearLocalData={handleClearLocalData}/>}
         {activeId&&activeProject&&(
           <Workspace key={activeId} project={activeProject}
