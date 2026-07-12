@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from "react";
 import { THEMES, TOOLS, PREDEFINED, LUT_PRESETS } from "./constants.js";
 import { SILHOUETTES } from "./silhouettes.js";
-import { uid, clamp, dist, vpts, computeMeasurements, snapPoint, alignTwoPoints, buildScope, evalFormula, getMissingVars } from "./utils.js";
+import { uid, clamp, dist, vpts, computeMeasurements, snapPoint, alignTwoPoints, buildScope, evalFormula, getMissingVars, autoControlPoints, findTangentOnCurve, snapTangentToCurve } from "./utils.js";
 import { generateInterpretation } from "./interpretation.js";
 import { generateReport } from "./reportGenerator.js";
 import { processImageToCanvas, computeHistogram, FloatingHistogram } from "./imageUtils.jsx";
@@ -528,6 +528,12 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     if(partial.type==="curve")m.label=partial.label||`Trace ${typeCount("curve")+1}`;
     if(partial.type==="angle3")m.label=partial.label||`Angle ${typeCount("angle3")+1}`;
     if(partial.type==="angle4")m.label=partial.label||`Inc_Angle ${typeCount("angle4")+1}`;
+    if(partial.type==="ellipse")m.label=partial.label||`Ellipse ${typeCount("ellipse")+1}`;
+    if(partial.type==="arc")m.label=partial.label||`Arc ${typeCount("arc")+1}`;
+    if(partial.type==="circle")m.label=partial.label||`Circle ${typeCount("circle")+1}`;
+    if(partial.type==="bezier")m.label=partial.label||`Bezier ${typeCount("bezier")+1}`;
+    if(partial.type==="tangent")m.label=partial.label||`Tangent ${typeCount("tangent")+1}`;
+    if(partial.type==="concentric")m.label=partial.label||`Concentric ${typeCount("concentric")+1}`;
     if(!m.refLabels&&m.type!=="point"&&m.points&&m.points.length>=1&&m.points.every(p=>p.x>-9000)){
       const refs=m.points.map(p=>{for(const src of markups)if(src.type==="point"&&src.label&&src.points?.length&&src.visible!==false&&Math.abs(src.points[0].x-p.x)<0.5&&Math.abs(src.points[0].y-p.y)<0.5)return src.label;return null;});
       if(refs.every(l=>l))m.refLabels=refs;
@@ -543,7 +549,13 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       angle4:{color:"#c084fc",width:1.5,label:`Inc_Angle ${markups.filter(m=>m.type==="angle4").length+1}`},
       polygon:{strokeColor:t.acc,fillColor:t.acc+"22",strokeWidth:1.5,label:`Polygon ${markups.filter(m=>m.type==="polygon").length+1}`},
       curve:{color:"#fb923c",width:1.5,label:`Trace ${markups.filter(m=>m.type==="curve").length+1}`},
-      perp:{color:"#a78bfa",width:1.5,label:`Perp ${markups.filter(m=>m.type==="perp").length+1}`}
+      perp:{color:"#a78bfa",width:1.5,label:`Perp ${markups.filter(m=>m.type==="perp").length+1}`},
+      ellipse:{color:"#60a5fa",width:1.5,label:`Ellipse ${markups.filter(m=>m.type==="ellipse").length+1}`},
+      arc:{color:"#fb923c",width:1.5,label:`Arc ${markups.filter(m=>m.type==="arc").length+1}`},
+      circle:{color:"#38bdf8",width:1.5,label:`Circle ${markups.filter(m=>m.type==="circle").length+1}`},
+      bezier:{color:"#c084fc",width:1.5,cp:autoControlPoints(draw.points||[]),label:`Bezier ${markups.filter(m=>m.type==="bezier").length+1}`},
+      tangent:{color:"#f97316",width:1.5,label:`Tangent ${markups.filter(m=>m.type==="tangent").length+1}`},
+      concentric:{color:"#60a5fa",width:1.5,count:4,spacing:0.3,label:`Concentric ${markups.filter(m=>m.type==="concentric").length+1}`}
     };
     const newMarkup={...D[draw.type]||{},...draw};
     if(draw.replacingId){
@@ -747,7 +759,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         }
       }
     }
-    if(currentDraw)drawInProgress(ctx,currentDraw,mousePos,zoom,pan,t);
+    if(currentDraw){drawInProgress(ctx,currentDraw,mousePos,zoom,pan,t);}
     if(snapEnabled&&snapPos)drawSnapIndicator(ctx,snapPos,zoom,pan);
     if(boxSelectRect){
       const{x1,y1,x2,y2}=boxSelectRect;
@@ -1028,20 +1040,27 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           dragPtIdx.current=-1;dragStart.current=ip;
           return;
         }
-        if(e.ctrlKey&&(m.type==="curve"||m.type==="polygon")){
+        if(e.ctrlKey&&(m.type==="curve"||m.type==="polygon"||m.type==="bezier")){
           const vp=vpts(m);
           let bestIdx=-1,bestDist=Infinity;
           for(let i=0;i<vp.length;i++){const d=dist(ip,vp[i]);if(d<bestDist){bestDist=d;bestIdx=i;}}
           const newPoints=[...m.points];
           newPoints.splice(bestIdx+1,0,ip);
-          updMarkup(hit,{points:newPoints});
+          const patch={points:newPoints};
+          if(m.type==="bezier")patch.cp=autoControlPoints(newPoints);
+          updMarkup(hit,patch);
           return;
         }
-        if(e.shiftKey&&(m.type==="curve"||m.type==="polygon")){
+        if(e.shiftKey&&(m.type==="curve"||m.type==="polygon"||m.type==="bezier")){
           const vp=vpts(m);
           let bestIdx=-1,bestDist=Infinity;
           for(let i=0;i<vp.length;i++){const d=dist(ip,vp[i]);if(d<bestDist){bestDist=d;bestIdx=i;}}
-          if(bestIdx>=0&&vp.length>2){const newPoints=m.points.filter((_,i)=>i!==bestIdx);updMarkup(hit,{points:newPoints});}
+          if(bestIdx>=0&&vp.length>2){const newPoints=m.points.filter((_,i)=>i!==bestIdx);const patch={points:newPoints};if(m.type==="bezier")patch.cp=autoControlPoints(newPoints);updMarkup(hit,patch);}
+          return;
+        }
+        if(m.type==="bezier"&&hoveredPtRef.current?.type==="bezierCp"){
+          isDragging.current=true;dragMid.current=hit;dragStartState.current=snapshotRef.current();
+          dragPtIdx.current={type:"cp",idx:hoveredPtRef.current.cpIdx};dragStart.current=ip;
           return;
         }
         isDragging.current=true;dragMid.current=hit;dragStartState.current=snapshotRef.current();
@@ -1062,6 +1081,40 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     if(activeTool==="midpoint"){if(!currentDraw)dispatch({type:"SET",payload:{currentDraw:{type:"midpoint",points:[ip]}}});else{const p1=currentDraw.points[0],p2=ip;if(p1.x>-9000&&p2.x>-9000){const mid={x:(p1.x+p2.x)/2,y:(p1.y+p2.y)/2};const n=markups.filter(m=>m.type==="point").length;addMarkup({type:"point",points:[mid],label:`M${n+1}`,color:"#fbbf24",size:6,definition:"Midpoint"});}dispatch({type:"SET",payload:{currentDraw:null}});}return;}
     if(activeTool==="perppoint"){if(!currentDraw)dispatch({type:"SET",payload:{currentDraw:{type:"perppoint",points:[ip]}}});else if(currentDraw.points.length===1)dispatch({type:"SET",payload:{currentDraw:{type:"perppoint",points:[currentDraw.points[0],ip]}}});else{const p1=currentDraw.points[0],p2=currentDraw.points[1],p3=ip;if(p1.x>-9000&&p2.x>-9000&&p3.x>-9000){const lx1=p2.x-p1.x,ly1=p2.y-p1.y;const lx2=-ly1,ly2=lx1;const perpPt={x:p3.x+lx2,y:p3.y+ly2};const n=markups.filter(m=>m.type==="line"||m.type==="perp").length+1;addMarkup({type:"line",mode:"segment",points:[perpPt,p3],color:"#f472b6",width:1.5,style:"solid",label:`⊥${n}`,showLength:true});}dispatch({type:"SET",payload:{currentDraw:null}});}return;}
     if(activeTool==="arrow"){if(!currentDraw)dispatch({type:"SET",payload:{currentDraw:{type:"arrow",points:[ip]}}});else{const p1=currentDraw.points[0],p2=ip;if(p1.x>-9000&&p2.x>-9000){addMarkup({type:"arrow",points:[p1,p2],color:"#34d399",width:2});}dispatch({type:"SET",payload:{currentDraw:null}});}return;}
+    if(activeTool==="tangent"){
+      if(!currentDraw){
+        const thr=25/zoom;
+        const hit=findTangentOnCurve(markups,ip,thr);
+        if(hit){
+          const a=hit.tangentAngle;
+          dispatch({type:"SET",payload:{currentDraw:{type:"tangent",points:[hit.tangentPoint],tangentAngle:a,tangentCurveId:hit.curveId,tangentCenter:hit.curveCenter,tangentRadius:hit.curveRadius}}});
+        }else{
+          dispatch({type:"SET",payload:{currentDraw:{type:"tangent",points:[ip]}}});
+        }
+      }else{
+        const p0=currentDraw.points[0];
+        if(currentDraw.tangentAngle!=null){
+          const a=currentDraw.tangentAngle;
+          const dx=ip.x-p0.x,dy=ip.y-p0.y;
+          const proj=dx*Math.cos(a)+dy*Math.sin(a);
+          const ep={x:p0.x+proj*Math.cos(a),y:p0.y+proj*Math.sin(a)};
+          finalizeMarkup({...currentDraw,points:[p0,ep]});
+        }else{
+          finalizeMarkup({...currentDraw,points:[p0,ip]});
+        }
+        dispatch({type:"SET",payload:{currentDraw:null}});
+      }
+      return;}
+    if(activeTool==="ellipse"||activeTool==="arc"||activeTool==="circle"||activeTool==="concentric"){
+      if(!currentDraw)dispatch({type:"SET",payload:{currentDraw:{type:activeTool,points:[ip],curveStyle:"linear",replacingId}}});
+      else{const nps=[...currentDraw.points,ip];const need={ellipse:3,arc:3,circle:2,concentric:3}[activeTool];
+        if(need&&nps.length>=need){finalizeMarkup({...currentDraw,points:nps});dispatch({type:"SET",payload:{currentDraw:null}});}
+        else dispatch({type:"SET",payload:{currentDraw:{...currentDraw,points:nps}}});}
+      return;}
+    if(activeTool==="bezier"){
+      if(!currentDraw)dispatch({type:"SET",payload:{currentDraw:{type:"bezier",points:[ip],replacingId}}});
+      else{dispatch({type:"SET",payload:{currentDraw:{...currentDraw,points:[...currentDraw.points,ip]}}});}
+      return;}
     if(["line","angle3","angle4","polygon","curve","perp"].includes(activeTool)){
       if(!currentDraw)dispatch({type:"SET",payload:{currentDraw:{type:activeTool,points:[ip],curveStyle:"linear",replacingId}}});
       else{const nps=[...currentDraw.points,ip];const need={line:2,angle3:3,angle4:4,perp:3}[activeTool];if(need&&nps.length>=need){finalizeMarkup({...currentDraw,points:nps});dispatch({type:"SET",payload:{currentDraw:null}});}else dispatch({type:"SET",payload:{currentDraw:{...currentDraw,points:nps}}});}return;}
@@ -1072,11 +1125,11 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     // F1: write pointer state to refs — no dispatch, no React re-render
     mousePosRef.current=sp;
     if(snapEnabled&&activeTool!=="select"&&activeTool!=="pan"){const ip=toImage(sp.x,sp.y);const sn=snapPoint(ip,markups,12/zoom,snapEnabled);snapPosRef.current=(Math.abs(sn.x-ip.x)>0.1||Math.abs(sn.y-ip.y)>0.1)?sn:null;}else snapPosRef.current=null;
-    if(activeTool==="select"&&!isDragging.current&&!silhouetteAction.current){const ip=toImage(sp.x,sp.y);let best=null,bd=Infinity;const ptThr=8/zoom;for(const m2 of markups){if(m2.locked||m2.visible===false)continue;if(m2.type==="point"){const vp=vpts(m2);if(vp.length){const d=dist(ip,vp[0]);if(d<bd&&d<ptThr){bd=d;best={type:"point",mid:m2.id};}}}if(m2.type==="silhouette"){const paths=m2.paths||SILHOUETTES[m2.silhouetteType]?.paths;if(!paths)continue;const rot=m2.rotation||0;const sc=m2.scale||1;const pos=m2.position||{x:0,y:0};const cosR=Math.cos(rot);const sinR=Math.sin(rot);paths.forEach((path,pi)=>{path.points.forEach((p,ptI)=>{const sx=p.x*sc*100;const sy=p.y*100;const rx=sx*cosR-sy*sinR;const ry=sx*sinR+sy*cosR;const d=dist(ip,{x:rx+pos.x,y:ry+pos.y});if(d<bd&&d<ptThr){bd=d;best={type:"silhouette",mid:m2.id,pathIdx:pi,ptIdx:ptI};}});});if(m2.id===selectedId){try{const h=getSilhouetteHandlesImage(m2,zoom);const rotThr=Math.max(10,22*Math.sqrt(zoom))/zoom;if(h.rotCenter&&isFinite(h.rotCenter.x)){const d=dist(ip,h.rotCenter);if(d<rotThr&&d<bd){bd=d;best={type:"rotate",mid:m2.id};}}const cornerThr=Math.max(8,12*Math.sqrt(zoom))/zoom;h.corners.forEach((c,ci)=>{if(isFinite(c.x)){const d=dist(ip,c);if(d<cornerThr&&d<bd){bd=d;best={type:"corner",mid:m2.id,cornerIdx:ci};}}});}catch{/*silent*/}}}else if(m2.type==="curve"||m2.type==="polygon"){(m2.points||[]).forEach((p,i)=>{const d=dist(ip,p);if(d<bd&&d<ptThr){bd=d;best={type:"path",mid:m2.id,ptIdx:i};}});}}hoveredPtRef.current=best;}else{hoveredPtRef.current=null;}
+    if(activeTool==="select"&&!isDragging.current&&!silhouetteAction.current){const ip=toImage(sp.x,sp.y);let best=null,bd=Infinity;const ptThr=8/zoom;for(const m2 of markups){if(m2.locked||m2.visible===false)continue;if(m2.type==="point"){const vp=vpts(m2);if(vp.length){const d=dist(ip,vp[0]);if(d<bd&&d<ptThr){bd=d;best={type:"point",mid:m2.id};}}}if(m2.type==="silhouette"){const paths=m2.paths||SILHOUETTES[m2.silhouetteType]?.paths;if(!paths)continue;const rot=m2.rotation||0;const sc=m2.scale||1;const pos=m2.position||{x:0,y:0};const cosR=Math.cos(rot);const sinR=Math.sin(rot);paths.forEach((path,pi)=>{path.points.forEach((p,ptI)=>{const sx=p.x*sc*100;const sy=p.y*100;const rx=sx*cosR-sy*sinR;const ry=sx*sinR+sy*cosR;const d=dist(ip,{x:rx+pos.x,y:ry+pos.y});if(d<bd&&d<ptThr){bd=d;best={type:"silhouette",mid:m2.id,pathIdx:pi,ptIdx:ptI};}});});if(m2.id===selectedId){try{const h=getSilhouetteHandlesImage(m2,zoom);const rotThr=Math.max(10,22*Math.sqrt(zoom))/zoom;if(h.rotCenter&&isFinite(h.rotCenter.x)){const d=dist(ip,h.rotCenter);if(d<rotThr&&d<bd){bd=d;best={type:"rotate",mid:m2.id};}}const cornerThr=Math.max(8,12*Math.sqrt(zoom))/zoom;h.corners.forEach((c,ci)=>{if(isFinite(c.x)){const d=dist(ip,c);if(d<cornerThr&&d<bd){bd=d;best={type:"corner",mid:m2.id,cornerIdx:ci};}}});}catch{/*silent*/}}        }else if(m2.type==="curve"||m2.type==="polygon"||m2.type==="bezier"){(m2.points||[]).forEach((p,i)=>{const d=dist(ip,p);if(d<bd&&d<ptThr){bd=d;best={type:m2.type==="bezier"?"bezier":"path",mid:m2.id,ptIdx:i};}});if(m2.type==="bezier"&&m2.cp){m2.cp.forEach((p,i)=>{const d=dist(ip,p);if(d<bd&&d<ptThr){bd=d;best={type:"bezierCp",mid:m2.id,cpIdx:i};}});}}}hoveredPtRef.current=best;}else{hoveredPtRef.current=null;}
     if(boxSelectRectRef.current){const ip=toImage(sp.x,sp.y);boxSelectRectRef.current={...boxSelectRectRef.current,x2:ip.x,y2:ip.y};scheduleRedrawRef.current();return;}
     if(isPanning.current&&panStart.current){panRef.current={x:panStart.current.px+(e.clientX-panStart.current.mx),y:panStart.current.py+(e.clientY-panStart.current.my)};scheduleRedrawRef.current();return;}
     if(isDragging.current&&multiDragIdsRef.current){const ip=toImage(sp.x,sp.y);const dx=ip.x-dragStart.current.x,dy=ip.y-dragStart.current.y;const ids=multiDragIdsRef.current;updMarkups(ms=>ms.map(m=>{if(!ids.includes(m.id))return m;if(m.type==="silhouette")return{...m,position:{x:(m.position?.x||0)+dx,y:(m.position?.y||0)+dy}};return{...m,points:(m.points||[]).map(p=>p.x>-9000?{x:p.x+dx,y:p.y+dy}:p)};}));dragStart.current=ip;scheduleRedrawRef.current();return;}
-    if(isDragging.current&&dragMid.current){const ip=toImage(sp.x,sp.y);const dx=ip.x-dragStart.current.x,dy=ip.y-dragStart.current.y;const m=markups.find(x=>x.id===dragMid.current);if(!m)return;if(m.type==="silhouette"){if(typeof dragPtIdx.current==="object"&&dragPtIdx.current!==null){const sc=m.scale||1;const rot=m.rotation||0;const cosR=Math.cos(rot);const sinR=Math.sin(rot);const baseSize=100;const dnx=(cosR*dx+sinR*dy)/(sc*baseSize);const dny=(-sinR*dx+cosR*dy)/(sc*baseSize);const{pathIdx,ptIdx}=dragPtIdx.current;updMarkup(dragMid.current,{paths:(m.paths||[]).map((path,pi)=>({...path,points:path.points.map((p,ptI)=>pi===pathIdx&&ptI===ptIdx?{x:p.x+dnx,y:p.y+dny}:p)}))});}else{updMarkup(dragMid.current,{position:{x:(m.position?.x||0)+dx,y:(m.position?.y||0)+dy}});}}else{updMarkup(dragMid.current,{points:(m.points||[]).map((p,i)=>i===dragPtIdx.current?{x:p.x+dx,y:p.y+dy}:p)});}dragStart.current=ip;scheduleRedrawRef.current();}
+    if(isDragging.current&&dragMid.current){const ip=toImage(sp.x,sp.y);const dx=ip.x-dragStart.current.x,dy=ip.y-dragStart.current.y;const m=markups.find(x=>x.id===dragMid.current);if(!m)return;if(m.type==="silhouette"){if(typeof dragPtIdx.current==="object"&&dragPtIdx.current!==null){const sc=m.scale||1;const rot=m.rotation||0;const cosR=Math.cos(rot);const sinR=Math.sin(rot);const baseSize=100;const dnx=(cosR*dx+sinR*dy)/(sc*baseSize);const dny=(-sinR*dx+cosR*dy)/(sc*baseSize);const{pathIdx,ptIdx}=dragPtIdx.current;updMarkup(dragMid.current,{paths:(m.paths||[]).map((path,pi)=>({...path,points:path.points.map((p,ptI)=>pi===pathIdx&&ptI===ptIdx?{x:p.x+dnx,y:p.y+dny}:p)}))});}else{updMarkup(dragMid.current,{position:{x:(m.position?.x||0)+dx,y:(m.position?.y||0)+dy}});}}else if(m.type==="tangent"&&dragPtIdx.current===0&&m.tangentCurveId){const curve=markups.find(c=>c.id===m.tangentCurveId);if(curve){const raw={x:(m.points[0]||{}).x+dx,y:(m.points[0]||{}).y+dy};const snapped=snapTangentToCurve(curve,raw);if(snapped){const ep=m.points[1]||raw;const a=snapped.tangentAngle;const dex=ep.x-snapped.tangentPoint.x,dey=ep.y-snapped.tangentPoint.y;const proj=dex*Math.cos(a)+dey*Math.sin(a);const newEp={x:snapped.tangentPoint.x+proj*Math.cos(a),y:snapped.tangentPoint.y+proj*Math.sin(a)};updMarkup(dragMid.current,{points:[snapped.tangentPoint,newEp],tangentAngle:snapped.tangentAngle});}}else{updMarkup(dragMid.current,{points:(m.points||[]).map((p,i)=>i===0?{x:p.x+dx,y:p.y+dy}:p)});}}else if(m.type==="bezier"&&typeof dragPtIdx.current==="object"&&dragPtIdx.current?.type==="cp"){const cp=[...(m.cp||[])];const ci=dragPtIdx.current.idx;if(ci<cp.length)cp[ci]={x:cp[ci].x+dx,y:cp[ci].y+dy};updMarkup(dragMid.current,{cp});}else if(m.type==="bezier"&&typeof dragPtIdx.current==="number"&&dragPtIdx.current>=0){const ni=dragPtIdx.current;const pts=(m.points||[]).map((p,i)=>i===ni?{x:p.x+dx,y:p.y+dy}:p);const cp=Array.isArray(m.cp)?[...(m.cp)]:[];if(cp.length===2*(pts.length-1)){if(ni>0&&cp[2*ni-1])cp[2*ni-1]={x:cp[2*ni-1].x+dx,y:cp[2*ni-1].y+dy};if(ni<pts.length-1&&cp[2*ni])cp[2*ni]={x:cp[2*ni].x+dx,y:cp[2*ni].y+dy};}updMarkup(dragMid.current,{points:pts,cp});}else{updMarkup(dragMid.current,{points:(m.points||[]).map((p,i)=>i===dragPtIdx.current?{x:p.x+dx,y:p.y+dy}:p)});}dragStart.current=ip;scheduleRedrawRef.current();}
     if(silhouetteAction.current){
       try {
         const ip=toImage(sp.x,sp.y);const sa=silhouetteAction.current;
@@ -1095,7 +1148,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         scheduleRedrawRef.current();
       } catch { silhouetteAction.current=null; /*silent*/ }
     }
-  },[activeTool,markups,zoom,snapEnabled,selectedId,updMarkup,updMarkups,toImage,getCanvasPos]);
+  },[activeTool,markups,zoom,snapEnabled,selectedId,updMarkup,updMarkups,toImage,getCanvasPos,currentDraw?.type]);
 
   const handleMouseUp=()=>{
     if(boxSelectRectRef.current){
@@ -1124,7 +1177,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     }
     isPanning.current=false;isDragging.current=false;silhouetteAction.current=null;multiDragIdsRef.current=null;
   };
-  const handleDblClick=()=>{if((activeTool==="polygon"||activeTool==="curve")&&currentDraw?.points.length>=2){finalizeMarkup(currentDraw);dispatch({type:"SET",payload:{currentDraw:null}});}};
+  const handleDblClick=()=>{if((["polygon","curve","bezier"].includes(activeTool))&&currentDraw?.points.length>=2){finalizeMarkup(currentDraw);dispatch({type:"SET",payload:{currentDraw:null}});}};
   useEffect(()=>{const c=canvasRef.current;if(!c)return;const onWheel=e=>{if(Math.abs(e.deltaY)>0.1||Math.abs(e.deltaX)>0.1){e.preventDefault();e.stopPropagation();const sp=getCanvasPos(e),f=e.deltaY>0?0.9:1.1,nz=clamp(zoom*f,0.05,15);const prev=panRef.current;panRef.current={x:sp.x-(sp.x-prev.x)*(nz/zoom),y:sp.y-(sp.y-prev.y)*(nz/zoom)};dispatch({type:"SET",payload:{pan:panRef.current}});dispatch({type:"SET",payload:{zoom:nz}});}};c.addEventListener("wheel",onWheel,{passive:false});return()=>c.removeEventListener("wheel",onWheel);},[zoom,dispatch,getCanvasPos]);
   const touchStartRef=useRef();const touchMoveRef=useRef();const touchEndRef=useRef();
   touchStartRef.current=e=>{
@@ -1426,6 +1479,21 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
                 <ToolBtn tool={{id:"arrow",icon:"→",label:"Arrow"}} active={activeTool==="arrow"} onClick={()=>{setActiveTool("arrow");dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
                 <ToolBtn tool={{id:"text",icon:"T",label:"Text"}} active={activeTool==="text"} onClick={()=>{setActiveTool("text");dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
               </div>
+              {/* Row 7b: Ellipse | Arc */}
+              <div style={{display:"flex",gap:1}}>
+                <ToolBtn tool={{id:"ellipse",icon:"◯",label:"Ellipse"}} active={activeTool==="ellipse"} onClick={()=>{setActiveTool("ellipse");dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
+                <ToolBtn tool={{id:"arc",icon:"◠",label:"Arc"}} active={activeTool==="arc"} onClick={()=>{setActiveTool("arc");dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
+              </div>
+              {/* Row 7c: Circle | Bezier */}
+              <div style={{display:"flex",gap:1}}>
+                <ToolBtn tool={{id:"circle",icon:"⊙",label:"Circle"}} active={activeTool==="circle"} onClick={()=>{setActiveTool("circle");dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
+                <ToolBtn tool={{id:"bezier",icon:"≂",label:"Bezier"}} active={activeTool==="bezier"} onClick={()=>{setActiveTool("bezier");dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
+              </div>
+              {/* Row 7d: Tangent | Concentric */}
+              <div style={{display:"flex",gap:1}}>
+                <ToolBtn tool={{id:"tangent",icon:"⊸",label:"Tangent"}} active={activeTool==="tangent"} onClick={()=>{setActiveTool("tangent");dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
+                <ToolBtn tool={{id:"concentric",icon:"◎",label:"Concentric"}} active={activeTool==="concentric"} onClick={()=>{setActiveTool("concentric");dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
+              </div>
               {/* Row 8: Ruler (centered) */}
               <div style={{display:"flex",justifyContent:"center"}}>
                 <ToolBtn tool={{id:"ruler",icon:"⟺",label:"Ruler"}} active={activeTool==="ruler"} onClick={()=>{setActiveTool("ruler");dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t}/>
@@ -1475,6 +1543,9 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
             [{id:"parallel",icon:"⫿",label:"Parallel"},{id:"perppoint",icon:"⊦",label:"Perp Pt"}],
             [{id:"perp",icon:"⊥",label:"Perp Dist"},{id:"text",icon:"T",label:"Text"}],
             [{id:"curve",icon:"∿",label:"Curve"},{id:"polygon",icon:"⬡",label:"Polygon"}],
+            [{id:"ellipse",icon:"◯",label:"Ellipse"},{id:"arc",icon:"◠",label:"Arc"}],
+            [{id:"circle",icon:"⊙",label:"Circle"},{id:"bezier",icon:"≂",label:"Bezier"}],
+            [{id:"tangent",icon:"⊸",label:"Tangent"},{id:"concentric",icon:"◎",label:"Concentric"}],
           ];
           return(<>
             {/* Collapsed bar — horizontal scroll row */}
@@ -1542,10 +1613,10 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
               </div>
             );
           })()}
-          {!isMobile&&<div style={{position:"absolute",bottom:isMobile?60:8,left:30,display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
+          {!isMobile&&<div style={{position:"absolute",bottom:34,left:30,display:"flex",gap:6,alignItems:"center",flexWrap:"wrap"}}>
             {/* F1: coordinates now drawn on canvas in redraw() — no DOM element needed */}
             {currentDraw&&<div style={{background:t.acc+"22",border:`1px solid ${t.acc}`,borderRadius:6,padding:"3px 10px",fontSize:11,color:t.acc,fontFamily:"'DM Mono',monospace"}}>
-              {["polygon","curve"].includes(activeTool)?`${currentDraw.points.length} pts · ${isMobile?"double-tap to finish":"dbl-click to finish"}`:(()=>{const n={line:2,angle3:3,angle4:4,perp:3,ruler:2}[activeTool];return`${currentDraw.points.length}/${n}`;})()}
+              {["polygon","curve","bezier"].includes(activeTool)?`${currentDraw.points.length} pts · ${isMobile?"double-tap to finish":"dbl-click to finish"}`:activeTool==="tangent"?`${currentDraw.points.length===1?(currentDraw.tangentAngle!=null?"tangent snapped · click for endpoint":"click 2nd point"):""}`:(()=>{const n={line:2,angle3:3,angle4:4,perp:3,ruler:2,ellipse:3,arc:3,circle:2,tangent:2,concentric:3}[activeTool];return n?`${currentDraw.points.length}/${n}`:`${currentDraw.points.length} pts`;})()}
             </div>}
           </div>}
           {/* Floating session filmstrip at bottom — collapsible to the left (desktop only) */}

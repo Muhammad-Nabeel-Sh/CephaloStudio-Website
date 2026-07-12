@@ -1,4 +1,4 @@
-import { clamp, dist, angle3pt, angle4pt, perpDist, polyArea, polyLen, vpts, catmullRom, splineArea, splineLen, getInfiniteLinePoints, projectedDistance } from "./utils.js";
+import { clamp, dist, angle3pt, angle4pt, perpDist, polyArea, polyLen, vpts, catmullRom, splineArea, splineLen, getInfiniteLinePoints, projectedDistance, fitEllipse, circleFrom3pts, autoControlPoints, distToMultiBezier, distToEllipse, distToArc } from "./utils.js";
 import { SILHOUETTES } from "./silhouettes.js";
 import { LUT_PRESETS } from "./constants.js";
 
@@ -86,6 +86,24 @@ export function drawMarkup(ctx, m, zoom, pan, cal, sel, t, reproCollecting, canv
         break;
       case "silhouette":
         drawSilhouette(ctx, m, isSel, t, zoom, pan, showAnnotations, annotationSize, hoveredPt);
+        break;
+      case "ellipse":
+        drawEllipse(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt);
+        break;
+      case "arc":
+        drawArc(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt);
+        break;
+      case "circle":
+        drawCircle(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt);
+        break;
+      case "bezier":
+        drawBezier(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt, pan);
+        break;
+      case "tangent":
+        drawTangent(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize);
+        break;
+      case "concentric":
+        drawConcentric(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize);
         break;
     }
   } catch { /*silent*/ }
@@ -567,6 +585,221 @@ function drawRuler(ctx, m, sp, t, zoom, showAnnotations, annotationSize = 1){
   }
 }
 
+function drawEllipse(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt) {
+  if (sp.length < 3) return;
+  const ell = fitEllipse(sp);
+  if (!ell) return;
+  const cx = ell.cx, cy = ell.cy;
+  const rx = ell.rx, ry = ell.ry;
+  ctx.strokeStyle = m.color || t.acc;
+  ctx.lineWidth = (m.width || 1.5) * Math.sqrt(zoom);
+  if (m.style === "dashed") ctx.setLineDash([6 * zoom, 4 * zoom]);
+  else if (m.style === "dotted") ctx.setLineDash([2 * zoom, 3 * zoom]);
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, ell.rotation, 0, 2 * Math.PI);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  sp.forEach((p, i) => {
+    const isH = hoveredPt && hoveredPt.type === "ellipse" && hoveredPt.mid === m.id && hoveredPt.ptIdx === i;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, (isSel || isH ? 5 : 3.5) * Math.sqrt(zoom), 0, 2 * Math.PI);
+    ctx.fillStyle = isH ? "#fff" : (m.color || t.acc);
+    ctx.fill();
+    if (isSel) { ctx.strokeStyle = t.acc; ctx.lineWidth = 1.5; ctx.stroke(); }
+  });
+  if (showAnnotations && !m.noLabel) {
+    drawMeasLabel(ctx, m.label || "Ellipse", cx, cy - ry - 10, showAnnotations, annotationSize, m, m.color || t.acc);
+  }
+}
+
+function drawArc(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt) {
+  if (sp.length < 3) return;
+  const c = circleFrom3pts(sp[0], sp[1], sp[2]);
+  if (!c) { ctx.beginPath(); sp.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)); ctx.stroke(); return; }
+  const cx = c.cx, cy = c.cy;
+  const r = c.r;
+  let a1 = Math.atan2(sp[0].y - cy, sp[0].x - cx);
+  let a2 = Math.atan2(sp[1].y - cy, sp[1].x - cx);
+  let a3 = Math.atan2(sp[2].y - cy, sp[2].x - cx);
+  const norm = a => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  a1 = norm(a1); a2 = norm(a2); a3 = norm(a3);
+  let start = a1, sweep = norm(a3 - a1);
+  if (norm(a2 - a1) > sweep) { start = a3; sweep = 2 * Math.PI - sweep; }
+  ctx.strokeStyle = m.color || "#fb923c";
+  ctx.lineWidth = (m.width || 1.5) * Math.sqrt(zoom);
+  if (m.style === "dashed") ctx.setLineDash([6 * zoom, 4 * zoom]);
+  else if (m.style === "dotted") ctx.setLineDash([2 * zoom, 3 * zoom]);
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, start, start + sweep);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  sp.forEach((p, i) => {
+    const isH = hoveredPt && hoveredPt.type === "arc" && hoveredPt.mid === m.id && hoveredPt.ptIdx === i;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, (isSel || isH ? 5 : 3.5) * Math.sqrt(zoom), 0, 2 * Math.PI);
+    ctx.fillStyle = isH ? "#fff" : (m.color || "#fb923c");
+    ctx.fill();
+    if (isSel) { ctx.strokeStyle = t.acc; ctx.lineWidth = 1.5; ctx.stroke(); }
+  });
+  if (showAnnotations && !m.noLabel) {
+    const mid = { x: (sp[0].x + sp[2].x) / 2, y: (sp[0].y + sp[2].y) / 2 };
+    drawMeasLabel(ctx, m.label || "Arc", mid.x, mid.y - 10, showAnnotations, annotationSize, m, m.color || "#fb923c");
+  }
+}
+
+function drawCircle(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt) {
+  if (sp.length < 2) return;
+  const r = dist(sp[0], sp[1]);
+  const cx = sp[0].x, cy = sp[0].y, cr = r;
+  ctx.strokeStyle = m.color || "#38bdf8";
+  ctx.lineWidth = (m.width || 1.5) * Math.sqrt(zoom);
+  if (m.style === "dashed") ctx.setLineDash([6 * zoom, 4 * zoom]);
+  else if (m.style === "dotted") ctx.setLineDash([2 * zoom, 3 * zoom]);
+  ctx.beginPath();
+  ctx.arc(cx, cy, cr, 0, 2 * Math.PI);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  sp.forEach((p, i) => {
+    const isH = hoveredPt && hoveredPt.type === "circle" && hoveredPt.mid === m.id && hoveredPt.ptIdx === i;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, (isSel || isH ? 5 : 3.5) * Math.sqrt(zoom), 0, 2 * Math.PI);
+    ctx.fillStyle = isH ? "#fff" : (m.color || "#38bdf8");
+    ctx.fill();
+    if (isSel) { ctx.strokeStyle = t.acc; ctx.lineWidth = 1.5; ctx.stroke(); }
+  });
+  if (showAnnotations && !m.noLabel) {
+    drawMeasLabel(ctx, m.label || "Circle", cx, cy - cr - 10, showAnnotations, annotationSize, m, m.color || "#38bdf8");
+  }
+}
+
+function drawBezier(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt, pan) {
+  if (sp.length < 2) return;
+  const cp = (m.cp && m.cp.length === 2 * (sp.length - 1))
+    ? m.cp.map(p => ({ x: p.x * zoom + pan.x, y: p.y * zoom + pan.y }))
+    : autoControlPoints(sp);
+  ctx.strokeStyle = m.color || "#c084fc";
+  ctx.lineWidth = (m.width || 1.5) * Math.sqrt(zoom);
+  if (m.style === "dashed") ctx.setLineDash([6 * zoom, 4 * zoom]);
+  else if (m.style === "dotted") ctx.setLineDash([2 * zoom, 3 * zoom]);
+  ctx.beginPath();
+  ctx.moveTo(sp[0].x, sp[0].y);
+  for (let i = 0; i < sp.length - 1; i++) {
+    ctx.bezierCurveTo(cp[2 * i].x, cp[2 * i].y, cp[2 * i + 1].x, cp[2 * i + 1].y, sp[i + 1].x, sp[i + 1].y);
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+  if (isSel) {
+    ctx.strokeStyle = m.color + "44";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3 * zoom, 3 * zoom]);
+    for (let i = 0; i < sp.length - 1; i++) {
+      ctx.beginPath();
+      ctx.moveTo(sp[i].x, sp[i].y); ctx.lineTo(cp[2 * i].x, cp[2 * i].y);
+      ctx.moveTo(cp[2 * i + 1].x, cp[2 * i + 1].y); ctx.lineTo(sp[i + 1].x, sp[i + 1].y);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+  cp.forEach((p, i) => {
+    const isH = hoveredPt && hoveredPt.type === "bezierCp" && hoveredPt.mid === m.id && hoveredPt.cpIdx === i;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, (isSel || isH ? 4 : 2.5) * Math.sqrt(zoom), 0, 2 * Math.PI);
+    ctx.fillStyle = isH ? "#fff" : (m.color || "#c084fc") + "88";
+    ctx.fill();
+  });
+  sp.forEach((p, i) => {
+    const isH = hoveredPt && hoveredPt.type === "bezier" && hoveredPt.mid === m.id && hoveredPt.ptIdx === i;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, (isSel || isH ? 5 : 3.5) * Math.sqrt(zoom), 0, 2 * Math.PI);
+    ctx.fillStyle = isH ? "#fff" : (m.color || "#c084fc");
+    ctx.fill();
+    if (isSel) { ctx.strokeStyle = t.acc; ctx.lineWidth = 1.5; ctx.stroke(); }
+  });
+  if (showAnnotations && !m.noLabel) {
+    const mid = sp[Math.floor(sp.length / 2)];
+    drawMeasLabel(ctx, m.label || "Bezier", mid.x, mid.y - 10, showAnnotations, annotationSize, m, m.color || "#c084fc");
+  }
+}
+
+function drawTangent(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize) {
+  if (sp.length < 2) return;
+  ctx.strokeStyle = m.color || "#fbbf24";
+  ctx.lineWidth = (m.width || 1.5) * Math.sqrt(zoom);
+  if (m.style === "dashed") ctx.setLineDash([6 * zoom, 4 * zoom]);
+  else if (m.style === "dotted") ctx.setLineDash([2 * zoom, 3 * zoom]);
+  ctx.beginPath();
+  ctx.moveTo(sp[0].x, sp[0].y);
+  ctx.lineTo(sp[1].x, sp[1].y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  if (m.tangentAngle != null) {
+    const tAngle = m.tangentAngle;
+    const rAngle = tAngle - Math.PI / 2;
+    const sq = 6 * Math.sqrt(zoom);
+    const ox = Math.cos(rAngle) * sq, oy = Math.sin(rAngle) * sq;
+    const tx = Math.cos(tAngle) * sq, ty = Math.sin(tAngle) * sq;
+    ctx.beginPath();
+    ctx.strokeStyle = (m.color || "#fbbf24") + "88";
+    ctx.lineWidth = 1;
+    ctx.moveTo(sp[0].x + ox, sp[0].y + oy);
+    ctx.lineTo(sp[0].x + ox + tx, sp[0].y + oy + ty);
+    ctx.lineTo(sp[0].x + tx, sp[0].y + ty);
+    ctx.stroke();
+  }
+  sp.forEach((p) => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, (isSel ? 4 : 3) * Math.sqrt(zoom), 0, 2 * Math.PI);
+    ctx.fillStyle = m.color || "#fbbf24";
+    ctx.fill();
+  });
+  if (showAnnotations && !m.noLabel) {
+    const mid = { x: (sp[0].x + sp[1].x) / 2, y: (sp[0].y + sp[1].y) / 2 };
+    drawMeasLabel(ctx, m.label || "Tangent", mid.x, mid.y - 10, showAnnotations, annotationSize, m, m.color || "#fbbf24");
+  }
+}
+
+function drawConcentric(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize) {
+  if (sp.length < 3) return;
+  const c = circleFrom3pts(sp[0], sp[1], sp[2]);
+  if (!c) return;
+  const cx = c.cx, cy = c.cy;
+  const r = c.r;
+  let a1 = Math.atan2(sp[0].y - cy, sp[0].x - cx);
+  let a2 = Math.atan2(sp[1].y - cy, sp[1].x - cx);
+  let a3 = Math.atan2(sp[2].y - cy, sp[2].x - cx);
+  const norm = a => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  a1 = norm(a1); a2 = norm(a2); a3 = norm(a3);
+  let start = a1, sweep = norm(a3 - a1);
+  if (norm(a2 - a1) > sweep) { start = a3; sweep = 2 * Math.PI - sweep; }
+  const count = m.count || 4;
+  const spacing = m.spacing || 0.3;
+  const offsets = m.offsets || Array.from({ length: count }, (_, i) => i * spacing);
+  const baseColor = m.color || "#60a5fa";
+  if (m.style === "dashed") ctx.setLineDash([6 * zoom, 4 * zoom]);
+  else if (m.style === "dotted") ctx.setLineDash([2 * zoom, 3 * zoom]);
+  offsets.forEach((off, i) => {
+    const rr = r * (1 + off);
+    const alpha = Math.max(0.3, 1 - i * (0.7 / Math.max(offsets.length - 1, 1)));
+    ctx.strokeStyle = baseColor;
+    ctx.globalAlpha = alpha;
+    ctx.lineWidth = (m.width || 1.5) * Math.sqrt(zoom);
+    ctx.beginPath();
+    ctx.arc(cx, cy, rr, start, start + sweep);
+    ctx.stroke();
+  });
+  ctx.globalAlpha = 1;
+  ctx.setLineDash([]);
+  sp.forEach((p) => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, (isSel ? 5 : 3.5) * Math.sqrt(zoom), 0, 2 * Math.PI);
+    ctx.fillStyle = baseColor;
+    ctx.fill();
+  });
+  if (showAnnotations && !m.noLabel) {
+    drawMeasLabel(ctx, m.label || "Concentric", cx, cy - r * (1 + offsets[offsets.length - 1]) - 10, showAnnotations, annotationSize, m, baseColor);
+  }
+}
+
 function drawSilhouette(ctx, m, isSel, t, zoom, pan, showAnnotations, annotationSize, hoveredPt = null) {
   try {
   const paths = m.paths || SILHOUETTES[m.silhouetteType]?.paths;
@@ -791,6 +1024,96 @@ export function drawInProgress(ctx, draw, mp, zoom, pan, t){
     ctx.closePath();
     ctx.fillStyle = "#34d399";
     ctx.fill();
+  }
+  else if(draw.type === "ellipse" && sp.length >= 2 && mp){
+    const pts = [...sp, mp];
+    const ell = fitEllipse(pts);
+    if(ell){
+      ctx.beginPath();
+      ctx.ellipse(ell.cx, ell.cy, ell.rx, ell.ry, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    pts.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fillStyle = t.acc; ctx.fill(); });
+  }
+  else if(draw.type === "arc" && sp.length >= 2 && mp){
+    const pts = [...sp, mp];
+    const c = circleFrom3pts(pts[0], pts[1], pts[2]);
+    if(c){
+      let a1 = Math.atan2(pts[0].y - c.cy, pts[0].x - c.cx);
+      let a2 = Math.atan2(pts[1].y - c.cy, pts[1].x - c.cx);
+      let a3 = Math.atan2(pts[2].y - c.cy, pts[2].x - c.cx);
+      const norm = a => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+      a1 = norm(a1); a2 = norm(a2); a3 = norm(a3);
+      let start = a1, sweep = norm(a3 - a1);
+      if(norm(a2 - a1) > sweep){ start = a3; sweep = 2 * Math.PI - sweep; }
+      ctx.beginPath();
+      ctx.arc(c.cx, c.cy, c.r, start, start + sweep);
+      ctx.stroke();
+    }
+    pts.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fillStyle = t.acc; ctx.fill(); });
+  }
+  else if(draw.type === "circle" && sp.length === 1 && mp){
+    const r = dist(sp[0], mp);
+    ctx.beginPath();
+    ctx.arc(sp[0].x, sp[0].y, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  else if(draw.type === "bezier" && sp.length >= 1 && mp){
+    const pts = [...sp, mp];
+    if(pts.length >= 2){
+      const cp = autoControlPoints(pts);
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for(let i = 0; i < pts.length - 1; i++){
+        ctx.bezierCurveTo(cp[2*i].x, cp[2*i].y, cp[2*i+1].x, cp[2*i+1].y, pts[i+1].x, pts[i+1].y);
+      }
+      ctx.stroke();
+      ctx.strokeStyle = t.acc + "44";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      for(let i = 0; i < pts.length - 1; i++){
+        ctx.beginPath();
+        ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(cp[2*i].x, cp[2*i].y);
+        ctx.moveTo(cp[2*i+1].x, cp[2*i+1].y); ctx.lineTo(pts[i+1].x, pts[i+1].y);
+        ctx.stroke();
+      }
+      ctx.setLineDash([]);
+    }
+    pts.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fillStyle = t.acc; ctx.fill(); });
+  }
+  else if(draw.type === "tangent" && sp.length === 1 && mp){
+    if(draw.tangentAngle != null){
+      const p0=sp[0];
+      const a=draw.tangentAngle;
+      const dx=mp.x-p0.x,dy=mp.y-p0.y;
+      const proj=dx*Math.cos(a)+dy*Math.sin(a);
+      const ep={x:p0.x+proj*Math.cos(a),y:p0.y+proj*Math.sin(a)};
+      ctx.beginPath();
+      ctx.moveTo(p0.x,p0.y);
+      ctx.lineTo(ep.x,ep.y);
+      ctx.stroke();
+    }else{
+      ctx.beginPath();
+      ctx.moveTo(sp[0].x,sp[0].y);
+      ctx.lineTo(mp.x,mp.y);
+      ctx.stroke();
+    }
+  }
+  else if(draw.type === "concentric" && sp.length >= 2 && mp){
+    const pts = [...sp, mp];
+    if(pts.length >= 3){
+      const c = circleFrom3pts(pts[0], pts[1], pts[2]);
+      if(c){
+        const count = draw.count || 4;
+        const spacing = draw.spacing || 0.3;
+        Array.from({ length: count }, (_, i) => i * spacing).forEach(off => {
+          ctx.beginPath();
+          ctx.arc(c.cx, c.cy, c.r * (1 + off), 0, Math.PI * 2);
+          ctx.stroke();
+        });
+      }
+    }
+    pts.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fillStyle = t.acc; ctx.fill(); });
   }
   else if(sp.length === 1 && mp){
     ctx.beginPath();
@@ -1305,6 +1628,35 @@ export function hitTest(markups, ip, zoom, reproCollecting){
     if(m.type === "perp" && vp.length >= 3 && dist(vp[2], ip) < thr * 2) return m.id;
     if(m.type === "text" && vp.length && dist(vp[0], ip) < thr * 4) return m.id;
     if(m.type === "silhouette" && silhouetteHitTest(m, ip, zoom)) return m.id;
+    if(m.type === "ellipse" && vp.length >= 3){
+      const ell = fitEllipse(vp);
+      if(ell){ const d = distToEllipse(ip, ell.cx, ell.cy, ell.rx, ell.ry); if(d !== null && d < thr) return m.id; }
+    }
+    if(m.type === "arc" && vp.length >= 3){
+      const d = distToArc(ip, vp[0], vp[1], vp[2]);
+      if(d !== null && d < thr) return m.id;
+    }
+    if(m.type === "circle" && vp.length >= 2){
+      const r = dist(vp[0], vp[1]);
+      if(Math.abs(dist(vp[0], ip) - r) < thr) return m.id;
+    }
+    if(m.type === "bezier" && vp.length >= 2){
+      const cp = (m.cp && m.cp.length === 2 * (vp.length - 1)) ? m.cp : autoControlPoints(vp);
+      const d = distToMultiBezier(ip, vp, cp);
+      if(d < thr) return m.id;
+    }
+    if(m.type === "tangent" && vp.length >= 2 && perpDist(ip, vp[0], vp[1]) < thr) return m.id;
+    if(m.type === "concentric" && vp.length >= 3){
+      const c = circleFrom3pts(vp[0], vp[1], vp[2]);
+      if(c){
+        const count = m.count || 4;
+        const spacing = m.spacing || 0.3;
+        const offsets = m.offsets || Array.from({ length: count }, (_, i) => i * spacing);
+        const dCenter = dist(ip, { x: c.cx, y: c.cy });
+        const matches = offsets.some(off => Math.abs(dCenter - c.r * (1 + off)) < thr * 2);
+        if(matches) return m.id;
+      }
+    }
   }
   
   return null;

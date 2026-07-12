@@ -144,6 +144,33 @@ export function computeMeasurements(m, cal) {
       if (totalArea > 0) meas.area = totalArea / (ppm * ppm);
     }
   }
+  if (m.type === "ellipse" && vp.length >= 3) {
+    const ell = fitEllipse(vp);
+    if (ell) {
+      meas.majorAxis = Math.max(ell.rx, ell.ry) * 2 / ppm;
+      meas.minorAxis = Math.min(ell.rx, ell.ry) * 2 / ppm;
+      meas.area = Math.PI * ell.rx * ell.ry / (ppm * ppm);
+      meas.perimeter = ellipsePerimeter(ell.rx, ell.ry) / ppm;
+    }
+  }
+  if (m.type === "arc" && vp.length >= 3) {
+    meas.arcLength = arcLength3pts(vp[0], vp[1], vp[2]) / ppm;
+    const c = circleFrom3pts(vp[0], vp[1], vp[2]);
+    if (c) { meas.radius = c.r / ppm; meas.arcAngle = arcAngle3pts(vp[0], vp[1], vp[2]); }
+  }
+  if (m.type === "circle" && vp.length >= 2) {
+    const r = dist(vp[0], vp[1]);
+    meas.radius = r / ppm;
+    meas.circumference = 2 * Math.PI * r / ppm;
+    meas.area = Math.PI * r * r / (ppm * ppm);
+  }
+  if (m.type === "bezier" && vp.length >= 2) { const cp = (m.cp && m.cp.length === 2 * (vp.length - 1)) ? m.cp : autoControlPoints(vp); meas.length = multiBezierLength(vp, cp) / ppm; }
+  if (m.type === "tangent" && vp.length >= 2) { meas.length = dist(vp[0], vp[1]) / ppm; }
+  if (m.type === "concentric" && vp.length >= 3) {
+    meas.arcLength = arcLength3pts(vp[0], vp[1], vp[2]) / ppm;
+    const c = circleFrom3pts(vp[0], vp[1], vp[2]);
+    if (c) meas.radius = c.r / ppm;
+  }
   return meas;
 }
 
@@ -935,4 +962,399 @@ export function linearRegression(xVals, yVals) {
   const pValue = isFinite(tSlope) ? 2 * (1 - tDistributeCDF(Math.abs(tSlope), df)) : 0;
   const seResidual = Math.sqrt(sse / (n - 2));
   return { slope, intercept, r2, r, seSlope, seIntercept, tSlope, tIntercept, pValue, significant: pValue < 0.05, seResidual, n, equation: `y = ${slope.toFixed(4)}x + ${intercept.toFixed(4)}` };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Ellipse / Arc / Bezier geometry helpers
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function fitEllipse(pts) {
+  if (!pts || pts.length < 3) return null;
+  const [{ x: x1, y: y1 }, { x: x2, y: y2 }, { x: x3, y: y3 }] = pts;
+  const D = 2 * (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2));
+  if (Math.abs(D) < 1e-10) return null;
+  const sq = p => p.x * p.x + p.y * p.y;
+  const ux = ((sq({ x: x1, y: y1 }) * (y2 - y3) + sq({ x: x2, y: y2 }) * (y3 - y1) + sq({ x: x3, y: y3 }) * (y1 - y2)) / D);
+  const uy = ((sq({ x: x1, y: y1 }) * (x3 - x2) + sq({ x: x2, y: y2 }) * (x1 - x3) + sq({ x: x3, y: y3 }) * (x2 - x1)) / D);
+  const r1 = Math.hypot(x1 - ux, y1 - uy);
+  const r2 = Math.hypot(x2 - ux, y2 - uy);
+  const r3 = Math.hypot(x3 - ux, y3 - uy);
+  const avgR = (r1 + r2 + r3) / 3;
+  return { cx: ux, cy: uy, rx: avgR, ry: avgR * 0.6, rotation: Math.atan2(y2 - y1, x2 - x1) };
+}
+
+export function ellipsePerimeter(rx, ry) {
+  return Math.PI * (3 * (rx + ry) - Math.sqrt((3 * rx + ry) * (rx + 3 * ry)));
+}
+
+export function circleFrom3pts(p1, p2, p3) {
+  const ax = p1.x, ay = p1.y, bx = p2.x, by = p2.y, cx = p3.x, cy = p3.y;
+  const D = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by));
+  if (Math.abs(D) < 1e-10) return null;
+  const ux = ((ax * ax + ay * ay) * (by - cy) + (bx * bx + by * by) * (cy - ay) + (cx * cx + cy * cy) * (ay - by)) / D;
+  const uy = ((ax * ax + ay * ay) * (cx - bx) + (bx * bx + by * by) * (ax - cx) + (cx * cx + cy * cy) * (bx - ax)) / D;
+  return { cx: ux, cy: uy, r: Math.hypot(ax - ux, ay - uy) };
+}
+
+export function arcLength3pts(p1, p2, p3) {
+  const c = circleFrom3pts(p1, p2, p3);
+  if (!c) return dist(p1, p3);
+  let a1 = Math.atan2(p1.y - c.cy, p1.x - c.cx);
+  let a2 = Math.atan2(p2.y - c.cy, p2.x - c.cx);
+  let a3 = Math.atan2(p3.y - c.cy, p3.x - c.cx);
+  const normalize = a => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  a1 = normalize(a1); a2 = normalize(a2); a3 = normalize(a3);
+  const between = (a, lo, hi) => lo <= hi ? (a >= lo && a <= hi) : (a >= lo || a <= hi);
+  let angle = normalize(a3 - a1);
+  if (between(a2, a1, a1 + angle)) return c.r * angle;
+  return c.r * (2 * Math.PI - angle);
+}
+
+export function arcAngle3pts(p1, p2, p3) {
+  const c = circleFrom3pts(p1, p2, p3);
+  if (!c) return 0;
+  let a1 = Math.atan2(p1.y - c.cy, p1.x - c.cx);
+  let a3 = Math.atan2(p3.y - c.cy, p3.x - c.cx);
+  let a2 = Math.atan2(p2.y - c.cy, p2.x - c.cx);
+  const normalize = a => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  a1 = normalize(a1); a2 = normalize(a2); a3 = normalize(a3);
+  let angle = normalize(a3 - a1);
+  if (normalize(a2 - a1) > angle) angle = 2 * Math.PI - angle;
+  return angle * 180 / Math.PI;
+}
+
+export function cubicBezierPoint(t, p0, p1, p2, p3) {
+  if (!p0 || !p1 || !p2 || !p3) return { x: 0, y: 0 };
+  const u = 1 - t;
+  return {
+    x: u * u * u * p0.x + 3 * u * u * t * p1.x + 3 * u * t * t * p2.x + t * t * t * p3.x,
+    y: u * u * u * p0.y + 3 * u * u * t * p1.y + 3 * u * t * t * p2.y + t * t * t * p3.y
+  };
+}
+
+export function cubicBezierLength(p0, p1, p2, p3, samples = 64) {
+  if (!p0 || !p1 || !p2 || !p3) return 0;
+  let len = 0, prev = p0;
+  for (let i = 1; i <= samples; i++) {
+    const cur = cubicBezierPoint(i / samples, p0, p1, p2, p3);
+    len += dist(prev, cur);
+    prev = cur;
+  }
+  return len;
+}
+
+export function cubicBezierTangent(t, p0, p1, p2, p3) {
+  const u = 1 - t;
+  const dx = 3 * u * u * (p1.x - p0.x) + 6 * u * t * (p2.x - p1.x) + 3 * t * t * (p3.x - p2.x);
+  const dy = 3 * u * u * (p1.y - p0.y) + 6 * u * t * (p2.y - p1.y) + 3 * t * t * (p3.y - p2.y);
+  const len = Math.hypot(dx, dy) || 1;
+  return { x: dx / len, y: dy / len };
+}
+
+export function distToBezier(pt, p0, p1, p2, p3, samples = 64) {
+  if (!p0 || !p1 || !p2 || !p3) return Infinity;
+  let minD = Infinity;
+  for (let i = 0; i <= samples; i++) {
+    const bp = cubicBezierPoint(i / samples, p0, p1, p2, p3);
+    const d = dist(pt, bp);
+    if (d < minD) minD = d;
+  }
+  return minD;
+}
+
+export function autoControlPoints(anchors) {
+  const n = anchors.length;
+  if (n < 2) return [];
+  const cp = [];
+  for (let i = 0; i < n - 1; i++) {
+    const p0 = anchors[i - 1] || anchors[i];
+    const p1 = anchors[i];
+    const p2 = anchors[i + 1];
+    const p3 = anchors[i + 2] || anchors[i + 1];
+    cp.push({ x: p1.x + (p2.x - p0.x) / 6, y: p1.y + (p2.y - p0.y) / 6 });
+    cp.push({ x: p2.x - (p3.x - p1.x) / 6, y: p2.y - (p3.y - p1.y) / 6 });
+  }
+  return cp;
+}
+
+export function multiBezierLength(anchors, cp, samples = 32) {
+  if (anchors.length < 2) return 0;
+  let len = 0;
+  for (let i = 0; i < anchors.length - 1; i++) {
+    len += cubicBezierLength(anchors[i], cp[2 * i], cp[2 * i + 1], anchors[i + 1], samples);
+  }
+  return len;
+}
+
+export function distToMultiBezier(pt, anchors, cp, samples = 32) {
+  if (anchors.length < 2) return Infinity;
+  let minD = Infinity;
+  for (let i = 0; i < anchors.length - 1; i++) {
+    const d = distToBezier(pt, anchors[i], cp[2 * i], cp[2 * i + 1], anchors[i + 1], samples);
+    if (d < minD) minD = d;
+  }
+  return minD;
+}
+
+export function distToEllipse(pt, cx, cy, rx, ry, rot = 0, samples = 96) {
+  let minD = Infinity;
+  const cosR = Math.cos(-rot), sinR = Math.sin(-rot);
+  const dx = pt.x - cx, dy = pt.y - cy;
+  const lx = dx * cosR - dy * sinR, ly = dx * sinR + dy * cosR;
+  for (let i = 0; i <= samples; i++) {
+    const a = (2 * Math.PI * i) / samples;
+    const ex = rx * Math.cos(a), ey = ry * Math.sin(a);
+    const d = Math.hypot(lx - ex, ly - ey);
+    if (d < minD) minD = d;
+  }
+  return minD;
+}
+
+export function distToArc(pt, p1, p2, p3, samples = 64) {
+  const c = circleFrom3pts(p1, p2, p3);
+  if (!c) return Math.min(dist(pt, p1), dist(pt, p2), dist(pt, p3));
+  let a1 = Math.atan2(p1.y - c.cy, p1.x - c.cx);
+  let a2 = Math.atan2(p2.y - c.cy, p2.x - c.cx);
+  let a3 = Math.atan2(p3.y - c.cy, p3.x - c.cx);
+  const normalize = a => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  a1 = normalize(a1); a2 = normalize(a2); a3 = normalize(a3);
+  let start = a1, end = normalize(a3 - a1);
+  if (normalize(a2 - a1) > end) { start = a3; end = 2 * Math.PI - end; }
+  let minD = Infinity;
+  for (let i = 0; i <= samples; i++) {
+    const a = start + (end * i) / samples;
+    const ax = c.cx + c.r * Math.cos(a), ay = c.cy + c.r * Math.sin(a);
+    const d = dist(pt, { x: ax, y: ay });
+    if (d < minD) minD = d;
+  }
+  return minD;
+}
+
+export function tangentAtCirclePoint(cx, cy, r, px, py, tangentLen = 50) {
+  const angle = Math.atan2(py - cy, px - cx);
+  const perpAngle = angle + Math.PI / 2;
+  return {
+    x1: px - tangentLen * Math.cos(perpAngle),
+    y1: py - tangentLen * Math.sin(perpAngle),
+    x2: px + tangentLen * Math.cos(perpAngle),
+    y2: py + tangentLen * Math.sin(perpAngle)
+  };
+}
+
+export function midpointOnArc(p1, p2, p3) {
+  const c = circleFrom3pts(p1, p2, p3);
+  if (!c) return { x: (p1.x + p3.x) / 2, y: (p1.y + p3.y) / 2 };
+  let a1 = Math.atan2(p1.y - c.cy, p1.x - c.cx);
+  let a2 = Math.atan2(p2.y - c.cy, p2.x - c.cx);
+  let a3 = Math.atan2(p3.y - c.cy, p3.x - c.cx);
+  const normalize = a => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  a1 = normalize(a1); a2 = normalize(a2); a3 = normalize(a3);
+  let start = a1, sweep = normalize(a3 - a1);
+  if (normalize(a2 - a1) > sweep) { start = a3; sweep = 2 * Math.PI - sweep; }
+  const mid = start + sweep / 2;
+  return { x: c.cx + c.r * Math.cos(mid), y: c.cy + c.r * Math.sin(mid) };
+}
+
+export function simplifyRDP(pts, tolerance) {
+  if (pts.length <= 2) return pts;
+  let maxD = 0, maxI = 0;
+  const first = pts[0], last = pts[pts.length - 1];
+  const dx = last.x - first.x, dy = last.y - first.y;
+  const lenSq = dx * dx + dy * dy;
+  for (let i = 1; i < pts.length - 1; i++) {
+    const t = lenSq > 0 ? ((pts[i].x - first.x) * dx + (pts[i].y - first.y) * dy) / lenSq : 0;
+    const px = first.x + clamp(t, 0, 1) * dx, py = first.y + clamp(t, 0, 1) * dy;
+    const d = Math.hypot(pts[i].x - px, pts[i].y - py);
+    if (d > maxD) { maxD = d; maxI = i; }
+  }
+  if (maxD > tolerance) {
+    const left = simplifyRDP(pts.slice(0, maxI + 1), tolerance);
+    const right = simplifyRDP(pts.slice(maxI), tolerance);
+    return [...left.slice(0, -1), ...right];
+  }
+  return [first, last];
+}
+
+function projectOnSegment(pt, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq < 1e-10) return { t: 0, dist: dist(pt, a) };
+  const t = clamp(((pt.x - a.x) * dx + (pt.y - a.y) * dy) / lenSq, 0, 1);
+  return { t, dist: dist(pt, { x: a.x + t * dx, y: a.y + t * dy }) };
+}
+
+export function nearestPointOnCubicBezier(pt, p0, p1, p2, p3, samples = 64) {
+  let bestT = 0, bestD = Infinity;
+  for (let i = 0; i <= samples; i++) {
+    const t = i / samples;
+    const bp = cubicBezierPoint(t, p0, p1, p2, p3);
+    const d = dist(pt, bp);
+    if (d < bestD) { bestD = d; bestT = t; }
+  }
+  for (let pass = 0; pass < 3; pass++) {
+    const lo = Math.max(0, bestT - 1 / samples), hi = Math.min(1, bestT + 1 / samples);
+    const steps = 16;
+    for (let i = 0; i <= steps; i++) {
+      const t = lo + (hi - lo) * i / steps;
+      const bp = cubicBezierPoint(t, p0, p1, p2, p3);
+      const d = dist(pt, bp);
+      if (d < bestD) { bestD = d; bestT = t; }
+    }
+  }
+  const tp = cubicBezierPoint(bestT, p0, p1, p2, p3);
+  const tg = cubicBezierTangent(bestT, p0, p1, p2, p3);
+  const angle = Math.atan2(tg.y, tg.x);
+  return { point: tp, t: bestT, dist: bestD, angle };
+}
+
+export function nearestPointOnMultiBezier(pt, anchors, cp, samplesPerSeg = 32) {
+  if (anchors.length < 2) return null;
+  let best = null;
+  for (let i = 0; i < anchors.length - 1; i++) {
+    const r = nearestPointOnCubicBezier(pt, anchors[i], cp[2 * i], cp[2 * i + 1], anchors[i + 1], samplesPerSeg);
+    if (!best || r.dist < best.dist) best = { ...r, segIdx: i };
+  }
+  return best;
+}
+
+export function nearestPointOnSampledCurve(pt, samples) {
+  if (!samples || samples.length < 2) return null;
+  let bestD = Infinity, bestI = 0, bestT = 0;
+  for (let i = 0; i < samples.length - 1; i++) {
+    const r = projectOnSegment(pt, samples[i], samples[i + 1]);
+    if (r.dist < bestD) { bestD = r.dist; bestI = i; bestT = r.t; }
+  }
+  const a = samples[bestI], b = samples[bestI + 1];
+  const tp = { x: a.x + bestT * (b.x - a.x), y: a.y + bestT * (b.y - a.y) };
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const angle = Math.atan2(dy, dx);
+  return { point: tp, dist: bestD, angle, t: (bestI + bestT) / (samples.length - 1) };
+}
+
+export function snapTangentToCurve(curveMarkup, dragPt) {
+  if (!curveMarkup) return null;
+  const vp = vpts(curveMarkup);
+  if (curveMarkup.type === "circle" && vp.length >= 2) {
+    const cx = vp[0].x, cy = vp[0].y, r = dist(vp[0], vp[1]);
+    if (r < 1) return null;
+    const a = Math.atan2(dragPt.y - cy, dragPt.x - cx);
+    return { tangentPoint: { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) }, tangentAngle: a + Math.PI / 2 };
+  }
+  if (curveMarkup.type === "arc" && vp.length >= 3) {
+    const c = circleFrom3pts(vp[0], vp[1], vp[2]);
+    if (!c || c.r < 1) return null;
+    const normalize = a => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+    let a1 = normalize(Math.atan2(vp[0].y - c.cy, vp[0].x - c.cx));
+    let a2 = normalize(Math.atan2(vp[1].y - c.cy, vp[1].x - c.cx));
+    let a3 = normalize(Math.atan2(vp[2].y - c.cy, vp[2].x - c.cx));
+    let start = a1, sweep = normalize(a3 - a1);
+    if (normalize(a2 - a1) > sweep) { start = a3; sweep = 2 * Math.PI - sweep; }
+    let aClick = Math.atan2(dragPt.y - c.cy, dragPt.x - c.cx);
+    aClick = normalize(aClick);
+    let rel = normalize(aClick - start);
+    if (rel > sweep) rel = rel > Math.PI ? 0 : sweep;
+    const a = start + rel;
+    return { tangentPoint: { x: c.cx + c.r * Math.cos(a), y: c.cy + c.r * Math.sin(a) }, tangentAngle: a + Math.PI / 2 };
+  }
+  if (curveMarkup.type === "ellipse" && vp.length >= 3) {
+    const ell = fitEllipse(vp);
+    if (!ell) return null;
+    const r = nearestPointOnSampledCurve(dragPt, Array.from({length: 96}, (_, i) => {
+      const a = (2 * Math.PI * i) / 96;
+      return { x: ell.cx + ell.rx * Math.cos(a) * Math.cos(ell.rotation) - ell.ry * Math.sin(a) * Math.sin(ell.rotation), y: ell.cy + ell.rx * Math.cos(a) * Math.sin(ell.rotation) + ell.ry * Math.sin(a) * Math.cos(ell.rotation) };
+    }));
+    if (!r) return null;
+    const a = 2 * Math.PI * r.t;
+    const nx = Math.cos(a) * Math.cos(ell.rotation) / ell.rx - Math.sin(a) * Math.sin(ell.rotation) / ell.ry;
+    const ny = Math.cos(a) * Math.sin(ell.rotation) / ell.rx + Math.sin(a) * Math.cos(ell.rotation) / ell.ry;
+    return { tangentPoint: r.point, tangentAngle: Math.atan2(ny, nx) + Math.PI / 2 };
+  }
+  if (curveMarkup.type === "bezier" && vp.length >= 2) {
+    const cp = (curveMarkup.cp && curveMarkup.cp.length === 2 * (vp.length - 1)) ? curveMarkup.cp : autoControlPoints(vp);
+    const r = nearestPointOnMultiBezier(dragPt, vp, cp, 48);
+    if (!r) return null;
+    return { tangentPoint: r.point, tangentAngle: r.angle + Math.PI / 2 };
+  }
+  if (curveMarkup.type === "curve" && vp.length >= 2) {
+    const samples = sampleSpline(curveMarkup.type === "curve" ? vp : vp, false, 16);
+    const r = nearestPointOnSampledCurve(dragPt, samples);
+    if (!r) return null;
+    return { tangentPoint: r.point, tangentAngle: r.angle + Math.PI / 2 };
+  }
+  return null;
+}
+
+export function findTangentOnCurve(markups, clickPt, threshold) {
+  let best = null;
+  let bestDist = Infinity;
+  for (const m of markups) {
+    if (m.visible === false || m.locked) continue;
+    const vp = vpts(m);
+    if (m.type === "circle" && vp.length >= 2) {
+      const cx = vp[0].x, cy = vp[0].y;
+      const r = dist(vp[0], vp[1]);
+      if (r < 1) continue;
+      const dx = clickPt.x - cx, dy = clickPt.y - cy;
+      const dCenter = Math.sqrt(dx * dx + dy * dy);
+      const dCircle = Math.abs(dCenter - r);
+      if (dCircle < threshold && dCircle < bestDist) {
+        bestDist = dCircle;
+        const a = Math.atan2(dy, dx);
+        const tp = { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+        best = { tangentPoint: tp, tangentAngle: a + Math.PI / 2, curveId: m.id, curveCenter: { x: cx, y: cy }, curveRadius: r };
+      }
+    } else if (m.type === "arc" && vp.length >= 3) {
+      const c = circleFrom3pts(vp[0], vp[1], vp[2]);
+      if (!c || c.r < 1) continue;
+      const normalize = a => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+      let a1 = normalize(Math.atan2(vp[0].y - c.cy, vp[0].x - c.cx));
+      let a2 = normalize(Math.atan2(vp[1].y - c.cy, vp[1].x - c.cx));
+      let a3 = normalize(Math.atan2(vp[2].y - c.cy, vp[2].x - c.cx));
+      let start = a1, sweep = normalize(a3 - a1);
+      if (normalize(a2 - a1) > sweep) { start = a3; sweep = 2 * Math.PI - sweep; }
+      const samples = 64;
+      for (let i = 0; i <= samples; i++) {
+        const a = start + (sweep * i) / samples;
+        const sx = c.cx + c.r * Math.cos(a), sy = c.cy + c.r * Math.sin(a);
+        const d = dist(clickPt, { x: sx, y: sy });
+        if (d < threshold && d < bestDist) {
+          bestDist = d;
+          const tp = { x: sx, y: sy };
+          best = { tangentPoint: tp, tangentAngle: a + Math.PI / 2, curveId: m.id, curveCenter: { x: c.cx, y: c.cy }, curveRadius: c.r };
+        }
+      }
+    } else if (m.type === "ellipse" && vp.length >= 3) {
+      const ell = fitEllipse(vp);
+      if (!ell) continue;
+      const samples = 96;
+      for (let i = 0; i < samples; i++) {
+        const a = (2 * Math.PI * i) / samples;
+        const ex = ell.cx + ell.rx * Math.cos(a) * Math.cos(ell.rotation) - ell.ry * Math.sin(a) * Math.sin(ell.rotation);
+        const ey = ell.cy + ell.rx * Math.cos(a) * Math.sin(ell.rotation) + ell.ry * Math.sin(a) * Math.cos(ell.rotation);
+        const d = dist(clickPt, { x: ex, y: ey });
+        if (d < threshold && d < bestDist) {
+          bestDist = d;
+          const nx = Math.cos(a) * Math.cos(ell.rotation) / ell.rx - Math.sin(a) * Math.sin(ell.rotation) / ell.ry;
+          const ny = Math.cos(a) * Math.sin(ell.rotation) / ell.rx + Math.sin(a) * Math.cos(ell.rotation) / ell.ry;
+          const na = Math.atan2(ny, nx);
+          best = { tangentPoint: { x: ex, y: ey }, tangentAngle: na + Math.PI / 2, curveId: m.id, curveCenter: { x: ell.cx, y: ell.cy }, curveRadius: Math.max(ell.rx, ell.ry) };
+        }
+      }
+    } else if (m.type === "bezier" && vp.length >= 2) {
+      const cp = (m.cp && m.cp.length === 2 * (vp.length - 1)) ? m.cp : autoControlPoints(vp);
+      const r = nearestPointOnMultiBezier(clickPt, vp, cp, 48);
+      if (r && r.dist < threshold && r.dist < bestDist) {
+        bestDist = r.dist;
+        best = { tangentPoint: r.point, tangentAngle: r.angle + Math.PI / 2, curveId: m.id };
+      }
+    } else if (m.type === "curve" && vp.length >= 2) {
+      const samples = sampleSpline(m.type === "curve" ? vp : vp, false, 16);
+      const r = nearestPointOnSampledCurve(clickPt, samples);
+      if (r && r.dist < threshold && r.dist < bestDist) {
+        bestDist = r.dist;
+        best = { tangentPoint: r.point, tangentAngle: r.angle + Math.PI / 2, curveId: m.id };
+      }
+    }
+  }
+  return best;
 }
