@@ -1220,7 +1220,7 @@ export function drawLUTLegend(ctx, lutMode, lutInvert, cw, ch, t){
   ctx.restore();
 }
 
-export function drawSnapIndicator(ctx, sn, zoom, pan){
+export function drawSnapIndicator(ctx, sn, zoom, pan, markups, mouseImg, snapRadius){
   const sx = sn.x * zoom + pan.x;
   const sy = sn.y * zoom + pan.y;
   
@@ -1238,6 +1238,24 @@ export function drawSnapIndicator(ctx, sn, zoom, pan){
   ctx.moveTo(sx, sy - 18);
   ctx.lineTo(sx, sy + 18);
   ctx.stroke();
+
+  if(markups && mouseImg && snapRadius){
+    ctx.strokeStyle = "#ffd700" + "33";
+    ctx.lineWidth = 1.5;
+    for(const m of markups){
+      if(m.visible === false) continue;
+      for(const p of (m.points || [])){
+        if(p.x < -9000) continue;
+        const dx = p.x - mouseImg.x, dy = p.y - mouseImg.y;
+        if(Math.sqrt(dx*dx + dy*dy) < snapRadius){
+          const psx = p.x * zoom + pan.x, psy = p.y * zoom + pan.y;
+          ctx.beginPath();
+          ctx.arc(psx, psy, 8, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+    }
+  }
   ctx.restore();
 }
 
