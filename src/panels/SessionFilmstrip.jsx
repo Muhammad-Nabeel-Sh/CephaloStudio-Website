@@ -32,7 +32,9 @@ export default function SessionFilmstrip({ project, t, onUpdateProject }) {
       <div style={{
         display: "flex", alignItems: "center", gap: 4, padding: "6px 10px",
         overflowX: "auto", overflowY: "hidden", flex: 1,
+        maxWidth: 5 * (52 + 4) + 30 + 20,
         scrollbarWidth: "thin",
+        scrollbarColor: `${t.bdr} transparent`,
       }}>
         {sessions.map((s) => {
           const isActive = s.id === activeId;

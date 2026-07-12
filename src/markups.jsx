@@ -100,7 +100,7 @@ export function drawMarkup(ctx, m, zoom, pan, cal, sel, t, reproCollecting, canv
         drawBezier(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt, pan);
         break;
       case "tangent":
-        drawTangent(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize);
+        drawTangent(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt);
         break;
       case "concentric":
         drawConcentric(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize);
@@ -703,14 +703,15 @@ function drawBezier(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotation
   cp.forEach((p, i) => {
     const isH = hoveredPt && hoveredPt.type === "bezierCp" && hoveredPt.mid === m.id && hoveredPt.cpIdx === i;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, (isSel || isH ? 4 : 2.5) * Math.sqrt(zoom), 0, 2 * Math.PI);
-    ctx.fillStyle = isH ? "#fff" : (m.color || "#c084fc") + "88";
+    ctx.arc(p.x, p.y, (isSel || isH ? 6 : 4) * Math.sqrt(zoom), 0, 2 * Math.PI);
+    ctx.fillStyle = isH ? "#fff" : (m.color || "#c084fc") + "cc";
     ctx.fill();
+    if (isSel) { ctx.strokeStyle = t.tx2; ctx.lineWidth = 1; ctx.stroke(); }
   });
   sp.forEach((p, i) => {
     const isH = hoveredPt && hoveredPt.type === "bezier" && hoveredPt.mid === m.id && hoveredPt.ptIdx === i;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, (isSel || isH ? 5 : 3.5) * Math.sqrt(zoom), 0, 2 * Math.PI);
+    ctx.arc(p.x, p.y, (isSel || isH ? 6 : 4.5) * Math.sqrt(zoom), 0, 2 * Math.PI);
     ctx.fillStyle = isH ? "#fff" : (m.color || "#c084fc");
     ctx.fill();
     if (isSel) { ctx.strokeStyle = t.acc; ctx.lineWidth = 1.5; ctx.stroke(); }
@@ -721,7 +722,7 @@ function drawBezier(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotation
   }
 }
 
-function drawTangent(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize) {
+function drawTangent(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt) {
   if (sp.length < 2) return;
   ctx.strokeStyle = m.color || "#fbbf24";
   ctx.lineWidth = (m.width || 1.5) * Math.sqrt(zoom);
@@ -735,22 +736,28 @@ function drawTangent(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotatio
   if (m.tangentAngle != null) {
     const tAngle = m.tangentAngle;
     const rAngle = tAngle - Math.PI / 2;
-    const sq = 6 * Math.sqrt(zoom);
+    const sq = 8 * Math.sqrt(zoom);
     const ox = Math.cos(rAngle) * sq, oy = Math.sin(rAngle) * sq;
-    const tx = Math.cos(tAngle) * sq, ty = Math.sin(tAngle) * sq;
     ctx.beginPath();
-    ctx.strokeStyle = (m.color || "#fbbf24") + "88";
+    ctx.strokeStyle = (m.color || "#fbbf24") + "66";
     ctx.lineWidth = 1;
-    ctx.moveTo(sp[0].x + ox, sp[0].y + oy);
-    ctx.lineTo(sp[0].x + ox + tx, sp[0].y + oy + ty);
-    ctx.lineTo(sp[0].x + tx, sp[0].y + ty);
+    ctx.setLineDash([3 * zoom, 3 * zoom]);
+    ctx.moveTo(sp[0].x - ox, sp[0].y - oy);
+    ctx.lineTo(sp[0].x + ox, sp[0].y + oy);
     ctx.stroke();
-  }
-  sp.forEach((p) => {
+    ctx.setLineDash([]);
     ctx.beginPath();
-    ctx.arc(p.x, p.y, (isSel ? 4 : 3) * Math.sqrt(zoom), 0, 2 * Math.PI);
-    ctx.fillStyle = m.color || "#fbbf24";
+    ctx.arc(sp[0].x, sp[0].y, 3 * Math.sqrt(zoom), 0, 2 * Math.PI);
+    ctx.fillStyle = (m.color || "#fbbf24") + "44";
     ctx.fill();
+  }
+  sp.forEach((p, i) => {
+    const isH = hoveredPt && hoveredPt.type === "tangent" && hoveredPt.mid === m.id && hoveredPt.ptIdx === i;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, (isSel || isH ? 5 : 3.5) * Math.sqrt(zoom), 0, 2 * Math.PI);
+    ctx.fillStyle = isH ? "#fff" : (m.color || "#fbbf24");
+    ctx.fill();
+    if (isSel) { ctx.strokeStyle = t.acc; ctx.lineWidth = 1.5; ctx.stroke(); }
   });
   if (showAnnotations && !m.noLabel) {
     const mid = { x: (sp[0].x + sp[1].x) / 2, y: (sp[0].y + sp[1].y) / 2 };
@@ -1642,6 +1649,7 @@ export function hitTest(markups, ip, zoom, reproCollecting){
     }
     if(m.type === "bezier" && vp.length >= 2){
       const cp = (m.cp && m.cp.length === 2 * (vp.length - 1)) ? m.cp : autoControlPoints(vp);
+      for(let j = 0; j < cp.length; j++){if(dist(ip, cp[j]) < thr * 1.5) return m.id;}
       const d = distToMultiBezier(ip, vp, cp);
       if(d < thr) return m.id;
     }
