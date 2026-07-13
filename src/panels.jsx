@@ -118,7 +118,7 @@ export function MarkupsPanel({ markups, t, theme, selectedId, onSelect, onDelete
                         {isLocked && <span style={{ fontSize: 9, color: t.warn, marginLeft: 4 }}>[locked]</span>}
                       </div>
                       {ms && !isHidden && <div style={{ fontSize: 12, color: t.acc, fontFamily: "'DM Mono',monospace" }}>{ms}</div>}
-                      {relNorms.length > 0 && !isHidden && ms && <NormBadges norms={relNorms} meas={meas} t={t} />}
+                      {relNorms.length > 0 && !isHidden && ms && <NormBadges norms={relNorms} meas={meas} calibration={calibration} t={t} />}
                     </div>
                     <button onClick={() => onDelete(m.id)} title="Delete markup" style={{ background: "none", border: "none", color: t.tx3, cursor: "pointer", fontSize: 14, flexShrink: 0 }}>×</button>
                   </div>
@@ -133,12 +133,15 @@ export function MarkupsPanel({ markups, t, theme, selectedId, onSelect, onDelete
   );
 }
 
-function NormBadges({ norms, meas, t }) {
+function NormBadges({ norms, meas, t, calibration }) {
+  const calDone = calibration?.done === true;
+  const calTypes = ["length","distance","area","perimeter","radius","circumference","majorAxis","minorAxis","arcLength","projectedDistance"];
   return (
     <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 2 }}>
       {norms.map(n => {
         const val = meas[n.measureType];
         if (val === undefined) return null;
+        if (!calDone && calTypes.includes(n.measureType)) return null;
         const dev = normDeviation(val, n);
         const col = deviationColor(dev.sdUnits, t);
         return (<span key={n.id} style={{ background: col + "22", color: col, border: `1px solid ${col}44`, borderRadius: 3, padding: "0px 4px", fontSize: 9, fontWeight: 700, fontFamily: "'DM Mono',monospace" }}>
@@ -189,15 +192,16 @@ export function MeasurementsPanel({ allMeas, formulaMeas, t, calibration, norms,
             return (
               <div key={m.id} style={{ marginBottom: 10, padding: 10, background: t.surf2, borderRadius: 8, border: `1px solid ${t.bdr}` }}>
                 <div style={{ fontSize: 12, fontWeight: 700, color: m.color || t.acc, marginBottom: 6, display: "flex", justifyContent: "space-between" }}><span>{m.label || m.type}</span><Tag color={m.color || t.acc}>{m.type}</Tag></div>
-                {Object.entries(meas).filter(([k]) => m.type === "point" || (k !== "x" && k !== "y")).map(([k, v]) => {
-                  const norm = relNorms.find(n => n.measureType === k);
+                  {Object.entries(meas).filter(([k]) => m.type === "point" || (k !== "x" && k !== "y")).map(([k, v]) => {
+                  const calTypes = ["length","distance","area","perimeter","radius","circumference","majorAxis","minorAxis","arcLength","projectedDistance"];
+                  const norm = !calibration.done && calTypes.includes(k) ? null : relNorms.find(n => n.measureType === k);
                   const dev = norm ? normDeviation(v, norm) : null;
                   return (
                     <div key={k} style={{ marginBottom: dev ? 10 : 4 }}>
                       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: t.tx2, alignItems: "center" }}>
                         <span>{k}</span>
                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <span style={{ fontFamily: "'DM Mono',monospace", color: t.tx, fontWeight: 600 }}>{k === "angle" ? formatAngle(v) : v.toFixed(2) + (k === "area" ? " mm²" : " mm")}</span>
+                          <span style={{ fontFamily: "'DM Mono',monospace", color: t.tx, fontWeight: 600 }}>{k === "angle" ? formatAngle(v) : v.toFixed(2) + (k === "area" ? (calibration.done ? " mm²" : " px²") : (calibration.done ? " mm" : " px"))}</span>
                           <button onClick={() => setEditingNorm({ markupLabel: m.label, measureType: k, existing: norm })}
                             style={{ background: "none", border: `1px solid ${norm ? t.ok + "55" : t.bdr}`, color: norm ? t.ok : t.tx3, borderRadius: 3, padding: "0 4px", cursor: "pointer", fontSize: 9, fontWeight: 700, lineHeight: "16px" }}>
                             {norm ? "N" : "±N"}
@@ -432,8 +436,8 @@ export function MarkupProps({ m, t, theme, onUpdate, onDelete, calibration, onPa
       {["arc", "ellipse", "circle", "concentric", "bezier", "tangent"].includes(m.type) && <PropRow label="Dash" t={t}><select value={m.style || "solid"} onChange={e => onUpdate({ style: e.target.value })} style={{ background: t.surf3, border: `1px solid ${t.bdr}`, borderRadius: 4, padding: "3px 6px", color: t.tx, fontSize: 12, width: "100%", fontFamily: "inherit" }}><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></PropRow>}
       {m.type === "bezier" && <PropRow label="Anchors" t={t}><div style={{ display: "flex", gap: 6, alignItems: "center" }}><span style={{ fontSize: 11, color: t.tx2 }}>{m.points?.length || 0} pts · {Math.max(0, (m.points?.length || 1) - 1)} seg</span><span style={{ fontSize: 9, color: t.tx3 }}>Ctrl+click add • Shift+click remove</span></div></PropRow>}
       {m.type === "concentric" && <><PropRow label="Arcs" t={t}><input type="range" min="2" max="10" step="1" value={m.count || 4} onChange={e => { const count = +e.target.value; const spacing = m.spacing || 0.3; onUpdate({ count, offsets: Array.from({ length: count }, (_, i) => i * spacing) }); }} style={{ width: "100%", accentColor: t.acc }} /><span style={{ fontSize: 10, color: t.tx2, marginLeft: 6 }}>{m.count || 4}</span></PropRow><PropRow label="Spacing" t={t}><input type="range" min="0.05" max="1" step="0.05" value={m.spacing || 0.3} onChange={e => { const spacing = +e.target.value; const count = m.count || 4; onUpdate({ spacing, offsets: Array.from({ length: count }, (_, i) => i * spacing) }); }} style={{ width: "100%", accentColor: t.acc }} /><span style={{ fontSize: 10, color: t.tx2, marginLeft: 6 }}>{((m.spacing || 0.3) * 100).toFixed(0)}%</span></PropRow></>}
-      {(()=>{const fm=Object.entries(meas).filter(([k])=>m.type==="point"||(k!=="x"&&k!=="y"));return fm.length>0&&<div style={{marginTop:10,padding:8,background:t.surf3,borderRadius:6}}>{fm.map(([k,v])=><div key={k} style={{display:"flex",justifyContent:"space-between",fontSize:11,color:t.tx2}}><span style={{textTransform:"capitalize"}}>{k}</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc}}>{k==="angle"?formatAngle(v):v.toFixed(2)+(k==="area"?" mm²":" mm")}</span></div>)}</div>;})()}
-      {relNorms.length > 0 && <div style={{ marginTop: 8, padding: 8, background: t.surf3, borderRadius: 6 }}><div style={{ fontSize: 10, color: t.tx2, marginBottom: 6, fontWeight: 600 }}>Clinical Norms</div>{relNorms.map(n => { const val = meas[n.measureType]; const dev = val !== undefined ? normDeviation(val, n) : null; return (<div key={n.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, marginBottom: 4 }}><span style={{ color: t.tx2 }}>{n.measureType}: {n.mean} ± {n.sd}</span><div style={{ display: "flex", gap: 4, alignItems: "center" }}>{dev && <span style={{ fontFamily: "'DM Mono',monospace", fontSize: 10, color: deviationColor(dev.sdUnits, t), fontWeight: 700 }}>{dev.delta > 0 ? "+" : ""}{dev.delta.toFixed(1)} ({dev.sdUnits > 0 ? "+" : ""}{dev.sdUnits.toFixed(1)}SD)</span>}<button onClick={() => setEditingNorm({ id: n.id, markupLabel: n.markupLabel, measureType: n.measureType, mean: n.mean, sd: n.sd, source: n.source })} style={{ background: "none", border: `1px solid ${t.bdr}`, color: t.tx2, borderRadius: 3, padding: "0 4px", cursor: "pointer", fontSize: 9, lineHeight: "16px" }}>Edit</button></div></div>);})}</div>}
+      {(()=>{const fm=Object.entries(meas).filter(([k])=>m.type==="point"||(k!=="x"&&k!=="y"));return fm.length>0&&<div style={{marginTop:10,padding:8,background:t.surf3,borderRadius:6}}>{fm.map(([k,v])=><div key={k} style={{display:"flex",justifyContent:"space-between",fontSize:11,color:t.tx2}}><span style={{textTransform:"capitalize"}}>{k}</span><span style={{fontFamily:"'DM Mono',monospace",color:t.acc}}>{k==="angle"?formatAngle(v):v.toFixed(2)+(k==="area"?(calibration?.done?" mm²":" px²"):(calibration?.done?" mm":" px"))}</span></div>)}</div>;})()}
+      {(()=>{const calTypes=["length","distance","area","perimeter","radius","circumference","majorAxis","minorAxis","arcLength","projectedDistance"];return relNorms.length>0&&<div style={{marginTop:8,padding:8,background:t.surf3,borderRadius:6}}><div style={{fontSize:10,color:t.tx2,marginBottom:6,fontWeight:600}}>Clinical Norms</div>{relNorms.map(n=>{const val=meas[n.measureType];const dev=val!==undefined&&(calibration?.done||!calTypes.includes(n.measureType))?normDeviation(val,n):null;return(<div key={n.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",fontSize:11,marginBottom:4}}><span style={{color:t.tx2}}>{n.measureType}: {n.mean}±{n.sd}</span><div style={{display:"flex",gap:4,alignItems:"center"}}>{dev&&<span style={{fontFamily:"'DM Mono',monospace",fontSize:10,color:deviationColor(dev.sdUnits,t),fontWeight:700}}>{dev.delta>0?"+":""}{dev.delta.toFixed(1)}({dev.sdUnits>0?"+":""}{dev.sdUnits.toFixed(1)}SD)</span>}<button onClick={()=>setEditingNorm({id:n.id,markupLabel:n.markupLabel,measureType:n.measureType,mean:n.mean,sd:n.sd,source:n.source})} style={{background:"none",border:`1px solid ${t.bdr}`,color:t.tx2,borderRadius:3,padding:"0 4px",cursor:"pointer",fontSize:9,lineHeight:"16px"}}>Edit</button></div></div>)})}</div>})()}
       {editingNorm && <InlineNormEditor t={t} {...editingNorm} onSave={(n) => { const filtered = (norms || []).filter(x => !(x.markupLabel === editingNorm.markupLabel && x.measureType === editingNorm.measureType)); onUpdateNorms([...filtered, { id: editingNorm.id || uid(), ...n }]); setEditingNorm(null); }} onDelete={() => { onUpdateNorms((norms || []).filter(x => !(x.markupLabel === editingNorm.markupLabel && x.measureType === editingNorm.measureType))); setEditingNorm(null); }} onClose={() => setEditingNorm(null)} />}
     </div>
   );

@@ -316,6 +316,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const procCache=useRef(new Map());const imgRefs=useRef({});const rafRef=useRef(null);
   // F1: pointer state lives in refs (not reducer state) so mousemove skips React re-render
   const mousePosRef=useRef(null);const snapPosRef=useRef(null);
+  const flashMarkupIdRef=useRef(null);const flashStartTimeRef=useRef(0);
   const boxSelectRectRef=useRef(null);const panRef=useRef({x:40,y:40});
   // F2: device-pixel-ratio for crisp HiDPI rendering
   const dprRef=useRef(window.devicePixelRatio||1);
@@ -607,6 +608,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const getCanvasPos=useCallback(e=>{const r=canvasRef.current.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};},[]);
 
   // U2: zoom-to-landmark — when selecting from MarkupsPanel, pan viewport to center on the markup
+  const flashRafRef=useRef(null);const flashTimerRef=useRef(null);
   const selectAndFocusMarkup=useCallback(id=>{
     setSelectedId(id);
     if(!id)return;
@@ -619,6 +621,11 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     const newPan={x:(cw/dpr)/2-cx*zoom,y:(ch/dpr)/2-cy*zoom};
     panRef.current=newPan;
     dispatch({type:"SET",payload:{pan:newPan}});
+    flashMarkupIdRef.current=id;flashStartTimeRef.current=performance.now();
+    if(flashTimerRef.current)clearTimeout(flashTimerRef.current);
+    flashTimerRef.current=setTimeout(()=>{flashMarkupIdRef.current=null;flashTimerRef.current=null;},1500);
+    if(flashRafRef.current)cancelAnimationFrame(flashRafRef.current);
+    const _fl=()=>{if(!flashMarkupIdRef.current)return;flashRafRef.current=requestAnimationFrame(_fl);scheduleRedrawRef.current();};flashRafRef.current=requestAnimationFrame(_fl);
   },[markups,zoom,setSelectedId,dispatch]);
 
   // F2+F8: ResizeObserver with DPR scaling and rAF coalescing
@@ -809,6 +816,22 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       }
     }
     if(showScaleBar)drawScaleBar(ctx,zoom,drawCalibration,W,H);
+    // Flash highlight: animate a pulsing ring around the clicked markup
+    if(flashMarkupIdRef.current){
+      const _fm=markups.find(m=>m.id===flashMarkupIdRef.current);
+      if(_fm){
+        const _fp=vpts(_fm);if(_fp.length){
+          const _fcx=_fp.reduce((s,p)=>s+p.x,0)/_fp.length,_fcy=_fp.reduce((s,p)=>s+p.y,0)/_fp.length;
+          const _el=(performance.now()-flashStartTimeRef.current)/1500;
+          const _op=0.7*(1-_el),_sc=1+_el*0.5;
+          const _sx=_fcx*zoom+pan.x,_sy=_fcy*zoom+pan.y,_br=Math.max(20,5*Math.sqrt(zoom))*_sc;
+          ctx.save();
+          ctx.strokeStyle=`rgba(255,215,0,${_op})`;ctx.lineWidth=3*Math.sqrt(zoom);
+          for(let _i=0;_i<2;_i++){const _r=_br+_i*8*Math.sqrt(zoom)*_sc;ctx.beginPath();ctx.arc(_sx,_sy,_r,0,Math.PI*2);ctx.stroke();}
+          ctx.restore();
+        }
+      }
+    }
     if(showLUT&&lutMode!=="gray")drawLUTLegend(ctx,lutMode,lutInvert,W,H,t);
     // A5: Placing-mode card moved to floating React panel — no longer drawn on canvas
     // F1: draw coordinates on canvas (replaces DOM overlay — no React re-render needed)
@@ -1703,7 +1726,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
                   {rightPanel==="layers"&&<LayersPanel t={t} images={sessionImage} onUpdateImages={imgs=>updSession({images:imgs})} onAddImage={()=>stackImgRef.current?.click()} onShowAlign={()=>{}} onShowTransform={()=>{}}/>}
                   {rightPanel==="sessions"&&<SessionsPanel project={project} t={t} onUpdateProject={onUpdateProject} activeSession={activeSession} setActiveSession={id=>onUpdateProject({...project,activeSessionId:id})} onExportTemplate={v=>exportCepht({name:`${project.name}`,projection:project.projection,markups:v.markups||[],formulas:v.formulas||[],norms:v.norms||[]})} compareSession={compareSession} setCompareSession={setCompareSession} showDisplacement={showDisplacement} setShowDisplacement={setShowDisplacement} displacementOverlay={displacementOverlay} setDisplacementOverlay={setDisplacementOverlay} refLandmark1={refLandmark1} setRefLandmark1={setRefLandmark1} refLandmark2={refLandmark2} setRefLandmark2={setRefLandmark2} overlayBlend={overlayBlend} setOverlayBlend={setOverlayBlend} calibration={calibration} formatAngle={formatAngle}/>}
                   {rightPanel==="research"&&<ResearchPanel t={t} project={project} onUpdateProject={onUpdateProject} calibration={calibration}/>}
-                  {rightPanel==="interpretation"&&<InterpretationPanel allMeas={allMeas} norms={norms} t={t} formatAngle={formatAngle}/>}
+                  {rightPanel==="interpretation"&&<InterpretationPanel allMeas={allMeas} norms={norms} t={t} formatAngle={formatAngle} calibration={calibration}/>}
                   {rightPanel==="silhouettes"&&<SilhouettesPanel t={t} onInsert={(silhouetteType) => {
                     try {
                       const def = SILHOUETTES[silhouetteType];

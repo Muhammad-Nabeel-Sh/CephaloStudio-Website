@@ -1677,12 +1677,15 @@ const PATTERN_RECOGNIZERS = [
   },
 ];
 
-export function generateInterpretation(allMeas, norms) {
+export function generateInterpretation(allMeas, norms, calibration) {
   const deviations = [];
+  const calDone = calibration?.done === true;
+  const calTypes = ["length","distance","area","perimeter","radius","circumference","majorAxis","minorAxis","arcLength","projectedDistance"];
   for (const { m, meas } of allMeas) {
     if (!m.label) continue;
     for (const [measureType, value] of Object.entries(meas)) {
       if (typeof value !== "number" || !isFinite(value)) continue;
+      if (!calDone && calTypes.includes(measureType)) continue;
       const norm = norms.find(n => n.markupLabel === m.label && n.measureType === measureType);
       if (!norm || norm.sd <= 0) continue;
       const dev = normDeviation(value, norm);

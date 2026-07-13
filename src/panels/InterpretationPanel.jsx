@@ -11,7 +11,7 @@ const CATEGORY_ICONS = {
   skeletal: "🦴", dental: "🦷", "soft-tissue": "👤", airway: "🫁", other: "◈",
 };
 
-export default function InterpretationPanel({ allMeas, norms, t, formatAngle }) {
+export default function InterpretationPanel({ allMeas, norms, t, formatAngle, calibration }) {
   const [userEdits, setUserEdits] = useState({});
   const [editingKey, setEditingKey] = useState(null);
   const editRef = useRef(null);
@@ -22,8 +22,8 @@ export default function InterpretationPanel({ allMeas, norms, t, formatAngle }) 
   }, []);
 
   const { deviations, patterns } = useMemo(
-    () => generateInterpretation(allMeas, norms),
-    [allMeas, norms]
+    () => generateInterpretation(allMeas, norms, calibration),
+    [allMeas, norms, calibration]
   );
 
   const grouped = useMemo(() => {
@@ -46,6 +46,7 @@ export default function InterpretationPanel({ allMeas, norms, t, formatAngle }) 
 
   return (
     <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 12 }}>
+      {!calibration?.done && <div style={{ background: t.warn + "22", border: `1px solid ${t.warn}44`, borderRadius: 8, padding: 12, fontSize: 12, color: t.warn }}>⚠ Calibrate your image ⟺ to enable linear norms comparison. Angle norms are still shown below.</div>}
       {/* Pattern recognition section */}
       {patterns.length > 0 && (
         <div style={{ background: t.acc + "10", borderRadius: 8, border: `1px solid ${t.acc}30`, padding: 12 }}>
