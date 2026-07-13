@@ -1070,7 +1070,18 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           const newPoints=[...m.points];
           newPoints.splice(bestIdx+1,0,ip);
           const patch={points:newPoints};
-          if(m.type==="bezier")patch.cp=autoControlPoints(newPoints);
+          if(m.type==="bezier"&&Array.isArray(m.cp)&&m.cp.length===2*(m.points.length-1)&&bestIdx<vp.length-1){
+            const oc=m.cp,nc=new Array(oc.length+2);
+            let j=0;
+            for(;j<2*bestIdx;j++)nc[j]=oc[j];
+            nc[j]=oc[j];j++;
+            const p0=vp[bestIdx],p1=ip,p2=vp[bestIdx+1];
+            nc[j]={x:p1.x-(p2.x-p1.x)/6,y:p1.y-(p2.y-p1.y)/6};j++;
+            nc[j]={x:p1.x+(p2.x-p0.x)/6,y:p1.y+(p2.y-p0.y)/6};j++;
+            nc[j]=oc[j-2];j++;
+            for(;j<nc.length;j++)nc[j]=oc[j-2];
+            patch.cp=nc;
+          }else if(m.type==="bezier")patch.cp=autoControlPoints(newPoints);
           updMarkup(hit,patch);
           return;
         }
@@ -1078,7 +1089,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           const vp=vpts(m);
           let bestIdx=-1,bestDist=Infinity;
           for(let i=0;i<vp.length;i++){const d=dist(ip,vp[i]);if(d<bestDist){bestDist=d;bestIdx=i;}}
-          if(bestIdx>=0&&vp.length>2){const newPoints=m.points.filter((_,i)=>i!==bestIdx);const patch={points:newPoints};if(m.type==="bezier")patch.cp=autoControlPoints(newPoints);updMarkup(hit,patch);}
+          if(bestIdx>=0&&vp.length>2){const newPoints=m.points.filter((_,i)=>i!==bestIdx);const patch={points:newPoints};if(m.type==="bezier"&&Array.isArray(m.cp)&&m.cp.length===2*(m.points.length-1)){const oc=m.cp;if(bestIdx===0)patch.cp=oc.slice(2);else if(bestIdx===vp.length-1)patch.cp=oc.slice(0,oc.length-2);else{const nc=new Array(oc.length-2);let j=0;for(;j<2*bestIdx-1;j++)nc[j]=oc[j];nc[j]=oc[2*bestIdx+1];j++;for(;j<nc.length;j++)nc[j]=oc[j+2];patch.cp=nc;}}else if(m.type==="bezier")patch.cp=autoControlPoints(newPoints);updMarkup(hit,patch);}
           return;
         }
         if(m.type==="bezier"&&hoveredPtRef.current?.type==="bezierCp"){
