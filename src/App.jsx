@@ -181,8 +181,8 @@ function CalibModal({t,calibration,onFinish,rulerLabel,rulerCount}){
       {mode==="ruler"?<><div style={{fontSize:13,color:t.tx2,marginBottom:16,lineHeight:1.6}}>Draw a ruler on the image (⟺ key), then enter its real-world length.</div>
         {rulerLabel&&<div style={{fontSize:12,color:t.ok,marginBottom:8}}>Using ruler: <strong>{rulerLabel}</strong></div>}
         {!rulerLabel&&rulerCount>1&&<div style={{fontSize:12,color:t.warn,marginBottom:8}}>⚠ Multiple rulers found — using the first one. Draw a ruler for a specific selection.</div>}
-        <PropRow label="Distance (mm)" t={t}><input type="number" value={mm} onChange={e=>setMm(e.target.value)} min="1" style={{background:t.surf2,border:`1px solid ${t.bdr}`,borderRadius:6,padding:"6px 10px",color:t.tx,fontSize:14,width:"100%",fontFamily:"'DM Mono',monospace"}}/></PropRow><Btn t={t} onClick={()=>onFinish(parseFloat(mm))} style={{width:"100%",marginTop:12}}>Set Calibration</Btn></>
-      :<><div style={{fontSize:13,color:t.tx2,marginBottom:16}}>Enter px/mm directly (from DICOM metadata).</div>{calibration.done&&<div style={{fontSize:12,color:t.ok,marginBottom:10}}>Current: {calibration.pxPerMm.toFixed(4)} px/mm</div>}<PropRow label="px / mm" t={t}><input type="number" value={ppm} onChange={e=>setPpm(e.target.value)} step="0.001" min="0.001" style={{background:t.surf2,border:`1px solid ${t.bdr}`,borderRadius:6,padding:"6px 10px",color:t.tx,fontSize:14,width:"100%",fontFamily:"'DM Mono',monospace"}}/></PropRow><Btn t={t} onClick={()=>onFinish(parseFloat(mm),parseFloat(ppm))} style={{width:"100%",marginTop:12}}>Apply</Btn></>}
+        <PropRow label="Distance (mm)" t={t}><input type="number" value={mm} onChange={e=>setMm(e.target.value)} min="1" style={{background:t.surf2,border:`1px solid ${t.bdr}`,borderRadius:6,padding:"6px 10px",color:t.tx,fontSize:14,width:"90%",fontFamily:"'DM Mono',monospace"}}/></PropRow><Btn t={t} onClick={()=>onFinish(parseFloat(mm))} style={{width:"100%",marginTop:12}}>Set Calibration</Btn></>
+      :<><div style={{fontSize:13,color:t.tx2,marginBottom:16}}>Enter px/mm directly (from DICOM metadata).</div>{calibration.done&&<div style={{fontSize:12,color:t.ok,marginBottom:10}}>Current: {calibration.pxPerMm.toFixed(4)} px/mm</div>}<PropRow label="px / mm" t={t}><input type="number" value={ppm} onChange={e=>setPpm(e.target.value)} step="0.001" min="0.001" style={{background:t.surf2,border:`1px solid ${t.bdr}`,borderRadius:6,padding:"6px 10px",color:t.tx,fontSize:14,width:"90%",fontFamily:"'DM Mono',monospace"}}/></PropRow><Btn t={t} onClick={()=>onFinish(parseFloat(mm),parseFloat(ppm))} style={{width:"100%",marginTop:12}}>Apply</Btn></>}
     </div>
   );
 }
@@ -342,6 +342,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     spotlightMode,
     displacementOverlay,refLandmark1,refLandmark2,overlayBlend}=ui;
   const [compareSession, setCompareSession] = useState(null);
+  const [contextMenu, setContextMenu] = useState(null);
+  const [showGrid, setShowGrid] = useState(false);
   const [showReportOptions, setShowReportOptions] = useState(false);
   const defaultSections = { cover: true, images: true, measurements: true, normograms: true, research: true, formulas: true, interpretation: true };
   const [reportSections, setReportSections] = useState({ ...defaultSections });
@@ -416,6 +418,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const isDragging=useRef(false);const dragStart=useRef(null);const dragStartState=useRef(null);
   const dragMid=useRef(null);const dragPtIdx=useRef(null);
   const multiDragIdsRef=useRef(null);
+  const copiedMarkupRef=useRef(null);
   const silhouetteAction=useRef(null);const hoveredPtRef=useRef(null);
   const canvasSize=useRef({w:800,h:600});const lastTouchDist=useRef(null);const lastTapRef=useRef(0);
   const undoStackRef=useRef([]);
@@ -815,6 +818,15 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         ctx.restore();
       }
     }
+    // Grid overlay
+    if(showGrid){
+      ctx.save();
+      ctx.strokeStyle=t.bdr+"33";ctx.lineWidth=0.5/zoom;
+      const gs=50/zoom;const ox=pan.x%gs;const oy=pan.y%gs;
+      for(let gx=-ox;gx<W;gx+=gs){ctx.beginPath();ctx.moveTo(gx,0);ctx.lineTo(gx,H);ctx.stroke();}
+      for(let gy=-oy;gy<H;gy+=gs){ctx.beginPath();ctx.moveTo(0,gy);ctx.lineTo(W,gy);ctx.stroke();}
+      ctx.restore();
+    }
     if(showScaleBar)drawScaleBar(ctx,zoom,drawCalibration,W,H);
     // Flash highlight: animate a pulsing ring around the clicked markup
     if(flashMarkupIdRef.current){
@@ -845,7 +857,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       ctx.fillStyle=t.tx2;ctx.fillText(coordTxt,30,H-14);
     }
     ctx.restore(); // F2: end DPR scale
-  },[markups,selectedId,selectedIds,zoom,sessionImage,calibration,t,currentDraw,snapEnabled,showScaleBar,showDefTooltips,showLUT,showAnnotations,annotationSize,showDisplacement,compareSession,getProcessed,angleMode,lutMode,lutInvert,activeTool,displacementOverlay,overlayBlend,refLandmark1,refLandmark2,showCalib,pendingRuler]);
+  },[markups,selectedId,selectedIds,zoom,sessionImage,calibration,t,currentDraw,snapEnabled,showScaleBar,showDefTooltips,showLUT,showAnnotations,annotationSize,showDisplacement,compareSession,getProcessed,angleMode,lutMode,lutInvert,activeTool,displacementOverlay,overlayBlend,refLandmark1,refLandmark2,showCalib,pendingRuler,showGrid]);
 
   useEffect(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});});
   const scheduleRedraw=useCallback(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});},[redraw]);
@@ -940,10 +952,11 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         return;
       }
       setSelectedId(hit);
-      const isMulti=selectedIds.length&&selectedIds.includes(hit);
-      if(isMulti){multiDragIdsRef.current=[...selectedIds];dragStart.current=ip;isDragging.current=true;dragStartState.current=snapshotRef.current();return;}
-      if(selectedIds.length)dispatch({type:"SET",payload:{selectedIds:[]}});
       const m=markups.find(x=>x.id===hit);
+      const gid=m?.groupId;const gIds=gid?markups.filter(x=>x.groupId===gid&&x.id!==hit).map(x=>x.id):[];
+      const isMulti=selectedIds.length&&selectedIds.includes(hit);
+      if(isMulti||gIds.length>0){multiDragIdsRef.current=gIds.length>0?[...gIds,hit]:[...selectedIds];dragStart.current=ip;isDragging.current=true;dragStartState.current=snapshotRef.current();return;}
+      if(selectedIds.length)dispatch({type:"SET",payload:{selectedIds:[]}});
       if(m?.locked){isDragging.current=false;return;}
         if(m?.type==="silhouette"){
           try {
@@ -1215,6 +1228,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     isPanning.current=false;isDragging.current=false;silhouetteAction.current=null;multiDragIdsRef.current=null;
   };
   const handleDblClick=()=>{if((["polygon","curve","bezier"].includes(activeTool))&&currentDraw?.points.length>=2){finalizeMarkup(currentDraw);dispatch({type:"SET",payload:{currentDraw:null}});}};
+  const handleCanvasContextMenu=useCallback(e=>{e.preventDefault();const sp=getCanvasPos(e);const ip=toImage(sp.x,sp.y);const hit=hitTest(markups,ip,zoom);setContextMenu(hit?{x:e.clientX,y:e.clientY,markupId:hit,imageX:ip.x,imageY:ip.y}:{x:e.clientX,y:e.clientY,markupId:null,imageX:ip.x,imageY:ip.y});},[markups,zoom,getCanvasPos,toImage]);
+  useEffect(()=>{if(!contextMenu)return;const close=()=>setContextMenu(null);const onKey=e=>{if(e.key==="Escape")close()};const onClickOutside=e=>{if(!e.target.closest('[data-cmenu]'))close()};document.addEventListener("mousedown",onClickOutside);document.addEventListener("keydown",onKey);return()=>{document.removeEventListener("mousedown",onClickOutside);document.removeEventListener("keydown",onKey);};},[contextMenu]);
   useEffect(()=>{const c=canvasRef.current;if(!c)return;const onWheel=e=>{if(Math.abs(e.deltaY)>0.1||Math.abs(e.deltaX)>0.1){e.preventDefault();e.stopPropagation();const sp=getCanvasPos(e),f=e.deltaY>0?0.9:1.1,nz=clamp(zoom*f,0.05,15);const prev=panRef.current;panRef.current={x:sp.x-(sp.x-prev.x)*(nz/zoom),y:sp.y-(sp.y-prev.y)*(nz/zoom)};dispatch({type:"SET",payload:{pan:panRef.current}});dispatch({type:"SET",payload:{zoom:nz}});}};c.addEventListener("wheel",onWheel,{passive:false});return()=>c.removeEventListener("wheel",onWheel);},[zoom,dispatch,getCanvasPos]);
   const touchStartRef=useRef();const touchMoveRef=useRef();const touchEndRef=useRef();
   touchStartRef.current=e=>{
@@ -1626,7 +1641,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         <div ref={containerRef} style={{flex:1,position:"relative",overflow:"hidden",background:t.bg,paddingBottom:isMobile&&!showMobilePanel?52:0}} onDrop={handleDrop} onDragOver={e=>e.preventDefault()}>
           <canvas ref={canvasRef} style={{display:"block",cursor:cursorStyle,touchAction:"none",background:"transparent"}}
             onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
-            onDoubleClick={handleDblClick}/>
+            onDoubleClick={handleDblClick} onContextMenu={handleCanvasContextMenu}/>
           {loadingImages&&<div role="status" aria-live="polite" style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:t.bg+"cc",zIndex:10}}>
             <div style={{textAlign:"center"}}><div style={{width:28,height:28,border:`3px solid ${t.bdr}`,borderTopColor:t.acc,borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto 10px"}}/><div style={{fontSize:13,color:t.tx2}}>Loading images…</div></div>
           </div>}
@@ -1785,6 +1800,61 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           </div>
         )}
       </div>
+
+      {/* RIGHT-CLICK CONTEXT MENU */}
+      {contextMenu&&(()=>{
+        const mId=contextMenu.markupId;const m=mId?markups.find(x=>x.id===mId):null;
+        const close=()=>setContextMenu(null);
+        const sel=selectedIds.length>1?selectedIds:[];
+        const dup=()=>{if(!m)return;const pts=m.points?.map(p=>({x:p.x+15,y:p.y+15}));const dupe={...m,id:uid(),label:`${m.label||m.type} (copy)`,points:pts};if(m.type==="bezier"){const cp=m.cp?m.cp.map(p=>({x:p.x+15,y:p.y+15})):autoControlPoints(pts);dupe.cp=cp;}addMarkup(dupe);close();};
+        const copyMeas=()=>{if(!m)return;const meas=computeMeasurements(m,calibration);const txt=Object.entries(meas).filter(([k])=>k!=="x"&&k!=="y").map(([k,v])=>`${m.label||m.type} ${k}: ${k==="angle"?v.toFixed(1)+"°":v.toFixed(2)+(calibration.done?"mm":"px")}`).join("\n");if(txt)navigator.clipboard.writeText(txt);close();};
+        const copyMarkup=()=>{if(!m)return;copiedMarkupRef.current=JSON.stringify(m);close();};
+        const pasteMarkup=(setPos)=>{const raw=copiedMarkupRef.current;if(!raw)return;try{const src=JSON.parse(raw);const imgPt=setPos||{x:contextMenu.imageX||0,y:contextMenu.imageY||0};const pts=src.points?.map(p=>({x:p.x+imgPt.x-(src.points?.[0]?.x||0),y:p.y+imgPt.y-(src.points?.[0]?.y||0)}));const dupe={...src,id:uid(),label:`${src.label||src.type} (pasted)`,points:pts};if(src.type==="bezier"&&src.cp)dupe.cp=src.cp.map(p=>({x:p.x+imgPt.x-(src.points?.[0]?.x||0),y:p.y+imgPt.y-(src.points?.[0]?.y||0)}));addMarkup(dupe);close();}catch{/*silent*/};};
+        const toFront=()=>{if(!m)return;updMarkups(ms=>{const idx=ms.findIndex(x=>x.id===mId);if(idx<0||idx===ms.length-1)return ms;const cp=[...ms];cp.splice(idx,1);cp.push(m);return cp;});close();};
+        const toBack=()=>{if(!m)return;updMarkups(ms=>{const idx=ms.findIndex(x=>x.id===mId);if(idx<0||idx===0)return ms;const cp=[...ms];cp.splice(idx,1);cp.unshift(m);return cp;});close();};
+        const groupSel=()=>{if(sel.length<2)return;const gid=uid();updMarkups(ms=>ms.map(x=>sel.includes(x.id)?{...x,groupId:gid}:x));close();};
+        const ungroupSel=()=>{const ids=m&&m.groupId?[...sel,mId]:sel;if(!ids.length)return;updMarkups(ms=>ms.map(x=>ids.includes(x.id)?{...x,groupId:void 0}:x));close();};
+        const pivotY=Math.min(contextMenu.y,window.innerHeight-320);
+        const item=(label,onClick,danger)=>(
+          <div onClick={onClick} style={{padding:"6px 14px",cursor:"pointer",display:"flex",alignItems:"center",gap:8,color:danger?t.err:t.tx,fontSize:12,transition:"background 0.1s",whiteSpace:"nowrap"}}
+            onMouseEnter={e=>e.currentTarget.style.background=t.surf2} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{label}</div>
+        );
+        const sep=<div style={{borderTop:`1px solid ${t.bdr}`,margin:"4px 0"}}/>;
+        return <div data-cmenu="1" style={{position:"fixed",left:Math.min(contextMenu.x,window.innerWidth-200),top:pivotY,zIndex:1000,background:t.surf,border:`1px solid ${t.bdr}`,borderRadius:8,boxShadow:`0 4px 20px ${t.shadow}88`,padding:"4px 0",minWidth:170,fontSize:12,color:t.tx}}>
+          {m ? <>
+            <div style={{padding:"6px 14px",fontSize:10,color:t.tx3,textTransform:"uppercase",letterSpacing:0.5,borderBottom:`1px solid ${t.bdr}`,fontWeight:600}}>{m.label||m.type}</div>
+            {item("Focus",()=>{selectAndFocusMarkup(mId);close()})}
+            {item("Rename",()=>{const n=window.prompt("Rename markup:",m.label);if(n&&n.trim())updMarkup(mId,{label:n.trim()});close()})}
+            {item("Change Color",()=>{const ci=document.createElement('input');ci.type='color';ci.value=m.color||t.acc;ci.style.position='fixed';ci.style.opacity='0';ci.style.pointerEvents='none';document.body.appendChild(ci);ci.addEventListener('input',()=>updMarkup(mId,{color:ci.value}));ci.addEventListener('change',()=>{document.body.removeChild(ci)});close();ci.click()})}
+            {sep}
+            {item("Duplicate",dup)}
+            {item("Copy",copyMarkup)}
+            {copiedMarkupRef.current?item("Paste",pasteMarkup):null}
+            {sep}
+            {item(m.visible===false?"Show":"Hide",()=>{updMarkup(mId,{visible:m.visible===false});close()})}
+            {item(m.locked?"Unlock":"Lock",()=>{updMarkup(mId,{locked:!m.locked});close()})}
+            {sep}
+            {item(refLandmark1===m.label?"✓ Ref Landmark 1":"Ref Landmark 1",()=>{setRefLandmark1(m.label===refLandmark1?null:m.label);close()})}
+            {item(refLandmark2===m.label?"✓ Ref Landmark 2":"Ref Landmark 2",()=>{setRefLandmark2(m.label===refLandmark2?null:m.label);close()})}
+            {item("Copy Measurement",copyMeas)}
+            {sep}
+            {item("Move to Front",toFront)}
+            {item("Send to Back",toBack)}
+            {sep}
+            {m.groupId?item("Ungroup",ungroupSel):null}
+            {sel.length>1?item("Group",groupSel):null}
+            {item("Delete",()=>{delMarkup(mId);close()},true)}
+          </> : <>
+            <div style={{padding:"6px 14px",fontSize:10,color:t.tx3,textTransform:"uppercase",letterSpacing:0.5,fontWeight:600}}>Canvas</div>
+            {copiedMarkupRef.current?item("Paste",()=>pasteMarkup({x:contextMenu.imageX||0,y:contextMenu.imageY||0})):null}
+            {item("Select All",()=>{const all=markups.map(x=>x.id);dispatch({type:"SET",payload:{selectedIds:all,selectedId:all.length===1?all[0]:null}});close()})}
+            {item("Calibrate ⟺",()=>{dispatch({type:"SET",payload:{showCalib:true}});close()})}
+            {item("Fit to View ⊙",()=>{dispatch({type:"SET",payload:{zoom:1}});panRef.current={x:40,y:40};dispatch({type:"SET",payload:{pan:{x:40,y:40}}});close()})}
+            {sep}
+            {item(showGrid?"Grid: On ✓":"Grid: Off",()=>{setShowGrid(v=>!v);close()})}
+          </>}
+        </div>;
+      })()}
 
       {/* MODALS */}
       {showCalib&&<Modal t={t} title="Calibration" onClose={()=>dispatch({type:"SET",payload:{showCalib:false}})}><CalibModal t={t} calibration={calibration} onFinish={finalizeCalib} rulerLabel={pendingRuler?.label||null} rulerCount={markups.filter(m=>m.type==="ruler").length}/></Modal>}
