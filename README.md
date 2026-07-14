@@ -48,10 +48,10 @@ Requires ES2020 support, Canvas 2D, and IndexedDB. Not supported in Internet Exp
 ├── Data/                       # CSV reference data
 ├── src/
 │   ├── main.jsx
-│   ├── App.jsx                 # Root component (~1925 lines)
+│   ├── App.jsx                 # Root component (~2190 lines)
 │   ├── constants.js            # Themes, tools, predefined analyses, LUT presets
-│   ├── utils.js                # Math, geometry, statistics (863 lines, 60+ exports)
-│   ├── markups.jsx             # Markup rendering, hit-testing, template parsing (1236 lines)
+│   ├── utils.js                # Math, geometry, statistics (1360 lines, 60+ exports)
+│   ├── markups.jsx             # Markup rendering, hit-testing, template parsing (1670 lines)
 │   ├── panels.jsx              # Side panels (1079 lines)
 │   ├── ui.jsx                  # UI primitives (Btn, Tag, InfoBox, etc.)
 │   ├── ToolBtn.jsx             # Toolbar button component
@@ -216,16 +216,25 @@ Project
 |------|--------|-------------|--------|
 | `point` | 1 | — | Dot with label |
 | `line` / `parallel` | 2 | Length (mm) | Segment with infinite extension |
-| `perppoint` | 3 | Perpendicular distance | Point projected onto line |
+| `perp` | 4 | Perpendicular distance | Distance from point to line |
+| `projDist` | 4 | Signed projection distance | Projection onto line |
 | `midpoint` | 2 | — | Midpoint dot |
+| `perppoint` | 3 | — | Perpendicular point marker |
 | `arrow` | 2 | Length | Directional arrow |
 | `angle3` | 3 | Angle (degrees, signed for ANB) | Arc between 3 points |
 | `angle4` | 4 | Angle (degrees, 4-point) | Arc between two lines |
-| `perp` | 4 | Perpendicular distance | Distance from point to line |
 | `polygon` | 3+ | Area (mm²), Perimeter (mm) | Filled polygon |
 | `curve` | 2+ | Length (Catmull-Rom spline) | Smooth curve |
-| `text` | 1 | — | Text label at position |
+| `ellipse` | 3 | Major/minor axis, area, perimeter | Ellipse fit |
+| `arc` | 3 | Arc length, radius, arc angle | Arc segment |
+| `circle` | 2 | Radius, circumference, area | Circle |
+| `bezier` | 2+ | Length (multi-segment cubic) | Cubic bezier with control handles |
+| `tangent` | 2 | Length | Tangent line snapped to curve |
+| `concentric` | 3 | Multi-ring arc | Concentric arcs |
 | `ruler` | 2 | Calibration reference | Dashed line (excluded from stats) |
+| `ratio` / `sum` / `difference` / `percentage` | — | Composite value | Computed measurement |
+| `text` | 1 | — | Text label at position |
+| `silhouette` | variable | Area, perimeter | SVG anatomical path |
 
 ### Drawing Flow
 
@@ -552,8 +561,16 @@ Theme objects provide consistent color keys: `bg`, `surf`, `surf2`, `surf3`, `bd
 | Q | Parallel |
 | G | Polygon |
 | C | Curve |
+| E | Ellipse |
+| U | Arc |
+| O | Circle |
+| B | Bezier |
+| N | Tangent |
+| X | Concentric |
 | T | Text |
 | R | Ruler/Calibrate |
+| S | Silhouette |
+| F | Formula |
 
 ---
 
@@ -608,3 +625,60 @@ Chart rendering uses Plotly.js loaded as a dynamic import (not in main bundle).
 - Single-user only, no collaboration features
 - localStorage auto-save has ~5MB browser limit
 - Research module functions (RM-ANOVA, MANOVA) work but some edge cases in repeated-measures data shapes have not been validated on real clinical datasets; golden-value regression tests now guard core p-value math (fCDF, tDistributeCDF, chi2CDF, betaIncomplete)
+
+## 23. Context Menu & Interaction Features
+
+### Right-Click Context Menu
+
+Right-clicking the canvas opens a context menu with type-sensitive options:
+
+**On a markup right-click:**
+| Item | Action |
+|------|--------|
+| Focus | Pans view + flashing golden ring (1.5s) |
+| Rename | Prompts for new label |
+| Change Color | Opens native color picker |
+| Duplicate | Clones markup with +15px offset |
+| Copy | Serializes markup to internal clipboard |
+| Paste | Places copied markup at cursor position |
+| Hide/Show | Toggles `visible` flag |
+| Lock/Unlock | Toggles `locked` flag |
+| Ref Landmark 1/2 | Sets as structural reference for overlay alignment |
+| Copy Measurement | Copies measurement values to system clipboard |
+| Move to Front | Reorders markup to top of z-order |
+| Send to Back | Reorders markup to bottom of z-order |
+| Group | Assigns same `groupId` to all selected markups |
+| Ungroup | Removes `groupId` from the markup |
+| Delete | Removes the markup |
+
+**On empty canvas right-click:**
+| Item | Action |
+|------|--------|
+| Paste | Pastes a previously copied markup at cursor |
+| Select All | Selects all markups on the canvas |
+| Calibrate | Opens the calibration dialog |
+| Fit to View | Resets zoom/pan to default |
+| Grid: On/Off | Toggles a 50px grid overlay on the canvas |
+
+### Grid Overlay
+
+Toggleable 50px grid (semi-transparent lines) via the context menu. The grid scrolls with the canvas pan and is drawn at the viewport level for performance.
+
+### Group System
+
+Markups can be grouped via the context menu (Group with multiple selected, or assign `groupId` property). Grouped markups drag together — when any member is dragged, all siblings with the same `groupId` move simultaneously. Ungroup removes the `groupId` to restore independent movement.
+
+### refLabels Self-Healing System
+
+When a markup is placed near an existing point (within 3px), the system automatically records `refLabels` — an array of point labels corresponding to each of the markup's points. When a referenced point is later moved (via drag), the **`syncRefDeps`** helper propagates the translation to all dependent markups:
+
+- Lines, curves, polygons, beziers: points shift with the reference
+- Circles, ellipses: center/radius points follow
+- Tangents: contact point re-snaps to the parent curve
+- Arrows: start/end positions update
+
+This keeps splines, polygons, beziers, circles, ellipses, tangents, and arrows attached to their reference landmarks without manual re-adjustment.
+
+### Flash Highlight
+
+When a markup is clicked in the Markups panel, the canvas briefly flashes a pulsing golden ring (two concentric rings, 1.5s duration) centered on the markup. This gives an immediate visual clue of where the landmark is located on the image.

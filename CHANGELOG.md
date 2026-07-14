@@ -1,6 +1,73 @@
 # Changelog
 
-## [1.1.0] - 2026-07-11
+## [1.2.0] - 2026-07-14
+
+### Added — Context Menu System
+- Right-click context menu on canvas with type-sensitive options
+- Markup actions: Focus, Rename, Change Color, Duplicate, Copy/Paste, Hide/Show, Lock/Unlock
+- Ref Landmark 1/2 setting, Copy Measurement to clipboard, Move to Front/Back, Group/Ungroup, Delete
+- Empty canvas actions: Paste, Select All, Calibrate, Fit to View, Toggle Grid
+- Global click-outside / Escape to close; `data-cmenu` attribute guards
+
+### Added — Grid Overlay
+- Toggleable 50px grid on canvas via context menu or `showGrid` state
+- Semi-transparent lines that pan/zoom with the viewport
+- Zero-overhead when disabled (no grid drawing)
+
+### Added — Group System
+- `groupId` property on markups via Group/Ungroup context menu actions
+- Grouped markups drag together automatically via `multiDragIdsRef`
+- All group siblings move simultaneously when any member is dragged
+
+### Added — Flash Highlight
+- Pulsating golden ring animation (1.5s) when clicking a markup in the Markups panel
+- `requestAnimationFrame` loop with automatic timeout/cancellation
+- Prevents overlapping animations on rapid clicks
+
+### Added — Calderation-Aware Norm Comparisons
+- `generateInterpretation` skips linear/area measurement comparison when calibration is not done
+- Warning banner in InterpretationPanel when uncalibrated
+- Units display `px`/`px²` instead of `mm`/`mm²` in MarkupProps and MeasurementsPanel
+- NormBadges, MeasurementsPanel, MarkupProps all guard against uncalibrated linear comparisons
+
+### Added — refLabels Propagation System
+- `syncRefDeps(label, dx, dy)` helper propagates point drags to all dependent markups via `refLabels`
+- Wired into single-drag and multi-drag paths (runs BEFORE the point update to prevent stale closure overwrite)
+- Works for all markup types: splines, polygons, beziers, circles, ellipses, tangents, arrows, lines, angles
+- Auto-link threshold increased from 0.5px to 3px for better initial linking
+
+### Added — Bezier CP Preservation
+- Ctrl+click (add point) preserves existing CPs for unaffected segments; only generates CPs for the 2 affected segments
+- Shift+click (remove point) preserves unaffected segment CPs; drops CPs for the merged segments
+- Handles edge cases: appending at end, removing first/last anchor
+
+### Fixed — Point Drag Regression
+- `syncRefDeps` was called after `updMarkup` for the dragged point, causing stale closure overwrite
+- Reordered: `syncRefDeps` runs before `updMarkup` so the point's move is the last update in the batch
+
+### Fixed — Bezier Control Point Interaction
+- Hit-test priority reversed: CPs checked before anchors (anchors were "shadowing" nearby CPs)
+- CP hit-test added to `hitTest()` function (clicking CP now selects the bezier)
+- CP visual size increased (4px unselected, 6px selected with border stroke; was 2.5/4)
+- Hover state changes now trigger canvas redraw for immediate visual feedback
+- Hit-test threshold increased from 8 to 12 screen pixels
+
+### Fixed — Cursor Management
+- Override `canvas.style.cursor` now respects activeTool and isPanning state
+- Sets grab/grabbing/crosshair/pointer based on context
+- Avoids redundant DOM writes (compares before setting)
+
+### Fixed — Snap Indicator Visibility
+- `snapPosRef` changes now trigger `scheduleRedrawRef.current()`
+- Golden snap crosshair now appears reliably on mouse move
+- `drawSnapIndicator` draws subtle circles around ALL nearby snap-eligible points (not just the target)
+
+### Fixed — Pan Tool Cursor
+- Cursor line now checks activeTool and sets "grab"/"grabbing" for pan tool
+- No longer overwrites tool-based cursor with empty string
+
+### Fixed — Test Count
+- 269 tests across 15 files, all passing
 
 ### Fixed — Statistical Correctness (Critical)
 - `betaCF` broken: missing `d=1/d` inversion + wrong `del=d*h` → `del=d*c`. Restored t/F/χ² correctness app-wide.
