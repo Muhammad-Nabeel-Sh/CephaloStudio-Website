@@ -509,6 +509,9 @@ export const LUT_PRESETS = [
   { id: "cool", name: "Cool", stops: ["#0ff", "#00f", "#f0f"] },
   { id: "jet", name: "Jet", stops: ["#00f", "#0ff", "#0f0", "#ff0", "#f00"] },
   { id: "viridis", name: "Viridis", stops: ["#440154", "#3b528b", "#21918c", "#5ec962", "#fde725"] },
+  { id: "magma", name: "Magma", stops: ["#000004", "#180f3d", "#440f76", "#721f81", "#9e2f7f", "#cd4071", "#f1605d", "#fdb42f", "#fcffa4"] },
+  { id: "inferno", name: "Inferno", stops: ["#000004", "#160b39", "#420a68", "#6a176e", "#932667", "#bc3754", "#dd513a", "#f37819", "#fca50a", "#fcffa4"] },
+  { id: "cividis", name: "Cividis", stops: ["#00204c", "#003f8c", "#1a5c8c", "#467b8c", "#6f948c", "#a3b07a", "#d4b84d", "#fde23a"] },
   { id: "bone", name: "Bone", stops: ["#000", "#5e7ba0", "#fff"] },
   { id: "rainbow", name: "Rainbow", stops: ["#f00", "#ff0", "#0f0", "#0ff", "#00f", "#f0f"] },
 ];

@@ -541,6 +541,82 @@ const GUIDES = {
     ],
   },
 
+  lut: {
+    title: "LUT Colorization Guide",
+    icon: "🎨",
+    sections: [
+      {
+        heading: "What is a LUT?",
+        body: "A Look-Up Table (LUT) maps each grayscale intensity (0–255) to a specific color. Applying a false-color LUT to a radiograph can reveal subtle density differences that are difficult to distinguish in grayscale alone. The image pixels are not modified — only the on-screen rendering is changed.",
+        icon: "📖",
+      },
+      {
+        heading: "Controls",
+        items: [
+          "Legend — toggles the color bar overlay on the canvas showing the intensity-to-color mapping",
+          "Invert — reverses the LUT direction (dark→light becomes light→dark), useful for viewing inverted radiographs",
+          "Revert — resets to default Grayscale mode with invert off",
+        ],
+        icon: "🎛️",
+      },
+      {
+        heading: "Grayscale",
+        body: "The default clinical view. Maps intensity directly to luminance (black→white). This is the standard for diagnostic radiology and should be used when making clinical measurements.",
+        icon: "⬛",
+      },
+      {
+        heading: "Hot",
+        body: "Black → red → yellow → white. Mimics a thermal camera palette. Low intensities appear dark, mid-range intensities appear red/orange, and high intensities appear yellow/white. Useful for highlighting areas of high bone density or metallic artifacts.",
+        icon: "🔥",
+      },
+      {
+        heading: "Cool",
+        body: "Cyan → blue → magenta. A blue-dominant palette that maps mid-range intensities to cool tones. Useful for soft tissue visualization where blue contrast against bone improves delineation.",
+        icon: "❄️",
+      },
+      {
+        heading: "Jet",
+        body: "Blue → cyan → green → yellow → red. The classic rainbow palette used widely in medical imaging. High contrast between adjacent intensity ranges makes it excellent for identifying density transitions — for example, the boundary between bone and airway. Can be visually overwhelming for continuous gradients.",
+        icon: "🌈",
+      },
+      {
+        heading: "Viridis",
+        body: "Dark purple → teal → green → yellow. A perceptually uniform colormap designed for scientific visualization. Equal steps in data produce equal steps in perceived color, making it ideal for quantitative density comparison. Perceptually uniform even when printed in grayscale or viewed by colorblind users.",
+        icon: "🟢",
+      },
+      {
+        heading: "Magma",
+        body: "Black → dark purple → magenta → orange → light yellow. A perceptually uniform palette from the matplotlib family. Similar to Inferno but with more magenta/pink in the mid-range, which improves contrast in soft tissue densities. Good for airway assessment.",
+        icon: "🟣",
+      },
+      {
+        heading: "Inferno",
+        body: "Black → dark purple → red → orange → yellow. A perceptually uniform palette with warm tones throughout. The strong red-to-orange transition makes it particularly effective for distinguishing cortical bone from trabecular bone and soft tissue.",
+        icon: "🟠",
+      },
+      {
+        heading: "Cividis",
+        body: "Dark blue → teal → sage → gold → yellow. Specifically designed for accessibility — it is optimized to be perceived identically by people with and without color vision deficiency (colorblindness). Use this when presenting to colleagues or in publications where accessibility is important.",
+        icon: "♿",
+      },
+      {
+        heading: "Bone",
+        body: "Black → blue-gray → white. A bi-tonal palette that mimics the appearance of X-ray film with a slight blue tint. The blue-gray mid-range improves the perception of soft tissue vs. bone boundaries compared to pure grayscale.",
+        icon: "🦴",
+      },
+      {
+        heading: "Rainbow",
+        body: "Red → yellow → green → cyan → blue → magenta. A full-spectrum hue cycle. Unlike Jet, it starts and ends at red, making it suitable for cyclic data. The wide hue range provides maximum visual contrast between adjacent intensity levels.",
+        icon: "🔴",
+      },
+      {
+        heading: "Tips",
+        body: "• Always revert to Grayscale before making clinical measurements — false colors can be misleading\n• Viridis/Magma/Inferno/Cividis are perceptually uniform: equal data intervals produce equal perceived color steps\n• Use Cividis for publications and presentations to ensure accessibility\n• Jet provides the highest visual contrast but can introduce artifacts at hue boundaries\n• The Legend toggle shows the color bar on the canvas for reference",
+        icon: "💡",
+      },
+    ],
+  },
+
   interpretation: {
     title: "Interpretation Guide",
     icon: "📋",

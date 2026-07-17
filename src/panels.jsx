@@ -366,7 +366,11 @@ export function ImagePanel({ t, processing, setProcessing, lutMode, setLutMode, 
       <Sld label="Edge Enhance" value={processing.edgeEnhance} min={0} max={100} onChange={v => { const p = { ...processing, edgeEnhance: v }; setProcessing(p); }} t={t} unit="%" />
       <div style={{ display: "flex", gap: 6, marginBottom: 4 }}><Btn t={t} small onClick={onReset} style={{ flex: 1 }}>↺ Reset</Btn><Btn t={t} small active={showHistogram} onClick={onShowHist} style={{ flex: 1 }}>▦ Histogram</Btn></div>
       <Divider t={t} />
-      <PanelHeader t={t}>LUT Colorization</PanelHeader>
+      <PanelHeader t={t}>
+        LUT Colorization
+        <button onClick={() => setGuideKey("lut")}
+          style={{ background: "none", border: `1px solid ${t.tx3}55`, color: t.tx3, borderRadius: 10, width: 18, height: 18, fontSize: 10, lineHeight: "16px", textAlign: "center", cursor: "pointer", padding: 0, marginLeft: 6, verticalAlign: "middle" }} title="LUT Guide">?</button>
+      </PanelHeader>
       <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
         <Btn t={t} small active={showLUT} onClick={() => setShowLUT(v => !v)}>Legend</Btn>
         <Btn t={t} small active={lutInvert} onClick={() => setLutInvert(!lutInvert)}>⇅ Invert</Btn>

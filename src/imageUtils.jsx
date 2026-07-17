@@ -22,11 +22,10 @@ export function getLUTColor(v, mode, invert = false) {
       else { r = 1 - 4 * (n - 0.875); }
       return [r * 255, g * 255, b * 255];
     }
-    case "viridis": {
-      const stops = [[68, 1, 84], [59, 82, 139], [33, 145, 140], [94, 201, 98], [253, 231, 37]];
-      const n = v / 255 * 4, i = Math.min(3, Math.floor(n)), f = n - i, c0 = stops[i], c1 = stops[i + 1];
-      return [c0[0] + (c1[0] - c0[0]) * f, c0[1] + (c1[1] - c0[1]) * f, c0[2] + (c1[2] - c0[2]) * f];
-    }
+    case "viridis": return _interpStops(v, [[68,1,84],[59,82,139],[33,145,140],[94,201,98],[253,231,37]]);
+    case "magma": return _interpStops(v, [[0,0,4],[24,15,61],[68,15,118],[114,31,129],[158,47,127],[205,64,113],[241,96,93],[253,180,47],[252,255,164]]);
+    case "inferno": return _interpStops(v, [[0,0,4],[22,11,57],[66,10,104],[106,23,110],[147,38,103],[188,55,84],[221,81,58],[243,120,25],[252,165,10],[252,255,164]]);
+    case "cividis": return _interpStops(v, [[0,32,76],[0,63,140],[26,92,140],[70,123,140],[111,148,140],[163,176,122],[212,184,77],[253,226,58]]);
     case "bone": {
       const n = v / 255;
       return [clamp(n * 210, 0, 255), clamp(n * 210, 0, 255), clamp(v * 1.08, 0, 255)];
@@ -44,6 +43,12 @@ export function getLUTColor(v, mode, invert = false) {
     }
     default: return [v, v, v];
   }
+}
+
+function _interpStops(v, stops) {
+  const n = v / 255 * (stops.length - 1), i = Math.min(stops.length - 2, Math.floor(n)), f = n - i;
+  const a = stops[i], b = stops[i + 1];
+  return [a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f];
 }
 
 export function applyEdgeKernel(idata, strength) {
