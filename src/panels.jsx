@@ -218,9 +218,10 @@ export function MeasurementsPanel({ allMeas, formulaMeas, t, calibration, norms,
                     </div>
                   );
                 })}
-              </div>
-            );
-          })}
+              {editingNorm?.markupLabel === m.label && <InlineNormEditor t={t} {...editingNorm} onSave={(n) => { const filtered = (norms || []).filter(x => !(x.markupLabel === editingNorm.markupLabel && x.measureType === editingNorm.measureType)); onUpdateNorms([...filtered, { id: editingNorm.existing?.id || uid(), ...n }]); setEditingNorm(null); }} onDelete={() => { onUpdateNorms((norms || []).filter(x => !(x.markupLabel === editingNorm.markupLabel && x.measureType === editingNorm.measureType))); setEditingNorm(null); }} onClose={() => setEditingNorm(null)} />}
+            </div>
+          );
+        })}
           {formulaMeas && formulaMeas.map(({ m, meas }) => {
             const relNorms = (norms || []).filter(n => n.markupLabel === m.label);
             return (
@@ -252,12 +253,11 @@ export function MeasurementsPanel({ allMeas, formulaMeas, t, calibration, norms,
                     </div>
                   );
                 })}
-              </div>
-            );
-          })}
+              {editingNorm?.markupLabel === m.label && <InlineNormEditor t={t} {...editingNorm} onSave={(n) => { const filtered = (norms || []).filter(x => !(x.markupLabel === editingNorm.markupLabel && x.measureType === editingNorm.measureType)); onUpdateNorms([...filtered, { id: editingNorm.existing?.id || uid(), ...n }]); setEditingNorm(null); }} onDelete={() => { onUpdateNorms((norms || []).filter(x => !(x.markupLabel === editingNorm.markupLabel && x.measureType === editingNorm.measureType))); setEditingNorm(null); }} onClose={() => setEditingNorm(null)} />}
+            </div>
+          );
+        })}
         </>}
-
-      {editingNorm && <InlineNormEditor t={t} {...editingNorm} onSave={(n) => { const filtered = (norms || []).filter(x => !(x.markupLabel === editingNorm.markupLabel && x.measureType === editingNorm.measureType)); onUpdateNorms([...filtered, { id: editingNorm.existing?.id || uid(), ...n }]); setEditingNorm(null); }} onDelete={() => { onUpdateNorms((norms || []).filter(x => !(x.markupLabel === editingNorm.markupLabel && x.measureType === editingNorm.measureType))); setEditingNorm(null); }} onClose={() => setEditingNorm(null)} />}
 
       {hasMeas && <Btn t={t} small onClick={onExportCSV} style={{ width: "100%", marginTop: 8 }}>⬇ Export CSV</Btn>}
     </div>
