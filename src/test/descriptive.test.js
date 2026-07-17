@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { runDescriptiveAll, selectNormStratum, PREDEFINED_NORMS } from "../research/descriptive.js";
+import { runDescriptiveAll, selectNormStratum, RESEARCH_NORMS } from "../research/descriptive.js";
 
 function makeSession(id, markups, opts = {}) {
   return {
@@ -57,8 +57,8 @@ describe("runDescriptiveAll", () => {
 // Guards against silently applying adult norms to children.
 // ═════════════════════════════════════════════════════════════════
 describe("selectNormStratum", () => {
-  const mcnamara = PREDEFINED_NORMS.find(n => n.id === "mcnamara");
-  const steiner = PREDEFINED_NORMS.find(n => n.id === "steiner");
+  const mcnamara = RESEARCH_NORMS.find(n => n.id === "mcnamara");
+  const steiner = RESEARCH_NORMS.find(n => n.id === "steiner");
 
   it("picks the age/sex-matched stratum for McNamara linear measures", () => {
     const sel = selectNormStratum(mcnamara, 12, "male");
@@ -111,7 +111,7 @@ describe("runDescriptiveAll — z-score stratum + warning propagation", () => {
 
   it("records the matched stratum and an age-mismatch warning on z-scores", () => {
     const sessions = [makeSession("s1", [makePoint("ANB", 4, 0)], { meta: { age: "9", sex: "female" } })];
-    const mcnamara = PREDEFINED_NORMS.find(n => n.id === "mcnamara");
+    const mcnamara = RESEARCH_NORMS.find(n => n.id === "mcnamara");
     const config = { labelIds: ["ANB"], referenceNorms: [{ ...mcnamara, id: "test-mc" }], patientAge: "9", patientSex: "female" };
     const result = runDescriptiveAll(sessions, config, { done: true, pxPerMm: 1 });
     expect(result.zScores).toBeDefined();
@@ -124,7 +124,7 @@ describe("runDescriptiveAll — z-score stratum + warning propagation", () => {
 
   it("emits an adult-norm-on-child warning for Steiner", () => {
     const sessions = [makeSession("s1", [makePoint("SNA", 82, 0)], { meta: { age: "9" } })];
-    const steiner = PREDEFINED_NORMS.find(n => n.id === "steiner");
+    const steiner = RESEARCH_NORMS.find(n => n.id === "steiner");
     const config = { labelIds: ["SNA"], referenceNorms: [{ ...steiner, id: "test-st" }], patientAge: "9" };
     const result = runDescriptiveAll(sessions, config, { done: true, pxPerMm: 1 });
     expect(result.zScores["test-st"]._stratumWarning).toMatch(/below the adult range/i);
@@ -132,7 +132,7 @@ describe("runDescriptiveAll — z-score stratum + warning propagation", () => {
 
   it("auto-derives patient age/sex from session meta when not in config", () => {
     const sessions = [makeSession("s1", [makePoint("ANB", 4, 0)], { meta: { age: "30", sex: "male" } })];
-    const mcnamara = PREDEFINED_NORMS.find(n => n.id === "mcnamara");
+    const mcnamara = RESEARCH_NORMS.find(n => n.id === "mcnamara");
     const config = { labelIds: ["ANB"], referenceNorms: [{ ...mcnamara, id: "test-mc2" }] };
     const result = runDescriptiveAll(sessions, config, { done: true, pxPerMm: 1 });
     expect(result.patientContext.age).toBe(30);

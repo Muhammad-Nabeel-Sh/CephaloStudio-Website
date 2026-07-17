@@ -3,8 +3,6 @@
 // Centralizes functions that were previously copy-pasted across files.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { tDistributeCDF } from "../utils.js";
-
 // ─── Normal CDF (standard normal distribution function) ────────────────────
 export function normalCdf(x) {
   if (x < -8) return 0;
@@ -17,22 +15,6 @@ export function normalCdf(x) {
   return 0.5 * (1 + s * erf);
 }
 
-// ─── t Critical value via bisection on tDistributeCDF ─────────────────────
-export function tCritical(p, df) {
-  if (df <= 0) return 1.96;
-  if (df > 1000) return p >= 0.995 ? 2.576 : p >= 0.975 ? 1.96 : p >= 0.95 ? 1.645 : 0;
-  const target = p;
-  let lo = 0.0, hi = 8.0, mid;
-  for (let it = 0; it < 60; it++) {
-    mid = (lo + hi) / 2;
-    const cdf = tDistributeCDF(mid, df);
-    if (cdf < target) lo = mid; else hi = mid;
-    if (Math.abs(cdf - target) < 1e-10) break;
-  }
-  return (lo + hi) / 2;
-}
-
-// ─── Matrix helpers ───────────────────────────────────────────────────────
 export function matMul(A, B) {
   const m = A.length, n = A[0].length, p = B[0].length;
   const C = Array.from({ length: m }, () => Array(p).fill(0));
@@ -103,9 +85,4 @@ export function benjaminiHochberg(pValues, alpha = 0.05) {
   return indexed.map((item, rank) => ({
     original: item.p, adjusted: item.adjusted, significant: rank <= lastSig, i: item.i,
   })).sort((a, b) => a.i - b.i);
-}
-
-// ─── Effect size accessor (A7) ────────────────────────────────────────────
-export function getEffectSizeValue(es) {
-  return es?.cohensD ?? es?.cohensDz ?? es?.rankBiserial ?? es?.matchedPairsR ?? es?.etaSq ?? es?.partialEtaSq ?? es?.epsilonSq ?? es?.kendallW ?? null;
 }

@@ -1,4 +1,5 @@
 import { computeMeasurements, mean, stdev, variance, tTestPaired, fCDF, chi2CDF, tDistributeCDF, clamp } from "../utils.js";
+import { matInverse } from "./statsCore.js";
 import { checkLongitudinalTimeSeparation } from "./validation.js";
 import { logError } from "../logger.js";
 
@@ -34,26 +35,6 @@ function determinant(A) {
   return det;
 }
 
-function matInverse(A) {
-  const n = A.length;
-  const aug = A.map((row, i) => [...row, ...Array.from({ length: n }, (_, j) => i === j ? 1 : 0)]);
-  for (let col = 0; col < n; col++) {
-    let maxRow = col;
-    for (let row = col + 1; row < n; row++) if (Math.abs(aug[row][col]) > Math.abs(aug[maxRow][col])) maxRow = row;
-    [aug[col], aug[maxRow]] = [aug[maxRow], aug[col]];
-    if (Math.abs(aug[col][col]) < 1e-12) return null;
-    const piv = aug[col][col];
-    for (let j = 0; j < 2 * n; j++) aug[col][j] /= piv;
-    for (let row = 0; row < n; row++) {
-      if (row === col) continue;
-      const f = aug[row][col];
-      for (let j = 0; j < 2 * n; j++) aug[row][j] -= f * aug[col][j];
-    }
-  }
-  return aug.map(row => row.slice(n));
-}
-
-// ─── Covariance matrix ─────────────────────────────────────────────────────
 function covarianceMatrix(matrix) {
   const n = matrix.length;
   const p = matrix[0].length;

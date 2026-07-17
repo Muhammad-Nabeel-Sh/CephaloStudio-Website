@@ -133,10 +133,11 @@ describe("Mann-Whitney U golden values", () => {
 });
 
 describe("Wilcoxon signed-rank golden values", () => {
-  // R: wilcox.test(c(1,2,3,4,5), c(2,3,4,5,6), paired=TRUE, exact=TRUE)
-  // V = 0, p-value = 0.0625
-  const before = [1, 2, 3, 4, 5];
-  const after = [2, 3, 4, 5, 6];
+  // Use data with unique absolute differences to avoid ties (which force normal approx)
+  // R: wilcox.test(c(2,4,7,11,16), c(1,2,4,7,11), paired=TRUE, exact=TRUE)
+  // diffs = c(1,2,3,4,5), all positive → V = 15, p-value = 0.0625
+  const before = [1, 2, 4, 7, 11];
+  const after = [2, 4, 7, 11, 16];
 
   it("known Wilcoxon signed-rank result", () => {
     const r = wilcoxonSignedRank(before, after);

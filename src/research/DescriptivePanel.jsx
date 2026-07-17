@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { useState, Fragment } from "react";
-import { PREDEFINED_NORMS } from "./descriptive.js";
+import { RESEARCH_NORMS } from "./descriptive.js";
 import { InfoBox } from "../ui.jsx";
 
 function sid() {
@@ -188,7 +188,7 @@ export function DescriptiveConfig({ study, sessions, onUpdateStudy, t }) {
         <div style={{ marginBottom: 6 }}>
           <div style={{ fontSize: 9, color: t.tx3, marginBottom: 3 }}>Predefined:</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
-            {PREDEFINED_NORMS.map(n => {
+            {RESEARCH_NORMS.map(n => {
               const alreadyAdded = (config.referenceNorms || []).some(r => r.label === n.label);
               return (
                 <button key={n.id} onClick={() => addPredefinedNorm(n)} disabled={alreadyAdded}

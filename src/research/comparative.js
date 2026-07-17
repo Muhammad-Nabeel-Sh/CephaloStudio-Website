@@ -1,4 +1,5 @@
 import { computeMeasurements, mean, stdev, variance, shapiroWilk, oneWayAnova, tTestPaired, tDistributeCDF, fCDF, chi2CDF } from "../utils.js";
+import { normalCdf, matMul, matInverse, benjaminiHochberg } from "./statsCore.js";
 import { logError } from "../logger.js";
 
 // ─── Statistical helpers ──────────────────────────────────────────────────
@@ -14,16 +15,6 @@ function rankArray(arr) {
     i = j + 1;
   }
   return ranks;
-}
-
-function normalCdf(x) {
-  if (x < -8) return 0;
-  if (x > 8) return 1;
-  const a = 0.3193815, b = -0.3565638, c = 1.7814779, d = -1.8212559, e = 1.3302744;
-  const phi = 0.39894228 * Math.exp(-x * x / 2);
-  let t = 1 / (1 + 0.2316419 * Math.abs(x));
-  t = phi * t * (a + t * (b + t * (c + t * (d + t * e))));
-  return x > 0 ? 1 - t : t;
 }
 
 function sum(arr) {
@@ -477,36 +468,6 @@ function bonferroniAdjust(pValues, alpha = 0.05) {
   }));
 }
 
-// Benjamini-Hochberg with enforced monotonicity. The adjusted p-value for rank r is
-// min over all ranks ≥ r of (p_r · m / r), then cumulatively-min'd from the top so the
-// adjusted values never increase as the original p decreases (the previous version
-// returned non-monotonic adjusted p's — only the step-up significance flag was correct).
-function benjaminiHochberg(pValues, alpha = 0.05) {
-  const m = pValues.length;
-  if (m === 0) return [];
-  const indexed = pValues.map((p, i) => ({ p, i })).sort((a, b) => a.p - b.p);
-  // raw adjusted = p * m / rank
-  for (let rank = 0; rank < m; rank++) {
-    indexed[rank].rawAdj = Math.min(indexed[rank].p * m / (rank + 1), 1);
-  }
-  // enforce monotonicity from the largest p downward (BH adjusted p-values must be
-  // non-decreasing as the original p increases; the previous version skipped this and
-  // could emit non-monotonic adjusted p-values).
-  let prev = 1;
-  for (let rank = m - 1; rank >= 0; rank--) {
-    prev = Math.min(prev, indexed[rank].rawAdj);
-    indexed[rank].adjusted = prev;
-  }
-  // step-up significance: largest rank whose p <= (rank+1)/m * alpha
-  let lastSig = -1;
-  for (let rank = 0; rank < m; rank++) {
-    if (indexed[rank].p <= ((rank + 1) / m) * alpha) lastSig = rank;
-  }
-  return indexed.map((item, rank) => ({
-    original: item.p, adjusted: item.adjusted, significant: rank <= lastSig, i: item.i,
-  })).sort((a, b) => a.i - b.i);
-}
-
 // Approximate F from Wilks' lambda. Guard against NaN when the sphericity-ish
 // discriminant `p²(k-1)² − 4` is non-positive (e.g., p=2,k=2); fall back to the
 // exact 2-DV / 2-group Rao F form in those cases.
@@ -526,35 +487,6 @@ function fFromWilks(lambda, p, k, N) {
   if (!isFinite(F) || !isFinite(df2) || df2 <= 0 || df1 <= 0) return null;
   const pValue = 1 - fCDF(F, df1, df2);
   return { F, df1, df2, pValue };
-}
-
-function matMul(A, B) {
-  const m = A.length, n = A[0].length, p = B[0].length;
-  const C = Array.from({ length: m }, () => Array(p).fill(0));
-  for (let i = 0; i < m; i++)
-    for (let j = 0; j < p; j++)
-      for (let k = 0; k < n; k++)
-        C[i][j] += A[i][k] * B[k][j];
-  return C;
-}
-
-function matInverse(A) {
-  const n = A.length;
-  const aug = A.map((row, i) => [...row, ...Array.from({ length: n }, (_, j) => i === j ? 1 : 0)]);
-  for (let col = 0; col < n; col++) {
-    let maxRow = col;
-    for (let row = col + 1; row < n; row++) if (Math.abs(aug[row][col]) > Math.abs(aug[maxRow][col])) maxRow = row;
-    [aug[col], aug[maxRow]] = [aug[maxRow], aug[col]];
-    if (Math.abs(aug[col][col]) < 1e-12) return null;
-    const piv = aug[col][col];
-    for (let j = 0; j < 2 * n; j++) aug[col][j] /= piv;
-    for (let row = 0; row < n; row++) {
-      if (row === col) continue;
-      const f = aug[row][col];
-      for (let j = 0; j < 2 * n; j++) aug[row][j] -= f * aug[col][j];
-    }
-  }
-  return aug.map(row => row.slice(n));
 }
 
 function eigenvalues2x2(A) {

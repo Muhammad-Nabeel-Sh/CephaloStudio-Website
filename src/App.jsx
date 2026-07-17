@@ -919,6 +919,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       if((e.ctrlKey||e.metaKey)&&e.key==="z"){undo();return;}
       if((e.ctrlKey||e.metaKey)&&e.key==="y"){redo();return;}
       if(e.key==="Escape"){boxSelectRectRef.current=null;dispatch({type:"SET",payload:{currentDraw:null,selectedId:null,selectedIds:[]}});if(mobileToolsExpanded)dispatch({type:"SET",payload:{mobileToolsExpanded:false}});else if(placingMode){if(placingIdx<placingQueue.length-1)dispatch({type:"SET",payload:{placingIdx:placingIdx+1}});else{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}}return;}
+      if(e.key==="F10"&&e.shiftKey){e.preventDefault();const hitMarkup=selectedId||null;setContextMenu({x:window.innerWidth/2,y:window.innerHeight/2,markupId:hitMarkup,imageX:0,imageY:0});return;}
+      if(e.key==="ContextMenu"||e.key==="Apps"){e.preventDefault();const hitMarkup=selectedId||null;setContextMenu({x:window.innerWidth/2,y:window.innerHeight/2,markupId:hitMarkup,imageX:0,imageY:0});return;}
       const tool=TOOLS.filter(Boolean).find(t2=>t2.key===e.key.toLowerCase());
       if(tool){dispatch({type:"SET",payload:{activeTool:tool.id}});dispatch({type:"SET",payload:{currentDraw:null}});return;}
       if(e.key==="Backspace"&&placingMode&&placingQueue.length>0){if(placingIdx>0)dispatch({type:"SET",payload:{placingIdx:placingIdx-1}});else{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}return;}
@@ -939,6 +941,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const autoCreateMeasurementsRef=useRef();
   const autoCreateMeasurements=useCallback((markups,templateName)=>autoCreateMeasurementsRef.current(markups,templateName),[]);
   const handleMouseDown=useCallback(e=>{
+    if(e.button===1){e.preventDefault();isPanning.current=true;panStart.current={mx:e.clientX,my:e.clientY,px:panRef.current.x,py:panRef.current.y};return;}
     if(e.button!==0)return;
     const sp=getCanvasPos(e);let ip=toImage(sp.x,sp.y);
     ip=snapPoint(ip,markups,12/zoom,snapEnabled);
@@ -1246,18 +1249,19 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   };
   const handleDblClick=()=>{if((["polygon","curve","bezier"].includes(activeTool))&&currentDraw?.points.length>=2){finalizeMarkup(currentDraw);dispatch({type:"SET",payload:{currentDraw:null}});}};
   const handleCanvasContextMenu=useCallback(e=>{e.preventDefault();const sp=getCanvasPos(e);const ip=toImage(sp.x,sp.y);const hit=hitTest(markups,ip,zoom);setContextMenu(hit?{x:e.clientX,y:e.clientY,markupId:hit,imageX:ip.x,imageY:ip.y}:{x:e.clientX,y:e.clientY,markupId:null,imageX:ip.x,imageY:ip.y});},[markups,zoom,getCanvasPos,toImage]);
-  useEffect(()=>{if(!contextMenu)return;const close=()=>setContextMenu(null);const onKey=e=>{if(e.key==="Escape")close()};const onClickOutside=e=>{if(!e.target.closest('[data-cmenu]'))close()};document.addEventListener("mousedown",onClickOutside);document.addEventListener("keydown",onKey);return()=>{document.removeEventListener("mousedown",onClickOutside);document.removeEventListener("keydown",onKey);};},[contextMenu]);
+  useEffect(()=>{if(!contextMenu)return;const close=()=>setContextMenu(null);const onKey=e=>{if(e.key==="Escape")close();if(e.key==="ArrowDown"||e.key==="ArrowUp"){e.preventDefault();const items=document.querySelectorAll('[data-cmenu] [role="menuitem"]');const current=e.target.closest('[role="menuitem"]');const idx=Array.from(items).indexOf(current);const next=e.key==="ArrowDown"?Math.min(idx+1,items.length-1):Math.max(idx-1,0);if(items[next])items[next].focus();}if(e.key==="Tab"){e.preventDefault();const items=document.querySelectorAll('[data-cmenu] [role="menuitem"]');const first=items[0];const last=items[items.length-1];if(e.shiftKey){if(document.activeElement===first){last.focus();}}else{if(document.activeElement===last){first.focus();}}}};const onClickOutside=e=>{if(!e.target.closest('[data-cmenu]'))close()};document.addEventListener("mousedown",onClickOutside);document.addEventListener("keydown",onKey);setTimeout(()=>{const first=document.querySelector('[data-cmenu] [role="menuitem"]');if(first)first.focus();},0);return()=>{document.removeEventListener("mousedown",onClickOutside);document.removeEventListener("keydown",onKey);};},[contextMenu]);
   useEffect(()=>{const c=canvasRef.current;if(!c)return;const onWheel=e=>{if(Math.abs(e.deltaY)>0.1||Math.abs(e.deltaX)>0.1){e.preventDefault();e.stopPropagation();const sp=getCanvasPos(e),f=e.deltaY>0?0.9:1.1,nz=clamp(zoom*f,0.05,15);const prev=panRef.current;panRef.current={x:sp.x-(sp.x-prev.x)*(nz/zoom),y:sp.y-(sp.y-prev.y)*(nz/zoom)};dispatch({type:"SET",payload:{pan:panRef.current}});dispatch({type:"SET",payload:{zoom:nz}});}};c.addEventListener("wheel",onWheel,{passive:false});return()=>c.removeEventListener("wheel",onWheel);},[zoom,dispatch,getCanvasPos]);
-  const touchStartRef=useRef();const touchMoveRef=useRef();const touchEndRef=useRef();
+  const touchStartRef=useRef();const touchMoveRef=useRef();const touchEndRef=useRef();const longPressTimerRef=useRef(null);
   touchStartRef.current=e=>{
-    if(e.touches.length===1){const t2=e.touches[0];const now=Date.now();if(now-lastTapRef.current<300){handleDblClick();lastTapRef.current=0;}else{lastTapRef.current=now;handleMouseDown({button:0,clientX:t2.clientX,clientY:t2.clientY});}}
+    if(e.touches.length===1){const t2=e.touches[0];const now=Date.now();if(now-lastTapRef.current<300){handleDblClick();lastTapRef.current=0;}else{lastTapRef.current=now;handleMouseDown({button:0,clientX:t2.clientX,clientY:t2.clientY});const sp=getCanvasPos({clientX:t2.clientX,clientY:t2.clientY});const ip=toImage(sp.x,sp.y);const hit=hitTest(markups,ip,zoom);longPressTimerRef.current=setTimeout(()=>{longPressTimerRef.current=null;setContextMenu({x:t2.clientX,y:t2.clientY,markupId:hit||null,imageX:ip.x,imageY:ip.y});},500);}}
     if(e.touches.length===2){lastTouchDist.current=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);if((activeTool==="curve"||activeTool==="polygon")&&currentDraw?.points.length>=2){handleMouseDown({button:0,clientX:(e.touches[0].clientX+e.touches[1].clientX)/2,clientY:(e.touches[0].clientY+e.touches[1].clientY)/2,ctrlKey:true});}}
   };
   touchMoveRef.current=e=>{
+    if(longPressTimerRef.current){clearTimeout(longPressTimerRef.current);longPressTimerRef.current=null;}
     if(e.touches.length===1){const t2=e.touches[0];handleMouseMove({clientX:t2.clientX,clientY:t2.clientY});}
     if(e.touches.length===2&&lastTouchDist.current){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);const f=d/lastTouchDist.current,nz=clamp(zoom*f,0.05,15);const cx=(e.touches[0].clientX+e.touches[1].clientX)/2,cy=(e.touches[0].clientY+e.touches[1].clientY)/2;const r=canvasRef.current.getBoundingClientRect();const sp={x:cx-r.left,y:cy-r.top};const prev=panRef.current;panRef.current={x:sp.x-(sp.x-prev.x)*(nz/zoom),y:sp.y-(sp.y-prev.y)*(nz/zoom)};dispatch({type:"SET",payload:{pan:panRef.current}});dispatch({type:"SET",payload:{zoom:nz}});lastTouchDist.current=d;}
   };
-  touchEndRef.current=()=>{handleMouseUp();lastTouchDist.current=null;};
+  touchEndRef.current=()=>{if(longPressTimerRef.current){clearTimeout(longPressTimerRef.current);longPressTimerRef.current=null;}handleMouseUp();lastTouchDist.current=null;};
   useEffect(()=>{const c=canvasRef.current;if(!c)return;const opts={passive:false};const onStart=e=>{e.preventDefault();touchStartRef.current(e);};const onMove=e=>{e.preventDefault();touchMoveRef.current(e);};const onEnd=e=>{touchEndRef.current(e);};c.addEventListener("touchstart",onStart,opts);c.addEventListener("touchmove",onMove,opts);c.addEventListener("touchend",onEnd,opts);return()=>{c.removeEventListener("touchstart",onStart);c.removeEventListener("touchmove",onMove);c.removeEventListener("touchend",onEnd);};},[]);
 
   const finalizeCalib=(mm,manualPpm)=>{
@@ -1673,7 +1677,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         <div ref={containerRef} style={{flex:1,position:"relative",overflow:"hidden",background:t.bg,paddingBottom:isMobile&&!showMobilePanel?52:0}} onDrop={handleDrop} onDragOver={e=>e.preventDefault()}>
           <canvas ref={canvasRef} style={{display:"block",cursor:cursorStyle,touchAction:"none",background:"transparent"}}
             onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
-            onDoubleClick={handleDblClick} onContextMenu={handleCanvasContextMenu}/>
+            onAuxClick={e=>e.preventDefault()} onDoubleClick={handleDblClick} onContextMenu={handleCanvasContextMenu}/>
           {loadingImages&&<div role="status" aria-live="polite" style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:t.bg+"cc",zIndex:10}}>
             <div style={{textAlign:"center"}}><div style={{width:28,height:28,border:`3px solid ${t.bdr}`,borderTopColor:t.acc,borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto 10px"}}/><div style={{fontSize:13,color:t.tx2}}>Loading images…</div></div>
           </div>}
@@ -1848,11 +1852,11 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         const ungroupSel=()=>{const ids=m&&m.groupId?[...sel,mId]:sel;if(!ids.length)return;updMarkups(ms=>ms.map(x=>ids.includes(x.id)?{...x,groupId:void 0}:x));close();};
         const pivotY=Math.min(contextMenu.y,window.innerHeight-320);
         const item=(label,onClick,danger)=>(
-          <div onClick={onClick} style={{padding:"6px 14px",cursor:"pointer",display:"flex",alignItems:"center",gap:8,color:danger?t.err:t.tx,fontSize:12,transition:"background 0.1s",whiteSpace:"nowrap"}}
+          <div role="menuitem" tabIndex={0} onClick={onClick} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();onClick();}}} style={{padding:"6px 14px",cursor:"pointer",display:"flex",alignItems:"center",gap:8,color:danger?t.err:t.tx,fontSize:12,transition:"background 0.1s",whiteSpace:"nowrap"}}
             onMouseEnter={e=>e.currentTarget.style.background=t.surf2} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{label}</div>
         );
         const sep=<div style={{borderTop:`1px solid ${t.bdr}`,margin:"4px 0"}}/>;
-        return <div data-cmenu="1" style={{position:"fixed",left:Math.min(contextMenu.x,window.innerWidth-200),top:pivotY,zIndex:1000,background:t.surf,border:`1px solid ${t.bdr}`,borderRadius:8,boxShadow:`0 4px 20px ${t.shadow}88`,padding:"4px 0",minWidth:170,fontSize:12,color:t.tx}}>
+        return <div data-cmenu="1" role="menu" style={{position:"fixed",left:Math.min(contextMenu.x,window.innerWidth-200),top:pivotY,zIndex:1000,background:t.surf,border:`1px solid ${t.bdr}`,borderRadius:8,boxShadow:`0 4px 20px ${t.shadow}88`,padding:"4px 0",minWidth:170,fontSize:12,color:t.tx}}>
           {m ? <>
             <div style={{padding:"6px 14px",fontSize:10,color:t.tx3,textTransform:"uppercase",letterSpacing:0.5,borderBottom:`1px solid ${t.bdr}`,fontWeight:600}}>{m.label||m.type}</div>
             {item("Focus",()=>{selectAndFocusMarkup(mId);close()})}

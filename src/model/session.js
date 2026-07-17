@@ -38,7 +38,7 @@ export function updateSession(session, patch) {
 export function mkReliabilitySession(baseSession, operatorId, trialNumber) {
   const s = mkSession({
     name: (baseSession.name || "Untitled") + " (Reliability)",
-    images: baseSession.images || [],
+    images: (baseSession.images || []).map(img => ({ ...img, id: uid() })),
     calibration: baseSession.calibration,
     subjectId: baseSession.subjectId,
     processing: baseSession.processing,

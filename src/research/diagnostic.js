@@ -1,15 +1,7 @@
 import { collectMeasurements, pivotMeasurements } from "./collect.js";
 import { chi2CDF } from "../utils.js";
+import { normalCdf as normalCDF, dot, matVecMul, matMul, matInverse, transposeMatrix, addIntercept } from "./statsCore.js";
 // ─── Math helpers ────────────────────────────────────────────────────────────
-function normalCDF(x) {
-  const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741;
-  const a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
-  const s = Math.sign(x), ax = Math.abs(x);
-  const t = 1 / (1 + p * ax);
-  const erf = 1 - ((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t * Math.exp(-ax * ax);
-  return 0.5 * (1 + s * erf);
-}
-
 function zCritical(alpha) {
   const lookup = [];
   for (let i = 0; i <= 30; i++) lookup.push({ z: i / 10, c: normalCDF(i / 10) });
@@ -26,49 +18,6 @@ function zCritical(alpha) {
 function bonferroniAdjust(pValues) {
   const m = pValues.length;
   return pValues.map(p => ({ original: p, adjusted: Math.min(p * m, 1), significant: Math.min(p * m, 1) < 0.05 }));
-}
-
-function dot(a, b) {
-  let s = 0;
-  for (let i = 0; i < a.length; i++) s += a[i] * b[i];
-  return s;
-}
-
-function transposeMatrix(m) {
-  if (m.length === 0) return [];
-  return m[0].map((_, i) => m.map(r => r[i]));
-}
-
-function matMul(A, B) {
-  const Bt = transposeMatrix(B);
-  return A.map(rowA => Bt.map(colB => dot(rowA, colB)));
-}
-
-function matVecMul(M, v) {
-  return M.map(row => dot(row, v));
-}
-
-function addIntercept(X) {
-  return X.map(row => [1, ...row]);
-}
-
-function matInverse(M) {
-  const n = M.length;
-  const aug = M.map((row, i) => [...row, ...Array(n).fill(0).map((_, j) => i === j ? 1 : 0)]);
-  for (let col = 0; col < n; col++) {
-    let pivot = col;
-    while (pivot < n && Math.abs(aug[pivot][col]) < 1e-12) pivot++;
-    if (pivot >= n) return M.map((_, i) => M[0].map((_, j) => i === j ? 1 : 0));
-    [aug[col], aug[pivot]] = [aug[pivot], aug[col]];
-    const pv = aug[col][col];
-    for (let j = 0; j < 2 * n; j++) aug[col][j] /= pv;
-    for (let r = 0; r < n; r++) {
-      if (r === col) continue;
-      const f = aug[r][col];
-      for (let j = 0; j < 2 * n; j++) aug[r][j] -= f * aug[col][j];
-    }
-  }
-  return aug.map(row => row.slice(n));
 }
 
 function sigmoid(z) {

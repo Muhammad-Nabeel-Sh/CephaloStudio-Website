@@ -178,7 +178,7 @@ function _buildAnalysis(id, label, src, overrideValues) {
   return { id, label: src.label || label, source: src.source || ref.source, population: src.population || ref.population, ageRange: src.ageRange || ref.ageRange, sex: src.sex || ref.sex, stratification: src.stratification || ref.stratification, values: overrideValues || _normsToValues(ref.norms) };
 }
 
-export const PREDEFINED_NORMS = [
+export const RESEARCH_NORMS = [
   _buildAnalysis("steiner", "Steiner", {
     label: "Steiner (Caucasian)",
     population: "Caucasian (North American)", ageRange: "Adult", sex: "Pooled (male + female)",
@@ -334,7 +334,7 @@ export function runDescriptiveAll(sessions, config, calibration) {
     groupOrder: groupNames,
     combined: {},
     referenceNorms: referenceNorms || [],
-    predefinedNorms: PREDEFINED_NORMS,
+    predefinedNorms: RESEARCH_NORMS,
   };
 
   for (const gName of groupNames) {
