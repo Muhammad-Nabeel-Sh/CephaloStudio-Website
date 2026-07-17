@@ -1,11 +1,14 @@
 import { PropRow, Btn } from "../ui.jsx";
 import { anonymizeProject } from "../anonymize.js";
+import { useState } from "react";
+import PanelGuideModal from "./PanelGuideModal.jsx";
 
 // Anonymization is now NON-destructive to the audit trail: it clears patient
 // identifiers from project.meta AND every session.meta, pseudonymizes operator
 // IDs, and appends a structured {timestamp, operatorId, reason, provenance}
 // entry to meta.anonymizationLog so there is a who/when record (was missing).
 export default function AnonModal({ t, project, onUpdateProject }) {
+  const [guideKey, setGuideKey] = useState(null);
   const anonymize = async () => {
     if (!window.confirm("Remove all patient identifiers?\n\nPatient name, DOB, age, sex, subject ID and per-session patient IDs will be cleared. Operator IDs will be pseudonymized (Rater-1, Rater-2…). Research group/timepoint labels are kept. An audit-log entry (who/when) is recorded.")) return;
     const anon = await anonymizeProject(project, { reason: "manual" });
@@ -17,7 +20,11 @@ export default function AnonModal({ t, project, onUpdateProject }) {
   return (
     <div>
       <div style={{ marginBottom: 16, padding: 12, background: t.surf2, borderRadius: 8, border: `1px solid ${t.bdr}` }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: t.tx, marginBottom: 10 }}>Patient Metadata</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 10 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, color: t.tx, flex: 1 }}>Patient Metadata</span>
+          <button onClick={() => setGuideKey("anonymization")}
+            style={{ background: "none", border: `1px solid ${t.tx3}55`, color: t.tx3, borderRadius: 10, width: 18, height: 18, fontSize: 10, lineHeight: "16px", textAlign: "center", cursor: "pointer", padding: 0, flexShrink: 0 }} title="Guide">?</button>
+        </div>
         {[["patientId", "Patient ID"], ["patientName", "Name"], ["dob", "DOB"], ["age", "Age"], ["gender", "Gender"], ["clinician", "Clinician"], ["facility", "Facility"]].map(([k, label]) => (
           <PropRow key={k} label={label} t={t}><input type="text" value={project.meta[k] || ""} onChange={e => onUpdateProject({ ...project, meta: { ...project.meta, [k]: e.target.value } })} style={{ background: t.surf3, border: `1px solid ${t.bdr}`, borderRadius: 4, padding: "4px 8px", color: t.tx, fontSize: 12, width: 240, fontFamily: "inherit" }} /></PropRow>
         ))}
@@ -45,6 +52,7 @@ export default function AnonModal({ t, project, onUpdateProject }) {
           </div>
         </div>
       )}
+      {guideKey && <PanelGuideModal t={t} guideKey={guideKey} onClose={() => setGuideKey(null)} />}
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { drawMarkup } from "./markups.jsx";
 import { EXAMPLE_LIST, getExampleData } from "./examplesData.js";
 import { KatexSpan, LatexFloatingPanel } from "./hooks.jsx";
 import { Btn, Tag, Sld, PropRow, Inp, Divider, PanelHeader } from "./ui.jsx";
+import PanelGuideModal from "./panels/PanelGuideModal.jsx";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MARKUPS PANEL
@@ -14,6 +15,7 @@ import { Btn, Tag, Sld, PropRow, Inp, Divider, PanelHeader } from "./ui.jsx";
 export function MarkupsPanel({ markups, t, theme, selectedId, onSelect, onDelete, onToggleVisible, onToggleLock, onToggleLabel, onReplace, replacingId, calibration, placingMode, placingQueue, placingIdx, onStopPlacing, onPausePlacing, onResumePlacing, onClear, onAddPoint, norms, formatAngle, angleMode, setAngleMode }) {
   const [collapsed, setCollapsed] = useState({});
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [guideKey, setGuideKey] = useState(null);
   const [sign, unit] = angleMode?.split("-") || ["signed", "deg"];
   const sections = [
     { id: "point", label: "Landmarks", types: ["point"], icon: "◉", color: t.acc },
@@ -62,6 +64,8 @@ export function MarkupsPanel({ markups, t, theme, selectedId, onSelect, onDelete
         {placingMode && <Btn t={t} small onClick={onPausePlacing} style={{ whiteSpace: "nowrap", flexShrink: 0, background: t.warn + "22", color: t.warn, border: `1px solid ${t.warn}` }}>⏸</Btn>}
         {(placingMode || placingQueue.length > 0) && <Btn t={t} small danger onClick={onStopPlacing} style={{ whiteSpace: "nowrap", flexShrink: 0 }}>⏹ End</Btn>}
         <Btn t={t} small danger onClick={handleClear} style={{ whiteSpace: "nowrap", flexShrink: 0 }}>Clear</Btn>
+        <button onClick={() => setGuideKey("markups")}
+          style={{ background: "none", border: `1px solid ${t.tx3}55`, color: t.tx3, borderRadius: 10, width: 18, height: 18, fontSize: 10, lineHeight: "16px", textAlign: "center", cursor: "pointer", padding: 0, marginLeft: "auto", flexShrink: 0 }} title="Guide">?</button>
       </div>
       <div style={{ padding: "8px 10px", display: "flex", gap: 4, borderBottom: `1px solid ${t.bdr}`, flexShrink: 0, flexWrap: "nowrap", overflowX: "auto", alignItems: "center" }}>
         <span style={{ fontSize: 10, color: t.tx2, flexShrink: 0 }}>∠</span>
@@ -129,6 +133,7 @@ export function MarkupsPanel({ markups, t, theme, selectedId, onSelect, onDelete
         );
       })}
       {markups.length === 0 && <div style={{ padding: 24, textAlign: "center", color: t.tx3, fontSize: 12 }}>No markups yet.<br />Select a tool and click on the image.</div>}
+      {guideKey && <PanelGuideModal t={t} guideKey={guideKey} onClose={() => setGuideKey(null)} />}
     </div>
   );
 }
@@ -158,12 +163,18 @@ function NormBadges({ norms, meas, t, calibration }) {
 export function MeasurementsPanel({ allMeas, formulaMeas, t, calibration, norms, onUpdateNorms, onExportCSV, onOpenCalib, formatAngle }) {
   const [editingNorm, setEditingNorm] = useState(null);
   const [showGallery, setShowGallery] = useState(false);
+  const [guideKey, setGuideKey] = useState(null);
   const hasMeas = allMeas.length > 0 || (formulaMeas && formulaMeas.length > 0);
   return (
     <div style={{ padding: 12 }}>
       {!calibration.done && <div style={{ background: t.warn + "22", border: `1px solid ${t.warn}44`, borderRadius: 8, padding: 12, marginBottom: 12, fontSize: 12, color: t.warn }}>⚠ Calibrate for mm values.<button onClick={onOpenCalib} style={{ display: "block", marginTop: 6, background: t.warn, color: "#000", border: "none", borderRadius: 4, padding: "3px 8px", cursor: "pointer", fontSize: 11, fontWeight: 700 }}>Open Calibration</button></div>}
       {calibration.done && <div style={{ background: t.ok + "11", border: `1px solid ${t.ok}33`, borderRadius: 6, padding: 8, marginBottom: 10, fontSize: 11, color: t.ok, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span>⟺ {calibration.pxPerMm.toFixed(3)} px/mm</span><button onClick={onOpenCalib} style={{ background: "none", border: `1px solid ${t.ok}55`, color: t.ok, borderRadius: 4, padding: "2px 8px", cursor: "pointer", fontSize: 10 }}>Edit</button>
+        <span>⟺ {calibration.pxPerMm.toFixed(3)} px/mm</span>
+        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+          <button onClick={() => setGuideKey("measurements")}
+            style={{ background: "none", border: `1px solid ${t.tx3}55`, color: t.tx3, borderRadius: 10, width: 18, height: 18, fontSize: 10, lineHeight: "16px", textAlign: "center", cursor: "pointer", padding: 0, flexShrink: 0 }} title="Guide">?</button>
+          <button onClick={onOpenCalib} style={{ background: "none", border: `1px solid ${t.ok}55`, color: t.ok, borderRadius: 4, padding: "2px 8px", cursor: "pointer", fontSize: 10 }}>Edit</button>
+        </div>
       </div>}
 
       <div style={{ marginBottom: 12, display: "flex", gap: 6 }}>
@@ -260,6 +271,7 @@ export function MeasurementsPanel({ allMeas, formulaMeas, t, calibration, norms,
         </>}
 
       {hasMeas && <Btn t={t} small onClick={onExportCSV} style={{ width: "100%", marginTop: 8 }}>⬇ Export CSV</Btn>}
+      {guideKey && <PanelGuideModal t={t} guideKey={guideKey} onClose={() => setGuideKey(null)} />}
     </div>
   );
 }
@@ -290,9 +302,14 @@ function InlineNormEditor({ t, markupLabel, measureType, existing, onSave, onDel
 // ═══════════════════════════════════════════════════════════════════════════════
 export function FormulasPanel({ formulas, t, scope, onAdd, onEdit, onDelete, pinnedFormulas, onPinFormula }) {
   const [bigLatex, setBigLatex] = useState(null);
+  const [guideKey, setGuideKey] = useState(null);
   return (
     <div style={{ padding: 12 }}>
-      <PanelHeader t={t}>Custom Formulas</PanelHeader>
+      <PanelHeader t={t}>
+        Custom Formulas
+        <button onClick={() => setGuideKey("formulas")}
+          style={{ background: "none", border: `1px solid ${t.tx3}55`, color: t.tx3, borderRadius: 10, width: 18, height: 18, fontSize: 10, lineHeight: "16px", textAlign: "center", cursor: "pointer", padding: 0, marginLeft: 6, verticalAlign: "middle" }} title="Guide">?</button>
+      </PanelHeader>
       <div style={{ fontSize: 11, color: t.tx2, marginBottom: 12, lineHeight: 1.5 }}>Define derived measurements. Variables use landmark label names.</div>
       {formulas.map(f => {
         const val = evalFormula(f.expression, scope);
@@ -323,6 +340,7 @@ export function FormulasPanel({ formulas, t, scope, onAdd, onEdit, onDelete, pin
       })}
       <Btn t={t} small onClick={onAdd} style={{ width: "100%", padding: "14px 8px", borderRadius: 10, border: `1.5px solid ${t.acc}`, background: t.acc + "15", cursor: "pointer", outline: "none", transition: "all 0.15s", fontSize: 12, fontWeight: 600, color: t.tx, textAlign: "center", lineHeight: 1.3 }}>New Formula</Btn>
       {bigLatex && <LatexFloatingPanel latex={bigLatex} onClose={() => setBigLatex(null)} />}
+      {guideKey && <PanelGuideModal t={t} guideKey={guideKey} onClose={() => setGuideKey(null)} />}
     </div>
   );
 }
@@ -331,9 +349,14 @@ export function FormulasPanel({ formulas, t, scope, onAdd, onEdit, onDelete, pin
 // IMAGE PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
 export function ImagePanel({ t, processing, setProcessing, lutMode, setLutMode, lutInvert, setLutInvert, showLUT, setShowLUT, showScaleBar, setShowScaleBar, calibration, onOpenCalib, onReset, onShowHist, showHistogram }) {
+  const [guideKey, setGuideKey] = useState(null);
   return (
     <div style={{ padding: 12 }}>
-      <PanelHeader t={t}>Window & Level</PanelHeader>
+      <PanelHeader t={t}>
+        Window & Level
+        <button onClick={() => setGuideKey("image")}
+          style={{ background: "none", border: `1px solid ${t.tx3}55`, color: t.tx3, borderRadius: 10, width: 18, height: 18, fontSize: 10, lineHeight: "16px", textAlign: "center", cursor: "pointer", padding: 0, marginLeft: 6, verticalAlign: "middle" }} title="Guide">?</button>
+      </PanelHeader>
       <Sld label="W Center" value={processing.windowCenter} min={0} max={255} onChange={v => { const p = { ...processing, windowCenter: v }; setProcessing(p); }} t={t} />
       <Sld label="W Width" value={processing.windowWidth} min={0} max={255} onChange={v => { const p = { ...processing, windowWidth: v }; setProcessing(p); }} t={t} />
       <Divider t={t} />
@@ -362,6 +385,7 @@ export function ImagePanel({ t, processing, setProcessing, lutMode, setLutMode, 
       <PanelHeader t={t}>Scale & Calibration</PanelHeader>
       {calibration.done ? <div style={{ fontSize: 12, color: t.ok, marginBottom: 8, display: "flex", justifyContent: "space-between", alignItems: "center" }}><span>⟺ {calibration.pxPerMm.toFixed(3)} px/mm</span><button onClick={onOpenCalib} style={{ background: "none", border: `1px solid ${t.ok}55`, color: t.ok, borderRadius: 4, padding: "2px 8px", cursor: "pointer", fontSize: 10 }}>Edit</button></div> : <div style={{ fontSize: 12, color: t.tx2, marginBottom: 8 }}>Not calibrated. Use ruler tool (R).</div>}
       <Btn t={t} small active={showScaleBar} onClick={() => setShowScaleBar(v => !v)}>On-Screen Scale Bar</Btn>
+      {guideKey && <PanelGuideModal t={t} guideKey={guideKey} onClose={() => setGuideKey(null)} />}
     </div>
   );
 }
@@ -370,12 +394,17 @@ export function ImagePanel({ t, processing, setProcessing, lutMode, setLutMode, 
 // LAYERS PANEL
 // ═══════════════════════════════════════════════════════════════════════════════════════
 export function LayersPanel({ t, images, onUpdateImages, onAddImage, onShowAlign, onShowTransform }) {
+  const [guideKey, setGuideKey] = useState(null);
   const updImg = (id, patch) => onUpdateImages(images.map(i => i.id === id ? { ...i, ...patch } : i));
   const move = (idx, dir) => { const imgs = [...images]; [imgs[idx], imgs[idx + dir]] = [imgs[idx + dir], imgs[idx]]; onUpdateImages(imgs); };
   const SCOLS = ["none", "#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#a855f7"];
   return (
     <div style={{ padding: 12 }}>
-      <PanelHeader t={t}>Image Stack ({images.length})</PanelHeader>
+      <PanelHeader t={t}>
+        Image Stack ({images.length})
+        <button onClick={() => setGuideKey("layers")}
+          style={{ background: "none", border: `1px solid ${t.tx3}55`, color: t.tx3, borderRadius: 10, width: 18, height: 18, fontSize: 10, lineHeight: "16px", textAlign: "center", cursor: "pointer", padding: 0, marginLeft: 6, verticalAlign: "middle" }} title="Guide">?</button>
+      </PanelHeader>
       <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
         <Btn t={t} small onClick={onShowAlign}>⊕ Align</Btn>
         <Btn t={t} small onClick={onShowTransform}>⟲ Transform</Btn>
@@ -408,6 +437,7 @@ export function LayersPanel({ t, images, onUpdateImages, onAddImage, onShowAlign
         </div>
       ))}
       <label style={{ cursor: "pointer", display: "block" }} onChange={onAddImage}><input type="file" accept="image/*" style={{ display: "none" }} /><div style={{ border: `2px dashed ${t.bdr}`, borderRadius: 8, padding: 12, textAlign: "center", color: t.tx2, fontSize: 12, cursor: "pointer" }}>+ Add to stack</div></label>
+      {guideKey && <PanelGuideModal t={t} guideKey={guideKey} onClose={() => setGuideKey(null)} />}
     </div>
   );
 }
@@ -461,6 +491,7 @@ function measTypeLabel(type) {
 
 export function TemplatesPanel({ t, projection, onLoadTemplate, onImportCepht }) {
   let allTemplates = PREDEFINED[projection] || [];
+  const [guideKey, setGuideKey] = useState(null);
   if (projection === "other") {
     const subKeys = ["smv", "opg", "handwrist", "photolateral", "photofrontal"];
     subKeys.forEach(key => {
@@ -601,6 +632,8 @@ export function TemplatesPanel({ t, projection, onLoadTemplate, onImportCepht })
         <div style={{ fontSize: 11, color: t.tx2, lineHeight: 1.45, flex: 1 }}>
           Browse cephalometric analysis templates. Click a template to view landmarks with definitions. Click <strong>Load</strong> to add points to your workspace.
         </div>
+        <button onClick={() => setGuideKey("templates")}
+          style={{ background: "none", border: `1px solid ${t.tx3}55`, color: t.tx3, borderRadius: 10, width: 18, height: 18, fontSize: 10, lineHeight: "16px", textAlign: "center", cursor: "pointer", padding: 0, marginRight: 6, flexShrink: 0 }} title="Guide">?</button>
         <button onClick={() => cephtInputRef.current?.click()} style={{ marginLeft: 8, padding: "4px 10px", borderRadius: 6, border: `1px solid ${t.bdr}`, background: t.surf2, color: t.tx, fontSize: 10, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>Import .cepht</button>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -635,6 +668,7 @@ export function TemplatesPanel({ t, projection, onLoadTemplate, onImportCepht })
           </div>
         </>
       )}
+      {guideKey && <PanelGuideModal t={t} guideKey={guideKey} onClose={() => setGuideKey(null)} />}
     </div>
   );
 }
@@ -646,6 +680,7 @@ export function SilhouettesPanel({ t, onInsert }) {
   const grouped = useMemo(() => getSilhouettesByCategory(), []);
   const categories = Object.keys(grouped);
   const [search, setSearch] = useState("");
+  const [guideKey, setGuideKey] = useState(null);
 
   const allSilhouettes = useMemo(() => {
     const q = search.toLowerCase();
@@ -678,8 +713,12 @@ export function SilhouettesPanel({ t, onInsert }) {
 
   return (
     <div style={{ padding: 12 }}>
-      <div style={{ fontSize: 11, color: t.tx2, marginBottom: 12, lineHeight: 1.5 }}>
-        Click a silhouette to place it on the canvas. Use handles to resize and rotate.
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 12 }}>
+        <div style={{ flex: 1, fontSize: 11, color: t.tx2, lineHeight: 1.5 }}>
+          Click a silhouette to place it on the canvas. Use handles to resize and rotate.
+        </div>
+        <button onClick={() => setGuideKey("silhouettes")}
+          style={{ background: "none", border: `1px solid ${t.tx3}55`, color: t.tx3, borderRadius: 10, width: 18, height: 18, fontSize: 10, lineHeight: "16px", textAlign: "center", cursor: "pointer", padding: 0, flexShrink: 0 }} title="Guide">?</button>
       </div>
       {(hasFullTracing || hasFullTracingWithDentition) && !search && (
         <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
@@ -722,6 +761,7 @@ export function SilhouettesPanel({ t, onInsert }) {
           })}
         </div>
       )}
+      {guideKey && <PanelGuideModal t={t} guideKey={guideKey} onClose={() => setGuideKey(null)} />}
     </div>
   );
 }
@@ -1069,6 +1109,7 @@ function ExampleViewerModal({ t, data, onClose }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 export function NormsReferenceModal({ t, onAdd, onClose }) {
   const [search, setSearch] = useState("");
+  const [guideKey, setGuideKey] = useState(null);
   const query = search.toLowerCase();
   const entries = useMemo(() => {
     const result = [];
@@ -1090,7 +1131,10 @@ export function NormsReferenceModal({ t, onAdd, onClose }) {
       <div style={{ background: t.bg, border: `1px solid ${t.bdr}`, borderRadius: 12, width: "min(90vw, 640px)", maxHeight: "min(90vh, 700px)", display: "flex", flexDirection: "column", boxShadow: `0 24px 64px ${t.shadow}50` }} onClick={e => e.stopPropagation()}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", borderBottom: `1px solid ${t.bdr}`, flexShrink: 0 }}>
           <span style={{ fontSize: 16 }}>📖</span>
-          <span style={{ fontSize: 13, fontWeight: 700, color: t.tx, flex: 1 }}>Norms Reference Gallery</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: t.tx, flex: 1 }}>Norms Reference Gallery
+            <button onClick={() => setGuideKey("norms")}
+              style={{ background: "none", border: `1px solid ${t.tx3}55`, color: t.tx3, borderRadius: 10, width: 18, height: 18, fontSize: 10, lineHeight: "16px", textAlign: "center", cursor: "pointer", padding: 0, marginLeft: 6, verticalAlign: "middle" }} title="Guide">?</button>
+          </span>
           <span style={{ fontSize: 10, color: t.tx3, fontFamily: "'DM Mono',monospace" }}>{Object.values(PREDEFINED_NORMS).reduce((s, p) => s + p.norms.length, 0)} norms</span>
           <button onClick={onClose} title="Close" style={{ background: "none", border: "none", color: t.tx3, cursor: "pointer", fontSize: 18, lineHeight: 1, padding: "0 4px" }}>×</button>
         </div>
@@ -1135,6 +1179,7 @@ export function NormsReferenceModal({ t, onAdd, onClose }) {
             </div>
           ))}
         </div>
+        {guideKey && <PanelGuideModal t={t} guideKey={guideKey} onClose={() => setGuideKey(null)} />}
       </div>
     </div>
   );

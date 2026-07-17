@@ -176,9 +176,11 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
                     <div style={{ fontSize: 12, fontWeight: 600, color: t.tx, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
                     <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
                       <span style={{ fontSize: 9, padding: "1px 5px", borderRadius: 3, background: (meta?.color || t.acc) + "22", color: meta?.color || t.acc, fontWeight: 600 }}>{meta?.name || s.type}</span>
-                      <span style={{ fontSize: 9, color: s.status === "completed" ? t.ok : s.status === "error" ? t.err : t.tx3 }}>
+                      <span style={{ fontSize: 9, color: s.status === "completed" ? t.ok : s.status === "error" ? t.err : s.status === "running" ? t.acc : t.tx3 }}>
                         {s.status}
                       </span>
+                      <button onClick={e => { e.stopPropagation(); setGuideType(s.type); }}
+                        style={{ background: "none", border: `1px solid ${t.tx3}55`, color: t.tx3, borderRadius: 10, width: 18, height: 18, fontSize: 10, lineHeight: "16px", textAlign: "center", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} title="Study Guide">?</button>
                     </div>
                   </div>
                   <button onClick={e => { e.stopPropagation(); handleRemove(s.id); }}

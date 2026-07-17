@@ -1,6 +1,7 @@
 import { useRef, useMemo, useCallback, useState } from "react";
 import { normDeviation } from "../utils.js";
 import { RULES } from "../interpretation.js";
+import PanelGuideModal from "./PanelGuideModal.jsx";
 
 const ROW_H = 40;
 const LABEL_W = 220;
@@ -494,6 +495,7 @@ export default function NormogramPanel({ allMeas, norms, t, formatAngle }) {
   const svgRef = useRef(null);
   const containerRef = useRef(null);
   const [chartMode, setChartMode] = useState("polygon");
+  const [guideKey, setGuideKey] = useState(null);
 
   const rows = useMemo(() => {
     const out = [];
@@ -642,6 +644,8 @@ export default function NormogramPanel({ allMeas, norms, t, formatAngle }) {
           </button>
         ))}
       </div>
+      <button onClick={() => setGuideKey("normogram")}
+        style={{ background: "none", border: `1px solid ${t.tx3}55`, color: t.tx3, borderRadius: 10, width: 18, height: 18, fontSize: 10, lineHeight: "16px", textAlign: "center", cursor: "pointer", padding: 0, marginLeft: 6, alignSelf: "center" }} title="Guide">?</button>
 
       <div style={{ width: "100%", maxWidth: 780, overflowX: "auto" }}>
         {chartMode === "polygon" && <PolygonChart {...chartProps} svgRef={svgRef} />}
@@ -679,6 +683,7 @@ export default function NormogramPanel({ allMeas, norms, t, formatAngle }) {
           </button>
         </div>
       )}
+      {guideKey && <PanelGuideModal t={t} guideKey={guideKey} onClose={() => setGuideKey(null)} />}
     </div>
   );
 }

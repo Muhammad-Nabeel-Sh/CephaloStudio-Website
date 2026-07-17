@@ -4,6 +4,7 @@ import { mkSubject, addSession, removeSession, duplicateSessionInProject, addSub
 import { Btn, Tag, InfoBox } from "../ui.jsx";
 import BatchImportModal from "./BatchImportModal.jsx";
 import SessionMetadataModal from "./SessionMetadataModal.jsx";
+import PanelGuideModal from "./PanelGuideModal.jsx";
 
 export default function SessionsPanel({
   project, t, onUpdateProject,
@@ -21,6 +22,7 @@ export default function SessionsPanel({
 
   const [showCompare, setShowCompare] = useState(false);
   const [showMetaModal, setShowMetaModal] = useState(false);
+  const [guideKey, setGuideKey] = useState(null);
 
   const sessionList = project?.sessions || [];
   const subjects = project?.subjects || [];
@@ -67,7 +69,7 @@ export default function SessionsPanel({
 
   return (
     <div style={{ padding: 12 }}>
-      <div style={{ display: "flex", gap: 2, marginBottom: 12, borderBottom: `1px solid ${t.bdr}44` }}>
+      <div style={{ display: "flex", gap: 2, marginBottom: 12, borderBottom: `1px solid ${t.bdr}44`, alignItems: "center" }}>
         {["sessions", "subjects"].map(tabId => (
           <button key={tabId} onClick={() => setTab(tabId)}
             style={{
@@ -78,6 +80,9 @@ export default function SessionsPanel({
             {tabId === "sessions" ? `Sessions (${sessionList.length})` : `Subjects (${subjects.length})`}
           </button>
         ))}
+        <div style={{ flex: 1 }} />
+        <button onClick={() => setGuideKey(tab)}
+          style={{ background: "none", border: `1px solid ${t.tx3}55`, color: t.tx3, borderRadius: 10, width: 18, height: 18, fontSize: 10, lineHeight: "16px", textAlign: "center", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} title="Guide">?</button>
       </div>
 
       {tab === "sessions" && (
@@ -294,6 +299,7 @@ export default function SessionsPanel({
           })}
         </div>
       )}
+      {guideKey && <PanelGuideModal t={t} guideKey={guideKey} onClose={() => setGuideKey(null)} />}
     </div>
   );
 }

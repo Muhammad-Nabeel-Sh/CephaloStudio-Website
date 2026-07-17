@@ -698,7 +698,7 @@ function ICCView({ details, t }) {
             return (
               <tr key={r.label} style={{ borderBottom: `1px solid ${t.bdr}22` }}>
                 <td style={{ padding: "5px 6px", color: t.tx, fontWeight: 600 }}>{r.label}</td>
-                <td style={{ padding: "5px 6px", color: intColor, fontWeight: 700 }}>{r.icc.toFixed(4)}</td>
+                <td style={{ padding: "5px 6px", color: intColor, fontWeight: 700 }}>{r.icc != null ? r.icc.toFixed(4) : "—"}</td>
                 <td style={{ padding: "5px 6px", color: t.tx2 }}>
                   {r.ci95?.[0] != null ? `[${r.ci95[0].toFixed(3)}, ${r.ci95[1].toFixed(3)}]` : "—"}
                 </td>
@@ -740,8 +740,8 @@ function BlandAltmanView({ details, t }) {
           {valid.map(r => (
             <tr key={r.label} style={{ borderBottom: `1px solid ${t.bdr}22` }}>
               <td style={{ padding: "5px 6px", color: t.tx, fontWeight: 600 }}>{r.label}</td>
-              <td style={{ padding: "5px 6px", color: t.tx2 }}>{r.meanDiff.toFixed(4)}</td>
-              <td style={{ padding: "5px 6px", color: t.tx2 }}>{r.sdDiff.toFixed(4)}</td>
+              <td style={{ padding: "5px 6px", color: t.tx2 }}>{r.meanDiff?.toFixed(4) || "—"}</td>
+              <td style={{ padding: "5px 6px", color: t.tx2 }}>{r.sdDiff?.toFixed(4) || "—"}</td>
               <td style={{ padding: "5px 6px", color: t.tx2 }}>{r.loaLower?.toFixed(4) || "—"}</td>
               <td style={{ padding: "5px 6px", color: t.tx2 }}>{r.loaUpper?.toFixed(4) || "—"}</td>
               <td style={{ padding: "5px 6px", color: r.proportionalBias?.detected ? t.err : t.ok }}>
@@ -775,7 +775,7 @@ function MethodErrorView({ details, t }) {
           {valid.map(r => (
             <tr key={r.label} style={{ borderBottom: `1px solid ${t.bdr}22` }}>
               <td style={{ padding: "5px 6px", color: t.tx, fontWeight: 600 }}>{r.label}</td>
-              <td style={{ padding: "5px 6px", color: t.tx2 }}>{r.dahlberg.toFixed(4)}</td>
+              <td style={{ padding: "5px 6px", color: t.tx2 }}>{r.dahlberg?.toFixed(4) || "—"}</td>
               <td style={{ padding: "5px 6px", color: t.tx2 }}>{r.sem?.toFixed(4) || "—"}</td>
               <td style={{ padding: "5px 6px", color: t.tx2 }}>{r.mdc?.toFixed(4) || "—"}</td>
               <td style={{ padding: "5px 6px", color: t.tx2 }}>{r.cv?.toFixed(2) || "—"}</td>

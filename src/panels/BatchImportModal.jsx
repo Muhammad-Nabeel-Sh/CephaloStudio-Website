@@ -6,6 +6,7 @@ import { mkSession } from "../model/session.js";
 import { mkSubject, addSubject, addSession } from "../model/project.js";
 import { parseCsv } from "../model/csv.js";
 import { uid } from "../utils.js";
+import PanelGuideModal from "./PanelGuideModal.jsx";
 
 const META_KEYS = new Set([
   "patientId", "operatorId", "group", "timepoint", "age", "sex", "trialNumber",
@@ -16,6 +17,7 @@ export default function BatchImportModal({ t, project, onUpdateProject, onClose 
   const [csvRows, setCsvRows] = useState([]);
   const [csvHeaders, setCsvHeaders] = useState([]);
   const [busy, setBusy] = useState(false);
+  const [guideKey, setGuideKey] = useState(null);
   const imgRef = useRef(null);
   const csvRef = useRef(null);
 
@@ -119,8 +121,12 @@ export default function BatchImportModal({ t, project, onUpdateProject, onClose 
   const csvColumns = csvHeaders.filter(h => h !== "filename" && h !== "file" && h !== "name");
 
   return (
-    <Modal t={t} title="Batch Import Sessions" onClose={onClose} wide>
+    <><Modal t={t} title="Batch Import Sessions" onClose={onClose} wide>
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: -8 }}>
+          <button onClick={() => setGuideKey("batchImport")}
+            style={{ background: "none", border: `1px solid ${t.tx3}55`, color: t.tx3, borderRadius: 10, width: 18, height: 18, fontSize: 10, lineHeight: "16px", textAlign: "center", cursor: "pointer", padding: 0 }} title="Guide">?</button>
+        </div>
         <div style={{ display: "flex", gap: 12 }}>
           <div style={{ flex: 1 }}>
             <Btn
@@ -187,5 +193,7 @@ export default function BatchImportModal({ t, project, onUpdateProject, onClose 
         </div>
       </div>
     </Modal>
+      {guideKey && <PanelGuideModal t={t} guideKey={guideKey} onClose={() => setGuideKey(null)} />}
+    </>
   );
 }

@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { Btn, Tag } from "../ui.jsx";
+import PanelGuideModal from "./PanelGuideModal.jsx";
 
 export default function SessionMetadataModal({ project, t, onUpdateProject, onClose }) {
   const sessionList = project?.sessions || [];
@@ -17,6 +18,7 @@ export default function SessionMetadataModal({ project, t, onUpdateProject, onCl
   const [newOpVal, setNewOpVal] = useState("");
   const [showParseModal, setShowParseModal] = useState(false);
   const [parsePattern, setParsePattern] = useState("{patient}_{group}_{timepoint}");
+  const [guideKey, setGuideKey] = useState(null);
   const parseRef = useRef(null);
   const lastClickedRef = useRef(null);
 
@@ -151,6 +153,8 @@ export default function SessionMetadataModal({ project, t, onUpdateProject, onCl
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
           <span style={{ fontSize: 15, fontWeight: 700, color: t.tx }}>Session Metadata</span>
+          <button onClick={() => setGuideKey("sessionMetadata")}
+            style={{ background: "none", border: "1px solid " + t.tx3 + "55", color: t.tx3, borderRadius: 10, width: 18, height: 18, fontSize: 10, lineHeight: "16px", textAlign: "center", cursor: "pointer", padding: 0, flexShrink: 0 }} title="Guide">?</button>
           <Tag color={t.acc}>{totalSessions} sessions</Tag>
           <Tag color={t.tx3}>{countMeta("group")}/{totalSessions} grouped</Tag>
           <Tag color={t.tx3}>{countMeta("timepoint")}/{totalSessions} with timepoint</Tag>
@@ -325,6 +329,7 @@ export default function SessionMetadataModal({ project, t, onUpdateProject, onCl
             </div>
           </div>
         )}
+        {guideKey && <PanelGuideModal t={t} guideKey={guideKey} onClose={() => setGuideKey(null)} />}
       </div>
     </div>
   );

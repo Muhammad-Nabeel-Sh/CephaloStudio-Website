@@ -1,6 +1,7 @@
 import { useMemo, useState, useRef, useCallback } from "react";
 import { generateInterpretation } from "../interpretation.js";
 import { deviationColor } from "../utils.js";
+import PanelGuideModal from "./PanelGuideModal.jsx";
 
 const CATEGORY_ORDER = ["skeletal", "dental", "soft-tissue", "airway", "other"];
 const CATEGORY_LABELS = {
@@ -14,6 +15,7 @@ const CATEGORY_ICONS = {
 export default function InterpretationPanel({ allMeas, norms, t, formatAngle, calibration }) {
   const [userEdits, setUserEdits] = useState({});
   const [editingKey, setEditingKey] = useState(null);
+  const [guideKey, setGuideKey] = useState(null);
   const editRef = useRef(null);
 
   const handleEdit = useCallback((key, text) => {
@@ -46,6 +48,11 @@ export default function InterpretationPanel({ allMeas, norms, t, formatAngle, ca
 
   return (
     <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ fontSize: 12, fontWeight: 700, color: t.tx, flex: 1 }}>Clinical Interpretation</span>
+        <button onClick={() => setGuideKey("interpretation")}
+          style={{ background: "none", border: `1px solid ${t.tx3}55`, color: t.tx3, borderRadius: 10, width: 18, height: 18, fontSize: 10, lineHeight: "16px", textAlign: "center", cursor: "pointer", padding: 0, flexShrink: 0 }} title="Guide">?</button>
+      </div>
       {!calibration?.done && <div style={{ background: t.warn + "22", border: `1px solid ${t.warn}44`, borderRadius: 8, padding: 12, fontSize: 12, color: t.warn }}>⚠ Calibrate your image ⟺ to enable linear norms comparison. Angle norms are still shown below.</div>}
       {/* Pattern recognition section */}
       {patterns.length > 0 && (
@@ -156,6 +163,7 @@ export default function InterpretationPanel({ allMeas, norms, t, formatAngle, ca
           </div>
         );
       })}
+      {guideKey && <PanelGuideModal t={t} guideKey={guideKey} onClose={() => setGuideKey(null)} />}
     </div>
   );
 }
