@@ -86,11 +86,15 @@ export const getInfiniteLinePoints = (p1, p2, w, h) => {
 };
 
 export function computeMeasurements(m, cal) {
-  const ppm = cal?.pxPerMm || 1, meas = {}, vp = vpts(m);
+  const calDone = cal?.done === true;
+  const ppm = calDone ? (cal.pxPerMm || 1) : 1;
+  const meas = {}, vp = vpts(m);
   if (vp.length > 0) { meas.x = vp[0].x; meas.y = vp[0].y; }
-  if ((m.type === "line" || m.type === "parallel") && vp.length >= 2 && m.mode !== "infinite") meas.length = dist(vp[0], vp[1]) / ppm;
+  if ((m.type === "line" || m.type === "parallel") && vp.length >= 2 && m.mode !== "infinite") {
+    meas.length = dist(vp[0], vp[1]) / ppm;
+  }
   if (m.type === "angle3" && vp.length >= 3) {
-    if (m.label === "ANB") {
+    if (m.measure === "ANB" || m.label === "ANB") {
       const u = { x: vp[0].x - vp[1].x, y: vp[0].y - vp[1].y };
       const w = { x: vp[2].x - vp[1].x, y: vp[2].y - vp[1].y };
       meas.angle = Math.atan2(u.x * w.y - u.y * w.x, u.x * w.x + u.y * w.y) * 180 / Math.PI;
@@ -171,6 +175,7 @@ export function computeMeasurements(m, cal) {
     const c = circleFrom3pts(vp[0], vp[1], vp[2]);
     if (c) meas.radius = c.r / ppm;
   }
+  meas._unit = calDone ? "mm" : "px";
   return meas;
 }
 
@@ -250,9 +255,24 @@ export function buildScope(markups, calibration) {
   markups.forEach(m => {
     const meas = computeMeasurements(m, calibration);
     const lbl = (m.label || m.type).replace(/[^a-zA-Z0-9]/g, "_");
-    Object.entries(meas).forEach(([k, v]) => { scope[lbl] = v; scope[`${lbl}_${k}`] = v; });
+    Object.entries(meas).forEach(([k, v]) => {
+      if (k.startsWith("_")) return;
+      scope[lbl] = v;
+      scope[`${lbl}_${k}`] = v;
+    });
   });
   return scope;
+}
+
+export function measUnit(meas) {
+  if (meas._unit === "mm") return "mm";
+  if (meas._unit === "px") return "px";
+  return "";
+}
+
+export function measUnitSq(meas) {
+  const u = measUnit(meas);
+  return u ? u + "²" : "";
 }
 
 const _builtins = new Set(["sin","cos","tan","asin","acos","atan","atan2","abs","sqrt","exp","log","log2","log10","ceil","floor","round","min","max","pow","pi","e","i","true","false","Infinity","NaN"]);
@@ -461,6 +481,10 @@ export const getICCInterpretation = icc => {
   return "Excellent";
 };
 
+// Fisher-z CI for single-rater ICC(1,1) or ICC(2,1). This is an alternative to the
+// F-based CI used by iccShroutFleiss in reliability.js. Does NOT support average-measure
+// ICC(k,k) forms. Use iccShroutFleiss for full-featured ICC CIs.
+// @deprecated Prefer the F-based CI in reliability.js which handles all ICC types.
 export function calculateICC_CI(icc, n, k, confidence = 0.95) {
   if (icc == null || n < 2 || k < 2) return null;
   const r = Math.max(-0.999, Math.min(0.999, icc));

@@ -1,34 +1,24 @@
-import { computeMeasurements, tDistributeCDF } from "../utils.js";
+import { computeMeasurements, tDistributeCDF, fCDF } from "../utils.js";
 import { checkReliabilityTimeSeparation } from "./validation.js";
 import { logError } from "../logger.js";
 
 // ─── Statistical helpers ──────────────────────────────────────────────────
 function fCritical(p, df1, df2) {
   if (df1 <= 0 || df2 <= 0) return 1;
-  const z = p >= 0.995 ? 2.807 : p >= 0.975 ? 1.96 : p >= 0.95 ? 1.645 : 0;
-  const a = 2 / (9 * df1);
-  const b = 2 / (9 * df2);
-  const num = 1 - b + z * Math.sqrt(b);
-  const denom = 1 - a - z * Math.sqrt(a);
-  if (denom <= 0) return 10;
-  return Math.pow(num / denom, 3);
-}
-
-function stdNormalCdf(x) {
-  if (x < -8) return 0;
-  if (x > 8) return 1;
-  const a = 0.3193815, b = -0.3565638, c = 1.7814779, d = -1.8212559, e = 1.3302744;
-  const phi = 0.39894228 * Math.exp(-x * x / 2);
-  let t = 1 / (1 + 0.2316419 * Math.abs(x));
-  t = phi * t * (a + t * (b + t * (c + t * (d + t * e))));
-  return x > 0 ? 1 - t : t;
+  let lo = 0.01, hi = 1000, mid;
+  for (let it = 0; it < 60; it++) {
+    mid = (lo + hi) / 2;
+    const cdf = fCDF(mid, df1, df2);
+    if (cdf < p) lo = mid; else hi = mid;
+    if (Math.abs(cdf - p) < 1e-8) break;
+  }
+  return mid;
 }
 
 function fPval(F, df1, df2) {
   if (F <= 0 || df1 <= 0 || df2 <= 0) return 1;
-  const z = ((1 - 2 / (9 * df2)) * Math.pow(F, 1 / 3) - (1 - 2 / (9 * df1))) /
-    Math.sqrt(2 / (9 * df1) * Math.pow(F, 2 / 3) + 2 / (9 * df2));
-  return 2 * (1 - stdNormalCdf(Math.abs(z)));
+  const p = 1 - fCDF(F, df1, df2);
+  return p >= 1 ? 1 : p < 0 ? 0 : p;
 }
 
 function simpleRegression(x, y) {
@@ -80,11 +70,17 @@ function iccShroutFleiss(data, k, type) {
     return col.reduce((a, b) => a + b, 0) / col.length;
   });
 
+  // Count actual non-missing observations per row/column for unbalanced-data adjustment
+  const rowCounts = matrix.map(row => row.filter(x => x != null).length);
+  const colCounts = raters.map((_, j) => matrix.map(row => row[j]).filter(v => v != null).length);
+  const anyMissing = rowCounts.some(c => c < k) || colCounts.some(c => c < n);
+
   const kActual = type.endsWith("k") ? k : 1;
 
   let SSR = 0, SSC = 0, SSE = 0;
   for (let i = 0; i < n; i++) {
-    SSR += k * (rowMeans[i] - grandMean) ** 2;
+    const ni = anyMissing ? rowCounts[i] : k;
+    SSR += ni * (rowMeans[i] - grandMean) ** 2;
     for (let j = 0; j < k; j++) {
       const v = matrix[i][j];
       if (v == null) continue;
@@ -93,7 +89,8 @@ function iccShroutFleiss(data, k, type) {
     }
   }
   for (let j = 0; j < k; j++) {
-    SSC += n * (colMeans[j] - grandMean) ** 2;
+    const nj = anyMissing ? colCounts[j] : n;
+    SSC += nj * (colMeans[j] - grandMean) ** 2;
   }
 
   const dfS = n - 1, dfR = k - 1, dfE = (n - 1) * (k - 1);
@@ -173,13 +170,21 @@ function runBlandAltman(samples) {
 
   const reg = simpleRegression(means, diffs);
 
+  // For 3+ occasions the all-pairs construction creates correlated differences.
+  // Use a variance-inflation factor based on the mean number of pairs per case
+  // so the bias CI SE accounts for the non-independence.
+  const nCases = Object.keys(byCase).length;
+  const avgPairsPerCase = nCases > 0 ? n / nCases : 1;
+  const vif = Math.sqrt(avgPairsPerCase); // VIF = sqrt of design effect
+  const biasSE = sdDiff / Math.sqrt(n) * vif;
+
   return {
     meanDiff, sdDiff, n,
     loaUpper: meanDiff + 1.96 * sdDiff,
     loaLower: meanDiff - 1.96 * sdDiff,
     loaUpperCi: [meanDiff + 1.96 * sdDiff - tCrit * seLoA, meanDiff + 1.96 * sdDiff + tCrit * seLoA],
     loaLowerCi: [meanDiff - 1.96 * sdDiff - tCrit * seLoA, meanDiff - 1.96 * sdDiff + tCrit * seLoA],
-    meanDiffCi: [meanDiff - tCrit * sdDiff / Math.sqrt(n), meanDiff + tCrit * sdDiff / Math.sqrt(n)],
+    meanDiffCi: [meanDiff - tCrit * biasSE, meanDiff + tCrit * biasSE],
     proportionalBias: { detected: reg.pValue < 0.05, slope: reg.slope, r: reg.r, pValue: reg.pValue, t: reg.t },
     points: means.map((m, i) => ({ mean: m, diff: diffs[i], outlier: Math.abs(diffs[i] - meanDiff) > 2 * sdDiff })),
     nPairs: n,
@@ -229,7 +234,9 @@ function collectLandmarkCoords(sessions, labelIds, calibration) {
   for (const s of sessions) {
     if (!s) continue;
     const cal = s.calibration?.done ? s.calibration : calibration || { done: false, pxPerMm: 1 };
-    const ppm = cal?.pxPerMm || 1;
+    const calDone = cal?.done === true;
+    const ppm = calDone ? (cal.pxPerMm || 1) : 1;
+    const unit = calDone ? "mm" : "px";
     const markups = s.markups || [];
     for (const m of markups) {
       if (!m.label) continue;
@@ -237,8 +244,7 @@ function collectLandmarkCoords(sessions, labelIds, calibration) {
       if (m.type === "ruler" || m.type === "silhouette" || m.type === "line" || m.type === "angle3") continue;
       if (!m.visible || !m.placed) continue;
       for (const p of (m.points || [])) {
-        // Convert pixel coordinates to mm
-        rows.push({ sessionId: s.id, label: m.label, x: p.x / ppm, y: p.y / ppm, unit: "mm" });
+        rows.push({ sessionId: s.id, label: m.label, x: p.x / ppm, y: p.y / ppm, unit });
       }
     }
   }
@@ -275,18 +281,19 @@ function runLandmarkErrorMap(coords) {
     const eig2 = (trace - Math.sqrt(disc)) / 2;
     const angle = cxx !== cyy ? 0.5 * Math.atan2(2 * cxy, cxx - cyy) : Math.PI / 4;
 
+    const coordsUnit = pts[0]?.unit || "mm";
     result[label] = {
       centroid: { x: cx, y: cy },
       n: m,
       meanError,
       maxError,
       sdError,
-      unit: "mm",
+      unit: coordsUnit,
       ellipse: {
         major: Math.sqrt(5.991) * Math.sqrt(Math.max(eig1, 0)),
         minor: Math.sqrt(5.991) * Math.sqrt(Math.max(eig2, 0)),
         angle,
-        unit: "mm",
+        unit: coordsUnit,
       },
     };
   }
@@ -325,7 +332,9 @@ export function runReliabilityAll(sessions, config, calibration) {
       if (!m.visible || !m.placed) continue;
       try {
         const vals = computeMeasurements(m, cal);
+        const rowUnit = vals._unit === "mm" ? "mm" : "px";
         for (const [key, raw] of Object.entries(vals)) {
+          if (key.startsWith("_")) continue;
           if (typeof raw !== "number" || !isFinite(raw)) continue;
           mRows.push({
             caseId: mapping.caseId,
@@ -336,7 +345,7 @@ export function runReliabilityAll(sessions, config, calibration) {
             label: m.label,
             measureKey: key,
             value: raw,
-            unit: key.includes("angle") || key.includes("deg") ? "°" : "mm",
+            unit: key.includes("angle") || key.includes("deg") ? "°" : rowUnit,
           });
         }
       } catch (e) { logError("reliability/markup", e); }

@@ -1,8 +1,10 @@
 # CephaloStudio: Market Comparison & Strategic Recommendations
 
+> **Date:** July 2026 (updated July 14)
+
 When comparing CephaloStudio to established web-based cephalometric platforms like **WebCeph**, **BCeph**, and **Cephalyzer**, your application exhibits a unique identity. It leans heavily into advanced statistical modeling and research workflows—an area where most commercial apps fall short. 
 
-Here is how CephaloStudio stacks up against the competition, followed by strategic recommendations to elevate it.
+Recent additions (context menu, grid overlay, group system, refLabels self-healing propagation, bezier CP preservation, calibration-aware norms, flash highlight) have significantly improved the markup interaction UX, closing the gap with commercial tools in workflow efficiency.
 
 ## 1. How CephaloStudio Compares to the Market
 

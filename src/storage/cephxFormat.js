@@ -169,6 +169,14 @@ export function importCephxPayload(payload) {
 
   // ─── Field validation + normalization ───────────────────────────────────
   project = { ...project };
+  // Reject unexpected top-level keys that are not in the known schema.
+  const KNOWN_TOP_KEYS = ["id","name","meta","sessions","format","version","projection","researchStudies","subjects","groups","timepoints","operators","activeSessionId","modified","created","images","reproStudies"];
+  for (const k of Object.keys(project)) {
+    if (!KNOWN_TOP_KEYS.includes(k) && !k.startsWith("_")) {
+      warnings.push(`Removed unknown top-level field "${k}" from imported project.`);
+      delete project[k];
+    }
+  }
   if (!project.id) { project.id = uid(); warnings.push("Project was missing an id; generated a new one."); }
   if (typeof project.name !== "string") project.name = "Imported Case";
   project.meta = (project.meta && typeof project.meta === "object") ? project.meta : {};

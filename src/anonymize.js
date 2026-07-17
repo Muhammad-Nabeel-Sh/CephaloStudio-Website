@@ -49,10 +49,8 @@ function buildOperatorPseudonyms(sessions) {
 export async function anonymizeProject(project, opts = {}) {
   const reason = opts.reason || "manual";
   const operatorId = opts.operatorId
-    || project.sessions?.find(s => s.meta?.operatorId)?.meta?.operatorId
-    || project.meta?.clinician
     || "unknown";
-  const retainProvenance = opts.retainProvenance !== false;
+  const retainProvenance = opts.retainProvenance === true;
   const ts = Date.now();
 
   // Collect original patient-PHI values for provenance hashing.
@@ -84,7 +82,7 @@ export async function anonymizeProject(project, opts = {}) {
       "session.subjectId",
       "session.operatorId (→pseudonym)",
     ],
-    provenance: retainProvenance && Object.keys(hashes).length ? { salt, hashes } : null,
+    provenance: retainProvenance && Object.keys(hashes).length ? { hashes } : null,
   };
 
   const opMap = buildOperatorPseudonyms(project.sessions);

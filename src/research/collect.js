@@ -1,14 +1,15 @@
 import { computeMeasurements } from "../utils.js";
 import { logError } from "../logger.js";
 
-const _collectCache = new WeakMap();
+let _collectCacheKey = "";
+let _collectCacheResult = null;
 
 export function collectMeasurements(sessions, labelIds, calibration, angleMode) {
   const labelKey = [...(labelIds || [])].sort().join(",");
   const calKey = calibration ? `${calibration.done}:${calibration.pxPerMm}:${calibration.knownMm}` : "";
-  const cacheKey = `${labelKey}|${calKey}|${angleMode || ""}`;
-  const cached = _collectCache.get(sessions);
-  if (cached && cached.key === cacheKey) return cached.result;
+  const sesKey = (sessions||[]).map(s => `${s.id}:${s.modified||0}`).join("|");
+  const cacheKey = `${sesKey}|${labelKey}|${calKey}|${angleMode || ""}`;
+  if (_collectCacheKey === cacheKey && _collectCacheResult) return _collectCacheResult;
 
   const rows = [];
   for (const s of sessions) {
@@ -23,7 +24,9 @@ export function collectMeasurements(sessions, labelIds, calibration, angleMode) 
       if (!m.visible || !m.placed) continue;
       try {
         const vals = computeMeasurements(m, cal, mode);
+        const rowUnit = vals._unit === "mm" ? "mm" : "px";
         for (const [key, raw] of Object.entries(vals)) {
+          if (key.startsWith("_")) continue;
           if (typeof raw !== "number" || !isFinite(raw)) continue;
           rows.push({
             sessionId: s.id,
@@ -32,14 +35,15 @@ export function collectMeasurements(sessions, labelIds, calibration, angleMode) 
             label: m.label,
             measureKey: key,
             value: raw,
-            unit: key.includes("angle") || key.includes("deg") ? "°" : "mm",
+            unit: key.includes("angle") || key.includes("deg") ? "°" : rowUnit,
             type: m.type,
           });
         }
       } catch (e) { logError("collect/markup", e); }
     }
   }
-  _collectCache.set(sessions, { key: cacheKey, result: rows });
+  _collectCacheKey = cacheKey;
+  _collectCacheResult = rows;
   return rows;
 }
 

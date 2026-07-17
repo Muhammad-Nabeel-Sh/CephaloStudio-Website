@@ -592,10 +592,12 @@ export default function NormogramPanel({ allMeas, norms, t, formatAngle }) {
     };
     const lines = [header.join(",")];
     for (const r of rows) {
-      const z = r.deviation !== null ? r.deviation : "";
-      const pct = r.deviation !== null ? normCdf(r.deviation) + "%" : "";
-      const sevLabel = r.deviation !== null ? (Math.abs(r.deviation) <= 1 ? "Normal" : Math.abs(r.deviation) <= 2 ? "Mild" : "Severe") : "";
-      lines.push([r.label, r.value, r.norm.mean, r.norm.sd, z, pct, sevLabel, r.interpretation].map(escape).join(","));
+      const z = r.dev ? r.dev.sdUnits : "";
+      const pct = r.dev ? (normCdf(r.dev.sdUnits) * 100).toFixed(1) + "%" : "";
+      const absZ = r.dev ? Math.abs(r.dev.sdUnits) : 0;
+      const sevLabel = r.dev ? (absZ <= 1 ? "Normal" : absZ <= 2 ? "Mild" : "Severe") : "";
+      const interp = r.dev ? interpretationText(r.label, r.value, r.norm.mean) : "";
+      lines.push([r.label, r.value, r.norm.mean, r.norm.sd, z, pct, sevLabel, interp].map(escape).join(","));
     }
     const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);

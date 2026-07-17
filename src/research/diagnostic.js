@@ -283,7 +283,10 @@ export function calibrationAnalysis(predictedProbs, observedLabels, nGroups = 10
   const prevalence = observedLabels.filter(l => l === 1).length / n;
   const brierRef = prevalence * (1 - prevalence);
   const brierSkill = brierRef > 0 ? 1 - brier / brierRef : 0;
-  return { groups, hlStat, hlDF, hlP, wellCalibrated: hlP > 0.05, ici, brier, brierSkill, n };
+  const lowExpected = groups.some(g => g.expected < 5 || (g.n - g.expected) < 5);
+  const warnings = [];
+  if (lowExpected) warnings.push(`Hosmer-Lemeshow: some groups have expected count < 5 (n=${n}, g=${groups.length}). The χ² approximation may be unreliable; consider reducing the number of groups or using a larger sample.`);
+  return { groups, hlStat, hlDF, hlP, wellCalibrated: hlP > 0.05, ici, brier, brierSkill, n, warnings };
 }
 
 // ─── Composite Index (Logistic Regression) ──────────────────────────────────
@@ -335,19 +338,37 @@ export function buildCompositeIndex(predictors, labels) {
   };
 }
 
+// ─── Seeded PRNG (Mulberry32) for reproducible CV ─────────────────────────
+// Returns a function that produces deterministic floats in [0,1) when called
+// repeatedly, seeded by an integer. Non-reproducible CV is a validation
+// integrity concern (clinical audit requires that rerunning the same data with
+// the same seed produces the same AUC).
+function seededRandom(seed) {
+  let s = seed | 0;
+  return () => {
+    s |= 0;
+    s = s + 0x6D2B79F5 | 0;
+    let t = Math.imul(s ^ s >>> 15, 1 | s);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
 // ─── Cross-Validation AUC ───────────────────────────────────────────────────
 // Fixes: (1) shuffle before k-fold to avoid contiguous-class folds that can be
 // pure/empty; (2) correctedAUC = apparentAUC - optimism, where optimism =
 // apparentAUC - cvAUC (the previous `correctedAUC = apparentAUC - (apparentAUC -
 // cvAUC)` simplified to cvAUC, a tautology, not a correction); (3) minimum n ≥ 10
 // with ≥ 5 per class for any ROC (CLSI EP12 recommends ≥ 50, but 10 is the floor
-// for a non-degenerate curve).
-export function crossValidateAUC(predictors, labels, method = "loocv", k = 10) {
+// for a non-degenerate curve); (4) seeded PRNG for reproducible folds (default
+// seed 42; override via config.cvSeed).
+export function crossValidateAUC(predictors, labels, method = "loocv", k = 10, seed = 42) {
   const n = labels.length;
   const nP = labels.filter(l => l === 1).length;
   const nN = labels.filter(l => l === 0).length;
   if (nP < 5 || nN < 5) return { note: `Cross-validation requires ≥ 5 cases per class (have ${nP} positive, ${nN} negative).` };
   const aucs = [];
+  const foldAucs = [];
 
   if (method === "loocv") {
     for (let i = 0; i < n; i++) {
@@ -357,17 +378,21 @@ export function crossValidateAUC(predictors, labels, method = "loocv", k = 10) {
       const testY = [labels[i]];
       const model = buildCompositeIndex(trainX, trainY);
       if (!model) continue;
-      const score = sigmoid(dot(addIntercept([testX[0]])[0], model.beta));
-      aucs.push({ score, label: testY[0], fold: i });
+      const trainScores = trainX.map(x => sigmoid(dot(addIntercept([x])[0], model.beta)));
+      const trainAUC = delongAUC_CI(trainScores, trainY)?.auc;
+      const testScore = sigmoid(dot(addIntercept([testX[0]])[0], model.beta));
+      const testAUC = testY[0] === 1 ? (testScore > 0.5 ? 1 : 0) : (testScore < 0.5 ? 1 : 0);
+      foldAucs.push({ trainAUC, testAUC, optimism: (trainAUC ?? 0) - testAUC });
+      aucs.push({ score: testScore, label: testY[0], fold: i });
     }
   } else if (method === "kfold") {
     // Shuffle indices before folding to avoid contiguous-class folds (e.g., if the
     // data is sorted by label, contiguous folds would be all-positive or all-negative).
     const idx = Array.from({ length: n }, (_, i) => i);
-    // Fisher-Yates shuffle (deterministic order: we don't seed for reproducibility —
-    // the caller can re-run for a different split)
+    // Fisher-Yates shuffle with seeded RNG for reproducibility
+    const rng = seededRandom(seed);
     for (let i = n - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
+      const j = Math.floor(rng() * (i + 1));
       [idx[i], idx[j]] = [idx[j], idx[i]];
     }
     const foldSize = Math.max(1, Math.floor(n / k));
@@ -381,9 +406,14 @@ export function crossValidateAUC(predictors, labels, method = "loocv", k = 10) {
       const testY = testIdx.map(i => labels[i]);
       const model = buildCompositeIndex(trainX, trainY);
       if (!model) continue;
-      const scores = testX.map(x => sigmoid(dot(addIntercept([x])[0], model.beta)));
+      // Compute per-fold training AUC for proper optimism correction
+      const trainScores = trainX.map(x => sigmoid(dot(addIntercept([x])[0], model.beta)));
+      const trainAUC = delongAUC_CI(trainScores, trainY)?.auc;
+      const testScores = testX.map(x => sigmoid(dot(addIntercept([x])[0], model.beta)));
+      const testAUC = delongAUC_CI(testScores, testY)?.auc;
+      foldAucs.push({ trainAUC, testAUC, optimism: (trainAUC ?? 0) - (testAUC ?? 0) });
       testIdx.forEach((origIdx, j) => {
-        aucs.push({ score: scores[j], label: testY[j], fold: f });
+        aucs.push({ score: testScores[j], label: testY[j], fold: f });
       });
     }
   }
@@ -400,16 +430,19 @@ export function crossValidateAUC(predictors, labels, method = "loocv", k = 10) {
   ) : null;
 
   const apparent = apparentAUC?.auc || 0;
-  const cv = cvAUC?.auc || 0;
-  const optimism = apparent - cv;
+  // Proper optimism: mean of per-fold (trainAUC - testAUC), not just apparent - cv
+  const meanOptimism = foldAucs.length > 0
+    ? foldAucs.reduce((s, f) => s + (f.optimism || 0), 0) / foldAucs.length
+    : 0;
 
   return {
     cvAUC,
     apparentAUC: apparent,
-    optimism,
-    // Corrected AUC = apparentAUC - optimism (proper bootstrap-style correction;
-    // the previous formula was `apparent - (apparent - cv)` = cv, a tautology)
-    correctedAUC: apparent - optimism,
+    optimism: meanOptimism,
+    // Corrected AUC = apparentAUC - optimism (proper Harrell-style correction
+    // using per-fold training vs test AUC difference, not the tautological
+    // apparent - (apparent - cv) = cv)
+    correctedAUC: Math.max(0, apparent - meanOptimism),
     foldResults: aucs,
     nFolds: aucs.length,
     method, k,
@@ -555,7 +588,7 @@ export function runDiagnosticAll(sessions, config, calibration) {
   let crossVal = null;
   if (predNames.length >= 2 && n >= 5) {
     const predMatrix = cases.map(c => predNames.map(pl => c[pl]));
-    crossVal = crossValidateAUC(predMatrix, labels, config.cvMethod || "loocv", config.cvK || 10);
+    crossVal = crossValidateAUC(predMatrix, labels, config.cvMethod || "loocv", config.cvK || 10, config.cvSeed ?? 42);
   }
 
   return {

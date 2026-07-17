@@ -183,7 +183,7 @@ describe("computeMeasurements", () => {
 
   it("returns x,y for a point", () => {
     const m = { type: "point", points: [{ x: 10, y: 20 }] };
-    expect(computeMeasurements(m, cal)).toEqual({ x: 10, y: 20 });
+    expect(computeMeasurements(m, cal)).toEqual({ x: 10, y: 20, _unit: "mm" });
   });
 
   it("returns length for a line", () => {

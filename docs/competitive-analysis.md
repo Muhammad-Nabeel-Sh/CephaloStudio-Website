@@ -129,14 +129,22 @@ The UI mentions DICOM support but there is no true DICOM parser — no DICOM tag
 
 ### 3.2 Markup & Tracing Tools
 
-**CephaloStudio** offers 18 tool types:
+**CephaloStudio** offers 23+ tool types:
 - **Points** (landmarks) with guided placement mode
 - **Lines / planes** (infinite-line rendering with dash style options)
 - **Angles** (3-point, 4-point)
-- **Polygons / curves** (Catmull-Rom spline / Bezier)
+- **Polygons / curves / bezier** (Catmull-Rom spline, multi-segment cubic bezier with control handles)
+- **Ellipse / arc / circle / concentric arcs** (parametric curve fitting)
+- **Tangent lines** (geometric tangent snapped to curves, follows parent curve on move)
 - **Perpendicular distance, parallel lines, ratio, sum, difference, percentage, projected distance**
+- **Midpoint, perpendicular point**
 - **Arrows, text annotations**
 - **Ruler for calibration**
+- **23 SVG anatomical silhouettes** (categorized: soft tissue, sella, airway, etc.)
+- **Right-click context menu** on all markups (Focus, Rename, Change Color, Duplicate, Copy/Paste, Hide/Show, Lock/Unlock, Ref Landmark, Move to Front/Back, Group/Ungroup, Copy Measurement, Delete)
+- **Grid overlay** (toggleable 50px grid)
+- **Group system** (groupId-based bulk drag)
+- **refLabels auto-link** — markups automatically attach to nearby points (3px tolerance); dragging a point propagates to all dependent markups via `syncRefDeps`
 - **Snap-to-landmark** and **snap-to-line** for precise placement
 - **2D alignment** (point-based transform)
 - **Right-click context menu**: copy, paste, lock/unlock, bring to front, send to back, toggle visibility

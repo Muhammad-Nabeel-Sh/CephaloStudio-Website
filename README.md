@@ -58,6 +58,7 @@ Requires ES2020 support, Canvas 2D, and IndexedDB. Not supported in Internet Exp
 │   ├── imageUtils.jsx          # Image processing (brightness, contrast, LUT)
 │   ├── hooks.jsx               # Custom hooks (useKatex, etc.)
 │   ├── silhouettes.js          # 23 SVG anatomical silhouettes (auto-generated)
+│   ├── norms.js                # Canonical cephalometric reference norms
 │   ├── logger.js               # PHI-safe error logging
 │   ├── interpretation.js       # Clinical interpretation generator
 │   ├── reportGenerator.js      # PDF report generation
@@ -114,6 +115,7 @@ Requires ES2020 support, Canvas 2D, and IndexedDB. Not supported in Internet Exp
 │       ├── setup.js
 │       ├── utils.test.js       # 97 tests
 │       ├── statGoldenValues.test.js  # 18 tests
+│       ├── researchGolden.test.js   # 31 tests
 │       ├── comparative.test.js # 18 tests
 │       ├── descriptive.test.js # 12 tests
 │       ├── distributions.test.js # 27 tests
@@ -128,6 +130,7 @@ Requires ES2020 support, Canvas 2D, and IndexedDB. Not supported in Internet Exp
 │       ├── longitudinal.test.js # 3 tests
 │       └── MarkupsPanel.test.jsx # 3 tests
 ```
+**Total: 300 tests across 16 test files**
 
 ### Scripts
 
@@ -420,12 +423,13 @@ Floating bottom-center horizontal thumbnail bar showing all sessions. Supports q
 
 ## 14. Testing & CI
 
-### Test Suite (269 tests, 15 files)
+### Test Suite (300 tests, 16 files)
 
 | Test File | Tests | Coverage |
 |-----------|-------|----------|
 | `utils.test.js` | 97 | All geometry, statistics, formulas, ICC, Bland-Altman utilities |
 | `statGoldenValues.test.js` | 18 | Reference-value regression guards for fCDF, tDistributeCDF, chi2CDF, betaIncomplete |
+| `researchGolden.test.js` | 31 | Golden-value tests for t-test, ANOVA, Mann-Whitney, Wilcoxon, Spearman, BH, Shapiro-Wilk, Cohen's d, ICC, Dahlberg, regression |
 | `comparative.test.js` | 18 | Test selection routing, Mann-Whitney, Wilcoxon, Box's M, multi-group structure |
 | `descriptive.test.js` | 12 | `runDescriptiveAll`, norm stratum selection, predefined norms |
 | `anonymize.test.js` | 10 | PHI anonymization |

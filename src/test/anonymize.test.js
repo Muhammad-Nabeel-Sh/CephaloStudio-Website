@@ -68,10 +68,9 @@ describe("anonymizeProject", () => {
   });
 
   it("retains salted provenance hashes (not the original values)", async () => {
-    const a = await anonymizeProject(makeProject(), { reason: "export" });
+    const a = await anonymizeProject(makeProject(), { reason: "export", retainProvenance: true });
     const e = a.meta.anonymizationLog[0];
     expect(e.provenance).toBeTruthy();
-    expect(e.provenance.salt).toBeTruthy();
     expect(e.provenance.hashes["project.patientName"]).toBeTruthy();
     // The original value must not appear anywhere in the anonymized output.
     expect(JSON.stringify(a)).not.toContain("John Doe");

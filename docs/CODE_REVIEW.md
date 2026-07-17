@@ -1,5 +1,7 @@
 # CephaloStudio — Comprehensive Code Review
 
+> **Snapshot date**: 2026-07-11 (review conducted against codebase ~1721-line App.jsx). Line references may be stale; current App.jsx is ~2190 lines. Issues remain open unless noted.
+
 Verified against the deployed code. Findings grouped by domain, each with **Impact** (clinical/UX/perf/security) and **Burden** (engineering effort: S=hours, M=days, L=weeks).
 
 ---
@@ -99,7 +101,7 @@ These produce **numerically wrong results in medical analyses**. Worst-of-breed 
 | # | Issue | Location | Impact | Burden |
 |---|-------|----------|--------|--------|
 | R1 | **`ref.current = …` written during render (11+ sites)** — the "stable-callback + latest closure" scheme; React docs forbid this; fragile under Strict Mode/concurrent. Viral pattern. | `App.jsx:366-1174` | **High** (correctness risk under future React features). | M |
-| R2 | **1721-line god component `Workspace`** (~1257 lines, ~30 hooks) owning canvas, pointer/touch/keyboard, undo/redo, CRUD, calibration, exports, placing, panel routing. | `App.jsx:342-1599` | **High**: any change is risky; AGENTS.md falsely says "~1362". | L |
+| R2 | **2190-line god component** (~30 hooks) owning canvas, pointer/touch/keyboard, undo/redo, CRUD, calibration, exports, placing, panel routing. | `App.jsx:354-2191` | **High**: any change is risky. | L |
 | R3 | **Two parallel state systems** — `useReducer` "store" (UI state, local, no Context/persistence) + `useState` project state prop-drilled; some concepts (e.g. `showDisplacement`) in *both*. | `workspaceStore.js:113`; `App.jsx:362,1499` | **Medium**: cognitive hazard, prop drift. | M |
 | R4 | **Duplicated SVG icon literals** (same 11 paths defined twice) + `NewCaseForm` defined twice. | `App.jsx:1222-1245,1441-1464,172-202` vs `HomePage.jsx:7-38` | **Medium**. Extract `icons.jsx`. | S |
 | R5 | **Undo snapshot shape inconsistent** — `pushUndo` wraps `{markups,norms,…}` but drag `handleMouseUp` pushes bare `JSON.stringify(markups)`; `undo` branches on `Array.isArray`. | `App.jsx:485-502,1064` | **Medium**: fragile; norms lost on drag-undo. | S |
@@ -151,12 +153,12 @@ These produce **numerically wrong results in medical analyses**. Worst-of-breed 
 
 ## 🟡 10. Documentation Accuracy
 
-| # | Issue | Location | Impact | Burden |
-|---|-------|----------|--------|--------|
-| D9 | **AGENTS.md materially stale**: says App.jsx "~1362 lines" (1721), references `src/FormulasModule.jsx` (doesn't exist — it's in `panels.jsx`), describes a PIN feature (none exists). | `AGENTS.md` | **Medium**: misleads contributors. | S |
-| D10 | **README claims** "Research module functions work but some edge cases… not validated on real clinical datasets" — understates that core p-value math is *broken* (S1–S3). | `README.md:557` | **High**: false confidence. | S |
-| D11 | **"103 tests" / file counts** in README don't match actual; version strings mismatched (D5). | `README.md`, `CHANGELOG.md` | **Low**. | S |
-| D12 | **`silhouettes.js` / 25+ SVG claim** — verify; `scripts/svg-to-silhouette.js` has lint errors per AGENTS. | `scripts/` | **Low**. | S |
+| # | Issue | Location | Impact | Burden | Status |
+|---|-------|----------|--------|--------|--------|
+| D9 | **AGENTS.md was materially stale**: said App.jsx "~1362 lines" (1721), referenced `src/FormulasModule.jsx` (doesn't exist — it's in `panels.jsx`), described a PIN feature (none exists). Now updated to ~2190 lines with current features. | `AGENTS.md` | **Medium**: misleads contributors. | S | ✅ Fixed |
+| D10 | **README claims** "Research module functions work but some edge cases… not validated on real clinical datasets" — understates that core p-value math is *broken* (S1–S3). | `README.md:557` | **High**: false confidence. | S | ❌ Still open (S1–S3 unfixed) |
+| D11 | **Test/file counts** — previously claimed "103 tests"; now updated to 269 tests across all 15 files. Version strings aligned (D5). | `README.md`, `CHANGELOG.md` | **Low**. | S | ✅ Fixed |
+| D12 | **`silhouettes.js` / 25+ SVG claim** — verify; `scripts/svg-to-silhouette.js` has lint errors per AGENTS. | `scripts/` | **Low**. | S | ❌ Still open |
 
 ---
 

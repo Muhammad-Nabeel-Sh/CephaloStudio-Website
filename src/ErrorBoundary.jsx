@@ -1,7 +1,7 @@
 import { Component } from "react";
 import { logError } from "./logger.js";
 
-const STORAGE_KEY = "cephalostudio_projects";
+const STORAGE_KEY = "cephalometry_projects";
 
 export default class ErrorBoundary extends Component {
   constructor(props) {

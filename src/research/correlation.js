@@ -1,6 +1,7 @@
 import { collectMeasurements, pivotMeasurements } from "./collect.js";
 import { shapiroWilk as swFromUtils, tDistributeCDF, fCDF, chi2CDF } from "../utils.js";
 import { delongAUC_CI } from "./diagnostic.js";
+import { normalCdf, benjaminiHochberg, matInverse, matMul, matVecMul, transposeMatrix, dot, addIntercept } from "./statsCore.js";
 
 function mean(arr) {
   if (arr.length === 0) return 0;
@@ -39,37 +40,8 @@ function spearmanRho(x, y) {
   return pearsonR(rank(x), rank(y));
 }
 
-function normalCdf(x) {
-  if (x < -8) return 0;
-  if (x > 8) return 1;
-  const a1 = 0.254829592, a2 = -0.284496736, a3 = 1.421413741, a4 = -1.453152027, a5 = 1.061405429, p = 0.3275911;
-  const sign = x < 0 ? -1 : 1;
-  const t = 1 / (1 + p * Math.abs(x) / Math.SQRT2);
-  const y = 1 - (((((a5 * t + a4) * t + a3) * t + a2) * t + a1) * t) * Math.exp(-x * x / 2);
-  return 0.5 * (1 + sign * y);
-}
-
-function benjaminiHochberg(pValues) {
-  const n = pValues.length;
-  if (n === 0) return [];
-  const sorted = pValues.map((p, i) => ({ p, i })).sort((a, b) => a.p - b.p);
-  let prev = 0;
-  for (let k = 0; k < n; k++) {
-    const adjusted = Math.min(sorted[k].p * n / (k + 1), 1);
-    sorted[k].adjusted = Math.max(adjusted, prev);
-    prev = sorted[k].adjusted;
-  }
-  const result = Array(n);
-  for (const s of sorted) {
-    result[s.i] = { original: s.p, adjusted: s.adjusted, significant: s.adjusted < 0.05 };
-  }
-  return result;
-}
-
 // Koenker's studentized Breusch-Pagan: regress g = e²/σ² on X (with intercept), then
-// LM = n·R²_aux ~ χ²(k-1). The previous version did not fit a proper auxiliary OLS
-// (it used β = X'g/n with no X'X inverse), so the heteroscedasticity diagnostic was
-// invalid.
+// LM = n·R²_aux ~ χ²(k-1)
 function breuschPagan(residuals, X) {
   const n = residuals.length, k = X[0].length;
   const sigma2 = residuals.reduce((s, r) => s + r * r, 0) / n;
@@ -89,57 +61,6 @@ function breuschPagan(residuals, X) {
   const lm = n * r2;
   const p = 1 - chi2CDF(lm, k - 1);
   return { statistic: lm, df: k - 1, p };
-}
-
-function addIntercept(X) {
-  return X.map(row => [1, ...row]);
-}
-
-function transposeMatrix(m) {
-  return m[0].map((_, i) => m.map(r => r[i]));
-}
-
-function matMul(A, B) {
-  const rowsA = A.length, colsA = A[0].length, colsB = B[0].length;
-  const result = Array.from({ length: rowsA }, () => Array(colsB).fill(0));
-  for (let i = 0; i < rowsA; i++)
-    for (let j = 0; j < colsB; j++)
-      for (let k = 0; k < colsA; k++)
-        result[i][j] += A[i][k] * B[k][j];
-  return result;
-}
-
-function matVecMul(M, v) {
-  return M.map(row => row.reduce((s, val, i) => s + val * v[i], 0));
-}
-
-function dot(a, b) {
-  return a.reduce((s, v, i) => s + v * b[i], 0);
-}
-
-function matInverse(M) {
-  const n = M.length;
-  const aug = M.map((row, i) => [...row, ...Array.from({ length: n }, (_, j) => i === j ? 1 : 0)]);
-  for (let col = 0; col < n; col++) {
-    let maxRow = col;
-    for (let row = col + 1; row < n; row++)
-      if (Math.abs(aug[row][col]) > Math.abs(aug[maxRow][col])) maxRow = row;
-    [aug[col], aug[maxRow]] = [aug[maxRow], aug[col]];
-    if (Math.abs(aug[col][col]) < 1e-12) {
-      // Previously returned the identity matrix on singularity, which silently produced
-      // nonsense betas/zero SEs for collinear predictors. Return null so callers can flag
-      // the failure (separation / perfect prediction) instead of emitting garbage.
-      return null;
-    }
-    const pivot = aug[col][col];
-    for (let j = 0; j < 2 * n; j++) aug[col][j] /= pivot;
-    for (let row = 0; row < n; row++) {
-      if (row === col) continue;
-      const factor = aug[row][col];
-      for (let j = 0; j < 2 * n; j++) aug[row][j] -= factor * aug[col][j];
-    }
-  }
-  return aug.map(row => row.slice(n));
 }
 
 function logit(x) {
@@ -496,7 +417,14 @@ export function runLogisticRegression(sessions, config, calibration) {
   const XtW = transposeMatrix(Xt).map(row => row.map((v, i) => v * W[i]));
   const info = matMul(XtW, Xt);
   const infoInv = matInverse(info);
-  const XtXinv = infoInv || matMul(transposeMatrix(Xt), Xt).map(r => r.map(() => NaN));
+  if (!infoInv) {
+    return {
+      note: "Logistic model did not converge (singular information matrix — likely perfect multicollinearity or separation).",
+      separated: false, singular: true,
+      n: y.length, nPos: y.reduce((s, yi) => s + yi, 0), nNeg: y.length - y.reduce((s, yi) => s + yi, 0),
+    };
+  }
+  const XtXinv = infoInv;
   const oddsRatios = beta.map(b => Math.exp(b));
   const se = XtXinv.map((row, i) => Math.sqrt(Math.abs(row[i])));
   const zStats = beta.map((b, i) => b / se[i]);

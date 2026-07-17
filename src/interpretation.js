@@ -28,9 +28,10 @@ export const RULES = {
     category: "skeletal", subgroup: "ap-differential",
     label: "ANB Angle",
     description: "Sagittal jaw relationship — difference between SNA and SNB (derived, can be negative)",
-    interpret: (v) => {
-      if (v > 4) return "Skeletal Class II pattern (mandibular retrognathism or maxillary prognathism)";
-      if (v < 0) return "Skeletal Class III pattern (mandibular prognathism or maxillary retrognathism)";
+    interpret: (v, m) => {
+      const sd = 2;
+      if (v > m + sd) return "Skeletal Class II pattern (mandibular retrognathism or maxillary prognathism)";
+      if (v < m - sd) return "Skeletal Class III pattern (mandibular prognathism or maxillary retrognathism)";
       return "Sagittal jaw relationship is within normal range (Class I)";
     },
   },
@@ -92,6 +93,16 @@ export const RULES = {
       if (v > m) return "Increased facial convexity";
       if (v < m) return "Straight or concave facial profile";
       return "Facial convexity is within normal range";
+    },
+  },
+  "Angle of Convexity": {
+    category: "skeletal", subgroup: "ap-differential",
+    label: "Angle of Convexity",
+    description: "Facial convexity angle (Downs)",
+    interpret: (v, m) => {
+      if (v > m) return "Facial profile is more convex";
+      if (v < m) return "Facial profile is more concave or straight";
+      return "Facial convexity angle is within normal range";
     },
   },
   "FMA": {
@@ -269,12 +280,12 @@ export const RULES = {
   },
   "U1-L1": {
     category: "dental", subgroup: "interincisal",
-    label: "U1-L1 Angle",
-    description: "Angle between upper and lower incisors",
+    label: "U1-L1 Angle (Interincisal)",
+    description: "Angle between upper and lower incisors — same as Interincisal angle",
     interpret: (v, m) => {
-      if (v > m) return "Decreased incisor compensation (upright incisors)";
-      if (v < m) return "Increased incisor compensation (bimaxillary proclination tendency)";
-      return "Incisor compensation is within normal range";
+      if (v > m) return "Interincisal angle is increased (incisors are retroclined relative to each other)";
+      if (v < m) return "Interincisal angle is decreased (incisors are proclined relative to each other, bimaxillary protrusion tendency)";
+      return "Incisor relationship is within normal range";
     },
   },
   // ═══════════════════════════════════════════
@@ -1677,6 +1688,17 @@ const PATTERN_RECOGNIZERS = [
   },
 ];
 
+function sdInterpretationText(zScore, normLabel, interpretFn, value, normMean) {
+  const absZ = Math.abs(zScore);
+  if (absZ <= 1) {
+    return `${normLabel} is within normal range`;
+  }
+  const directionText = interpretFn(value, normMean);
+  const severity = absZ > 2 ? "Abnormal" : "Borderline";
+  const direction = directionText.includes("within normal range") ? "" : ` (${directionText})`;
+  return `${severity} deviation${direction}`;
+}
+
 export function generateInterpretation(allMeas, norms, calibration) {
   const deviations = [];
   const calDone = calibration?.done === true;
@@ -1684,6 +1706,7 @@ export function generateInterpretation(allMeas, norms, calibration) {
   for (const { m, meas } of allMeas) {
     if (!m.label) continue;
     for (const [measureType, value] of Object.entries(meas)) {
+      if (measureType.startsWith("_")) continue;
       if (typeof value !== "number" || !isFinite(value)) continue;
       if (!calDone && calTypes.includes(measureType)) continue;
       const norm = norms.find(n => n.markupLabel === m.label && n.measureType === measureType);
@@ -1704,7 +1727,7 @@ export function generateInterpretation(allMeas, norms, calibration) {
         category: rule?.category || "other",
         subgroup: rule?.subgroup || "",
         description: rule?.description || "",
-        interpretation: interpretFn(value, norm.mean),
+        interpretation: sdInterpretationText(dev.sdUnits, rule?.label || m.label, interpretFn, value, norm.mean),
         normSource: norm.source,
       });
     }

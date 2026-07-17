@@ -1,35 +1,35 @@
 export function parseCsv(text) {
-  const lines = text.trim().split(/\r?\n/);
-  if (lines.length < 2) return { headers: [], rows: [] };
-  const headers = parseLine(lines[0]);
+  // Parse the full text char-by-char to handle quoted fields containing newlines
   const rows = [];
-  for (let i = 1; i < lines.length; i++) {
-    const vals = parseLine(lines[i]);
-    if (vals.length === 0) continue;
-    if (vals.length === 1 && vals[0] === "") continue;
-    const row = {};
-    headers.forEach((h, j) => { row[h.trim()] = j < vals.length ? vals[j].trim() : ""; });
-    rows.push(row);
-  }
-  return { headers, rows };
-}
-
-function parseLine(line) {
-  const result = [];
-  let cur = "", inQ = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
+  let row = [], cur = "", inQ = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
     if (inQ) {
       if (ch === '"') {
-        if (i + 1 < line.length && line[i + 1] === '"') { cur += '"'; i++; }
+        if (i + 1 < text.length && text[i + 1] === '"') { cur += '"'; i++; }
         else inQ = false;
       } else cur += ch;
     } else {
       if (ch === '"') inQ = true;
-      else if (ch === ",") { result.push(cur); cur = ""; }
-      else cur += ch;
+      else if (ch === ",") { row.push(cur); cur = ""; }
+      else if (ch === "\n" || ch === "\r") {
+        if (ch === "\r" && i + 1 < text.length && text[i + 1] === "\n") i++;
+        if (cur.length > 0 || row.length > 0) { row.push(cur); cur = ""; }
+        if (row.length > 0) { rows.push(row); row = []; }
+      } else cur += ch;
     }
   }
-  result.push(cur);
-  return result;
+  if (cur.length > 0 || row.length > 0) { row.push(cur); rows.push(row); }
+  if (rows.length < 2) return { headers: [], rows: [] };
+  const headers = rows[0];
+  const data = [];
+  for (let i = 1; i < rows.length; i++) {
+    const vals = rows[i];
+    if (vals.length === 0) continue;
+    if (vals.length === 1 && vals[0] === "") continue;
+    const rowObj = {};
+    headers.forEach((h, j) => { rowObj[h.trim()] = j < vals.length ? vals[j].trim() : ""; });
+    data.push(rowObj);
+  }
+  return { headers, rows: data };
 }

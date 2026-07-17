@@ -7,13 +7,14 @@
 // contain patient identifiers). On a shared workstation those strings persist
 // in the DevTools console history — a PHI leak.
 //
-// In dev (`import.meta.env.DEV`) we log the full object for debugging. In
-// production we log only the label + the error name + a truncated message,
-// never the raw object/stack. Error MESSAGES rarely carry PHI (a JSON.parse
-// message is like "Unexpected token at position 0"); the PHI lives in the
-// object we now withhold. Message length is capped as a belt-and-braces guard.
+// In ALL builds we log only the label + the error name + a truncated message,
+// never the raw object/stack. The optional `debug=1` query parameter unlocks
+// full object logging for development.
+// Error MESSAGES rarely carry PHI (a JSON.parse message is like "Unexpected
+// token at position 0"); the PHI lives in the object we now withhold. Message
+// length is capped as a belt-and-braces guard.
 
-const DEV = !!(import.meta.env && import.meta.env.DEV);
+const DEBUG = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("debug") === "1";
 
 function summarize(err) {
   if (err == null) return "";
@@ -23,11 +24,11 @@ function summarize(err) {
 }
 
 export function logError(label, err, devExtra) {
-  if (DEV) { console.error(label, err, devExtra !== undefined ? devExtra : ""); return; }
+  if (DEBUG) { console.error(label, err, devExtra !== undefined ? devExtra : ""); return; }
   console.error(`${label} ${summarize(err)}`.trim());
 }
 
 export function logWarn(label, err, devExtra) {
-  if (DEV) { console.warn(label, err, devExtra !== undefined ? devExtra : ""); return; }
+  if (DEBUG) { console.warn(label, err, devExtra !== undefined ? devExtra : ""); return; }
   console.warn(`${label} ${summarize(err)}`.trim());
 }

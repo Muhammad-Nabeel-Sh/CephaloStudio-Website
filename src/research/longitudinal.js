@@ -241,6 +241,7 @@ function pairedPostHoc(data, timepointKeys, labels) {
       const sdDiff = stdev(diffs, mDiff);
       const tRes = tTestPaired(valsA, valsB);
       if (!tRes) continue;
+      const dz = sdDiff > 0 ? mDiff / sdDiff : 0;
       results.push({
         tpA: labels?.[i] || timepointKeys[i],
         tpB: labels?.[j] || timepointKeys[j],
@@ -249,7 +250,8 @@ function pairedPostHoc(data, timepointKeys, labels) {
         t: tRes.t,
         df: tRes.df,
         pValue: tRes.pValue,
-        d: tRes.cohensD,
+        d: dz,
+        cohensDz: dz,
       });
     }
   }
@@ -336,10 +338,10 @@ function linearMixedModel(data, timepointLabels) {
   // Also keep the naive (OLS) SEs for comparison
   const seOLS = [Math.sqrt(XtXinv[0][0] * sigma2), Math.sqrt(XtXinv[1][1] * sigma2)];
 
-  // Use cluster-robust SEs for inference
+  // Use cluster-robust SEs for inference with conservative df
   const se = seRobust;
   const tValsBeta = [beta[0] / se[0], beta[1] / se[1]];
-  const df = allY.length - 2;
+  const df = n - 2;
   const pVals = tValsBeta.map(t => 2 * (1 - tDistributeCDF(Math.abs(t), df)));
 
   // Subject-level variance (random intercept estimate)

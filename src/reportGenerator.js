@@ -32,7 +32,7 @@ const LOGO_SVG = `<?xml version="1.0" encoding="UTF-8" standalone="no"?><!DOCTYP
 
 // ─── Utilities ───────────────────────────────────────────────────────────────
 function fmtAngle(v) { return v != null ? v.toFixed(1) + "\u00b0" : "\u2014"; }
-function fmtMm(v) { return v != null ? v.toFixed(2) + " mm" : "\u2014"; }
+function fmtMm(v, unit) { return v != null ? v.toFixed(2) + " " + (unit || "mm") : "\u2014"; }
 function fmtP(p) {
   if (p == null) return "\u2014";
   if (p < 0.001) return "<0.001";
@@ -140,7 +140,7 @@ function genNormogramChart(rows, w) {
     const xc = cx(r.sd), yc = TOP + i * RH + RH / 2;
     const col = sevColor(r.dev.sdUnits);
     const lbl = (r.label || "").length > 14 ? r.label.slice(0, 12) + "\u2026" : r.label;
-    const vs = (r.measureType === "angle" ? fmtAngle(r.value) : fmtMm(r.value));
+    const vs = (r.measureType === "angle" ? fmtAngle(r.value) : fmtMm(r.value, r.unit));
     svg += `<text x="${LB-8}" y="${yc+1}" text-anchor="end" dominant-baseline="middle" fill="${C.tx}" font-size="10" font-weight="600" font-family="'DM Mono',monospace">${lbl}</text>`;
     svg += `<circle cx="${xc}" cy="${yc}" r="4.5" fill="${col}" stroke="${C.bg}" stroke-width="1.5"/>`;
     svg += `<text x="${xc+9}" y="${yc+1}" dominant-baseline="middle" fill="${col}" font-size="9" font-weight="700" font-family="'DM Mono',monospace">${vs}</text>`;
@@ -265,16 +265,18 @@ function buildCover(doc, project, session) {
     y += 7;
   });
 
-  // Bottom footer
-  // doc.setFillColor(C.dark2);
-  // doc.rect(0, PAGE_H - 15, PAGE_W, 15, "F");
-  // doc.setFont("helvetica", "normal");
-  // doc.setFontSize(8);
-  // doc.setTextColor("#ffffff");
-  // doc.text("Cephalometry Studio \u2014 Cephalometric Analysis", MARGIN, PAGE_H - 7.5);
-  // doc.setFontSize(7);
-  // doc.setTextColor("#ffffffcc");
-  // doc.text("Generated " + new Date().toLocaleString(), MARGIN, PAGE_H - 8);
+  // Disclaimer footer
+  doc.setFillColor(C.dark2);
+  doc.rect(0, PAGE_H - 22, PAGE_W, 22, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7);
+  doc.setTextColor(C.txhd);
+  doc.text("RESEARCH & EDUCATIONAL USE ONLY", MARGIN, PAGE_H - 15);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(5.5);
+  doc.setTextColor("#ffffffbb");
+  doc.text("Cephalometry Studio is intended for research and educational purposes only. It is not approved or cleared for ", MARGIN, PAGE_H - 9);
+  doc.text("clinical diagnosis or treatment planning. Clinical decisions should not be made solely on the basis of these measurements.", MARGIN, PAGE_H - 4);
 }
 
 function getImageDimensions(url) {
@@ -351,10 +353,10 @@ function buildMeasurements(doc, allMeas, norms) {
   for (const { m, meas } of allMeas) {
     if (!m.label) continue;
     for (const [mt, val] of Object.entries(meas)) {
-      if (mt === "x" || mt === "y") continue;
+      if (mt === "x" || mt === "y" || mt.startsWith("_")) continue;
       if (typeof val !== "number" || !isFinite(val)) continue;
       const n = norms.find(x => x.markupLabel === m.label && x.measureType === mt);
-      const vs = mt === "angle" ? fmtAngle(val) : fmtMm(val);
+      const vs = mt === "angle" ? fmtAngle(val) : fmtMm(val, meas._unit);
       const z = n && n.sd > 0 ? ((val - n.mean) / n.sd).toFixed(2) : "\u2014";
       rows.push([m.label, vs, n ? n.mean.toFixed(1) : "\u2014", n ? n.sd.toFixed(2) : "\u2014", z]);
     }
@@ -386,11 +388,12 @@ async function buildNormogram(doc, allMeas, norms) {
   for (const { m, meas } of allMeas) {
     if (!m.label) continue;
     for (const [mt, val] of Object.entries(meas)) {
+      if (mt.startsWith("_")) continue;
       if (typeof val !== "number" || !isFinite(val)) continue;
       const n = norms.find(x => x.markupLabel === m.label && x.measureType === mt);
       if (!n || n.sd <= 0) continue;
       const delta = val - n.mean;
-      rows.push({ label: m.label, value: val, measureType: mt, norm: n, dev: { delta, sdUnits: n.sd > 0 ? delta / n.sd : 0 }, color: m.color });
+      rows.push({ label: m.label, value: val, measureType: mt, norm: n, dev: { delta, sdUnits: n.sd > 0 ? delta / n.sd : 0 }, color: m.color, unit: meas._unit });
     }
   }
   const seen = new Set();

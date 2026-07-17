@@ -5,7 +5,7 @@ CephaloStudio is a React + Vite application for cephalometric analysis (medical 
 - **Framework**: React 19 with Vite 8
 - **Styling**: Inline styles (no CSS framework)
 - **Math**: mathjs for formulas, katex for LaTeX rendering
-- **No TypeScript**, **269 tests (Vitest)**
+- **No TypeScript**, **300 tests (Vitest)**
 
 ---
 
@@ -32,7 +32,7 @@ npx eslint src/panels.jsx
 npm run lint -- --fix
 ```
 
-**No test framework configured.** If adding tests, use Vitest (matches Vite ecosystem).
+**Vitest** is configured and used for all tests (matches Vite ecosystem).
 
 ---
 
@@ -156,11 +156,13 @@ const result = compiled.evaluate(scope);
 ```
 
 ### Measurement Types
-- `length`: distance in mm (calibration-dependent)
+- `length`: distance in mm if calibrated, px otherwise (calibration-dependent)
 - `angle`: degrees (3-point or 4-point, calibration-independent)
-- `area`: polygon area in mm²
-- `perimeter`: polygon perimeter in mm
-- `distance`: perpendicular distance in mm
+- `area`: polygon area in mm² if calibrated, px² otherwise
+- `perimeter`: polygon perimeter in mm if calibrated, px otherwise
+- `distance`: perpendicular distance in mm if calibrated, px otherwise
+- `computeMeasurements()` returns `_unit: "mm"` or `"px"` on every result object
+- ANB signed-angle uses `m.measure === "ANB"` structural flag (falls back to `m.label`)
 
 ### Predefined Analyses
 Stored in `PREDEFINED` object with keys: `lateral`, `ap`, `other`
@@ -232,11 +234,13 @@ Recommended settings for `.vscode/settings.json`:
 
 ### Done
 - **Phase 4 — Research Module Framework**: Created `src/research/` with `studyModel.js`, `engine.js`
-- **Reliability module**: ICC(2,1) with 95% CI, Bland-Altman, Dahlberg/SEM/MDC, landmark error mapping via 2×2 eigendecomposition — config + results UI (`ReliabilityPanel.jsx`)
-- **Descriptive/Normative module**: descriptive stats, reference intervals, z-scores, predefined norms — config + results UI (`DescriptivePanel.jsx`)
-- **Comparative module**: test selection (normality+Levene's → route), parametric/non-parametric tests, post-hoc (Tukey HSD/Bonferroni), effect sizes auto-selected, MANOVA — config + results UI (`ComparativePanel.jsx`)
-- **Longitudinal module**: RM-ANOVA with Mauchly's sphericity test, GG/HF/LB epsilons, LMM (two-level REML), pairwise Bonferroni — config + results UI (`LongitudinalPanel.jsx`)
-- **ResultsDialog**: Floating modal (normogram pattern) with Tables/Charts tabs for all 4 modules
+- **Reliability module**: ICC(2,1) with 95% CI (F-based, exact fCDF inversion), Bland-Altman (with VIF for 3+ occasion bias CI), Dahlberg/SEM/MDC, landmark error mapping via 2×2 eigendecomposition — config + results UI (`ReliabilityPanel.jsx`)
+- **Descriptive/Normative module**: descriptive stats, reference intervals, z-scores, predefined norms (single source in `src/norms.js`) — config + results UI (`DescriptivePanel.jsx`)
+- **Comparative module**: test selection (normality+Levene's → route), parametric/non-parametric tests, post-hoc (Tukey HSD via studentized range CDF / Bonferroni), effect sizes auto-selected, MANOVA (Box's M, Wilks/Pillai/Hotelling/Roy via Jacobi eigendecomposition) — config + results UI (`ComparativePanel.jsx`)
+- **Longitudinal module**: RM-ANOVA with Mauchly's sphericity test (orthonormal Helmert contrasts), GG/HF/LB epsilons, LMM (two-level pseudo-REML with cluster-robust SEs), pairwise Bonferroni — config + results UI (`LongitudinalPanel.jsx`)
+- **Correlation module**: Pearson/Spearman, partial correlation, linear/logistic regression (Newton-Raphson with step-halving, separation detection), VIF, diagnostic plots — config + results UI (`CorrelationPanel.jsx`)
+- **Diagnostic module**: ROC/AUC with DeLong CI, optimal thresholds (Youden/F1/distance/accuracy), Hosmer-Lemeshow calibration, logistic composite index, cross-validated AUC (LOOCV/k-fold, seeded PRNG for reproducibility) — config + results UI (`DiagnosticPanel.jsx`)
+- **ResultsDialog**: Floating modal (normogram pattern) with Tables/Charts tabs for all 6 modules
 - **Charts module** (`moduleCharts.jsx`): ICC forest plot, Bland-Altman plot, Error map, Distribution+normal curve, Box plots, Group means bar, Effect size forest, P-value dot chart, Longitudinal trajectories, Change score chart
 - **`addMarkup()` auto-links refLabels** by detecting matching point labels within 3px tolerance; `refreshAutoMeas()` applies to any `refLabels` bearer regardless of `autoCreated`
 - **`syncRefDeps(label, dx, dy)`**: propagates point drags to all dependent markups via `refLabels` — keeps splines, polygons, beziers, circles, ellipses, tangents, arrows attached to their reference points
@@ -244,7 +248,6 @@ Recommended settings for `.vscode/settings.json`:
 - **Templates**: `.cepht` v2.0 export with point coords, validation, measurement preview, subset editing, localStorage library
 - **Session Filmstrip**: floating bottom-center horizontal thumbnail bar (max 5 visible, scrollbar)
 - **Batch Import**: multi-image + CSV sidecar parsing
-- **App.jsx refactored**: removed dead database mode code, simplified to ~2190 lines
 - **Data Integrity & Storage (D1-D8)**:
   - `saveProjects` rewritten: IDB writes awaited before localStorage; failed images kept in envelope (D1); orphan GC on every save (D2); IDB-unavailable / quota banner via custom event (D3)
   - `cephxFormat.js` (new): import validation, v2.0→v2.1 migration, `normalizeSessionImages` shared by import + export (D4); version constants + enhanced `validateCepht` (D5)
@@ -257,9 +260,13 @@ Recommended settings for `.vscode/settings.json`:
 - **Grid overlay**: Toggleable 50px grid on canvas via context menu
 - **Group system**: `groupId` property on markups; grouped markups drag together
 - **Flash highlight**: Pulsing golden ring (1.5s) when clicking markup from the Markups panel
-- **Calibration-aware norms**: `generateInterpretation` skips linear measurement comparison when calibration is not done; units show `px` instead of `mm`; warning banners in InterpretationPanel and MeasurementsPanel
+- **Calibration-aware norms**: `generateInterpretation` skips linear measurement comparison when calibration is not done; units show `px` instead of `mm`; `computeMeasurements()` returns `_unit` on every result; warning banners in InterpretationPanel and MeasurementsPanel
 - **Cursor management**: Context-aware cursor (pointer on hoverables, grab for pan, crosshair for drawing tools)
+- **Code review (C1–C17 clinical correctness)**: Fixed `computeMeasurements` unit propagation; calibration reset on image load; validation in `finalizeCalib`; CSV/panel unit display; PDF disclaimer + PHI gate; merged norms into single `src/norms.js`; SD-banded interpretation (not mean-banded); ANB structural flag; U1-L1/Interincisal alignment; Convexity disambiguation; 2D magnification warning in CalibModal
+- **Code review (S1–S15 statistical correctness)**: Fixed Cohen's dz (was undefined); BH adjustment direction (was reversed); ICC uses exact fCDF (was Paulson approx); ICC unbalanced-data handling; seeded PRNG for cross-validation; logistic regression singular-matrix bail-out; consolidated tCritical; HL small-n warning; LMM conservative df; Bland-Altman VIF; MANOVA fractional df; studentized range CDF quadrature improvement
+- **Golden-value tests**: 31 new tests in `src/test/researchGolden.test.js` covering basic stats, t-test, ANOVA, Mann-Whitney, Wilcoxon, Spearman, BH adjustment, Shapiro-Wilk, Cohen's d, ICC, Dahlberg, linear regression against R/published references
 
 ### Build Status
 - `npm run build` — OK (chunk size warning is pre-existing, mathjs is large; plotly loaded as dynamic import)
 - `npm run lint` — 1 warning in App.jsx only (`react-hooks/exhaustive-deps` for `currentDraw.type`, pre-existing)
+- `npm test` — 300 tests pass (15 test files, 0 failures)

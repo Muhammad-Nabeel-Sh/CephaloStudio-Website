@@ -405,24 +405,20 @@ function independentTTest(arr1, arr2, welch = false) {
 // distribution.
 function studentizedRangeCDF(q, k, df) {
   if (q <= 0 || k < 2 || df < 1) return 0;
-  const steps = 200;
+  // Use more Simpson steps and wider integration bound for accuracy with small df
+  const steps = Math.max(200, Math.round(40 * Math.min(1, df / 10)));
   const dHalf = df / 2;
-  // Log density of Y = sqrt(chi²_df/df) (chi distribution scaled): f(y) ∝ y^{df-1} e^{-df y²/2}
-  // logF = (df-1)·ln(y) - df·y²/2 + const (const folded into weight, cancels in normalized sum)
   let p = 0;
-  const maxX = 6 + q / 2; // upper limit; grows with q since the integrand depends on q·x
+  const maxX = df < 5 ? 12 + q / 2 : 6 + q / 2;
   for (let i = 0; i <= steps; i++) {
     const x = (maxX * i) / steps;
-    // Probability that all of k-1 independent N(0,1) are within [-qx/√2, qx/√2] given Y=x
     const z = q * x / Math.SQRT2;
     const inner = Math.pow(normalCdf(z) - normalCdf(-z), k - 1);
     const w = (i === 0 || i === steps) ? 1 : (i % 2 === 1 ? 4 : 2);
-    const logF = (df - 1) * Math.log(Math.max(x, 1e-9)) - dHalf * x * x; // -df·x²/2, df/2=x²·(df/2)
+    const logF = (df - 1) * Math.log(Math.max(x, 1e-9)) - dHalf * x * x;
     p += w * inner * Math.exp(logF);
   }
   p = p * (maxX / (3 * steps));
-  // Normalise so the CDF at q→∞ is 1 (the integral of the chi density over [0,∞) is the
-  // normalising constant). Compute that constant with the same quadrature but inner=1.
   let norm = 0;
   for (let i = 0; i <= steps; i++) {
     const x = (maxX * i) / steps;
@@ -529,7 +525,7 @@ function fFromWilks(lambda, p, k, N) {
   }
   if (!isFinite(F) || !isFinite(df2) || df2 <= 0 || df1 <= 0) return null;
   const pValue = 1 - fCDF(F, df1, df2);
-  return { F, df1: Math.round(df1), df2: Math.round(df2), pValue };
+  return { F, df1, df2, pValue };
 }
 
 function matMul(A, B) {

@@ -83,8 +83,12 @@ function fromB64(str) {
 }
 
 // Returns the envelope object to JSON.stringify into localStorage.
+// When encryption is unavailable (HTTP, old browser), emits a warning and
+// returns a plaintext envelope so the app still functions. Callers can check
+// `secureStorageAvailable()` to decide whether to warn the user.
 export async function encryptJSON(obj) {
   if (!secureStorageAvailable()) {
+    try { window.dispatchEvent(new CustomEvent("cephalostudio:storage-warning", { detail: { kind: "encryption-unavailable", message: "Encryption is not available (requires HTTPS + modern browser). Patient data is stored in plaintext in localStorage — do not use this app on a shared machine without HTTPS." } })); } catch { /* dispatchEvent is best-effort */ }
     return { v: 1, enc: false, plaintext: JSON.stringify(obj) };
   }
   try {
@@ -94,7 +98,7 @@ export async function encryptJSON(obj) {
     const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, data);
     return { v: 1, enc: true, iv: b64(iv), ct: b64(ct) };
   } catch {
-    // Crypto failure must not lose data — fall back to plaintext envelope.
+    try { window.dispatchEvent(new CustomEvent("cephalostudio:storage-warning", { detail: { kind: "encryption-unavailable", message: "Encryption failed unexpectedly. Patient data stored in plaintext — check browser security settings." } })); } catch { /* dispatchEvent is best-effort */ }
     return { v: 1, enc: false, plaintext: JSON.stringify(obj) };
   }
 }

@@ -20,7 +20,13 @@ export default function BatchImportModal({ t, project, onUpdateProject, onClose 
   const csvRef = useRef(null);
 
   const handleImages = useCallback(async (files) => {
-    const reads = Array.from(files).map(f => new Promise((res, rej) => {
+    const valid = Array.from(files).filter(f => {
+      if (!f.type.startsWith("image/")) { alert(`"${f.name}" is not an image file. Skipped.`); return false; }
+      if (f.size > 100 * 1024 * 1024) { alert(`"${f.name}" is too large (${(f.size/1024/1024).toFixed(1)} MB). Maximum 100 MB. Skipped.`); return false; }
+      return true;
+    });
+    if (valid.length === 0) return;
+    const reads = valid.map(f => new Promise((res, rej) => {
       const r = new FileReader();
       r.onload = () => res({ file: f, dataUrl: r.result });
       r.onerror = rej;

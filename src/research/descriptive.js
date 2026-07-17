@@ -1,4 +1,4 @@
-import { computeMeasurements, chi2CDF } from "../utils.js";
+import { computeMeasurements, chi2CDF, tDistributeCDF } from "../utils.js";
 import { logError } from "../logger.js";
 
 // ─── Statistical helpers ──────────────────────────────────────────────────
@@ -14,11 +14,18 @@ function stdNormalCdf(x) {
 
 function tCritical(p, df) {
   if (df <= 0) return 1.96;
+  // For df > 1000 use z approximation
   if (df > 1000) return p >= 0.995 ? 2.576 : p >= 0.975 ? 1.96 : p >= 0.95 ? 1.645 : 0;
-  const z = p >= 0.995 ? 2.576 : p >= 0.975 ? 1.96 : p >= 0.95 ? 1.645 : 0;
-  const a = (z ** 3 + z) / (4 * df);
-  const b = (5 * z ** 5 + 16 * z ** 3 + 3 * z) / (96 * df * df);
-  return z + a + b;
+  // For df <= 1000, invert tDistributeCDF by bisection (exact)
+  const target = p;
+  let lo = 0.0, hi = 8.0, mid;
+  for (let it = 0; it < 60; it++) {
+    mid = (lo + hi) / 2;
+    const cdf = tDistributeCDF(mid, df);
+    if (cdf < target) lo = mid; else hi = mid;
+    if (Math.abs(cdf - target) < 1e-10) break;
+  }
+  return (lo + hi) / 2;
 }
 
 // ─── Descriptive statistics for a single group of values ─────────────────
@@ -132,7 +139,7 @@ function computeZScore(value, norm) {
 
   // Direction-specific clinical note for well-known cephalometric measures
   let directionNote = null;
-  if (norm.label === "ANB" || norm.label === "ANB") {
+  if (norm.label === "ANB") {
     if (z > 2) directionNote = "Class II skeletal pattern (ANB above norm)";
     else if (z < -2) directionNote = "Class III skeletal pattern (ANB below norm)";
   } else if (norm.label === "SNA") {
@@ -158,47 +165,48 @@ function computeZScore(value, norm) {
 //   2. Mismatch warning: when no stratum matches and the patient's age falls
 //      outside the norm's `ageRange`, a warning is attached to the z-score
 //      so the UI can flag a likely-misapplied norm.
+import { DEFAULT_NORMS } from "../norms.js";
+
+function _normsToValues(norms) {
+  const values = {};
+  for (const n of norms) values[n.label] = { mean: n.mean, sd: n.sd };
+  return values;
+}
+
+function _buildAnalysis(id, label, src, overrideValues) {
+  const ref = DEFAULT_NORMS[label];
+  return { id, label: src.label || label, source: src.source || ref.source, population: src.population || ref.population, ageRange: src.ageRange || ref.ageRange, sex: src.sex || ref.sex, stratification: src.stratification || ref.stratification, values: overrideValues || _normsToValues(ref.norms) };
+}
+
 export const PREDEFINED_NORMS = [
-  {
-    id: "steiner",
+  _buildAnalysis("steiner", "Steiner", {
     label: "Steiner (Caucasian)",
-    values: {
-      SNA: { mean: 82, sd: 3 }, SNB: { mean: 80, sd: 3 }, ANB: { mean: 2, sd: 2 },
-      "SN-MP": { mean: 32, sd: 4 }, "FMA": { mean: 25, sd: 4 }, "IMPA": { mean: 90, sd: 5 },
-    },
-    source: "Steiner CC. Cephalometrics in clinical practice. Angle Orthod. 1959;29(1):8-29.",
-    population: "Caucasian (North American)",
-    ageRange: "Adult",
-    sex: "Pooled (male + female)",
+    population: "Caucasian (North American)", ageRange: "Adult", sex: "Pooled (male + female)",
     stratification: "Not stratified by age, sex, or ethnicity. Applies a single adult value to all patients.",
-  },
-  {
-    id: "downs",
+  }),
+  _buildAnalysis("downs", "Downs", {
     label: "Downs (Caucasian)",
-    values: {
-      "Facial Angle": { mean: 87, sd: 3 },
-      "Angle of Convexity": { mean: 0, sd: 5 },
-      "AB Plane": { mean: -5, sd: 2 },
-      "Mandibular Plane": { mean: 22, sd: 4 },
-      "Y-Axis": { mean: 59, sd: 3 },
-    },
-    source: "Downs WB. Variations in facial relationships: their significance in treatment and prognosis. Am J Orthod. 1948;34(10):812-840.",
-    population: "Caucasian (North American)",
-    ageRange: "Adolescent (12-17y)",
-    sex: "Pooled (male + female)",
+    population: "Caucasian (North American)", ageRange: "Adolescent (12-17y)", sex: "Pooled (male + female)",
     stratification: "Not stratified by age, sex, or ethnicity. Based on adolescent subjects — may not apply to adults.",
-  },
+  }, {
+    "Facial angle": { mean: 87.8, sd: 3.6 },
+    "Convexity": { mean: 0, sd: 5.9 },
+    "AB plane": { mean: -4.6, sd: 3.7 },
+    "Mandibular plane": { mean: 21.9, sd: 3.7 },
+    "Y-axis": { mean: 59.4, sd: 3.8 },
+    "Occlusal plane": { mean: 9.3, sd: 3.8 },
+    "Interincisal": { mean: 135.4, sd: 5.8 },
+    "U1-L1": { mean: 135.4, sd: 5.8 },
+  }),
   {
     id: "mcnamara",
     label: "McNamara",
-    // Age-stable angular measurements live at the top level.
     values: {
       "Maxillary Depth": { mean: 90, sd: 3 },
       "Facial Depth": { mean: 88, sd: 3 },
       "ANB": { mean: 2, sd: 2 },
+      "Lower facial height": { mean: 47, sd: 4 },
     },
-    // Linear effective-length measurements are age/sex-stratified. Stratum
-    // values override the top level for any label they define.
     strata: [
       { group: "Child (9y) — male",   ageMin: 7,  ageMax: 10, sex: "male",   values: { "Effective Mandibular Length (Co-Gn)": { mean: 117, sd: 6 }, "Effective Maxillary Length (Co-A)": { mean: 90, sd: 4 } } },
       { group: "Child (9y) — female", ageMin: 7,  ageMax: 10, sex: "female", values: { "Effective Mandibular Length (Co-Gn)": { mean: 115, sd: 6 }, "Effective Maxillary Length (Co-A)": { mean: 88, sd: 4 } } },
@@ -213,7 +221,7 @@ export const PREDEFINED_NORMS = [
     population: "Caucasian (North American)",
     ageRange: "Stratified (7y through adult)",
     sex: "Stratified (male / female)",
-    stratification: "Angular measurements (Maxillary Depth, Facial Depth, ANB) are age-stable and shared across strata. Linear effective-length measurements (Co-Gn, Co-A) are stratified by age and sex. Means are approximate and vary slightly by source (±1-2 mm); verify against a population-matched reference before clinical use.",
+    stratification: "Maxillary Depth, Facial Depth, and ANB are age-stable angular measurements shared across strata. Lower facial height is also age-stable. Linear effective-length measurements (Co-Gn, Co-A) are stratified by age and sex. Means are approximate and vary slightly by source (±1-2 mm); verify against a population-matched reference before clinical use.",
   },
 ];
 

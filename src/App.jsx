@@ -128,8 +128,9 @@ function exportCephx(project) {
   const blob = new Blob([json], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `${project.name.replace(/\s+/g, "_")}.cephx`;
+  a.download = `${(project.name || "project").replace(/\s+/g, "_")}.cephx`;
   a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),60000);
 }
 function importCephx(file,onLoad){
   const reader=new FileReader();
@@ -151,6 +152,7 @@ function exportCepht(template,version="1.0"){
   const payload={format:"cepht",version,exported:Date.now(),...template};
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}));
   a.download=`${template.name.replace(/\s+/g,"_")}.cepht`;a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),60000);
 }
 function exportTemplateAsCepht(project,name,includeCoord){
   const session=project.sessions?.find(s=>s.id===project.activeSessionId)||project.sessions?.[0];
@@ -181,8 +183,8 @@ function CalibModal({t,calibration,onFinish,rulerLabel,rulerCount}){
       {mode==="ruler"?<><div style={{fontSize:13,color:t.tx2,marginBottom:16,lineHeight:1.6}}>Draw a ruler on the image (⟺ key), then enter its real-world length.</div>
         {rulerLabel&&<div style={{fontSize:12,color:t.ok,marginBottom:8}}>Using ruler: <strong>{rulerLabel}</strong></div>}
         {!rulerLabel&&rulerCount>1&&<div style={{fontSize:12,color:t.warn,marginBottom:8}}>⚠ Multiple rulers found — using the first one. Draw a ruler for a specific selection.</div>}
-        <PropRow label="Distance (mm)" t={t}><input type="number" value={mm} onChange={e=>setMm(e.target.value)} min="1" style={{background:t.surf2,border:`1px solid ${t.bdr}`,borderRadius:6,padding:"6px 10px",color:t.tx,fontSize:14,width:"90%",fontFamily:"'DM Mono',monospace"}}/></PropRow><Btn t={t} onClick={()=>onFinish(parseFloat(mm))} style={{width:"100%",marginTop:12}}>Set Calibration</Btn></>
-      :<><div style={{fontSize:13,color:t.tx2,marginBottom:16}}>Enter px/mm directly (from DICOM metadata).</div>{calibration.done&&<div style={{fontSize:12,color:t.ok,marginBottom:10}}>Current: {calibration.pxPerMm.toFixed(4)} px/mm</div>}<PropRow label="px / mm" t={t}><input type="number" value={ppm} onChange={e=>setPpm(e.target.value)} step="0.001" min="0.001" style={{background:t.surf2,border:`1px solid ${t.bdr}`,borderRadius:6,padding:"6px 10px",color:t.tx,fontSize:14,width:"90%",fontFamily:"'DM Mono',monospace"}}/></PropRow><Btn t={t} onClick={()=>onFinish(parseFloat(mm),parseFloat(ppm))} style={{width:"100%",marginTop:12}}>Apply</Btn></>}
+        <PropRow label="Distance (mm)" t={t}><input type="number" value={mm} onChange={e=>setMm(e.target.value)} min="1" style={{background:t.surf2,border:`1px solid ${t.bdr}`,borderRadius:6,padding:"6px 10px",color:t.tx,fontSize:14,width:"90%",fontFamily:"'DM Mono',monospace"}}/></PropRow><div style={{fontSize:9,color:t.tx3,marginTop:8}}>2D cephalometric radiographs carry ~8–15% magnification. Ensure the ruler distance reflects the actual image scale (not CBCT).</div><Btn t={t} onClick={()=>onFinish(parseFloat(mm))} style={{width:"100%",marginTop:12}}>Set Calibration</Btn></>
+      :<><div style={{fontSize:13,color:t.tx2,marginBottom:16}}>Enter px/mm directly (from DICOM metadata).</div>{calibration.done&&<div style={{fontSize:12,color:t.ok,marginBottom:10}}>Current: {calibration.pxPerMm.toFixed(4)} px/mm</div>}<PropRow label="px / mm" t={t}><input type="number" value={ppm} onChange={e=>setPpm(e.target.value)} step="0.001" min="0.001" style={{background:t.surf2,border:`1px solid ${t.bdr}`,borderRadius:6,padding:"6px 10px",color:t.tx,fontSize:14,width:"90%",fontFamily:"'DM Mono',monospace"}}/></PropRow><div style={{fontSize:9,color:t.tx3,marginTop:8}}>2D cephalograms have ~8–15% inherent magnification. CBCT-derived px/mm is more accurate for linear measurements.</div><Btn t={t} onClick={()=>onFinish(parseFloat(mm),parseFloat(ppm))} style={{width:"100%",marginTop:12}}>Apply</Btn></>}
     </div>
   );
 }
@@ -403,8 +405,14 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     return()=>{window.removeEventListener("mousemove",onMove);window.removeEventListener("mouseup",onUp);};
   },[toolbarDragging,dispatch]);
 
+  // ─── These must be declared before any useEffect that references them ──────
+  const activeSession=project.sessions?.find(s=>s.id===project.activeSessionId)||project.sessions?.[0];
+  const markups=useMemo(()=>activeSession?.markups||[],[activeSession?.markups]);
+
   // Migration: legacy session.image -> session.images[]
+  const legacyMigrationDoneRef=useRef(false);
   useEffect(()=>{
+    if(legacyMigrationDoneRef.current)return;
     if(!activeSession)return;
     if(activeSession.images?.length)return;
     const oldImg = activeSession.image || project.images?.[0] || project.sessions?.find(s=>s.image)?.image;
@@ -412,7 +420,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       const entry = oldImg.id ? oldImg : {id:uid(),name:"Imported",dataUrl:oldImg.dataUrl||oldImg,dx:0,dy:0,opacity:1,blendMode:"normal",visible:true,color:"none",transform:{tx:0,ty:0,rot:0,scale:1}};
       onUpdateProject(updateSessionInProject(project,activeSession.id,{images:[entry],image:undefined}));
     }
-  },[]); // eslint-disable-line react-hooks/exhaustive-deps
+    legacyMigrationDoneRef.current=true;
+  },[activeSession, project, onUpdateProject, activeSession?.id]);
 
   const isPanning=useRef(false);const panStart=useRef(null);
   const isDragging=useRef(false);const dragStart=useRef(null);const dragStartState=useRef(null);
@@ -426,8 +435,6 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const snapshotRef=useRef();
   const [undoVersion,setUndoVersion]=useState(0);
 
-  const activeSession=project.sessions?.find(s=>s.id===project.activeSessionId)||project.sessions?.[0];
-  const markups=useMemo(()=>activeSession?.markups||[],[activeSession?.markups]);
   const sessionImage=useMemo(()=>activeSession?.images||[],[activeSession?.images]);
 
   // Auto-start placing mode when project has unplaced markups (from wizard)
@@ -469,11 +476,11 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const redoRef=useRef();
   const updMarkupRef=useRef();
   const delMarkupRef=useRef();
-  snapshotRef.current=()=>JSON.stringify({markups,norms,placingMode,placingIdx,placingQueue});
+  snapshotRef.current=()=>JSON.stringify({markups,norms,placingMode,placingIdx,placingQueue,calibration,formulas,processing});
   const pushUndoRef=useRef();
   pushUndoRef.current=()=>{
     undoStackRef.current.push(snapshotRef.current());
-    if(undoStackRef.current.length>50)undoStackRef.current.shift();
+    if(undoStackRef.current.length>200)undoStackRef.current.shift();
     redoStackRef.current=[];
     setUndoVersion(v=>v+1);
   };
@@ -481,14 +488,14 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   undoRef.current=()=>{
     if(undoStackRef.current.length===0)return;
     redoStackRef.current.push(snapshotRef.current());
-    if(redoStackRef.current.length>50)redoStackRef.current.shift();
+    if(redoStackRef.current.length>200)redoStackRef.current.shift();
     const prev=undoStackRef.current.pop();
     if(!prev)return;
     const parsed=JSON.parse(prev);
     if(Array.isArray(parsed)){
       updSession({markups:parsed});
     }else{
-      updSession({markups:parsed.markups,norms:parsed.norms});
+      updSession({markups:parsed.markups,norms:parsed.norms,calibration:parsed.calibration,formulas:parsed.formulas,processing:parsed.processing});
       dispatch({type:"SET",payload:{placingMode:parsed.placingMode,placingIdx:parsed.placingIdx,placingQueue:parsed.placingQueue}});
     }
     setUndoVersion(v=>v+1);
@@ -497,14 +504,14 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   redoRef.current=()=>{
     if(redoStackRef.current.length===0)return;
     undoStackRef.current.push(snapshotRef.current());
-    if(undoStackRef.current.length>50)undoStackRef.current.shift();
+    if(undoStackRef.current.length>200)undoStackRef.current.shift();
     const next=redoStackRef.current.pop();
     if(!next)return;
     const parsed=JSON.parse(next);
     if(Array.isArray(parsed)){
       updSession({markups:parsed});
     }else{
-      updSession({markups:parsed.markups,norms:parsed.norms});
+      updSession({markups:parsed.markups,norms:parsed.norms,calibration:parsed.calibration,formulas:parsed.formulas,processing:parsed.processing});
       dispatch({type:"SET",payload:{placingMode:parsed.placingMode,placingIdx:parsed.placingIdx,placingQueue:parsed.placingQueue}});
     }
     setUndoVersion(v=>v+1);
@@ -859,15 +866,22 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     ctx.restore(); // F2: end DPR scale
   },[markups,selectedId,selectedIds,zoom,sessionImage,calibration,t,currentDraw,snapEnabled,showScaleBar,showDefTooltips,showLUT,showAnnotations,annotationSize,showDisplacement,compareSession,getProcessed,angleMode,lutMode,lutInvert,activeTool,displacementOverlay,overlayBlend,refLandmark1,refLandmark2,showCalib,pendingRuler,showGrid]);
 
-  useEffect(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});});
+  useEffect(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});},[redraw]);
   const scheduleRedraw=useCallback(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});},[redraw]);
   const scheduleRedrawRef=useRef(scheduleRedraw);scheduleRedrawRef.current=scheduleRedraw;
+  // W3: listen for image-processed events from the worker and trigger a redraw
+  useEffect(()=>{
+    const onProcessed=()=>scheduleRedrawRef.current();
+    window.addEventListener("cephalostudio:image-processed",onProcessed);
+    return ()=>window.removeEventListener("cephalostudio:image-processed",onProcessed);
+  },[]);
 
   // U3: Keep redrawing while calibration modal is open (pulsing highlight animation)
   useEffect(()=>{if(!showCalib||!pendingRuler)return;let raf;const loop=()=>{scheduleRedrawRef.current();raf=requestAnimationFrame(loop);};raf=requestAnimationFrame(loop);return()=>cancelAnimationFrame(raf);},[showCalib,pendingRuler]);
 
   const loadImage=(file,addToStack=false)=>{
     if(!file||!file.type.startsWith("image/"))return;
+    if(file.size>100*1024*1024){alert(`"${file.name}" is too large (${(file.size/1024/1024).toFixed(1)} MB). Maximum image size is 100 MB.`);return;}
     dispatch({type:"SET",payload:{loadingImages:true}});
     const reader=new FileReader();
     reader.onload=e=>{
@@ -882,7 +896,10 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           updSession({images: [entry]});
         }
         dispatch({type:"SET",payload:{loadingImages:false}});
-        if(!addToStack){const cw=canvasSize.current.w-80,ch=canvasSize.current.h-80;const sc=Math.min(cw/(img.naturalWidth||600),ch/(img.naturalHeight||500),1);dispatch({type:"SET",payload:{zoom:sc}});panRef.current={x:40,y:40};dispatch({type:"SET",payload:{pan:{x:40,y:40}}});}
+        if(!addToStack){
+          const cw=canvasSize.current.w-80,ch=canvasSize.current.h-80;const sc=Math.min(cw/(img.naturalWidth||600),ch/(img.naturalHeight||500),1);dispatch({type:"SET",payload:{zoom:sc}});panRef.current={x:40,y:40};dispatch({type:"SET",payload:{pan:{x:40,y:40}}});
+          updSession({calibration:{done:false,pxPerMm:1,knownMm:""}});
+        }
       };
       // D8: a corrupt/permission-denied image decode used to hang the
       // "Loading images…" overlay forever. Clear it and tell the user.
@@ -1244,9 +1261,23 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   useEffect(()=>{const c=canvasRef.current;if(!c)return;const opts={passive:false};const onStart=e=>{e.preventDefault();touchStartRef.current(e);};const onMove=e=>{e.preventDefault();touchMoveRef.current(e);};const onEnd=e=>{touchEndRef.current(e);};c.addEventListener("touchstart",onStart,opts);c.addEventListener("touchmove",onMove,opts);c.addEventListener("touchend",onEnd,opts);return()=>{c.removeEventListener("touchstart",onStart);c.removeEventListener("touchmove",onMove);c.removeEventListener("touchend",onEnd);};},[]);
 
   const finalizeCalib=(mm,manualPpm)=>{
-    if(manualPpm){updSession({calibration:{done:true,pxPerMm:manualPpm,knownMm:mm}});dispatch({type:"SET",payload:{showCalib:false}});return;}
-    const ruler=pendingRuler||markups.find(m=>m.type==="ruler");if(!ruler)return;const vp=vpts(ruler);if(vp.length<2)return;
-    updSession({calibration:{done:true,pxPerMm:dist(vp[0],vp[1])/mm,knownMm:mm}});dispatch({type:"SET",payload:{showCalib:false}});
+    if(manualPpm){
+      const p = parseFloat(manualPpm);
+      if(!isFinite(p)||p<=0||p>1000)return;
+      pushUndo();
+      updSession({calibration:{done:true,pxPerMm:p,knownMm:mm||""}});
+      dispatch({type:"SET",payload:{showCalib:false}});
+      return;
+    }
+    const ruler=pendingRuler||markups.find(m=>m.type==="ruler");if(!ruler)return;
+    const vp=vpts(ruler);if(vp.length<2)return;
+    const pixelDist=dist(vp[0],vp[1]);
+    if(pixelDist<10)return;
+    const ppm = pixelDist / mm;
+    if(!isFinite(ppm)||ppm<=0||ppm>1000)return;
+    pushUndo();
+    updSession({calibration:{done:true,pxPerMm:ppm,knownMm:mm||""}});
+    dispatch({type:"SET",payload:{showCalib:false}});
   };
 
   const loadTemplate=(analysis)=>{
@@ -1257,6 +1288,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       pointIds[pt.l]=id;
       newMarkups.push({id,type:"point",points:[{x:-99999,y:-99999}],label:pt.l,definition:pt.def,color:pt.color,size:6,visible:true,placed:false});
     });
+    pushUndo();
     updSession({markups:[...markups,...newMarkups],analysisTemplate:analysis.name});
     setPlacingQueue(newMarkups.map(m=>m.id));dispatch({type:"SET",payload:{placingIdx:0}});dispatch({type:"SET",payload:{placingMode:true}});dispatch({type:"SET",payload:{rightPanel:"markups"}});
   };
@@ -1297,7 +1329,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         label:meas.l,definition:meas.def||"",
         color:meas.color||"#888",
         visible:true,locked:true,autoCreated:true,placed:true,
-        refLabels:meas.pts,norm:meas.norm,...extraProps,
+        refLabels:meas.pts,norm:meas.norm,measure:meas.l,...extraProps,
       });
     }
     const updatedLabels=new Set([...existingLabels,...result.map(m=>m.label)]);
@@ -1345,8 +1377,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
 
   const exportCSV=()=>{
     const rows=[["ID","Type","Label","Definition","Points_px","Measurement","Value","Unit"]];
-    markups.forEach(m=>{const meas=computeMeasurements(m,calibration);const ps=vpts(m).map(p=>`(${p.x.toFixed(1)},${p.y.toFixed(1)})`).join(";");if(!Object.keys(meas).length)rows.push([m.id,m.type,m.label||"",m.definition||"",ps,"","",""]);else Object.entries(meas).forEach(([k,v])=>rows.push([m.id,m.type,m.label||"",m.definition||"",ps,k,v.toFixed(2),k==="angle"?formatAngle(v):"mm"]));});
-    const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([rows.map(r=>r.map(c=>`"${c}"`).join(",")).join("\n")],{type:"text/csv"}));a.download=`${project.name}.csv`;a.click();
+    markups.forEach(m=>{const meas=computeMeasurements(m,calibration);const ps=vpts(m).map(p=>`(${p.x.toFixed(1)},${p.y.toFixed(1)})`).join(";");if(!Object.keys(meas).length)rows.push([m.id,m.type,m.label||"",m.definition||"",ps,"","",""]);else Object.entries(meas).forEach(([k,v])=>{if(k.startsWith("_"))return;rows.push([m.id,m.type,m.label||"",m.definition||"",ps,k,v.toFixed(2),k==="angle"?formatAngle(v):(meas._unit==="mm"?"mm":"px")]);});});
+    const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([rows.map(r=>r.map(c=>`"${c}"`).join(",")).join("\n")],{type:"text/csv"}));a.download=`${project.name}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),60000);
   };
 
   const captureMarkupImage = useCallback(async () => {
@@ -1601,7 +1633,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           ];
           return(<>
             {/* Collapsed bar — horizontal scroll row */}
-            <div style={{position:"fixed",bottom:0,left:0,right:0,height:52,display:"flex",alignItems:"center",borderTop:`1px solid ${t.bdr}`,zIndex:20,background:t.surf,padding:"0 4px",gap:2,overflowX:"auto",overflowY:"hidden",scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
+            <div style={{position:"absolute",bottom:0,left:0,right:0,height:52,display:"flex",alignItems:"center",borderTop:`1px solid ${t.bdr}`,zIndex:20,background:t.surf,padding:"0 4px",gap:2,overflowX:"auto",overflowY:"hidden",scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
               {primaryTools.map(tool=>(
                 <ToolBtn key={tool.id} tool={tool} active={activeTool===tool.id} onClick={()=>selTool(tool.id)} theme={theme} t={t} style={{flexShrink:0}}/>
               ))}
@@ -1745,7 +1777,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
               <div style={{flex:1,overflowY:"auto",scrollbarWidth:"none"}}>
                 <style>{`.panel-scroll::-webkit-scrollbar{display:none}`}</style>
                 <div className="panel-scroll">
-                  {rightPanel==="markups"&&<MarkupsPanel markups={markups} t={t} theme={theme} selectedId={selectedId} onSelect={selectAndFocusMarkup} onDelete={delMarkup} onToggleVisible={id=>updMarkup(id,{visible:markups.find(m=>m.id===id)?.visible===false})} onToggleLock={id=>updMarkup(id,{locked:!markups.find(m=>m.id===id)?.locked})} onToggleLabel={id=>updMarkup(id,{noLabel:!markups.find(m=>m.id===id)?.noLabel})} calibration={calibration} placingMode={placingMode} placingQueue={placingQueue} placingIdx={placingIdx} onStopPlacing={()=>{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}} onPausePlacing={()=>{dispatch({type:"SET",payload:{placingMode:false}});}} onResumePlacing={()=>{dispatch({type:"SET",payload:{placingMode:true}});}} onClear={()=>updSession({markups:[]})} onAddPoint={()=>{dispatch({type:"SET",payload:{activeTool:"point"}});dispatch({type:"SET",payload:{currentDraw:null}});}} norms={norms} formatAngle={formatAngle} angleMode={angleMode} setAngleMode={setAngleMode} onReplace={(type,id)=>{if(replacingId===id){dispatch({type:"SET",payload:{replacingId:null}});dispatch({type:"SET",payload:{activeTool:"select"}});}else{dispatch({type:"SET",payload:{replacingId:id}});dispatch({type:"SET",payload:{activeTool:type}});}dispatch({type:"SET",payload:{currentDraw:null}});}} replacingId={replacingId}/>}
+                  {rightPanel==="markups"&&<MarkupsPanel markups={markups} t={t} theme={theme} selectedId={selectedId} onSelect={selectAndFocusMarkup} onDelete={delMarkup} onToggleVisible={id=>updMarkup(id,{visible:markups.find(m=>m.id===id)?.visible===false})} onToggleLock={id=>updMarkup(id,{locked:!markups.find(m=>m.id===id)?.locked})} onToggleLabel={id=>updMarkup(id,{noLabel:!markups.find(m=>m.id===id)?.noLabel})} calibration={calibration} placingMode={placingMode} placingQueue={placingQueue} placingIdx={placingIdx} onStopPlacing={()=>{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}} onPausePlacing={()=>{dispatch({type:"SET",payload:{placingMode:false}});}} onResumePlacing={()=>{dispatch({type:"SET",payload:{placingMode:true}});}} onClear={()=>{pushUndo();updSession({markups:[]})}} onAddPoint={()=>{dispatch({type:"SET",payload:{activeTool:"point"}});dispatch({type:"SET",payload:{currentDraw:null}});}} norms={norms} formatAngle={formatAngle} angleMode={angleMode} setAngleMode={setAngleMode} onReplace={(type,id)=>{if(replacingId===id){dispatch({type:"SET",payload:{replacingId:null}});dispatch({type:"SET",payload:{activeTool:"select"}});}else{dispatch({type:"SET",payload:{replacingId:id}});dispatch({type:"SET",payload:{activeTool:type}});}dispatch({type:"SET",payload:{currentDraw:null}});}} replacingId={replacingId}/>}
                   {rightPanel==="measurements"&&<MeasurementsPanel allMeas={allMeas} formulaMeas={formulaMeas} t={t} calibration={calibration} norms={norms} onUpdateNorms={ns=>updSession({norms:ns})} onExportCSV={exportCSV} onOpenCalib={()=>dispatch({type:"SET",payload:{showCalib:true}})} formatAngle={formatAngle}/>}
                   {rightPanel==="formulas"&&<FormulasPanel formulas={formulas} t={t} scope={measScope} onAdd={()=>{dispatch({type:"SET",payload:{editFormulaId:null}});dispatch({type:"SET",payload:{showFormulaEditor:true}});}} onEdit={id=>{dispatch({type:"SET",payload:{editFormulaId:id}});dispatch({type:"SET",payload:{showFormulaEditor:true}});}} onDelete={id=>updSession({formulas:formulas.filter(f=>f.id!==id)})} pinnedFormulas={pinnedFormulas} onPinFormula={id=>setPinnedFormulas(s=>{const n=new Set(s);if(n.has(id))n.delete(id);else n.add(id);return n;})}/>}
                   {rightPanel==="image"&&<ImagePanel t={t} processing={processing} setProcessing={p=>updSession({processing:p})} lutMode={lutMode} setLutMode={m=>updSession({lutMode:m})} lutInvert={lutInvert} setLutInvert={v=>updSession({lutInvert:v})} showLUT={showLUT} setShowLUT={setShowLUT} showScaleBar={showScaleBar} setShowScaleBar={setShowScaleBar} calibration={calibration} onOpenCalib={()=>dispatch({type:"SET",payload:{showCalib:true}})} onReset={()=>updSession({processing:{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},lutMode:"gray",lutInvert:false})} onShowHist={()=>setShowHistogram(v=>!v)} showHistogram={showHistogram}/>}
@@ -1807,7 +1839,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         const close=()=>setContextMenu(null);
         const sel=selectedIds.length>1?selectedIds:[];
         const dup=()=>{if(!m)return;const pts=m.points?.map(p=>({x:p.x+15,y:p.y+15}));const dupe={...m,id:uid(),label:`${m.label||m.type} (copy)`,points:pts};if(m.type==="bezier"){const cp=m.cp?m.cp.map(p=>({x:p.x+15,y:p.y+15})):autoControlPoints(pts);dupe.cp=cp;}addMarkup(dupe);close();};
-        const copyMeas=()=>{if(!m)return;const meas=computeMeasurements(m,calibration);const txt=Object.entries(meas).filter(([k])=>k!=="x"&&k!=="y").map(([k,v])=>`${m.label||m.type} ${k}: ${k==="angle"?v.toFixed(1)+"°":v.toFixed(2)+(calibration.done?"mm":"px")}`).join("\n");if(txt)navigator.clipboard.writeText(txt);close();};
+        const copyMeas=()=>{if(!m)return;const meas=computeMeasurements(m,calibration);const txt=Object.entries(meas).filter(([k])=>!k.startsWith("_")&&k!=="x"&&k!=="y").map(([k,v])=>`${m.label||m.type} ${k}: ${k==="angle"?v.toFixed(1)+"°":v.toFixed(2)+(k==="area"?(calibration.done?" mm²":" px²"):(calibration.done?" mm":" px"))}`).join("\n");if(txt)navigator.clipboard.writeText(txt);close();};
         const copyMarkup=()=>{if(!m)return;copiedMarkupRef.current=JSON.stringify(m);close();};
         const pasteMarkup=(setPos)=>{const raw=copiedMarkupRef.current;if(!raw)return;try{const src=JSON.parse(raw);const imgPt=setPos||{x:contextMenu.imageX||0,y:contextMenu.imageY||0};const pts=src.points?.map(p=>({x:p.x+imgPt.x-(src.points?.[0]?.x||0),y:p.y+imgPt.y-(src.points?.[0]?.y||0)}));const dupe={...src,id:uid(),label:`${src.label||src.type} (pasted)`,points:pts};if(src.type==="bezier"&&src.cp)dupe.cp=src.cp.map(p=>({x:p.x+imgPt.x-(src.points?.[0]?.x||0),y:p.y+imgPt.y-(src.points?.[0]?.y||0)}));addMarkup(dupe);close();}catch{/*silent*/};};
         const toFront=()=>{if(!m)return;updMarkups(ms=>{const idx=ms.findIndex(x=>x.id===mId);if(idx<0||idx===ms.length-1)return ms;const cp=[...ms];cp.splice(idx,1);cp.push(m);return cp;});close();};
@@ -1885,6 +1917,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           ))}
           <div style={{borderTop:`1px solid ${t.bdr}`,marginTop:10,paddingTop:12,display:"flex",gap:10}}>
             <Btn t={t} onClick={async ()=>{setShowReportOptions(false);
+              if(hasUnanonymizedPHI(project)&&!window.confirm("This project contains patient identifiers (name, DOB, etc.). The PDF report will include them on the cover. This software is intended for research and educational purposes only. Continue?")){setShowReportOptions(true);return;}
               try {
                 const imgEl = sessionImage?.[0] ? imgRefs.current[sessionImage[0].id] : null;
                 const origUrl = imgEl ? imgEl.src : null;
@@ -1904,6 +1937,10 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
 
       {showFormulaEditor&&<Modal t={t} title={editFormulaId?"Edit Formula":"New Formula"} onClose={()=>dispatch({type:"SET",payload:{showFormulaEditor:false}})}><FormulaEditor t={t} formula={editFormulaId?formulas.find(f=>f.id===editFormulaId):null} scope={measScope} onSave={f=>{const newFs=editFormulaId?formulas.map(x=>x.id===editFormulaId?f:x):[...formulas,f];updSession({formulas:newFs});dispatch({type:"SET",payload:{showFormulaEditor:false}});}} onClose={()=>dispatch({type:"SET",payload:{showFormulaEditor:false}})}/></Modal>}
       {showHistogram&&<FloatingHistogram hist={histData} t={t} lutMode={lutMode} lutInvert={lutInvert} processing={processing} onProcessingChange={p=>updSession({processing:p})} onClose={()=>dispatch({type:"SET",payload:{showHistogram:false}})}/>}
+      <div style={{position:"relative",bottom:0,left:0,right:0,zIndex:999,background:t.surf3,borderTop:`1px solid ${t.bdr}`,padding:"3px 12px",display:"flex",justifyContent:"center",alignItems:"center",gap:8,fontSize:9,color:t.tx3}}>
+        <span style={{fontWeight:700,fontSize:8,color:t.warn,letterSpacing:0.5}}>⚠ RESEARCH & EDUCATIONAL USE ONLY</span>
+        <span>Not cleared for clinical diagnosis. Clinical decisions should not rely solely on these measurements.</span>
+      </div>
     </div>
   );
 }
@@ -1947,6 +1984,10 @@ async function loadProjects() {
     if (Array.isArray(parsed)) projects = parsed; // legacy plaintext projects array
     else if (parsed && typeof parsed === "object") {
       projects = await decryptJSON(parsed);
+      // P7: key-loss detection — if the envelope was encrypted but decrypt returned null
+      if (!projects && parsed.enc === true) {
+        emitStorageWarning("key-loss", "Your saved data could not be decrypted. The encryption key may have been lost (cleared IndexedDB). If you have a backup file (.cephx), import it to restore your projects.");
+      }
     }
     if (!projects) return [];
     // Normalize legacy session.image → session.images[] on load so the GC
@@ -2090,8 +2131,16 @@ export default function CephalometryStudio(){
     (async()=>{
       const lp=await loadProjects();
       if(cancelled)return;
-      setProjects(lp);
-      setActiveId(lp.length>0?lp[0].id:null);
+      // P6: data-retention purge — remove projects older than 90 days unless they have an audit log
+      const retentionDays = 90;
+      const cutoff = Date.now() - retentionDays * 86400000;
+      const withRetention = lp.filter(p => (p.modified || 0) > cutoff || (p.meta?.anonymizationLog?.length || 0) > 0);
+      if (withRetention.length < lp.length) {
+        const purged = lp.length - withRetention.length;
+        logWarn(`Retention: purged ${purged} project(s) older than ${retentionDays} days.`);
+      }
+      setProjects(withRetention);
+      setActiveId(withRetention.length>0?withRetention[0].id:null);
       setLoaded(true);
     })();
     return ()=>{cancelled=true;};
@@ -2106,7 +2155,16 @@ export default function CephalometryStudio(){
     return ()=>window.removeEventListener("cephalostudio:storage-warning",onWarn);
   },[]);
 
-  useEffect(()=>{if(loaded)saveProjects(projects).then(()=>{dirtyRef.current=false;});},[projects,loaded]);
+  // W4: debounce autosave so rapid edits don't encrypt-write per tick
+  const saveTimerRef=useRef(null);
+  const debouncedSave=useCallback(()=>{
+    if(saveTimerRef.current)clearTimeout(saveTimerRef.current);
+    saveTimerRef.current=setTimeout(()=>{
+      saveProjects(projects).then(()=>{dirtyRef.current=false;});
+    },800);
+  },[projects]);
+
+  useEffect(()=>{if(loaded){dirtyRef.current=true;debouncedSave();}},[projects,loaded,debouncedSave]);
 
   useEffect(()=>{
     const handler=e=>{if(dirtyRef.current){e.preventDefault();e.returnValue="";}};
