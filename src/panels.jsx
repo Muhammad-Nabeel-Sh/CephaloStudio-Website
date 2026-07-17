@@ -369,7 +369,7 @@ export function ImagePanel({ t, processing, setProcessing, lutMode, setLutMode, 
       <PanelHeader t={t}>LUT Colorization</PanelHeader>
       <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
         <Btn t={t} small active={showLUT} onClick={() => setShowLUT(v => !v)}>Legend</Btn>
-        <Btn t={t} small active={lutInvert} onClick={() => setLutInvert(v => !v)}>⇅ Invert</Btn>
+        <Btn t={t} small active={lutInvert} onClick={() => setLutInvert(!lutInvert)}>⇅ Invert</Btn>
         <Btn t={t} small onClick={() => { setLutMode("gray"); setLutInvert(false); }}>Revert</Btn>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 4 }}>

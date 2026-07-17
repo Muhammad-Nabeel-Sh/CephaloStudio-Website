@@ -857,7 +857,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         }
       }
     }
-    if(showLUT&&lutMode!=="gray")drawLUTLegend(ctx,lutMode,lutInvert,W,H,t);
+    if(showLUT)drawLUTLegend(ctx,lutMode,lutInvert,W,H,t);
     // A5: Placing-mode card moved to floating React panel — no longer drawn on canvas
     // F1: draw coordinates on canvas (replaces DOM overlay — no React re-render needed)
     if(mousePos){

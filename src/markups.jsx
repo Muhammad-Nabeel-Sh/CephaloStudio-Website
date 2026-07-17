@@ -1188,7 +1188,7 @@ export function drawScaleBar(ctx, zoom, cal, cw, ch){
 
 export function drawLUTLegend(ctx, lutMode, lutInvert, cw, ch, t){
   const preset = LUT_PRESETS.find(l => l.id === lutMode);
-  if(!preset || lutMode === "gray") return;
+  if(!preset) return;
   
   const bx = cw - 58, by = 20, bh = Math.min(ch * 0.4, 180), bw = 18;
   const stops = lutInvert ? [...preset.stops].reverse() : preset.stops;

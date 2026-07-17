@@ -63,9 +63,42 @@ export function applyEdgeKernel(idata, strength) {
 // When available, heavy per-pixel processing runs off the main thread so
 // slider drags don't freeze the UI. Falls back to synchronous processing if
 // the Worker constructor is unavailable (e.g. some test environments).
+//
+// Drain-latest pattern: when a slider is dragged, many processImageToCanvas
+// calls fire in rapid succession. Instead of queuing N worker tasks (one per
+// tick), we keep only the latest job. When the worker finishes the current
+// task, it checks for a newer pending job and dispatches that — skipping all
+// stale intermediate work. The image-processed event fires only for the final
+// result, so the canvas updates once with the latest parameters.
 let _procWorker = null;
 let _workerId = 0;
 const _workerCallbacks = new Map();
+let _workerBusy = false;
+let _pendingJob = null; // latest { gen, canvas, ctx, img, nw, nh, proc, lutMode, lutInvert }
+
+function _runWorker(job) {
+  const worker = getProcWorker();
+  if (!worker) { _workerBusy = false; return; }
+  _workerBusy = true;
+  const { gen, ctx, img, nw, nh, proc, lutMode, lutInvert } = job;
+  ctx.drawImage(img, 0, 0);
+  const idata = ctx.getImageData(0, 0, nw, nh);
+  _workerCallbacks.set(gen, (processedPixels) => {
+    const result = ctx.createImageData(nw, nh);
+    result.data.set(processedPixels);
+    ctx.putImageData(result, 0, 0);
+    _workerBusy = false;
+    if (_pendingJob && _pendingJob.gen > gen) {
+      const next = _pendingJob;
+      _pendingJob = null;
+      _runWorker(next);
+    } else {
+      _pendingJob = null;
+      if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("cephalostudio:image-processed"));
+    }
+  });
+  worker.postMessage({ id: gen, pixels: new Uint8ClampedArray(idata.data), width: nw, height: nh, proc, lutMode, lutInvert });
+}
 
 function getProcWorker() {
   if (_procWorker) return _procWorker;
@@ -76,7 +109,11 @@ function getProcWorker() {
       const cb = _workerCallbacks.get(id);
       if (cb) { _workerCallbacks.delete(id); cb(data); }
     };
-    _procWorker.onerror = () => { _procWorker = null; }; // graceful fallback
+    _procWorker.onerror = () => {
+      _procWorker = null;
+      _workerBusy = false;
+      if (_pendingJob) { const next = _pendingJob; _pendingJob = null; setTimeout(() => _runWorker(next), 0); }
+    };
   } catch { _procWorker = null; }
   return _procWorker;
 }
@@ -91,21 +128,16 @@ export function processImageToCanvas(img, proc, lutMode, lutInvert) {
   ctx.drawImage(img, 0, 0);
   const { brightness = 0, contrast = 0, windowWidth = 0, windowCenter = 128, edgeEnhance = 0 } = proc;
   if (!brightness && !contrast && !windowWidth && !edgeEnhance && lutMode === "gray" && !lutInvert) return oc;
-  // F3: try offloading to Web Worker
+  // F3: try offloading to Web Worker — drain-latest pattern
   const worker = getProcWorker();
   if (worker) {
-    const idata = ctx.getImageData(0, 0, nw, nh);
-    const id = ++_workerId;
-    _workerCallbacks.set(id, (processedPixels) => {
-      const result = ctx.createImageData(nw, nh);
-      result.data.set(processedPixels);
-      ctx.putImageData(result, 0, 0);
-      // Signal that processing completed — the cache entry is already set to
-      // the "in-progress" canvas, so we just need a redraw to pick up the
-      // updated pixels.  The redraw trigger lives in App.jsx (procCache update).
-      if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("cephalostudio:image-processed"));
-    });
-    worker.postMessage({ id, pixels: new Uint8ClampedArray(idata.data), width: nw, height: nh, proc: { brightness, contrast, windowWidth, windowCenter, edgeEnhance }, lutMode, lutInvert });
+    const gen = ++_workerId;
+    const job = { gen, canvas: oc, ctx, img, nw, nh, proc: { brightness, contrast, windowWidth, windowCenter, edgeEnhance }, lutMode, lutInvert };
+    if (_workerBusy) {
+      _pendingJob = job; // overwrite stale intermediate jobs — only the latest matters
+    } else {
+      _runWorker(job);
+    }
     return oc; // return canvas immediately — worker will update it async
   }
   // Fallback: synchronous processing (no Worker available)
