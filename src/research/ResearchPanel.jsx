@@ -8,6 +8,7 @@ import { LongitudinalConfig, LongitudinalResults } from "./LongitudinalPanel.jsx
 import { CorrelationConfig, CorrelationResults } from "./CorrelationPanel.jsx";
 import { DiagnosticConfig, DiagnosticResults } from "./DiagnosticPanel.jsx";
 import ResultsDialog from "./ResultsDialog.jsx";
+import StudyGuideModal from "./StudyGuideModal.jsx";
 
 export default function ResearchPanel({ t, project, onUpdateProject, calibration }) {
   const studies = project?.researchStudies || [];
@@ -18,6 +19,7 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
   const [dialogStudy, setDialogStudy] = useState(null);
   const [runningId, setRunningId] = useState(null);
   const [progress, setProgress] = useState({ p: 0, label: "" });
+  const [guideType, setGuideType] = useState(null);
   const abortRef = useRef(null);
 
   const handleCreate = () => {
@@ -131,7 +133,11 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <span style={{ fontSize: 18 }} dangerouslySetInnerHTML={{ __html: st.icon }} />
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: t.tx }}>{st.name}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: t.tx }}>{st.name}</span>
+                      <button onClick={e => { e.stopPropagation(); setGuideType(st.id); }}
+                        style={{ background: "none", border: `1px solid ${t.tx3}55`, color: t.tx3, borderRadius: 10, width: 18, height: 18, fontSize: 10, lineHeight: "16px", textAlign: "center", cursor: "pointer", padding: 0, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} title="Guide">?</button>
+                    </div>
                     <div style={{ fontSize: 10, color: t.tx2, marginTop: 2 }}>{st.desc}</div>
                   </div>
                 </div>
@@ -268,6 +274,7 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
       {dialogStudy?.status === "completed" && (
         <ResultsDialog study={dialogStudy} t={t} onClose={() => setDialogStudy(null)} />
       )}
+      {guideType && <StudyGuideModal t={t} studyType={guideType} onClose={() => setGuideType(null)} />}
     </div>
   );
 }
