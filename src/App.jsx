@@ -10,6 +10,7 @@ import { Btn, Tag, Sld, PropRow, Inp } from "./ui.jsx";
 import ToolBtn from "./ToolBtn.jsx";
 import { drawMarkup, drawInProgress, drawScaleBar, drawLUTLegend, drawSnapIndicator, drawDisplacementVectors, drawAirwayOverlay, hitTest, getSilhouetteHandlesImage } from "./markups.jsx";
 import { MarkupsPanel, MeasurementsPanel, FormulasPanel, ImagePanel, LayersPanel, MarkupProps, TemplatesPanel, SilhouettesPanel, ExamplesPanel } from "./panels.jsx";
+import { loadNormLibrary, saveNormLibrary } from "./normLibrary.js";
 import { Modal } from "./panels/Modal.jsx";
 import PanelGuideModal from "./panels/PanelGuideModal.jsx";
 import HomePage from "./panels/HomePage.jsx";
@@ -463,6 +464,10 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const formulas=useMemo(()=>activeSession?.formulas||[],[activeSession?.formulas]);const norms=useMemo(()=>activeSession?.norms||[],[activeSession?.norms]);
   const analysisTemplate=activeSession?.analysisTemplate||"blank";
   const selectedMarkup=markups.find(m=>m.id===selectedId);
+
+  const [userPresets,setUserPresets]=useState(()=>loadNormLibrary());
+  const handleSavePreset=useCallback((preset,mode)=>{setUserPresets(prev=>{const next=mode==="update"?prev.map(p=>p.id===preset.id?preset:p):[...prev,preset];saveNormLibrary(next);return next;});},[]);
+  const handleDeletePreset=useCallback(id=>{setUserPresets(prev=>{const next=prev.filter(p=>p.id!==id);saveNormLibrary(next);return next;});},[]);
 
   const updSessionRef=useRef();
   updSessionRef.current=patch=>onUpdateProject(updateSessionInProject(project,activeSession.id,patch));
@@ -1788,7 +1793,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
                 <style>{`.panel-scroll::-webkit-scrollbar{display:none}`}</style>
                 <div className="panel-scroll">
                   {rightPanel==="markups"&&<MarkupsPanel markups={markups} t={t} theme={theme} selectedId={selectedId} onSelect={selectAndFocusMarkup} onDelete={delMarkup} onToggleVisible={id=>updMarkup(id,{visible:markups.find(m=>m.id===id)?.visible===false})} onToggleLock={id=>updMarkup(id,{locked:!markups.find(m=>m.id===id)?.locked})} onToggleLabel={id=>updMarkup(id,{noLabel:!markups.find(m=>m.id===id)?.noLabel})} calibration={calibration} placingMode={placingMode} placingQueue={placingQueue} placingIdx={placingIdx} onStopPlacing={()=>{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}} onPausePlacing={()=>{dispatch({type:"SET",payload:{placingMode:false}});}} onResumePlacing={()=>{dispatch({type:"SET",payload:{placingMode:true}});}} onClear={()=>{pushUndo();updSession({markups:[]})}} onAddPoint={()=>{dispatch({type:"SET",payload:{activeTool:"point"}});dispatch({type:"SET",payload:{currentDraw:null}});}} norms={norms} formatAngle={formatAngle} angleMode={angleMode} setAngleMode={setAngleMode} onReplace={(type,id)=>{if(replacingId===id){dispatch({type:"SET",payload:{replacingId:null}});dispatch({type:"SET",payload:{activeTool:"select"}});}else{dispatch({type:"SET",payload:{replacingId:id}});dispatch({type:"SET",payload:{activeTool:type}});}dispatch({type:"SET",payload:{currentDraw:null}});}} replacingId={replacingId}/>}
-                  {rightPanel==="measurements"&&<MeasurementsPanel allMeas={allMeas} formulaMeas={formulaMeas} t={t} calibration={calibration} norms={norms} onUpdateNorms={ns=>updSession({norms:ns})} onExportCSV={exportCSV} onOpenCalib={()=>dispatch({type:"SET",payload:{showCalib:true}})} formatAngle={formatAngle}/>}
+                  {rightPanel==="measurements"&&<MeasurementsPanel allMeas={allMeas} formulaMeas={formulaMeas} t={t} calibration={calibration} norms={norms} onUpdateNorms={ns=>updSession({norms:ns})} onExportCSV={exportCSV} onOpenCalib={()=>dispatch({type:"SET",payload:{showCalib:true}})} formatAngle={formatAngle} userPresets={userPresets} onSavePreset={handleSavePreset} onDeletePreset={handleDeletePreset}/>}
                   {rightPanel==="formulas"&&<FormulasPanel formulas={formulas} t={t} scope={measScope} onAdd={()=>{dispatch({type:"SET",payload:{editFormulaId:null}});dispatch({type:"SET",payload:{showFormulaEditor:true}});}} onEdit={id=>{dispatch({type:"SET",payload:{editFormulaId:id}});dispatch({type:"SET",payload:{showFormulaEditor:true}});}} onDelete={id=>updSession({formulas:formulas.filter(f=>f.id!==id)})} pinnedFormulas={pinnedFormulas} onPinFormula={id=>setPinnedFormulas(s=>{const n=new Set(s);if(n.has(id))n.delete(id);else n.add(id);return n;})}/>}
                   {rightPanel==="image"&&<ImagePanel t={t} processing={processing} setProcessing={p=>updSession({processing:p})} lutMode={lutMode} setLutMode={m=>updSession({lutMode:m})} lutInvert={lutInvert} setLutInvert={v=>updSession({lutInvert:v})} showLUT={showLUT} setShowLUT={setShowLUT} showScaleBar={showScaleBar} setShowScaleBar={setShowScaleBar} calibration={calibration} onOpenCalib={()=>dispatch({type:"SET",payload:{showCalib:true}})} onReset={()=>updSession({processing:{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},lutMode:"gray",lutInvert:false})} onShowHist={()=>setShowHistogram(v=>!v)} showHistogram={showHistogram}/>}
                   {rightPanel==="layers"&&<LayersPanel t={t} images={sessionImage} onUpdateImages={imgs=>updSession({images:imgs})} onAddImage={()=>stackImgRef.current?.click()} onShowAlign={()=>{}} onShowTransform={()=>{}}/>}

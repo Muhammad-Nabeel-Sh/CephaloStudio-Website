@@ -2,6 +2,7 @@
 import { uid, computeMeasurements, normDeviation, deviationColor, evalFormula, onEnter } from "./utils.js";
 import { logWarn } from "./logger.js";
 import { LUT_PRESETS, PREDEFINED, PREDEFINED_NORMS } from "./constants.js";
+import { addPreset, exportLibraryJSON, exportPresetJSON, exportPresetCSV, importLibraryJSON, importPresetCSV, validatePreset } from "./normLibrary.js";
 import { SILHOUETTES, getSilhouettesByCategory } from "./silhouettes.js";
 import { drawMarkup } from "./markups.jsx";
 import { EXAMPLE_LIST, getExampleData } from "./examplesData.js";
@@ -160,7 +161,7 @@ function NormBadges({ norms, meas, t, calibration }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // MEASUREMENTS PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
-export function MeasurementsPanel({ allMeas, formulaMeas, t, calibration, norms, onUpdateNorms, onExportCSV, onOpenCalib, formatAngle }) {
+export function MeasurementsPanel({ allMeas, formulaMeas, t, calibration, norms, onUpdateNorms, onExportCSV, onOpenCalib, formatAngle, userPresets, onSavePreset, onDeletePreset }) {
   const [editingNorm, setEditingNorm] = useState(null);
   const [showGallery, setShowGallery] = useState(false);
   const [guideKey, setGuideKey] = useState(null);
@@ -190,11 +191,11 @@ export function MeasurementsPanel({ allMeas, formulaMeas, t, calibration, norms,
           onUpdateNorms(existing);
         }} style={{ flexShrink: 0 }}>+ All Presets</Btn>
       </div>
-      {showGallery && <NormsReferenceModal t={t} onAdd={(label, mean, sd, type, source) => {
+      {showGallery && <NormsReferenceModal t={t} onAdd={Object.assign((label, mean, sd, type, source) => {
         const existing = norms ? [...norms] : [];
         if (existing.some(e => e.markupLabel === label && e.measureType === type)) return;
         onUpdateNorms([...existing, { id: uid(), markupLabel: label, measureType: type, mean, sd, source }]);
-      }} onClose={() => setShowGallery(false)} />}
+      }, { __norms: norms || [] })} userPresets={userPresets} onSavePreset={onSavePreset} onDeletePreset={onDeletePreset} onClose={() => setShowGallery(false)} />}
 
       {!hasMeas ? <div style={{ color: t.tx3, fontSize: 12, textAlign: "center", paddingTop: 20 }}>Place lines, angles, or polygons.</div>
         : <>
@@ -280,18 +281,24 @@ function InlineNormEditor({ t, markupLabel, measureType, existing, onSave, onDel
   const [mean, setMean] = useState(String(existing?.mean || ""));
   const [sd, setSd] = useState(String(existing?.sd || ""));
   const [source, setSource] = useState(existing?.source || "");
+  const [ageRange, setAgeRange] = useState(existing?.ageRange || "");
+  const [sex, setSex] = useState(existing?.sex || "");
   return (
     <div style={{ background: t.surf3, border: `1px solid ${t.bdr}`, borderRadius: 8, padding: 12, marginBottom: 12, overflow: "hidden" }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: t.acc, marginBottom: 8 }}>Norm for {markupLabel} · {measureType}</div>
+      <div style={{ fontSize: 11, fontWeight: 700, color: t.acc, marginBottom: 8 }}>Norm for {markupLabel} &middot; {measureType}</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 6 }}>
         <div><div style={{ fontSize: 10, color: t.tx2, marginBottom: 2 }}>Mean</div><Inp value={mean} onChange={setMean} t={t} type="number" placeholder="e.g. 82" style={{ width: "100%" }} /></div>
         <div><div style={{ fontSize: 10, color: t.tx2, marginBottom: 2 }}>SD</div><Inp value={sd} onChange={setSd} t={t} type="number" placeholder="e.g. 3" style={{ width: "100%" }} /></div>
       </div>
-      <div style={{ marginBottom: 8 }}><div style={{ fontSize: 10, color: t.tx2, marginBottom: 2 }}>Source</div><Inp value={source} onChange={setSource} t={t} placeholder="e.g. Steiner 1953, Caucasian adults" style={{ width: "100%" }} /></div>
+      <div style={{ marginBottom: 6 }}><div style={{ fontSize: 10, color: t.tx2, marginBottom: 2 }}>Source</div><Inp value={source} onChange={setSource} t={t} placeholder="e.g. Steiner 1953, Caucasian adults" style={{ width: "100%" }} /></div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 8 }}>
+        <div><div style={{ fontSize: 10, color: t.tx2, marginBottom: 2 }}>Age Range</div><Inp value={ageRange} onChange={setAgeRange} t={t} placeholder="e.g. Adult / 12-17y" style={{ width: "100%" }} /></div>
+        <div><div style={{ fontSize: 10, color: t.tx2, marginBottom: 2 }}>Sex</div><Inp value={sex} onChange={setSex} t={t} placeholder="e.g. Pooled / Male / Female" style={{ width: "100%" }} /></div>
+      </div>
       <div style={{ display: "flex", gap: 6 }}>
-        <Btn t={t} small onClick={() => onSave({ markupLabel, measureType, mean: parseFloat(mean), sd: parseFloat(sd), source })} disabled={!mean || !sd} style={{ flex: 1 }}>Save</Btn>
+        <Btn t={t} small onClick={() => onSave({ markupLabel, measureType, mean: parseFloat(mean), sd: parseFloat(sd), source, ageRange, sex })} disabled={!mean || !sd} style={{ flex: 1 }}>Save</Btn>
         {existing && <Btn t={t} small danger onClick={onDelete}>Del</Btn>}
-        <Btn t={t} small onClick={onClose}>✕</Btn>
+        <Btn t={t} small onClick={onClose}>&times;</Btn>
       </div>
     </div>
   );
@@ -1109,80 +1116,235 @@ function ExampleViewerModal({ t, data, onClose }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// NORMS REFERENCE GALLERY MODAL
+// NORMS REFERENCE GALLERY MODAL — Browse presets + manage personal library
 // ═══════════════════════════════════════════════════════════════════════════════
-export function NormsReferenceModal({ t, onAdd, onClose }) {
+const _emptyPreset = () => ({ name: "", source: "", population: "", ageRange: "", sex: "", stratification: "", norms: [{ label: "", mean: 0, sd: 1, type: "angle" }] });
+
+export function NormsReferenceModal({ t, onAdd, onClose, userPresets, onSavePreset, onDeletePreset }) {
+  const [tab, setTab] = useState("browse");
   const [search, setSearch] = useState("");
   const [guideKey, setGuideKey] = useState(null);
+  const [editingPreset, setEditingPreset] = useState(null);
+  const [editErrors, setEditErrors] = useState([]);
+  const [importError, setImportError] = useState(null);
+  const jsonRef = useRef(null);
+  const csvRef = useRef(null);
   const query = search.toLowerCase();
-  const entries = useMemo(() => {
-    const result = [];
-    Object.entries(PREDEFINED_NORMS).forEach(([key, preset]) => {
-      preset.norms.forEach(n => {
-        if (!query || n.label.toLowerCase().includes(query) || preset.source.toLowerCase().includes(query) || key.toLowerCase().includes(query))
-          result.push({ ...n, presetKey: key, source: preset.source });
-      });
-    });
-    return result;
-  }, [query]);
-  const grouped = useMemo(() => {
-    const g = {};
-    entries.forEach(e => { if (!g[e.presetKey]) g[e.presetKey] = { source: e.source, norms: [] }; g[e.presetKey].norms.push(e); });
-    return g;
-  }, [entries]);
+
+  const allBuiltIn = useMemo(() => Object.entries(PREDEFINED_NORMS).map(([key, p]) => ({ key, ...p, builtIn: true })), []);
+  const allUser = useMemo(() => (userPresets || []).map(p => ({ key: p.id, ...p, builtIn: false })), [userPresets]);
+  const allPresets = useMemo(() => [...allBuiltIn, ...allUser], [allBuiltIn, allUser]);
+
+  const filteredPresets = useMemo(() => {
+    if (!query) return allPresets;
+    return allPresets.filter(p => p.name?.toLowerCase().includes(query) || p.source?.toLowerCase().includes(query) || p.norms?.some(n => n.label?.toLowerCase().includes(query)));
+  }, [allPresets, query]);
+
+  function handleImportJSON(e) {
+    const file = e.target.files?.[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = importLibraryJSON(reader.result, userPresets || []);
+      if (result.ok) { result.newPresets.forEach(p => onSavePreset(p, "add")); setTab("library"); setImportError(null); }
+      else setImportError(result.errors.join("\n"));
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  }
+
+  function handleImportCSV(e) {
+    const file = e.target.files?.[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = importPresetCSV(reader.result);
+      if (result.ok) { setEditingPreset({ ..._emptyPreset(), ...result.preset, name: file.name.replace(/\.csv$/i, "") }); setTab("editor"); setImportError(null); }
+      else setImportError(result.errors.join("\n"));
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  }
+
+  function downloadJSON(text, filename) {
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type: "application/json" })); a.download = filename; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  }
+
+  function handleSavePreset() {
+    const errs = validatePreset(editingPreset); setEditErrors(errs);
+    if (errs.length > 0) return;
+    if (editingPreset.id) { onSavePreset({ id: editingPreset.id, ...editingPreset }, "update"); }
+    else { const result = addPreset(editingPreset); if (result.ok) onSavePreset(result.preset, "add"); }
+    setEditingPreset(null); setEditErrors([]);
+  }
+
+  function PresetTable({ preset, source, onAddOne, onAddAll, builtIn, onEdit, onDelete, onExportJSON, onExportCSV }) {
+    return (
+      <div style={{ marginBottom: 14, border: `1px solid ${t.bdr}`, borderRadius: 8, overflow: "hidden" }}>
+        <div style={{ padding: "8px 12px", background: t.surf2, borderBottom: `1px solid ${t.bdr}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: builtIn ? t.acc : t.ok }}>{preset.name || "?"}</span>
+            {!builtIn && <span style={{ fontSize: 8, color: t.ok, marginLeft: 4, background: t.ok + "22", borderRadius: 3, padding: "0 4px", fontWeight: 700 }}>MY</span>}
+            <span style={{ fontSize: 10, color: t.tx3, marginLeft: 8 }}>{source || preset.source}</span>
+          </div>
+          <div style={{ display: "flex", gap: 4, alignItems: "center", flexShrink: 0 }}>
+            {onAddAll && <button onClick={onAddAll} style={{ padding: "3px 8px", borderRadius: 4, border: "none", background: t.acc + "22", color: t.acc, cursor: "pointer", fontSize: 9, fontWeight: 700 }}>Add All ({preset.norms.length})</button>}
+            {!builtIn && <>
+              <button onClick={onEdit} style={{ padding: "3px 6px", borderRadius: 4, border: `1px solid ${t.bdr}`, background: "transparent", color: t.tx2, cursor: "pointer", fontSize: 9 }} title="Edit">Edit</button>
+              <button onClick={onDelete} style={{ padding: "3px 6px", borderRadius: 4, border: `1px solid ${t.err}55`, background: "transparent", color: t.err, cursor: "pointer", fontSize: 9 }} title="Delete">Del</button>
+            </>}
+            <button onClick={onExportJSON} style={{ padding: "3px 6px", borderRadius: 4, border: `1px solid ${t.bdr}`, background: "transparent", color: t.tx3, cursor: "pointer", fontSize: 9 }} title="Export JSON">JSON</button>
+            <button onClick={onExportCSV} style={{ padding: "3px 6px", borderRadius: 4, border: `1px solid ${t.bdr}`, background: "transparent", color: t.tx3, cursor: "pointer", fontSize: 9 }} title="Export CSV">CSV</button>
+          </div>
+        </div>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", fontSize: 10, borderCollapse: "collapse" }}>
+            <thead><tr style={{ borderBottom: `1px solid ${t.bdr}44`, background: t.surf3 }}>
+              <th style={{ textAlign: "left", padding: "5px 10px", color: t.tx2, fontWeight: 600 }}>Label</th>
+              <th style={{ textAlign: "right", padding: "5px 10px", color: t.tx2, fontWeight: 600 }}>Mean</th>
+              <th style={{ textAlign: "right", padding: "5px 10px", color: t.tx2, fontWeight: 600 }}>SD</th>
+              <th style={{ textAlign: "center", padding: "5px 10px", color: t.tx2, fontWeight: 600 }}>Type</th>
+              {onAddOne && <th style={{ textAlign: "right", padding: "5px 10px" }}></th>}
+            </tr></thead>
+            <tbody>
+              {preset.norms.map((n, i) => (
+                <tr key={i} style={{ borderBottom: `1px solid ${t.bdr}33` }}>
+                  <td style={{ padding: "5px 10px", color: t.tx, fontWeight: 600, whiteSpace: "nowrap" }}>{n.label}</td>
+                  <td style={{ padding: "5px 10px", textAlign: "right", fontFamily: "'DM Mono',monospace", color: t.tx }}>{Number(n.mean).toFixed(1)}</td>
+                  <td style={{ padding: "5px 10px", textAlign: "right", fontFamily: "'DM Mono',monospace", color: t.tx3 }}>&plusmn; {Number(n.sd).toFixed(1)}</td>
+                  <td style={{ padding: "5px 10px", textAlign: "center" }}><span style={{ background: (n.type === "angle" ? t.warn : t.ok) + "22", color: n.type === "angle" ? t.warn : t.ok, borderRadius: 3, padding: "1px 5px", fontSize: 8, fontWeight: 700 }}>{n.type}</span></td>
+                  {onAddOne && <td style={{ padding: "5px 10px", textAlign: "right" }}><button onClick={() => onAddOne(n.label, n.mean, n.sd, n.type, source || preset.source)} style={{ padding: "2px 7px", borderRadius: 4, border: `1px solid ${t.acc}55`, background: "transparent", color: t.acc, cursor: "pointer", fontSize: 9, fontWeight: 600 }}>+ Add</button></td>}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  const builtInCount = allBuiltIn.reduce((s, p) => s + (p.norms?.length || 0), 0);
+  const userCount = allUser.reduce((s, p) => s + (p.norms?.length || 0), 0);
+
+  if (editingPreset) {
+    const p = editingPreset;
+    function updPatch(patch) { setEditingPreset(prev => ({ ...prev, ...patch })); }
+    function updNorm(i, field, val) { setEditingPreset(prev => { const norms = [...prev.norms]; norms[i] = { ...norms[i], [field]: val }; return { ...prev, norms }; }); }
+    function addNorm() { setEditingPreset(prev => ({ ...prev, norms: [...prev.norms, { label: "", mean: 0, sd: 1, type: "angle" }] })); }
+    function removeNorm(i) { setEditingPreset(prev => ({ ...prev, norms: prev.norms.filter((_, j) => j !== i) })); }
+    return (
+      <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, backdropFilter: "blur(4px)" }} onClick={() => { setEditingPreset(null); setEditErrors([]); }}>
+        <div style={{ background: t.bg, border: `1px solid ${t.bdr}`, borderRadius: 12, width: "min(90vw, 640px)", maxHeight: "min(90vh, 700px)", display: "flex", flexDirection: "column", boxShadow: `0 24px 64px ${t.shadow}50` }} onClick={e => e.stopPropagation()}>
+          <div style={{ padding: "12px 16px", overflowY: "auto", flex: 1 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: t.acc, marginBottom: 10 }}>{p.id ? "Edit Preset" : "New Preset"}</div>
+            {editErrors.length > 0 && <div style={{ background: t.err + "22", border: `1px solid ${t.err}44`, borderRadius: 6, padding: 8, marginBottom: 10, fontSize: 10, color: t.err, whiteSpace: "pre-wrap" }}>{editErrors.join("\n")}</div>}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 8 }}>
+              <div style={{ gridColumn: "1 / -1" }}><div style={{ fontSize: 10, color: t.tx2, marginBottom: 2 }}>Preset Name *</div><input value={p.name} onChange={e => updPatch({ name: e.target.value })} style={{ width: "100%", padding: "6px 8px", border: `1px solid ${t.bdr}`, borderRadius: 4, background: t.surf3, color: t.tx, fontSize: 11 }} placeholder="e.g. Harvold (Norwegian)" /></div>
+              <div><div style={{ fontSize: 10, color: t.tx2, marginBottom: 2 }}>Source / Citation</div><input value={p.source} onChange={e => updPatch({ source: e.target.value })} style={{ width: "100%", padding: "6px 8px", border: `1px solid ${t.bdr}`, borderRadius: 4, background: t.surf3, color: t.tx, fontSize: 11 }} placeholder="e.g. Harvold, 1974" /></div>
+              <div><div style={{ fontSize: 10, color: t.tx2, marginBottom: 2 }}>Population</div><input value={p.population} onChange={e => updPatch({ population: e.target.value })} style={{ width: "100%", padding: "6px 8px", border: `1px solid ${t.bdr}`, borderRadius: 4, background: t.surf3, color: t.tx, fontSize: 11 }} placeholder="e.g. Norwegian" /></div>
+              <div><div style={{ fontSize: 10, color: t.tx2, marginBottom: 2 }}>Age Range</div><input value={p.ageRange} onChange={e => updPatch({ ageRange: e.target.value })} style={{ width: "100%", padding: "6px 8px", border: `1px solid ${t.bdr}`, borderRadius: 4, background: t.surf3, color: t.tx, fontSize: 11 }} placeholder="e.g. Adult / Mixed / 12-17y" /></div>
+              <div><div style={{ fontSize: 10, color: t.tx2, marginBottom: 2 }}>Sex</div><input value={p.sex} onChange={e => updPatch({ sex: e.target.value })} style={{ width: "100%", padding: "6px 8px", border: `1px solid ${t.bdr}`, borderRadius: 4, background: t.surf3, color: t.tx, fontSize: 11 }} placeholder="e.g. Pooled / Male / Female" /></div>
+              <div style={{ gridColumn: "1 / -1" }}><div style={{ fontSize: 10, color: t.tx2, marginBottom: 2 }}>Stratification Notes</div><textarea value={p.stratification} onChange={e => updPatch({ stratification: e.target.value })} rows={2} style={{ width: "100%", padding: "6px 8px", border: `1px solid ${t.bdr}`, borderRadius: 4, background: t.surf3, color: t.tx, fontSize: 11, resize: "vertical", fontFamily: "inherit" }} placeholder="Notes about age/sex/ethnic stratification" /></div>
+            </div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: t.tx2, marginBottom: 6, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span>Norms ({p.norms.length})</span>
+              <button onClick={addNorm} style={{ padding: "2px 8px", borderRadius: 4, border: `1px solid ${t.acc}55`, background: t.acc + "22", color: t.acc, cursor: "pointer", fontSize: 9, fontWeight: 700 }}>+ Add Norm</button>
+            </div>
+            <div style={{ border: `1px solid ${t.bdr}`, borderRadius: 6, overflow: "hidden" }}>
+              <table style={{ width: "100%", fontSize: 10, borderCollapse: "collapse" }}>
+                <thead><tr style={{ background: t.surf3, borderBottom: `1px solid ${t.bdr}` }}>
+                  <th style={{ textAlign: "left", padding: "4px 6px", color: t.tx2, fontWeight: 600 }}>Label</th>
+                  <th style={{ textAlign: "right", padding: "4px 6px", color: t.tx2, fontWeight: 600, width: 60 }}>Mean</th>
+                  <th style={{ textAlign: "right", padding: "4px 6px", color: t.tx2, fontWeight: 600, width: 50 }}>SD</th>
+                  <th style={{ textAlign: "center", padding: "4px 6px", color: t.tx2, fontWeight: 600, width: 65 }}>Type</th>
+                  <th style={{ width: 24 }}></th>
+                </tr></thead>
+                <tbody>
+                  {p.norms.map((n, i) => (
+                    <tr key={i} style={{ borderBottom: `1px solid ${t.bdr}33` }}>
+                      <td style={{ padding: 2 }}><input value={n.label} onChange={e => updNorm(i, "label", e.target.value)} style={{ width: "100%", padding: "3px 5px", border: `1px solid transparent`, borderRadius: 3, background: "transparent", color: t.tx, fontSize: 10, fontWeight: 600 }} placeholder="Label" /></td>
+                      <td style={{ padding: 2 }}><input type="number" value={n.mean} onChange={e => updNorm(i, "mean", parseFloat(e.target.value) || 0)} style={{ width: "100%", padding: "3px 5px", border: `1px solid transparent`, borderRadius: 3, background: "transparent", color: t.tx, fontSize: 10, textAlign: "right", fontFamily: "'DM Mono',monospace" }} /></td>
+                      <td style={{ padding: 2 }}><input type="number" value={n.sd} onChange={e => updNorm(i, "sd", parseFloat(e.target.value) || 0)} style={{ width: "100%", padding: "3px 5px", border: `1px solid transparent`, borderRadius: 3, background: "transparent", color: t.tx, fontSize: 10, textAlign: "right", fontFamily: "'DM Mono',monospace" }} step="0.1" min="0" /></td>
+                      <td style={{ padding: 2, textAlign: "center" }}><select value={n.type} onChange={e => updNorm(i, "type", e.target.value)} style={{ padding: "2px 4px", border: `1px solid transparent`, borderRadius: 3, background: "transparent", color: t.tx, fontSize: 9 }}>{["angle", "length", "area", "ratio", "value"].map(tp => <option key={tp} value={tp}>{tp}</option>)}</select></td>
+                      <td style={{ padding: 2, textAlign: "center" }}><button onClick={() => removeNorm(i)} style={{ background: "none", border: "none", color: t.err, cursor: "pointer", fontSize: 12, padding: "0 3px" }} title="Remove">&times;</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+              <Btn t={t} small onClick={handleSavePreset} style={{ flex: 1 }}>Save Preset</Btn>
+              <Btn t={t} small onClick={() => { setEditingPreset(null); setEditErrors([]); }} style={{ flex: 1 }}>Cancel</Btn>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, backdropFilter: "blur(4px)" }} onClick={onClose}>
-      <div style={{ background: t.bg, border: `1px solid ${t.bdr}`, borderRadius: 12, width: "min(90vw, 640px)", maxHeight: "min(90vh, 700px)", display: "flex", flexDirection: "column", boxShadow: `0 24px 64px ${t.shadow}50` }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: t.bg, border: `1px solid ${t.bdr}`, borderRadius: 12, width: "min(90vw, 680px)", maxHeight: "min(90vh, 720px)", display: "flex", flexDirection: "column", boxShadow: `0 24px 64px ${t.shadow}50` }} onClick={e => e.stopPropagation()}>
+        {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "14px 16px", borderBottom: `1px solid ${t.bdr}`, flexShrink: 0 }}>
-          <span style={{ fontSize: 16 }}>📖</span>
-          <span style={{ fontSize: 13, fontWeight: 700, color: t.tx, flex: 1 }}>Norms Reference Gallery
-            <button onClick={() => setGuideKey("norms")}
-              style={{ background: "none", border: `1px solid ${t.tx3}55`, color: t.tx3, borderRadius: 10, width: 18, height: 18, fontSize: 10, lineHeight: "16px", textAlign: "center", cursor: "pointer", padding: 0, marginLeft: 6, verticalAlign: "middle" }} title="Guide">?</button>
+          <span style={{ fontSize: 16 }}>&#x1F4D6;</span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: t.tx, flex: 1 }}>Norms Reference
+            <button onClick={() => setGuideKey("norms")} style={{ background: "none", border: `1px solid ${t.tx3}55`, color: t.tx3, borderRadius: 10, width: 18, height: 18, fontSize: 10, lineHeight: "16px", textAlign: "center", cursor: "pointer", padding: 0, marginLeft: 6, verticalAlign: "middle" }} title="Guide">?</button>
           </span>
-          <span style={{ fontSize: 10, color: t.tx3, fontFamily: "'DM Mono',monospace" }}>{Object.values(PREDEFINED_NORMS).reduce((s, p) => s + p.norms.length, 0)} norms</span>
-          <button onClick={onClose} title="Close" style={{ background: "none", border: "none", color: t.tx3, cursor: "pointer", fontSize: 18, lineHeight: 1, padding: "0 4px" }}>×</button>
+          <span style={{ fontSize: 10, color: t.tx3, fontFamily: "'DM Mono',monospace" }}>{builtInCount} built-in{userCount > 0 ? ` + ${userCount} custom` : ""}</span>
+          <button onClick={onClose} title="Close" style={{ background: "none", border: "none", color: t.tx3, cursor: "pointer", fontSize: 18, lineHeight: 1, padding: "0 4px" }}>&times;</button>
         </div>
-        <div style={{ padding: "8px 16px", borderBottom: `1px solid ${t.bdr}44`, flexShrink: 0 }}>
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search norms by name, preset, or source..." style={{ width: "80%", padding: "8px 10px", border: `1px solid ${t.bdr}`, borderRadius: 8, background: t.surf3, color: t.tx, fontSize: 12, outline: "none" }} />
-        </div>
-        <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
-          {Object.keys(grouped).length === 0 ? (
-            <div style={{ textAlign: "center", padding: 40, color: t.tx3, fontSize: 12 }}>No norms match your search.</div>
-          ) : Object.entries(grouped).map(([key, group]) => (
-            <div key={key} style={{ marginBottom: 14, border: `1px solid ${t.bdr}`, borderRadius: 8, overflow: "hidden" }}>
-              <div style={{ padding: "8px 12px", background: t.surf2, borderBottom: `1px solid ${t.bdr}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <div><span style={{ fontSize: 11, fontWeight: 700, color: t.acc }}>{key}</span><span style={{ fontSize: 10, color: t.tx3, marginLeft: 8 }}>{group.source}</span></div>
-                <button onClick={() => { group.norms.forEach(n => onAdd(n.label, n.mean, n.sd, n.type, group.source)); }} style={{ padding: "3px 8px", borderRadius: 4, border: "none", background: t.acc + "22", color: t.acc, cursor: "pointer", fontSize: 9, fontWeight: 700 }}>Add All ({group.norms.length})</button>
-              </div>
-              <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", fontSize: 10, borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr style={{ borderBottom: `1px solid ${t.bdr}44`, background: t.surf3 }}>
-                      <th style={{ textAlign: "left", padding: "5px 10px", color: t.tx2, fontWeight: 600 }}>Label</th>
-                      <th style={{ textAlign: "right", padding: "5px 10px", color: t.tx2, fontWeight: 600 }}>Mean</th>
-                      <th style={{ textAlign: "right", padding: "5px 10px", color: t.tx2, fontWeight: 600 }}>SD</th>
-                      <th style={{ textAlign: "center", padding: "5px 10px", color: t.tx2, fontWeight: 600 }}>Type</th>
-                      <th style={{ textAlign: "right", padding: "5px 10px" }}></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {group.norms.map((n, i) => (
-                      <tr key={i} style={{ borderBottom: `1px solid ${t.bdr}33` }}>
-                        <td style={{ padding: "5px 10px", color: t.tx, fontWeight: 600, whiteSpace: "nowrap" }}>{n.label}</td>
-                        <td style={{ padding: "5px 10px", textAlign: "right", fontFamily: "'DM Mono',monospace", color: t.tx }}>{n.mean.toFixed(1)}</td>
-                        <td style={{ padding: "5px 10px", textAlign: "right", fontFamily: "'DM Mono',monospace", color: t.tx3 }}>± {n.sd.toFixed(1)}</td>
-                        <td style={{ padding: "5px 10px", textAlign: "center" }}><span style={{ background: (n.type === "angle" ? t.warn : t.ok) + "22", color: n.type === "angle" ? t.warn : t.ok, borderRadius: 3, padding: "1px 5px", fontSize: 8, fontWeight: 700 }}>{n.type}</span></td>
-                        <td style={{ padding: "5px 10px", textAlign: "right" }}>
-                          <button onClick={() => onAdd(n.label, n.mean, n.sd, n.type, group.source)} style={{ padding: "2px 7px", borderRadius: 4, border: `1px solid ${t.acc}55`, background: "transparent", color: t.acc, cursor: "pointer", fontSize: 9, fontWeight: 600, whiteSpace: "nowrap" }}>+ Add</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+        {/* Tabs */}
+        <div style={{ display: "flex", borderBottom: `1px solid ${t.bdr}`, flexShrink: 0 }}>
+          {[{ id: "browse", label: "Browse Presets" }, { id: "library", label: "My Library" }].map(tb => (
+            <button key={tb.id} onClick={() => { setTab(tb.id); setEditingPreset(null); setImportError(null); }} style={{ flex: 1, padding: "8px 12px", background: tab === tb.id ? t.surf2 : "transparent", border: "none", borderBottom: tab === tb.id ? `2px solid ${t.acc}` : "2px solid transparent", color: tab === tb.id ? t.acc : t.tx3, fontSize: 11, fontWeight: tab === tb.id ? 700 : 500, cursor: "pointer", transition: "all 0.15s" }}>{tb.label}{tb.id === "library" && userCount > 0 ? ` (${allUser.length})` : ""}</button>
           ))}
         </div>
+        {/* Search (browse only) */}
+        {tab === "browse" && <div style={{ padding: "8px 16px", borderBottom: `1px solid ${t.bdr}44`, flexShrink: 0 }}>
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name, source, or measurement..." style={{ width: "85%", padding: "8px 10px", border: `1px solid ${t.bdr}`, borderRadius: 8, background: t.surf3, color: t.tx, fontSize: 12, outline: "none" }} />
+        </div>}
+        {/* Import error */}
+        {importError && <div style={{ margin: "8px 16px 0", padding: "6px 10px", background: t.err + "22", border: `1px solid ${t.err}44`, borderRadius: 6, fontSize: 10, color: t.err, whiteSpace: "pre-wrap" }}>{importError}<button onClick={() => setImportError(null)} style={{ marginLeft: 8, background: "none", border: "none", color: t.err, cursor: "pointer" }}>&times;</button></div>}
+        {/* Browse tab */}
+        {tab === "browse" && <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
+          {filteredPresets.length === 0 ? (
+            <div style={{ textAlign: "center", padding: 40, color: t.tx3, fontSize: 12 }}>No presets match your search.</div>
+          ) : filteredPresets.map(p => (
+            <PresetTable key={p.key} preset={p} source={p.source} builtIn={p.builtIn}
+              onAddOne={(label, mean, sd, type, source) => { const existing = []; if (onAdd.__norms) existing.push(...onAdd.__norms); if (!existing.some(e => e.markupLabel === label && e.measureType === type)) onAdd(label, mean, sd, type, source); }}
+              onAddAll={() => p.norms.forEach(n => onAdd(n.label, n.mean, n.sd, n.type, p.source))}
+              onEdit={() => setEditingPreset({ ...p })}
+              onDelete={() => { if (window.confirm(`Delete "${p.name}" from your library?`)) onDeletePreset(p.id); }}
+              onExportJSON={() => downloadJSON(exportPresetJSON(p), `${p.name.replace(/\s+/g, "_")}.json`)}
+              onExportCSV={() => downloadJSON(exportPresetCSV(p), `${p.name.replace(/\s+/g, "_")}.csv`)}
+            />
+          ))}
+        </div>}
+        {/* Library tab */}
+        {tab === "library" && <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
+          <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
+            <Btn t={t} small onClick={() => setEditingPreset(_emptyPreset())} style={{ flex: 1 }}>+ New Preset</Btn>
+            <Btn t={t} small onClick={() => jsonRef.current?.click()}>Import JSON</Btn>
+            <Btn t={t} small onClick={() => csvRef.current?.click()}>Import CSV</Btn>
+            {allUser.length > 0 && <Btn t={t} small onClick={() => downloadJSON(exportLibraryJSON(allUser), "norm_library.json")}>Export All</Btn>}
+            <input ref={jsonRef} type="file" accept=".json" onChange={handleImportJSON} style={{ display: "none" }} />
+            <input ref={csvRef} type="file" accept=".csv" onChange={handleImportCSV} style={{ display: "none" }} />
+          </div>
+          {allUser.length === 0 ? (
+            <div style={{ textAlign: "center", padding: 40, color: t.tx3, fontSize: 12 }}>
+              <div style={{ marginBottom: 8, fontSize: 20 }}>&#x1F4E6;</div>
+              No custom presets yet.<br />Create one or import from a JSON/CSV file.
+            </div>
+          ) : allUser.map(p => (
+            <PresetTable key={p.id} preset={p} source={p.source} builtIn={false}
+              onAddOne={(label, mean, sd, type, source) => { const existing = []; if (onAdd.__norms) existing.push(...onAdd.__norms); if (!existing.some(e => e.markupLabel === label && e.measureType === type)) onAdd(label, mean, sd, type, source); }}
+              onAddAll={() => p.norms.forEach(n => onAdd(n.label, n.mean, n.sd, n.type, p.source))}
+              onEdit={() => setEditingPreset({ ...p })}
+              onDelete={() => { if (window.confirm(`Delete "${p.name}" from your library?`)) onDeletePreset(p.id); }}
+              onExportJSON={() => downloadJSON(exportPresetJSON(p), `${p.name.replace(/\s+/g, "_")}.json`)}
+              onExportCSV={() => downloadJSON(exportPresetCSV(p), `${p.name.replace(/\s+/g, "_")}.csv`)}
+            />
+          ))}
+        </div>}
         {guideKey && <PanelGuideModal t={t} guideKey={guideKey} onClose={() => setGuideKey(null)} />}
       </div>
     </div>
