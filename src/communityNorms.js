@@ -13,13 +13,13 @@ const CACHE_KEY = "ceph_community_norms";
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
 // ─── CONFIG — Update these to match your GitHub repo ────────────────────────
-const GITHUB_OWNER = "CephaloStudio";
-const GITHUB_REPO = "CephaloStudio Website";
+const GITHUB_OWNER = "Muhammad-Nabeel-Sh";
+const GITHUB_REPO = "CephaloStudio-Website";
 const GITHUB_BRANCH = "main";
 
 export const COMMUNITY_REPO_URL = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/${GITHUB_BRANCH}/norms/community.json`;
-const CONTRIBUTION_URL = `https://github.com/${GITHUB_OWNER}/${encodeURIComponent(GITHUB_REPO)}/issues/new?template=new-preset.yml`;
-const REPO_URL = `https://github.com/${GITHUB_OWNER}/${encodeURIComponent(GITHUB_REPO)}/tree/${GITHUB_BRANCH}/norms`;
+const CONTRIBUTION_URL = `/contribute.html`;
+const REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/tree/${GITHUB_BRANCH}/norms`;
 
 // ─── Cache ──────────────────────────────────────────────────────────────────
 

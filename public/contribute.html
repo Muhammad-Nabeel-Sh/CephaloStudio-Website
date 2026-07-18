@@ -6,38 +6,38 @@
   <title>CephaloStudio — Contribute Norm Preset</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; padding: 24px; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a22; color: #e2e8f0; min-height: 100vh; padding: 24px; }
     .container { max-width: 720px; margin: 0 auto; }
     h1 { font-size: 22px; margin-bottom: 4px; }
     .subtitle { color: #94a3b8; font-size: 13px; margin-bottom: 24px; }
-    .card { background: #1e293b; border: 1px solid #334155; border-radius: 10px; padding: 20px; margin-bottom: 16px; }
-    .card h2 { font-size: 14px; color: #38bdf8; margin-bottom: 12px; }
+    .card { background: #252530; border: 1px; border-radius: 10px; padding: 20px; margin-bottom: 16px; }
+    .card h2 { font-size: 14px; color: #a855f7; margin-bottom: 12px; }
     label { display: block; font-size: 11px; color: #94a3b8; margin-bottom: 4px; font-weight: 600; }
-    input, textarea, select { width: 100%; padding: 8px 10px; border: 1px solid #334155; border-radius: 6px; background: #0f172a; color: #e2e8f0; font-size: 13px; font-family: inherit; margin-bottom: 10px; }
-    input:focus, textarea:focus, select:focus { outline: none; border-color: #38bdf8; }
+    input, textarea, select { width: 100%; padding: 8px 10px; border: 1px; border-radius: 6px; background: #1a1a22; color: #e2e8f0; font-size: 13px; font-family: inherit; margin-bottom: 10px; }
+    input:focus, textarea:focus, select:focus { outline: none; border-color: #a855f7; }
     textarea { resize: vertical; min-height: 60px; }
     .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .row-3 { display: grid; grid-template-columns: 1fr 80px 60px 80px 32px; gap: 6px; align-items: end; }
     .norms-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    .norms-table th { text-align: left; padding: 6px 8px; color: #94a3b8; font-weight: 600; font-size: 10px; border-bottom: 1px solid #334155; }
+    .norms-table th { text-align: left; padding: 6px 8px; color: #94a3b8; font-weight: 600; font-size: 10px; border-bottom: 1px; }
     .norms-table td { padding: 4px 2px; }
     .norms-table input, .norms-table select { margin-bottom: 0; font-size: 12px; padding: 6px 8px; }
     .norms-table .remove-btn { background: none; border: none; color: #f87171; cursor: pointer; font-size: 18px; padding: 0 4px; }
     .btn { display: inline-block; padding: 8px 16px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.15s; }
-    .btn-primary { background: #38bdf8; color: #0f172a; }
-    .btn-primary:hover { background: #7dd3fc; }
+    .btn-primary { background: #451e6a; color: #e2e8f0; }
+    .btn-primary:hover { background: #633093; }
     .btn-secondary { background: #334155; color: #e2e8f0; }
     .btn-secondary:hover { background: #475569; }
-    .btn-success { background: #22c55e; color: #0f172a; }
-    .btn-success:hover { background: #4ade80; }
+    .btn-success { background: #11428b; color: #e2e8f0; }
+    .btn-success:hover { background: #1d54a6; }
     .btn-small { padding: 4px 10px; font-size: 11px; }
     .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
-    .error { background: #7f1d1d; border: 1px solid #f87171; border-radius: 6px; padding: 10px; margin-bottom: 12px; font-size: 12px; color: #fca5a5; white-space: pre-wrap; display: none; }
-    .success { background: #14532d; border: 1px solid #22c55e; border-radius: 6px; padding: 10px; margin-bottom: 12px; font-size: 12px; color: #86efac; display: none; }
-    .preview { background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 12px; margin-top: 12px; font-family: 'DM Mono', monospace; font-size: 11px; color: #94a3b8; white-space: pre-wrap; max-height: 300px; overflow-y: auto; display: none; }
+    .error { background: #cb3636; border: 1px; border-radius: 6px; padding: 10px; margin-bottom: 12px; font-size: 12px; color: #e2e8f0; white-space: pre-wrap; display: none; }
+    .success { background: #1d703e; border: 1px; border-radius: 6px; padding: 10px; margin-bottom: 12px; font-size: 12px; color: #e2e8f0; display: none; }
+    .preview { background: #1a1a22; border: 1px; border-radius: 6px; padding: 12px; margin-top: 12px; font-family: 'DM Mono', monospace; font-size: 11px; color: #94a3b8; white-space: pre-wrap; max-height: 300px; overflow-y: auto; display: none; }
     .help { font-size: 10px; color: #64748b; margin-top: -8px; margin-bottom: 10px; }
-    a { color: #38bdf8; }
+    a { color: #a855f7; }
   </style>
 </head>
 <body>
@@ -122,8 +122,8 @@
   </div>
 
   <script>
-    const REPO = "CephaloStudio/CephaloStudio Website";
-    const ISSUE_URL = "https://github.com/" + encodeURIComponent(REPO) + "/issues/new";
+    const REPO = "Muhammad-Nabeel-Sh/CephaloStudio-Website";
+    const ISSUE_URL = "https://github.com/" + REPO + "/issues/new";
     let normRows = [];
 
     function addNormRow(label, mean, sd, type) {
