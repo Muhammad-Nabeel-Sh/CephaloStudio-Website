@@ -99,7 +99,7 @@ export default function PlotlyChart({ data, layout, config, style }) {
     if (!el || !data) return;
     let cancelled = false;
 
-    import("plotly.js-dist-min").then(Plotly => {
+    import("plotly.js-basic-dist-min").then(Plotly => {
       if (cancelled || el !== ref.current) return;
       plotlyRef.current = Plotly;
       Plotly.newPlot(el, deepClone(data), enrichedLayout, {
