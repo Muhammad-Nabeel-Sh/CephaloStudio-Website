@@ -1,0 +1,24 @@
+{
+  "version": "1.0",
+  "updated": "2026-07-18T00:00:00Z",
+  "presets": [
+    {
+      "name": "Steiner",
+      "source": "Steiner, 1953 / Am J Orthod",
+      "population": "Caucasian (North American)",
+      "ageRange": "Adult",
+      "sex": "Pooled (male + female)",
+      "stratification": "Not stratified. Single adult value.",
+      "contributor": "CephaloStudio Team",
+      "norms": [
+        { "label": "SNA", "mean": 82, "sd": 2, "type": "angle" },
+        { "label": "SNB", "mean": 80, "sd": 2, "type": "angle" },
+        { "label": "ANB", "mean": 2, "sd": 2, "type": "angle" },
+        { "label": "SN-MP", "mean": 32, "sd": 2, "type": "angle" },
+        { "label": "U1-NA", "mean": 22, "sd": 2, "type": "angle" },
+        { "label": "L1-NB", "mean": 25, "sd": 2, "type": "angle" },
+        { "label": "Interincisal", "mean": 131, "sd": 5, "type": "angle" }
+      ]
+    }
+  ]
+}

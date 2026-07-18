@@ -1,0 +1,30 @@
+---
+name: Norm Preset Submission
+about: Submit a new norm preset for the community library
+title: "Norm Preset: "
+labels: norm-preset
+---
+
+## Preset Information
+
+**Name:** 
+**Source / Citation:** 
+**Population:** 
+**Age Range:** 
+**Sex:** 
+**Stratification Notes:** 
+
+## Norms
+
+| Label | Mean | SD | Type |
+|---|---|---|---|
+| | | | |
+
+Type options: `angle`, `length`, `area`, `ratio`, `value`
+
+## Checklist
+
+- [ ] Data is from a published, peer-reviewed source
+- [ ] Values have been accurately transcribed from the original publication
+- [ ] Preset name clearly identifies the analysis and population
+- [ ] Source includes author, year, and journal

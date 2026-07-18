@@ -3,6 +3,7 @@ import { uid, computeMeasurements, normDeviation, deviationColor, evalFormula, o
 import { logWarn } from "./logger.js";
 import { LUT_PRESETS, PREDEFINED, PREDEFINED_NORMS } from "./constants.js";
 import { addPreset, exportLibraryJSON, exportPresetJSON, exportPresetCSV, importLibraryJSON, importPresetCSV, validatePreset } from "./normLibrary.js";
+import { fetchCommunityNorms, installPreset, getContributionURL, getRepoURL } from "./communityNorms.js";
 import { SILHOUETTES, getSilhouettesByCategory } from "./silhouettes.js";
 import { drawMarkup } from "./markups.jsx";
 import { EXAMPLE_LIST, getExampleData } from "./examplesData.js";
@@ -1131,6 +1132,24 @@ export function NormsReferenceModal({ t, onAdd, onClose, userPresets, onSavePres
   const csvRef = useRef(null);
   const query = search.toLowerCase();
 
+  const [communityPresets, setCommunityPresets] = useState([]);
+  const [communityLoading, setCommunityLoading] = useState(false);
+  const [communityError, setCommunityError] = useState(null);
+  const [communityUpdated, setCommunityUpdated] = useState(null);
+  const installedNames = useMemo(() => new Set((userPresets || []).map(p => p.name?.toLowerCase())), [userPresets]);
+  const communityFetched = useRef(false);
+
+  function fetchCommunity(force) {
+    if (!force && communityFetched.current) return;
+    communityFetched.current = true;
+    setCommunityLoading(true);
+    fetchCommunityNorms(force).then(result => {
+      setCommunityLoading(false);
+      if (result.ok) { setCommunityPresets(result.presets); setCommunityUpdated(result.updated); setCommunityError(null); }
+      else setCommunityError(result.error);
+    });
+  }
+
   const allBuiltIn = useMemo(() => Object.entries(PREDEFINED_NORMS).map(([key, p]) => ({ key, ...p, builtIn: true })), []);
   const allUser = useMemo(() => (userPresets || []).map(p => ({ key: p.id, ...p, builtIn: false })), [userPresets]);
   const allPresets = useMemo(() => [...allBuiltIn, ...allUser], [allBuiltIn, allUser]);
@@ -1289,13 +1308,13 @@ export function NormsReferenceModal({ t, onAdd, onClose, userPresets, onSavePres
           <span style={{ fontSize: 13, fontWeight: 700, color: t.tx, flex: 1 }}>Norms Reference
             <button onClick={() => setGuideKey("norms")} style={{ background: "none", border: `1px solid ${t.tx3}55`, color: t.tx3, borderRadius: 10, width: 18, height: 18, fontSize: 10, lineHeight: "16px", textAlign: "center", cursor: "pointer", padding: 0, marginLeft: 6, verticalAlign: "middle" }} title="Guide">?</button>
           </span>
-          <span style={{ fontSize: 10, color: t.tx3, fontFamily: "'DM Mono',monospace" }}>{builtInCount} built-in{userCount > 0 ? ` + ${userCount} custom` : ""}</span>
+          <span style={{ fontSize: 10, color: t.tx3, fontFamily: "'DM Mono',monospace" }}>{builtInCount} built-in{userCount > 0 ? ` + ${userCount} custom` : ""}{communityPresets.length > 0 ? ` + ${communityPresets.length} community` : ""}</span>
           <button onClick={onClose} title="Close" style={{ background: "none", border: "none", color: t.tx3, cursor: "pointer", fontSize: 18, lineHeight: 1, padding: "0 4px" }}>&times;</button>
         </div>
         {/* Tabs */}
         <div style={{ display: "flex", borderBottom: `1px solid ${t.bdr}`, flexShrink: 0 }}>
-          {[{ id: "browse", label: "Browse Presets" }, { id: "library", label: "My Library" }].map(tb => (
-            <button key={tb.id} onClick={() => { setTab(tb.id); setEditingPreset(null); setImportError(null); }} style={{ flex: 1, padding: "8px 12px", background: tab === tb.id ? t.surf2 : "transparent", border: "none", borderBottom: tab === tb.id ? `2px solid ${t.acc}` : "2px solid transparent", color: tab === tb.id ? t.acc : t.tx3, fontSize: 11, fontWeight: tab === tb.id ? 700 : 500, cursor: "pointer", transition: "all 0.15s" }}>{tb.label}{tb.id === "library" && userCount > 0 ? ` (${allUser.length})` : ""}</button>
+          {[{ id: "browse", label: "Browse" }, { id: "community", label: "Community" }, { id: "library", label: "My Library" }].map(tb => (
+            <button key={tb.id} onClick={() => { setTab(tb.id); setEditingPreset(null); setImportError(null); if (tb.id === "community") fetchCommunity(false); }} style={{ flex: 1, padding: "8px 12px", background: tab === tb.id ? t.surf2 : "transparent", border: "none", borderBottom: tab === tb.id ? `2px solid ${t.acc}` : "2px solid transparent", color: tab === tb.id ? t.acc : t.tx3, fontSize: 11, fontWeight: tab === tb.id ? 700 : 500, cursor: "pointer", transition: "all 0.15s" }}>{tb.label}{tb.id === "library" && userCount > 0 ? ` (${allUser.length})` : ""}{tb.id === "community" && communityPresets.length > 0 ? ` (${communityPresets.length})` : ""}</button>
           ))}
         </div>
         {/* Search (browse only) */}
@@ -1318,6 +1337,72 @@ export function NormsReferenceModal({ t, onAdd, onClose, userPresets, onSavePres
               onExportCSV={() => downloadJSON(exportPresetCSV(p), `${p.name.replace(/\s+/g, "_")}.csv`)}
             />
           ))}
+        </div>}
+        {/* Community tab */}
+        {tab === "community" && <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
+          <div style={{ display: "flex", gap: 6, marginBottom: 12, alignItems: "center" }}>
+            <Btn t={t} small onClick={() => fetchCommunity(true)} disabled={communityLoading}>
+              {communityLoading ? "Loading..." : "Refresh"}
+            </Btn>
+            <span style={{ fontSize: 10, color: t.tx3, flex: 1 }}>{communityUpdated ? `Updated: ${new Date(communityUpdated).toLocaleDateString()}` : ""}</span>
+            <button onClick={() => window.open(getContributionURL(), "_blank")} style={{ padding: "3px 8px", borderRadius: 4, border: `1px solid ${t.ok}55`, background: t.ok + "11", color: t.ok, cursor: "pointer", fontSize: 9, fontWeight: 600 }}>Contribute Preset</button>
+            <button onClick={() => window.open(getRepoURL(), "_blank")} style={{ padding: "3px 8px", borderRadius: 4, border: `1px solid ${t.bdr}`, background: "transparent", color: t.tx3, cursor: "pointer", fontSize: 9 }}>Repo</button>
+          </div>
+          {communityError && <div style={{ marginBottom: 10, padding: "6px 10px", background: t.err + "22", border: `1px solid ${t.err}44`, borderRadius: 6, fontSize: 10, color: t.err }}>{communityError}</div>}
+          {communityLoading && communityPresets.length === 0 && (
+            <div style={{ textAlign: "center", padding: 40, color: t.tx3, fontSize: 12 }}>Fetching community presets...</div>
+          )}
+          {!communityLoading && communityPresets.length === 0 && !communityError && (
+            <div style={{ textAlign: "center", padding: 40, color: t.tx3, fontSize: 12 }}>
+              <div style={{ marginBottom: 8, fontSize: 20 }}>&#x1F310;</div>
+              No community presets available yet.<br />
+              <a href={getContributionURL()} target="_blank" rel="noreferrer" style={{ color: t.acc, fontSize: 11 }}>Contribute the first one</a>
+            </div>
+          )}
+          {communityPresets.map((cp, i) => {
+            const isInstalled = installedNames.has(cp.name?.toLowerCase());
+            return (
+              <div key={i} style={{ marginBottom: 14, border: `1px solid ${t.bdr}`, borderRadius: 8, overflow: "hidden" }}>
+                <div style={{ padding: "8px 12px", background: t.surf2, borderBottom: `1px solid ${t.bdr}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: t.acc }}>{cp.name}</span>
+                    <span style={{ fontSize: 8, color: t.ok, marginLeft: 4, background: t.ok + "22", borderRadius: 3, padding: "0 4px", fontWeight: 700 }}>COMMUNITY</span>
+                    <span style={{ fontSize: 10, color: t.tx3, marginLeft: 8 }}>{cp.source}</span>
+                    {cp.contributor && <span style={{ fontSize: 9, color: t.tx3, marginLeft: 4 }}>&middot; {cp.contributor}</span>}
+                  </div>
+                  <div style={{ display: "flex", gap: 4, alignItems: "center", flexShrink: 0 }}>
+                    {isInstalled ? (
+                      <span style={{ padding: "3px 8px", borderRadius: 4, fontSize: 9, fontWeight: 700, color: t.ok, background: t.ok + "22" }}>Installed</span>
+                    ) : (
+                      <button onClick={() => { const result = installPreset(cp, userPresets); if (result.ok) onSavePreset(result.preset, "add"); }} style={{ padding: "3px 8px", borderRadius: 4, border: "none", background: t.acc + "22", color: t.acc, cursor: "pointer", fontSize: 9, fontWeight: 700 }}>Install ({cp.norms?.length || 0})</button>
+                    )}
+                  </div>
+                </div>
+                {cp.norms && cp.norms.length > 0 && (
+                  <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", fontSize: 10, borderCollapse: "collapse" }}>
+                      <thead><tr style={{ borderBottom: `1px solid ${t.bdr}44`, background: t.surf3 }}>
+                        <th style={{ textAlign: "left", padding: "5px 10px", color: t.tx2, fontWeight: 600 }}>Label</th>
+                        <th style={{ textAlign: "right", padding: "5px 10px", color: t.tx2, fontWeight: 600 }}>Mean</th>
+                        <th style={{ textAlign: "right", padding: "5px 10px", color: t.tx2, fontWeight: 600 }}>SD</th>
+                        <th style={{ textAlign: "center", padding: "5px 10px", color: t.tx2, fontWeight: 600 }}>Type</th>
+                      </tr></thead>
+                      <tbody>
+                        {cp.norms.map((n, j) => (
+                          <tr key={j} style={{ borderBottom: `1px solid ${t.bdr}33` }}>
+                            <td style={{ padding: "5px 10px", color: t.tx, fontWeight: 600, whiteSpace: "nowrap" }}>{n.label}</td>
+                            <td style={{ padding: "5px 10px", textAlign: "right", fontFamily: "'DM Mono',monospace", color: t.tx }}>{Number(n.mean).toFixed(1)}</td>
+                            <td style={{ padding: "5px 10px", textAlign: "right", fontFamily: "'DM Mono',monospace", color: t.tx3 }}>&plusmn; {Number(n.sd).toFixed(1)}</td>
+                            <td style={{ padding: "5px 10px", textAlign: "center" }}><span style={{ background: (n.type === "angle" ? t.warn : t.ok) + "22", color: n.type === "angle" ? t.warn : t.ok, borderRadius: 3, padding: "1px 5px", fontSize: 8, fontWeight: 700 }}>{n.type}</span></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>}
         {/* Library tab */}
         {tab === "library" && <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
