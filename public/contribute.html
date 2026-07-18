@@ -6,7 +6,7 @@
   <title>CephaloStudio — Contribute Norm Preset</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a22; color: #e2e8f0; min-height: 100vh; padding: 24px; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #1a1a22; color: #e2e8f0; min-height: 100vh; padding: 24px; background-image: linear-gradient(rgba(51,65,85,0.12) 1px, transparent 1px), linear-gradient(90deg, rgba(51,65,85,0.12) 1px, transparent 1px); background-size: 50px 50px; }
     .container { max-width: 720px; margin: 0 auto; }
     h1 { font-size: 22px; margin-bottom: 4px; }
     .subtitle { color: #94a3b8; font-size: 13px; margin-bottom: 24px; }
@@ -158,7 +158,7 @@
       document.getElementById("normCount").textContent = "(" + normRows.length + ")";
     }
 
-    function esc(s) { return String(s || "").replace(/"/g, "&quot;"); }
+    function esc(s) { return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 
     function gatherData() {
       const name = document.getElementById("presetName").value.trim();
@@ -266,7 +266,14 @@
         labels: "norm-preset"
       });
 
-      window.open(ISSUE_URL + "?" + params.toString(), "_blank");
+      const url = ISSUE_URL + "?" + params.toString();
+      if (url.length > 8000) {
+        navigator.clipboard.writeText(buildJSON(data)).catch(() => {});
+        showError("Preset is too large for the GitHub URL (" + url.length + " chars). The JSON has been copied to your clipboard — open the issue page and paste it in.");
+        window.open(ISSUE_URL + "?title=" + encodeURIComponent("Norm Preset: " + data.name) + "&labels=norm-preset", "_blank");
+        return;
+      }
+      window.open(url, "_blank");
       showSuccess("GitHub Issue opened! Paste the JSON from the preview into the issue body if needed, then submit.");
     }
 

@@ -1331,8 +1331,7 @@ export function NormsReferenceModal({ t, onAdd, onClose, userPresets, onSavePres
             <PresetTable key={p.key} preset={p} source={p.source} builtIn={p.builtIn}
               onAddOne={(label, mean, sd, type, source) => { const existing = []; if (onAdd.__norms) existing.push(...onAdd.__norms); if (!existing.some(e => e.markupLabel === label && e.measureType === type)) onAdd(label, mean, sd, type, source); }}
               onAddAll={() => p.norms.forEach(n => onAdd(n.label, n.mean, n.sd, n.type, p.source))}
-              onEdit={() => setEditingPreset({ ...p })}
-              onDelete={() => { if (window.confirm(`Delete "${p.name}" from your library?`)) onDeletePreset(p.id); }}
+              {...(!p.builtIn ? { onEdit: () => setEditingPreset({ ...p }), onDelete: () => { if (window.confirm(`Delete "${p.name}" from your library?`)) onDeletePreset(p.id); } } : {})}
               onExportJSON={() => downloadJSON(exportPresetJSON(p), `${p.name.replace(/\s+/g, "_")}.json`)}
               onExportCSV={() => downloadJSON(exportPresetCSV(p), `${p.name.replace(/\s+/g, "_")}.csv`)}
             />

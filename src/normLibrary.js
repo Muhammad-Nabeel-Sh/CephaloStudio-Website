@@ -42,8 +42,6 @@ export function updatePreset(id, patch) {
   return { ok: true, patch: clean };
 }
 
-export function deletePreset(id) { return id; }
-
 // ─── Validation ─────────────────────────────────────────────────────────────
 
 export function validatePreset(p) {
