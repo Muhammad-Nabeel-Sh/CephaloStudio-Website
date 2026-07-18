@@ -76,12 +76,12 @@ function RelDiagram({ type }) {
   const light = color + "22";
   const labels = {
     intra: { title: "Intra-Observer", desc: "Same rater, repeat sessions", occ1: "Occasion 1", occ2: "Occasion 2 (2 weeks later)" },
-    inter: { title: "Inter-Observer", desc: "Different raters, same session", rater1: "Rater 1 (Dr. Smith)", rater2: "Rater 2 (Dr. Jones)" },
+    inter: { title: "Inter-Observer", desc: "Different raters, same session", rater1: "Rater 1 (Dr. Muhammad)", rater2: "Rater 2 (Dr. Abdullah)" },
     method: { title: "Method Comparison", desc: "Same case, two methods", m1: "Digital Tracing", m2: "Manual Tracing" },
   };
   const l = labels[type] || labels.intra;
   return (
-    <svg viewBox="0 0 640 260" style={{ width: "100%", maxWidth: 640, height: "auto", display: "block" }}>
+    <svg viewBox="0 0 640 260" style={{ width: "95%", height: "auto", display: "block" }}>
       <text x="320" y="22" textAnchor="middle" fill={color} fontSize="13" fontWeight="700" fontFamily="sans-serif">{l.title}</text>
       <text x="320" y="38" textAnchor="middle" fill={color + "cc"} fontSize="10" fontFamily="sans-serif">{l.desc}</text>
 
@@ -95,11 +95,11 @@ function RelDiagram({ type }) {
           <line x1="320" y1="104" x2="185" y2="134" stroke={color + "88"} strokeWidth="1.5" markerEnd="url(#arr)" />
           <rect x="55" y="130" width="180" height="48" rx="6" fill={light} stroke={color} strokeWidth="1.5" />
           <text x="145" y="150" textAnchor="middle" fill={color} fontSize="11" fontWeight="600" fontFamily="sans-serif">Session A ({l.occ1})</text>
-          <text x="145" y="168" textAnchor="middle" fill={color + "cc"} fontSize="9.5" fontFamily="sans-serif">Dr. X places marks</text>
+          <text x="145" y="168" textAnchor="middle" fill={color + "cc"} fontSize="9.5" fontFamily="sans-serif">Dr. Muhammad places marks</text>
           <line x1="320" y1="104" x2="455" y2="134" stroke={color + "88"} strokeWidth="1.5" markerEnd="url(#arr)" />
           <rect x="385" y="130" width="220" height="48" rx="6" fill={light} stroke={color} strokeWidth="1.5" />
           <text x="495" y="150" textAnchor="middle" fill={color} fontSize="11" fontWeight="600" fontFamily="sans-serif">Session B ({l.occ2})</text>
-          <text x="495" y="168" textAnchor="middle" fill={color + "cc"} fontSize="9.5" fontFamily="sans-serif">Dr. X re-places marks</text>
+          <text x="495" y="168" textAnchor="middle" fill={color + "cc"} fontSize="9.5" fontFamily="sans-serif">Dr. Muhammad re-places marks</text>
           <line x1="145" y1="178" x2="145" y2="195" stroke={color + "88"} strokeWidth="1.5" />
           <line x1="495" y1="178" x2="495" y2="195" stroke={color + "88"} strokeWidth="1.5" />
           <line x1="145" y1="198" x2="495" y2="198" stroke={color + "88"} strokeWidth="1.5" />
@@ -158,7 +158,7 @@ function CompDiagram({ type }) {
   const color = "#f472b6";
   const light = color + "22";
   return (
-    <svg viewBox="0 0 640 260" style={{ width: "100%", maxWidth: 640, height: "auto", display: "block" }}>
+    <svg viewBox="0 0 640 260" style={{ width: "95%", height: "auto", display: "block" }}>
       <text x="320" y="22" textAnchor="middle" fill={color} fontSize="13" fontWeight="700" fontFamily="sans-serif">
         {type === "independent" ? "Independent Groups Design" : "Paired / Repeated Measures Design"}
       </text>
@@ -193,9 +193,9 @@ function CompDiagram({ type }) {
           <text x="320" y="122" textAnchor="middle" fill={color} fontSize="10" fontWeight="600" fontFamily="sans-serif">Independent t-test</text>
           <text x="320" y="148" textAnchor="middle" fill={color + "cc"} fontSize="9" fontFamily="sans-serif">or Mann-Whitney U</text>
 
-          <text x="320" y="200" textAnchor="middle" fill={color} fontSize="10" fontWeight="600" fontFamily="sans-serif">Tests whether Mean₁ − Mean₂ ≠ 0</text>
-          <text x="320" y="215" textAnchor="middle" fill={color + "cc"} fontSize="9" fontFamily="sans-serif">Assumes: independence, normality (or non-parametric fallback)</text>
-          <text x="320" y="230" textAnchor="middle" fill={color + "cc"} fontSize="9" fontFamily="sans-serif">Also: Levene's test for equal variance → Welch's t-test if violated</text>
+          <text x="320" y="220" textAnchor="middle" fill={color} fontSize="10" fontWeight="600" fontFamily="sans-serif">Tests whether Mean₁ − Mean₂ ≠ 0</text>
+          <text x="320" y="235" textAnchor="middle" fill={color + "cc"} fontSize="9" fontFamily="sans-serif">Assumes: independence, normality (or non-parametric fallback)</text>
+          <text x="320" y="250" textAnchor="middle" fill={color + "cc"} fontSize="9" fontFamily="sans-serif">Also: Levene's test for equal variance → Welch's t-test if violated</text>
         </>
       ) : (
         <>
@@ -211,27 +211,27 @@ function CompDiagram({ type }) {
           <line x1="240" y1="80" x2="320" y2="80" stroke={color + "88"} strokeWidth="1.5" markerEnd="url(#arrC)" />
           <text x="280" y="73" textAnchor="middle" fill={color} fontSize="9" fontWeight="600" fontFamily="sans-serif">Time 1</text>
           {/* Time 1 box */}
-          <rect x="320" y="55" width="130" height="50" rx="6" fill={light} stroke={color} strokeWidth="1.5" />
-          <text x="385" y="75" textAnchor="middle" fill={color} fontSize="11" fontWeight="600" fontFamily="sans-serif">Pre-treatment</text>
-          <text x="385" y="93" textAnchor="middle" fill={color + "cc"} fontSize="9.5" fontFamily="sans-serif">Measure once</text>
+          <rect x="330" y="55" width="150" height="50" rx="6" fill={light} stroke={color} strokeWidth="1.5" />
+          <text x="405" y="75" textAnchor="middle" fill={color} fontSize="11" fontWeight="600" fontFamily="sans-serif">Pre-treatment</text>
+          <text x="405" y="93" textAnchor="middle" fill={color + "cc"} fontSize="9.5" fontFamily="sans-serif">Measure once</text>
 
           {/* Arrow to Time 2 */}
           <line x1="240" y1="160" x2="320" y2="160" stroke={color + "88"} strokeWidth="1.5" markerEnd="url(#arrC)" />
           <text x="280" y="153" textAnchor="middle" fill={color} fontSize="9" fontWeight="600" fontFamily="sans-serif">Time 2</text>
           {/* Time 2 box */}
-          <rect x="320" y="135" width="130" height="50" rx="6" fill={light} stroke={color} strokeWidth="1.5" />
-          <text x="385" y="155" textAnchor="middle" fill={color} fontSize="11" fontWeight="600" fontFamily="sans-serif">Post-treatment</text>
-          <text x="385" y="173" textAnchor="middle" fill={color + "cc"} fontSize="9.5" fontFamily="sans-serif">Measure again (same subjects)</text>
+          <rect x="330" y="135" width="150" height="50" rx="6" fill={light} stroke={color} strokeWidth="1.5" />
+          <text x="405" y="155" textAnchor="middle" fill={color} fontSize="11" fontWeight="600" fontFamily="sans-serif">Post-treatment</text>
+          <text x="405" y="173" textAnchor="middle" fill={color + "cc"} fontSize="9.5" fontFamily="sans-serif">Measure again (same subjects)</text>
 
           {/* Difference arrow */}
           <line x1="385" y1="105" x2="385" y2="135" stroke={color + "88"} strokeWidth="1.5" markerEnd="url(#arrC)" />
           <text x="400" y="122" textAnchor="middle" fill={color} fontSize="9" fontWeight="600" fontFamily="sans-serif">Difference scores</text>
 
           {/* Analysis */}
-          <line x1="450" y1="130" x2="530" y2="130" stroke={color + "88"} strokeWidth="1.5" markerEnd="url(#arrC)" />
-          <rect x="520" y="105" width="100" height="50" rx="6" fill={light} stroke={color} strokeWidth="1.5" />
-          <text x="570" y="125" textAnchor="middle" fill={color} fontSize="10" fontWeight="600" fontFamily="sans-serif">Paired t-test</text>
-          <text x="570" y="142" textAnchor="middle" fill={color + "cc"} fontSize="9" fontFamily="sans-serif">or Wilcoxon</text>
+          <line x1="490" y1="130" x2="530" y2="130" stroke={color + "88"} strokeWidth="1.5" markerEnd="url(#arrC)" />
+          <rect x="540" y="105" width="120" height="50" rx="6" fill={light} stroke={color} strokeWidth="1.5" />
+          <text x="590" y="125" textAnchor="middle" fill={color} fontSize="10" fontWeight="600" fontFamily="sans-serif">Paired t-test</text>
+          <text x="590" y="142" textAnchor="middle" fill={color + "cc"} fontSize="9" fontFamily="sans-serif">or Wilcoxon</text>
         </>
       )}
       <defs><marker id="arrC" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill={color + "88"} /></marker></defs>
@@ -244,7 +244,7 @@ function LongDiagram() {
   const color = "#fb923c";
   const light = color + "22";
   return (
-    <svg viewBox="0 0 640 260" style={{ width: "100%", maxWidth: 640, height: "auto", display: "block" }}>
+    <svg viewBox="0 0 640 260" style={{ width: "95%", height: "auto", display: "block" }}>
       <text x="320" y="22" textAnchor="middle" fill={color} fontSize="13" fontWeight="700" fontFamily="sans-serif">Longitudinal / Growth Tracking Design</text>
       <text x="320" y="38" textAnchor="middle" fill={color + "cc"} fontSize="10" fontFamily="sans-serif">Same subjects, repeated measurements across time</text>
 
@@ -307,7 +307,7 @@ function CorrDiagram({ type }) {
     ? [[80,50],[100,70],[120,85],[140,105],[160,120],[180,140],[200,155],[220,175],[240,190],[260,210]]
     : [[100,60],[120,190],[140,130],[160,80],[180,170],[200,100],[220,150],[240,110],[260,180],[280,140]];
   return (
-    <svg viewBox="0 0 640 260" style={{ width: "100%", maxWidth: 640, height: "auto", display: "block" }}>
+    <svg viewBox="0 0 640 260" style={{ width: "95%", height: "auto", display: "block" }}>
       <text x="320" y="22" textAnchor="middle" fill={color} fontSize="13" fontWeight="700" fontFamily="sans-serif">Correlation Analysis</text>
       <text x="320" y="38" textAnchor="middle" fill={color + "cc"} fontSize="10" fontFamily="sans-serif">{label}</text>
       {/* Scatter axes */}
@@ -342,14 +342,12 @@ function DiagDiagram() {
   const color = "#f59e0b";
   const light = color + "22";
   return (
-    <svg viewBox="0 0 640 260" style={{ width: "100%", maxWidth: 640, height: "auto", display: "block" }}>
+    <svg viewBox="0 0 640 260" style={{ width: "95%", height: "auto", display: "block" }}>
       <text x="320" y="22" textAnchor="middle" fill={color} fontSize="13" fontWeight="700" fontFamily="sans-serif">Diagnostic Performance Analysis</text>
-      <text x="320" y="38" textAnchor="middle" fill={color + "cc"} fontSize="10" fontFamily="sans-serif">ROC curve — Sensitivity vs 1−Specificity</text>
-
       {/* ROC axes */}
       <line x1="80" y1="40" x2="80" y2="220" stroke={color + "88"} strokeWidth="1.5" />
       <line x1="60" y1="220" x2="380" y2="220" stroke={color + "88"} strokeWidth="1.5" />
-      <text x="60" y="35" textAnchor="end" fill={color + "cc"} fontSize="9" fontFamily="sans-serif">Sensitivity (TPR)</text>
+      <text x="70" y="35" textAnchor="end" fill={color + "cc"} fontSize="9" fontFamily="sans-serif">Sensitivity (TPR)</text>
       <text x="380" y="243" textAnchor="end" fill={color + "cc"} fontSize="9" fontFamily="sans-serif">1 − Specificity (FPR)</text>
       {/* Diagonal reference */}
       <line x1="80" y1="220" x2="380" y2="40" stroke={color + "44"} strokeWidth="1" strokeDasharray="4,4" />
@@ -360,9 +358,9 @@ function DiagDiagram() {
       <text x="230" y="185" textAnchor="middle" fill={color + "cc"} fontSize="9" fontFamily="sans-serif">[95% CI: 0.81, 0.93]</text>
 
       {/* Confusion matrix */}
-      <rect x="420" y="50" width="190" height="160" rx="8" fill={light} stroke={color} strokeWidth="1.5" />
-      <text x="515" y="70" textAnchor="middle" fill={color} fontSize="11" fontWeight="600" fontFamily="sans-serif">Confusion Matrix</text>
-      <line x1="435" y1="80" x2="595" y2="80" stroke={color + "44"} strokeWidth="0.5" />
+      <rect x="420" y="50" width="170" height="170" rx="8" fill={light} stroke={color} strokeWidth="1.5" />
+      <text x="505" y="70" textAnchor="middle" fill={color} fontSize="11" fontWeight="600" fontFamily="sans-serif">Confusion Matrix</text>
+      <line x1="435" y1="80" x2="570" y2="80" stroke={color + "44"} strokeWidth="0.5" />
       {/* Matrix grid */}
       <rect x="450" y="95" width="45" height="25" rx="3" fill={color + "18"} stroke={color + "88"} strokeWidth="1" />
       <text x="472" y="112" textAnchor="middle" fill={color} fontSize="9" fontWeight="600" fontFamily="sans-serif">TP</text>
@@ -372,9 +370,9 @@ function DiagDiagram() {
       <text x="472" y="147" textAnchor="middle" fill={color} fontSize="9" fontWeight="600" fontFamily="sans-serif">FN</text>
       <rect x="505" y="130" width="45" height="25" rx="3" fill={color + "18"} stroke={color + "88"} strokeWidth="1" />
       <text x="527" y="147" textAnchor="middle" fill={color} fontSize="9" fontWeight="600" fontFamily="sans-serif">TN</text>
-      <text x="515" y="175" textAnchor="middle" fill={color + "cc"} fontSize="9" fontFamily="sans-serif">Sens = TP / (TP+FN)</text>
-      <text x="515" y="190" textAnchor="middle" fill={color + "cc"} fontSize="9" fontFamily="sans-serif">Spec = TN / (TN+FP)</text>
-      <text x="515" y="205" textAnchor="middle" fill={color + "cc"} fontSize="9" fontFamily="sans-serif">Youden's J = Sens+Spec−1</text>
+      <text x="505" y="175" textAnchor="middle" fill={color + "cc"} fontSize="9" fontFamily="sans-serif">Sens = TP / (TP+FN)</text>
+      <text x="505" y="190" textAnchor="middle" fill={color + "cc"} fontSize="9" fontFamily="sans-serif">Spec = TN / (TN+FP)</text>
+      <text x="505" y="205" textAnchor="middle" fill={color + "cc"} fontSize="9" fontFamily="sans-serif">Youden's J = Sens+Spec−1</text>
 
       <defs><marker id="arrE" viewBox="0 0 8 8" refX="6" refY="4" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill={color + "88"} /></marker></defs>
     </svg>
