@@ -11,6 +11,7 @@ import ToolBtn from "./ToolBtn.jsx";
 import { drawMarkup, drawInProgress, drawScaleBar, drawLUTLegend, drawSnapIndicator, drawDisplacementVectors, drawAirwayOverlay, hitTest, getSilhouetteHandlesImage } from "./markups.jsx";
 import { MarkupsPanel, MeasurementsPanel, FormulasPanel, ImagePanel, LayersPanel, MarkupProps, TemplatesPanel, SilhouettesPanel, ExamplesPanel } from "./panels.jsx";
 import { loadNormLibrary, saveNormLibrary } from "./normLibrary.js";
+import { procrustesAlign, structuralAlign, REFERENCE_PLANES } from "./research/superimposition.js";
 import { Modal } from "./panels/Modal.jsx";
 import PanelGuideModal from "./panels/PanelGuideModal.jsx";
 import HomePage from "./panels/HomePage.jsx";
@@ -338,7 +339,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
 
   const{ui,dispatch,setSelectedId,setActiveTool,setRightPanel,
     setPlacingQueue,setShowMobilePanel,
-    setShowLUT,setShowScaleBar,setShowHistogram,setShowDisplacement,setDisplacementOverlay,setRefLandmark1,setRefLandmark2,setOverlayBlend}=useWorkspaceStore();
+    setShowLUT,setShowScaleBar,setShowHistogram,setShowDisplacement,setDisplacementOverlay,setRefLandmark1,setRefLandmark2,setOverlayBlend,setOverlayAlignMode}=useWorkspaceStore();
   const{zoom,selectedId,selectedIds,replacingId,currentDraw,
     activeTool,snapEnabled,showScaleBar,showDefTooltips,
     showLUT,showHistogram,showAnnotations,annotationSize,showDisplacement,rightPanel,showCalib,pendingRuler,
@@ -348,7 +349,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     isMobile,showMobilePanel,mobileToolsExpanded,
     toolbarPos,toolbarDragging,rightPanelWidth,rightPanelResizing,
     spotlightMode,
-    displacementOverlay,refLandmark1,refLandmark2,overlayBlend}=ui;
+    displacementOverlay,refLandmark1,refLandmark2,overlayBlend,overlayAlignMode}=ui;
   const [compareSession, setCompareSession] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
   const [showGrid, setShowGrid] = useState(false);
@@ -707,23 +708,39 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       ctx.save();
       ctx.globalAlpha = overlayBlend;
       const compMarkups = compareSession.markups || [];
-      // Structural reference alignment
-      if(refLandmark1 && refLandmark2){
+      let tf = null;
+      if(overlayAlignMode === "procrustes"){
+        const srcPts = [], dstPts = [];
+        const seen = new Set();
+        compMarkups.forEach(m => {
+          if(m.type !== "point" || !m.label || seen.has(m.label)) return;
+          seen.add(m.label);
+          const match = markups.find(o => o.type === "point" && o.label === m.label);
+          if(match && match.points[0] && m.points[0]) {
+            dstPts.push(m.points[0]);
+            srcPts.push(match.points[0]);
+          }
+        });
+        if(srcPts.length >= 2) tf = procrustesAlign(dstPts, srcPts);
+      } else if(overlayAlignMode === "structural" && refLandmark1){
+        const plane = REFERENCE_PLANES.find(p => p.id === refLandmark1) || REFERENCE_PLANES[0];
+        const srcPts = [markups.find(m => m.type === "point" && m.label === plane.pt1)?.points?.[0], markups.find(m => m.type === "point" && m.label === plane.pt2)?.points?.[0]].filter(Boolean);
+        const dstPts = [compMarkups.find(m => m.type === "point" && m.label === plane.pt1)?.points?.[0], compMarkups.find(m => m.type === "point" && m.label === plane.pt2)?.points?.[0]].filter(Boolean);
+        if(srcPts.length >= 2 && dstPts.length >= 2) tf = structuralAlign(dstPts, srcPts);
+      } else if(overlayAlignMode === "2pt" && refLandmark1 && refLandmark2){
         const p1a = vpts(markups.find(m => m.type === "point" && m.label === refLandmark1)||{});
         const p1b = vpts(markups.find(m => m.type === "point" && m.label === refLandmark2)||{});
         const p2a = vpts(compMarkups.find(m => m.type === "point" && m.label === refLandmark1)||{});
         const p2b = vpts(compMarkups.find(m => m.type === "point" && m.label === refLandmark2)||{});
-        if(p1a.length && p1b.length && p2a.length && p2b.length){
-          const tf = alignTwoPoints(p2a[0], p2b[0], p1a[0], p1b[0]);
-          ctx.translate(pan.x, pan.y);
-          ctx.scale(zoom, zoom);
-          ctx.translate(tf.tx, tf.ty);
-          ctx.rotate(tf.rot);
-          ctx.scale(tf.scale, tf.scale);
-          compMarkups.forEach(m => drawMarkup(ctx, m, 1, {x:0,y:0}, drawCalibration, null, t, false, canvasSize.current, angleMode, false, annotationSize, null));
-        } else {
-          compMarkups.forEach(m => drawMarkup(ctx, m, zoom, pan, drawCalibration, null, t, false, canvasSize.current, angleMode, false, annotationSize, null));
-        }
+        if(p1a.length && p1b.length && p2a.length && p2b.length) tf = alignTwoPoints(p2a[0], p2b[0], p1a[0], p1b[0]);
+      }
+      if(tf && !tf.error){
+        ctx.translate(pan.x, pan.y);
+        ctx.scale(zoom, zoom);
+        ctx.translate(tf.tx, tf.ty);
+        ctx.rotate(tf.rot);
+        ctx.scale(tf.scale, tf.scale);
+        compMarkups.forEach(m => drawMarkup(ctx, m, 1, {x:0,y:0}, drawCalibration, null, t, false, canvasSize.current, angleMode, false, annotationSize, null));
       } else {
         compMarkups.forEach(m => drawMarkup(ctx, m, zoom, pan, drawCalibration, null, t, false, canvasSize.current, angleMode, false, annotationSize, null));
       }
@@ -875,7 +892,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       ctx.fillStyle=t.tx2;ctx.fillText(coordTxt,30,H-14);
     }
     ctx.restore(); // F2: end DPR scale
-  },[markups,selectedId,selectedIds,zoom,sessionImage,calibration,t,currentDraw,snapEnabled,showScaleBar,showDefTooltips,showLUT,showAnnotations,annotationSize,showDisplacement,compareSession,getProcessed,angleMode,lutMode,lutInvert,activeTool,displacementOverlay,overlayBlend,refLandmark1,refLandmark2,showCalib,pendingRuler,showGrid]);
+  },[markups,selectedId,selectedIds,zoom,sessionImage,calibration,t,currentDraw,snapEnabled,showScaleBar,showDefTooltips,showLUT,showAnnotations,annotationSize,showDisplacement,compareSession,getProcessed,angleMode,lutMode,lutInvert,activeTool,displacementOverlay,overlayBlend,overlayAlignMode,refLandmark1,refLandmark2,showCalib,pendingRuler,showGrid]);
 
   useEffect(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});},[redraw]);
   const scheduleRedraw=useCallback(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});},[redraw]);
@@ -1797,7 +1814,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
                   {rightPanel==="formulas"&&<FormulasPanel formulas={formulas} t={t} scope={measScope} onAdd={()=>{dispatch({type:"SET",payload:{editFormulaId:null}});dispatch({type:"SET",payload:{showFormulaEditor:true}});}} onEdit={id=>{dispatch({type:"SET",payload:{editFormulaId:id}});dispatch({type:"SET",payload:{showFormulaEditor:true}});}} onDelete={id=>updSession({formulas:formulas.filter(f=>f.id!==id)})} pinnedFormulas={pinnedFormulas} onPinFormula={id=>setPinnedFormulas(s=>{const n=new Set(s);if(n.has(id))n.delete(id);else n.add(id);return n;})}/>}
                   {rightPanel==="image"&&<ImagePanel t={t} processing={processing} setProcessing={p=>updSession({processing:p})} lutMode={lutMode} setLutMode={m=>updSession({lutMode:m})} lutInvert={lutInvert} setLutInvert={v=>updSession({lutInvert:v})} showLUT={showLUT} setShowLUT={setShowLUT} showScaleBar={showScaleBar} setShowScaleBar={setShowScaleBar} calibration={calibration} onOpenCalib={()=>dispatch({type:"SET",payload:{showCalib:true}})} onReset={()=>updSession({processing:{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},lutMode:"gray",lutInvert:false})} onShowHist={()=>setShowHistogram(v=>!v)} showHistogram={showHistogram}/>}
                   {rightPanel==="layers"&&<LayersPanel t={t} images={sessionImage} onUpdateImages={imgs=>updSession({images:imgs})} onAddImage={()=>stackImgRef.current?.click()} onShowAlign={()=>{}} onShowTransform={()=>{}}/>}
-                  {rightPanel==="sessions"&&<SessionsPanel project={project} t={t} onUpdateProject={onUpdateProject} activeSession={activeSession} setActiveSession={id=>onUpdateProject({...project,activeSessionId:id})} onExportTemplate={v=>exportCepht({name:`${project.name}`,projection:project.projection,markups:v.markups||[],formulas:v.formulas||[],norms:v.norms||[]})} compareSession={compareSession} setCompareSession={setCompareSession} showDisplacement={showDisplacement} setShowDisplacement={setShowDisplacement} displacementOverlay={displacementOverlay} setDisplacementOverlay={setDisplacementOverlay} refLandmark1={refLandmark1} setRefLandmark1={setRefLandmark1} refLandmark2={refLandmark2} setRefLandmark2={setRefLandmark2} overlayBlend={overlayBlend} setOverlayBlend={setOverlayBlend} calibration={calibration} formatAngle={formatAngle}/>}
+                  {rightPanel==="sessions"&&<SessionsPanel project={project} t={t} onUpdateProject={onUpdateProject} activeSession={activeSession} setActiveSession={id=>onUpdateProject({...project,activeSessionId:id})} onExportTemplate={v=>exportCepht({name:`${project.name}`,projection:project.projection,markups:v.markups||[],formulas:v.formulas||[],norms:v.norms||[]})} compareSession={compareSession} setCompareSession={setCompareSession} showDisplacement={showDisplacement} setShowDisplacement={setShowDisplacement} displacementOverlay={displacementOverlay} setDisplacementOverlay={setDisplacementOverlay} refLandmark1={refLandmark1} setRefLandmark1={setRefLandmark1} refLandmark2={refLandmark2} setRefLandmark2={setRefLandmark2} overlayBlend={overlayBlend} setOverlayBlend={setOverlayBlend} overlayAlignMode={overlayAlignMode} setOverlayAlignMode={setOverlayAlignMode} calibration={calibration} formatAngle={formatAngle}/>}
                   {rightPanel==="research"&&<ResearchPanel t={t} project={project} onUpdateProject={onUpdateProject} calibration={calibration}/>}
                   {rightPanel==="interpretation"&&<InterpretationPanel allMeas={allMeas} norms={norms} t={t} formatAngle={formatAngle} calibration={calibration}/>}
                   {rightPanel==="silhouettes"&&<SilhouettesPanel t={t} onInsert={(silhouetteType) => {

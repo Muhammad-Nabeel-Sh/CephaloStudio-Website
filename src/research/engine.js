@@ -4,6 +4,7 @@ import { runComparativeAll } from "./comparative.js";
 import { runLongitudinalAll } from "./longitudinal.js";
 import { runCorrelationAll, runRegression, runLogisticRegression } from "./correlation.js";
 import { runDiagnosticAll } from "./diagnostic.js";
+import { runSuperimpositionAll } from "./superimposition.js";
 import { logError } from "../logger.js";
 
 // `onProgress` is an optional coarse-grained callback (fraction 0..1, label).
@@ -51,6 +52,10 @@ export function runStudy(study, sessions, calibration, onProgress) {
       case "diagnostic":
         prog(0.2, "diagnostic");
         results = runDiagnosticAll(sessions, config, calibration);
+        break;
+      case "superimposition":
+        prog(0.2, "superimposition");
+        results = runSuperimpositionAll(sessions, config, calibration);
         break;
 
       default:

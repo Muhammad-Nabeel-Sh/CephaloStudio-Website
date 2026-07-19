@@ -47,6 +47,7 @@ export const INITIAL_UI = {
   refLandmark1: "",
   refLandmark2: "",
   overlayBlend: 0.5,
+  overlayAlignMode: "2pt",
 
 };
 
@@ -194,6 +195,10 @@ export function useWorkspaceStore() {
     (v) => dispatch({ type: Actions.UI_SET, payload: { overlayBlend: typeof v === "function" ? v(ui.overlayBlend) : v } }),
     [ui.overlayBlend]
   );
+  const setOverlayAlignMode = useCallback(
+    (v) => dispatch({ type: Actions.UI_SET, payload: { overlayAlignMode: typeof v === "function" ? v(ui.overlayAlignMode) : v } }),
+    [ui.overlayAlignMode]
+  );
 
   return {
     ui,
@@ -218,5 +223,6 @@ export function useWorkspaceStore() {
     setRefLandmark1,
     setRefLandmark2,
     setOverlayBlend,
+    setOverlayAlignMode,
   };
 }

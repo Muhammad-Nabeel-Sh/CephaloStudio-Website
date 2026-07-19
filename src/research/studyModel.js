@@ -7,6 +7,7 @@ export const STUDY_TYPES = [
   { id: "longitudinal", name: "Longitudinal",                  icon: SI + "M120-200v-80h220v80H120Zm0-160v-80h360v80H120Zm0-160v-80h480v80H120Zm0-160v-80h600v80H120Zm600 480-56-56 104-104H520v-80h248L664-504l56-56 200 200-200 200Z\"/></svg>",  desc: "Growth tracking, change scores",                 color: "#fb923c", needsGroups: false },
   { id: "correlation",  name: "Correlation",                   icon: SI + "M440-280H280q-83 0-141.5-58.5T80-480q0-83 58.5-141.5T280-680h160v80H280q-50 0-85 35t-35 85q0 50 35 85t85 35h160v80ZM320-440v-80h320v80H320Zm200 160v-80h160q50 0 85-35t35-85q0-50-35-85t-85-35H520v-80h160q83 0 141.5 58.5T880-480q0 83-58.5 141.5T680-280H520Z\"/></svg>",  desc: "Pearson/Spearman, regression",                   color: "#a78bfa", needsGroups: false },
   { id: "diagnostic",   name: "Diagnostic",                    icon: SI + "M420-120v-300H120v-120h300v-300h120v300h300v120H540v300H420Z\"/></svg>",  desc: "Sensitivity, specificity, ROC",                  color: "#f59e0b", needsGroups: true  },
+  { id: "superimposition", name: "Superimposition / Growth",  icon: SI + "M480-80q-50 0-85-35t-35-85q0-49 33-82t82-34h4q-7-18-10.5-37T468-374q0-56 35-99t92-43q18 0 35 3.5t35 10.5q7-18 10.5-37t10.5-37H680q-7 18-10.5 37T659-529q0 56-35 99t-92 43q-18 0-35-3.5T497-395q-7 18-10.5 37T476-321h-4q-49 0-82.5 33.5T356-208q0 49 33.5 84.5T475-88l5 8Z\"/></svg>", desc: "T1-on-T2 Procrustes/structural overlay, displacement", color: "#e879f9", needsGroups: false },
 ];
 
 function uid() {
@@ -71,6 +72,13 @@ export function mkStudy(type, opts = {}) {
     base.config.sphericityCorrection = opts.config?.sphericityCorrection || "greenhouse-geisser";
     base.config.modelType = opts.config?.modelType || "rm_anova";
     base.config.minTimeSeparation = opts.config?.minTimeSeparation ?? 30;
+  }
+
+  if (type === "superimposition") {
+    base.config.baseSessionId = opts.config?.baseSessionId || "";
+    base.config.compareSessionId = opts.config?.compareSessionId || "";
+    base.config.method = opts.config?.method || "procrustes";
+    base.config.referencePlane = opts.config?.referencePlane || "SN";
   }
 
   return base;

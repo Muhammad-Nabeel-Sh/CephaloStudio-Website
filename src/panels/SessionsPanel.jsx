@@ -14,6 +14,7 @@ export default function SessionsPanel({
   refLandmark1, setRefLandmark1,
   refLandmark2, setRefLandmark2,
   overlayBlend, setOverlayBlend,
+  overlayAlignMode, setOverlayAlignMode,
 }) {
   const [newName, setNewName] = useState("");
   const [showBatchImport, setShowBatchImport] = useState(false);
@@ -194,23 +195,51 @@ export default function SessionsPanel({
                     {displacementOverlay && (
                       <div style={{ marginBottom: 8, padding: 8, borderRadius: 6, background: t.surf3, border: `1px solid ${t.bdr}44` }}>
                         <div style={{ fontSize: 10, color: t.tx2, marginBottom: 6 }}>Alignment</div>
-                        <div style={{ marginBottom: 6 }}>
-                          <div style={{ fontSize: 9, color: t.tx3, marginBottom: 2 }}>Anchor pt 1</div>
-                          <select value={refLandmark1 || ""} onChange={e => setRefLandmark1(e.target.value || null)}
-                            style={{ width: "100%", fontSize: 10, padding: "3px 5px", borderRadius: 4, border: `1px solid ${t.bdr}`, background: t.surf2, color: t.tx, fontFamily: "inherit" }}>
-                            <option value="">Auto</option>
-                            {uniquePointLabels.map(l => <option key={l} value={l}>{l}</option>)}
-                          </select>
+                        <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+                          {[{id:"2pt",label:"2-Point"},{id:"procrustes",label:"Procrustes"},{id:"structural",label:"Structural"}].map(m => (
+                            <Btn key={m.id} t={t} small active={overlayAlignMode === m.id} onClick={() => setOverlayAlignMode(m.id)}>{m.label}</Btn>
+                          ))}
                         </div>
+                        {overlayAlignMode === "2pt" && (
+                          <>
+                            <div style={{ marginBottom: 6 }}>
+                              <div style={{ fontSize: 9, color: t.tx3, marginBottom: 2 }}>Anchor pt 1</div>
+                              <select value={refLandmark1 || ""} onChange={e => setRefLandmark1(e.target.value || null)}
+                                style={{ width: "100%", fontSize: 10, padding: "3px 5px", borderRadius: 4, border: `1px solid ${t.bdr}`, background: t.surf2, color: t.tx, fontFamily: "inherit" }}>
+                                <option value="">Auto</option>
+                                {uniquePointLabels.map(l => <option key={l} value={l}>{l}</option>)}
+                              </select>
+                            </div>
+                            <div style={{ marginBottom: 6 }}>
+                              <div style={{ fontSize: 9, color: t.tx3, marginBottom: 2 }}>Anchor pt 2</div>
+                              <select value={refLandmark2 || ""} onChange={e => setRefLandmark2(e.target.value || null)}
+                                style={{ width: "100%", fontSize: 10, padding: "3px 5px", borderRadius: 4, border: `1px solid ${t.bdr}`, background: t.surf2, color: t.tx, fontFamily: "inherit" }}>
+                                <option value="">Auto</option>
+                                {uniquePointLabels.map(l => <option key={l} value={l}>{l}</option>)}
+                              </select>
+                            </div>
+                          </>
+                        )}
+                        {overlayAlignMode === "structural" && (
+                          <div style={{ marginBottom: 6 }}>
+                            <div style={{ fontSize: 9, color: t.tx3, marginBottom: 2 }}>Reference Plane</div>
+                            <select value={refLandmark1 || ""} onChange={e => setRefLandmark1(e.target.value || null)}
+                              style={{ width: "100%", fontSize: 10, padding: "3px 5px", borderRadius: 4, border: `1px solid ${t.bdr}`, background: t.surf2, color: t.tx, fontFamily: "inherit" }}>
+                              <option value="">S-N (default)</option>
+                              <option value="Ba-N">Ba-N</option>
+                              <option value="palatal">Palatal</option>
+                              <option value="mandible">Mandibular</option>
+                              <option value="FH">Frankfort Horizontal</option>
+                              <option value="OP">Occlusal</option>
+                            </select>
+                          </div>
+                        )}
+                        {overlayAlignMode === "procrustes" && (
+                          <div style={{ fontSize: 9, color: t.tx3, lineHeight: 1.5, marginBottom: 6 }}>
+                            Uses all matching landmarks to compute optimal rotation, translation, and scale via generalized Procrustes analysis.
+                          </div>
+                        )}
                         <div style={{ marginBottom: 6 }}>
-                          <div style={{ fontSize: 9, color: t.tx3, marginBottom: 2 }}>Anchor pt 2</div>
-                          <select value={refLandmark2 || ""} onChange={e => setRefLandmark2(e.target.value || null)}
-                            style={{ width: "100%", fontSize: 10, padding: "3px 5px", borderRadius: 4, border: `1px solid ${t.bdr}`, background: t.surf2, color: t.tx, fontFamily: "inherit" }}>
-                            <option value="">Auto</option>
-                            {uniquePointLabels.map(l => <option key={l} value={l}>{l}</option>)}
-                          </select>
-                        </div>
-                        <div>
                           <div style={{ fontSize: 9, color: t.tx3, marginBottom: 2 }}>Blend</div>
                           <input type="range" min="0.1" max="1" step="0.05" value={overlayBlend} onChange={e => setOverlayBlend(+e.target.value)}
                             style={{ width: "100%", accentColor: t.acc }} />
@@ -220,7 +249,7 @@ export default function SessionsPanel({
                     )}
                     <div style={{ fontSize: 9, color: t.tx3, lineHeight: 1.5 }}>
                       <b style={{ color: t.tx2 }}>⇝ Vec</b> draws displacement lines between matching landmarks.
-                      <br /><b style={{ color: t.tx2 }}>Overlay</b> renders the compared session's markups with structural alignment using two anchor points.
+                      <br /><b style={{ color: t.tx2 }}>Overlay</b> renders the compared session with alignment: <b>2-Point</b> (manual anchors), <b>Procrustes</b> (all landmarks), or <b>Structural</b> (reference plane).
                     </div>
                   </>
                 )}

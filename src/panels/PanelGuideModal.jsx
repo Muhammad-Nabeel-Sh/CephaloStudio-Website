@@ -769,6 +769,46 @@ const GUIDES = {
       },
     ],
   },
+
+  superimposition: {
+    title: "Superimposition Guide",
+    icon: "🔀",
+    sections: [
+      {
+        heading: "What is superimposition?",
+        body: "Superimposition overlays two cephalometric tracings to visualize and quantify positional changes over time (growth, treatment, or relapse). It computes per-landmark displacement vectors, angular changes, and linear measurement deltas between a base (T1) and comparison (T2) session.",
+        icon: "📖",
+      },
+      {
+        heading: "Alignment methods",
+        items: [
+          "Procrustes — Uses ALL matching landmarks to compute optimal rotation, translation, and scale via Generalized Procrustes Analysis (Kabsch algorithm). No manual anchor points needed. Best when both sessions have a complete landmark set",
+          "Structural — Aligns along a defined reference plane (S-N, Ba-N, Palatal, Mandibular, FH, Occlusal). The source session is rotated and translated so its plane matches the destination. Use this when you want the superimposition anchored on a specific anatomical structure",
+          "2-Point — Manual alignment using two anchor landmarks. The source is translated, rotated, and scaled so the two anchor points exactly match the destination. Simple but sensitive to landmark placement error",
+        ],
+        icon: "⚙️",
+      },
+      {
+        heading: "Output tabs",
+        items: [
+          "Displacements — Per-landmark distance (mm) and direction (degrees) from base to comparison. Color-coded: green (<2mm), yellow (2-5mm), red (>5mm)",
+          "Angular — Changes in angle measurements (angle3/angle4 markups) between sessions. Positive = opening, negative = closing",
+          "Linear — Changes in linear measurements (lines, rulers) between sessions. Shows delta and percent change",
+        ],
+        icon: "📊",
+      },
+      {
+        heading: "Canvas overlay",
+        body: "In the Sessions panel, click 'Overlay' next to a comparison session to render it semi-transparently on the canvas. The overlay alignment mode (2-Point / Procrustes / Structural) matches the same algorithms used in this research module.",
+        icon: "🖼️",
+      },
+      {
+        heading: "Tips",
+        body: "• Ensure both sessions have matching landmark labels — Procrustes and displacement vectors rely on label matching\n• The 'Matched' count in the header shows how many landmarks were found in both sessions\n• Centroid Size comparison reveals overall size change (scaling) independent of position\n• Use Procrustes for growth analysis where scale change is expected (e.g., T1→T2 in a growing patient)",
+        icon: "💡",
+      },
+    ],
+  },
 };
 
 export default function PanelGuideModal({ t, guideKey, onClose }) {

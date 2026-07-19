@@ -6,7 +6,8 @@ import { ComparativeResults } from "./ComparativePanel.jsx";
 import { LongitudinalResults } from "./LongitudinalPanel.jsx";
 import { CorrelationResults } from "./CorrelationPanel.jsx";
 import { DiagnosticResults } from "./DiagnosticPanel.jsx";
-import { ReliabilityCharts, DescriptiveCharts, ComparativeCharts, LongitudinalCharts, CorrelationCharts, DiagnosticCharts } from "./moduleCharts.jsx";
+import { SuperimpositionResults } from "./SuperimpositionPanel.jsx";
+import { ReliabilityCharts, DescriptiveCharts, ComparativeCharts, LongitudinalCharts, CorrelationCharts, DiagnosticCharts, SuperimpositionCharts } from "./moduleCharts.jsx";
 import { exportResultsCSV } from "./resultsExport.js";
 
 export default function ResultsDialog({ study, t, onClose }) {
@@ -19,6 +20,7 @@ export default function ResultsDialog({ study, t, onClose }) {
     longitudinal: { name: "Longitudinal", tabLabel: "Tables", results: LongitudinalResults, charts: LongitudinalCharts },
     correlation: { name: "Correlation", tabLabel: "Tables", results: CorrelationResults, charts: CorrelationCharts },
     diagnostic: { name: "Diagnostic", tabLabel: "Tables", results: DiagnosticResults, charts: DiagnosticCharts },
+    superimposition: { name: "Superimposition / Growth", tabLabel: "Displacement", results: SuperimpositionResults, charts: SuperimpositionCharts },
   };
   const m = meta[study.type];
   if (!m) return null;

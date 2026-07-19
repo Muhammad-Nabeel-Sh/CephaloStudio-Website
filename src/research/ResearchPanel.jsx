@@ -7,6 +7,7 @@ import { ComparativeConfig, ComparativeResults } from "./ComparativePanel.jsx";
 import { LongitudinalConfig, LongitudinalResults } from "./LongitudinalPanel.jsx";
 import { CorrelationConfig, CorrelationResults } from "./CorrelationPanel.jsx";
 import { DiagnosticConfig, DiagnosticResults } from "./DiagnosticPanel.jsx";
+import { SuperimpositionConfig, SuperimpositionResults } from "./SuperimpositionPanel.jsx";
 import ResultsDialog from "./ResultsDialog.jsx";
 import StudyGuideModal from "./StudyGuideModal.jsx";
 
@@ -217,7 +218,11 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
                       <DiagnosticConfig study={s} sessions={sessions} onUpdateStudy={handleUpdateStudy} t={t} />
                     )}
 
-                    {s.type !== "reliability" && s.type !== "descriptive" && s.type !== "comparative" && s.type !== "longitudinal" && s.type !== "correlation" && s.type !== "diagnostic" && sessions.length > 0 && (
+                    {s.type === "superimposition" && (
+                      <SuperimpositionConfig study={s} sessions={sessions} onUpdateStudy={handleUpdateStudy} t={t} />
+                    )}
+
+                    {s.type !== "reliability" && s.type !== "descriptive" && s.type !== "comparative" && s.type !== "longitudinal" && s.type !== "correlation" && s.type !== "diagnostic" && s.type !== "superimposition" && sessions.length > 0 && (
                       <div style={{ marginBottom: 8 }}>
                         <div style={{ fontSize: 9, fontWeight: 600, color: t.tx3, textTransform: "uppercase", letterSpacing: 0.3, marginBottom: 4 }}>Measurements</div>
                         <LabelSelector sessions={sessions} selected={s.config.labelIds || []} onToggle={l => handleToggleLabel(s.id, l)} t={t} />

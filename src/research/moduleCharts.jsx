@@ -1496,3 +1496,86 @@ function ChangeScoreChart({ labels, t }) {
     <PlotlyChart data={[trace]} layout={layout} style={{ height: layout.height }} />
   </ChartCard>;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SUPERIMPOSITION CHARTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function SuperimpositionCharts({ results, t }) {
+  if (!results || results.error) return <div style={{ fontSize: FONT.md, color: t.tx3, textAlign: "center", padding: 20 }}>No chartable data.</div>;
+  const displacements = results.displacements || [];
+  if (displacements.length === 0) return <div style={{ fontSize: FONT.md, color: t.tx3, textAlign: "center", padding: 20 }}>No displacement data.</div>;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <DisplacementBarPlot displacements={displacements} t={t} />
+      <DisplacementPolarPlot displacements={displacements} t={t} />
+    </div>
+  );
+}
+
+function DisplacementBarPlot({ displacements, t }) {
+  const sorted = [...displacements].sort((a, b) => b.lenMm - a.lenMm);
+  const colors = sorted.map(d => d.lenMm < 2 ? "#22c55e" : d.lenMm < 5 ? "#eab308" : "#ef4444");
+
+  const trace = {
+    type: "bar", orientation: "h",
+    y: sorted.map(d => d.label),
+    x: sorted.map(d => d.lenMm),
+    marker: { color: colors, line: { width: 0 } },
+    text: sorted.map(d => d.lenMm.toFixed(2) + " " + d.unit),
+    textposition: "outside",
+    textfont: { size: 10, color: t.tx2, family: FONT_STACK },
+    hovertemplate: "%{y}: %{x:.2f} mm<extra></extra>",
+    showlegend: false,
+  };
+
+  const layout = {
+    paper_bgcolor: t.surf, plot_bgcolor: t.surf,
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
+    margin: { l: 100, r: 80, t: 15, b: 45 },
+    xaxis: { title: "Displacement (mm)", gridcolor: t.surf3, zeroline: false },
+    yaxis: { autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 10 } },
+    height: Math.max(200, displacements.length * 24 + 50),
+  };
+
+  return <ChartCard title="Landmark Displacement" t={t}>
+    <PlotlyChart data={[trace]} layout={layout} style={{ height: layout.height }} />
+  </ChartCard>;
+}
+
+function DisplacementPolarPlot({ displacements, t }) {
+  const pts = displacements.filter(d => d.lenMm > 0.01);
+  if (pts.length === 0) return null;
+
+  const trace = {
+    type: "scatterpolar", mode: "markers+text",
+    r: pts.map(d => d.lenMm),
+    theta: pts.map(d => d.angle),
+    text: pts.map(d => d.label),
+    textposition: "top center",
+    textfont: { size: 9, color: t.tx2, family: FONT_STACK },
+    marker: {
+      size: pts.map(d => Math.max(6, Math.min(16, d.lenMm * 2))),
+      color: pts.map(d => d.lenMm < 2 ? "#22c55e" : d.lenMm < 5 ? "#eab308" : "#ef4444"),
+      line: { width: 1, color: t.bdr },
+    },
+    showlegend: false,
+  };
+
+  const layout = {
+    paper_bgcolor: t.surf, plot_bgcolor: t.surf,
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
+    polar: {
+      bgcolor: t.surf,
+      radialaxis: { gridcolor: t.surf3, linecolor: t.bdr, tickfont: { size: 9, color: t.tx3 } },
+      angularaxis: { gridcolor: t.surf3, linecolor: t.bdr, tickfont: { size: 9, color: t.tx3 } },
+    },
+    margin: { l: 60, r: 60, t: 40, b: 40 },
+    height: 380,
+  };
+
+  return <ChartCard title="Displacement Direction (Polar)" t={t}>
+    <PlotlyChart data={[trace]} layout={layout} style={{ height: 380 }} />
+  </ChartCard>;
+}
