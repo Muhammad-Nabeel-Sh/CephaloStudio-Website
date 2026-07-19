@@ -240,8 +240,14 @@ Recommended settings for `.vscode/settings.json`:
 - **Longitudinal module**: RM-ANOVA with Mauchly's sphericity test (orthonormal Helmert contrasts), GG/HF/LB epsilons, LMM (two-level pseudo-REML with cluster-robust SEs), pairwise Bonferroni — config + results UI (`LongitudinalPanel.jsx`)
 - **Correlation module**: Pearson/Spearman, partial correlation, linear/logistic regression (Newton-Raphson with step-halving, separation detection), VIF, diagnostic plots — config + results UI (`CorrelationPanel.jsx`)
 - **Diagnostic module**: ROC/AUC with DeLong CI, optimal thresholds (Youden/F1/distance/accuracy), Hosmer-Lemeshow calibration, logistic composite index, cross-validated AUC (LOOCV/k-fold, seeded PRNG for reproducibility) — config + results UI (`DiagnosticPanel.jsx`)
-- **ResultsDialog**: Floating modal (normogram pattern) with Tables/Charts tabs for all 6 modules
-- **Charts module** (`moduleCharts.jsx`): ICC forest plot, Bland-Altman plot, Error map, Distribution+normal curve, Box plots, Group means bar, Effect size forest, P-value dot chart, Longitudinal trajectories, Change score chart
+- **Superimposition/Growth module** (F3): Procrustes + structural alignment (rotation-only 2-point), alignment-aware displacements with error propagation, rotation tracking (mandibular/palatal/occlusal/Y-axis), plane intersections, delta norms (age/sex-stratified), clinical pattern detection (8 pattern types), multi-timepoint longitudinal analysis, group-level research, centroid size — config + results UI (`SuperimpositionPanel.jsx`) with 7 tabs, engine in `superimposition.js` (~920 lines)
+- **Charts module** (`moduleCharts.jsx`): ICC forest plot, Bland-Altman plot, Error map, Distribution+normal curve, Box plots, Group means bar, Effect size forest, P-value dot chart, Longitudinal trajectories, Change score chart, Displacement bar/polar/vector field, Rotation tracking bar, Plane angle dot, Delta norm bar, Pattern severity bar (all Plotly basic-dist-compatible)
+- **ResultsDialog**: Floating modal (normogram pattern) with Tables/Charts tabs for all 7 modules (incl. superimposition)
+- **Study guides**: `PanelGuideModal.jsx` — 17+ guides (incl. superimposition); `StudyGuideModal.jsx` — 7 study-type-specific guides with diagrams
+- **Guide Dialog Boxes**: PanelGuideModal.jsx with superimposition guide; StudyGuideModal.jsx covers all 7 research modules
+- **New LUTs**: magma, inferno, cividis color maps; grayscale legend fix
+- **Normative Database Editor** (F7): Full editor for predefined norms in `src/norms.js`
+- **Community Norms Contribution**: `public/contribute.html` subpage, norms fetched from GitHub raw
 - **`addMarkup()` auto-links refLabels** by detecting matching point labels within 3px tolerance; `refreshAutoMeas()` applies to any `refLabels` bearer regardless of `autoCreated`
 - **`syncRefDeps(label, dx, dy)`**: propagates point drags to all dependent markups via `refLabels` — keeps splines, polygons, beziers, circles, ellipses, tangents, arrows attached to their reference points
 - **Sessions model** (`session.js`, `project.js`) replacing versions and repro trials
@@ -265,8 +271,12 @@ Recommended settings for `.vscode/settings.json`:
 - **Code review (C1–C17 clinical correctness)**: Fixed `computeMeasurements` unit propagation; calibration reset on image load; validation in `finalizeCalib`; CSV/panel unit display; PDF disclaimer + PHI gate; merged norms into single `src/norms.js`; SD-banded interpretation (not mean-banded); ANB structural flag; U1-L1/Interincisal alignment; Convexity disambiguation; 2D magnification warning in CalibModal
 - **Code review (S1–S15 statistical correctness)**: Fixed Cohen's dz (was undefined); BH adjustment direction (was reversed); ICC uses exact fCDF (was Paulson approx); ICC unbalanced-data handling; seeded PRNG for cross-validation; logistic regression singular-matrix bail-out; consolidated tCritical; HL small-n warning; LMM conservative df; Bland-Altman VIF; MANOVA fractional df; studentized range CDF quadrature improvement
 - **Golden-value tests**: 31 new tests in `src/test/researchGolden.test.js` covering basic stats, t-test, ANOVA, Mann-Whitney, Wilcoxon, Spearman, BH adjustment, Shapiro-Wilk, Cohen's d, ICC, Dahlberg, linear regression against R/published references
+- **Superimposition statistical/clinical audit**: Fixed angular/linear deltas (were T1−T2 instead of T2−T1); centroid size pctChange inverted; growth pattern classification labels swapped (clockwise↔counterclockwise, hyper↔hypo); mandibular autorotation "opening"↔"closing" inverted; centroid size pattern never fired (was looking up `displacements._centroidSize` which was never set); `runLongitudinalSuperimposition` passed obsolete `referencePlane` key instead of `planePoint1/planePoint2`; `structuralAlign` included unwanted scale (changed to rotation-only); panel T1/T2 column header labels swapped for angular and linear tables
+
+### Ongoing
+- (none)
 
 ### Build Status
 - `npm run build` — OK (chunk size warning is pre-existing, mathjs is large; plotly loaded as dynamic import)
 - `npm run lint` — 1 warning in App.jsx only (`react-hooks/exhaustive-deps` for `currentDraw.type`, pre-existing)
-- `npm test` — 300 tests pass (15 test files, 0 failures)
+- `npm test` — 300 tests pass (16 test files, 0 failures)

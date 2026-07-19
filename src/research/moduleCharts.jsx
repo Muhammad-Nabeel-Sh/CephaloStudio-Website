@@ -1510,6 +1510,11 @@ export function SuperimpositionCharts({ results, t }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <DisplacementBarPlot displacements={displacements} t={t} />
       <DisplacementPolarPlot displacements={displacements} t={t} />
+      <DisplacementVectorField displacements={displacements} t={t} />
+      {results.rotationTracking?.length > 0 && <RotationTrackingChart rotationTracking={results.rotationTracking} t={t} />}
+      {results.planeIntersections?.length > 0 && <PlaneAngleChart planeIntersections={results.planeIntersections} t={t} />}
+      {results.deltaNorms?.length > 0 && <DeltaNormChart deltaNorms={results.deltaNorms} t={t} />}
+      {results.patterns?.length > 0 && <PatternRadarChart patterns={results.patterns} t={t} />}
     </div>
   );
 }
@@ -1548,34 +1553,295 @@ function DisplacementPolarPlot({ displacements, t }) {
   const pts = displacements.filter(d => d.lenMm > 0.01);
   if (pts.length === 0) return null;
 
+  const dirs = [
+    { label: "N", angle: 90 }, { label: "NE", angle: 45 }, { label: "E", angle: 0 },
+    { label: "SE", angle: -45 }, { label: "S", angle: -90 }, { label: "SW", angle: -135 },
+    { label: "W", angle: 180 }, { label: "NW", angle: 135 },
+  ];
+
+  const sorted = [...pts].sort((a, b) => b.lenMm - a.lenMm);
   const trace = {
-    type: "scatterpolar", mode: "markers+text",
-    r: pts.map(d => d.lenMm),
-    theta: pts.map(d => d.angle),
-    text: pts.map(d => d.label),
-    textposition: "top center",
-    textfont: { size: 9, color: t.tx2, family: FONT_STACK },
+    type: "bar",
+    x: sorted.map(d => d.lenMm),
+    y: sorted.map(d => d.label),
+    orientation: "h",
     marker: {
-      size: pts.map(d => Math.max(6, Math.min(16, d.lenMm * 2))),
-      color: pts.map(d => d.lenMm < 2 ? "#22c55e" : d.lenMm < 5 ? "#eab308" : "#ef4444"),
-      line: { width: 1, color: t.bdr },
+      color: sorted.map(d => {
+        const norm = ((d.angle + 360) % 360);
+        const hue = norm / 360;
+        return `hsl(${Math.round(hue * 360)}, 65%, 55%)`;
+      }),
     },
+    text: sorted.map(d => {
+      const norm = ((d.angle + 360) % 360);
+      const closest = dirs.reduce((best, dir) => {
+        const diff = Math.abs(norm - ((dir.angle + 360) % 360));
+        const wrap = Math.min(diff, 360 - diff);
+        return wrap < best.diff ? { ...dir, diff } : best;
+      }, { diff: Infinity });
+      return `${d.lenMm.toFixed(2)} ${d.unit} (${closest.label})`;
+    }),
+    textposition: "outside",
+    textfont: { size: 10, color: t.tx2, family: FONT_STACK },
+    hovertemplate: "%{y}: %{x:.2f} mm<extra></extra>",
     showlegend: false,
   };
 
   const layout = {
     paper_bgcolor: t.surf, plot_bgcolor: t.surf,
     font: { color: t.tx2, family: FONT_STACK, size: 11 },
-    polar: {
-      bgcolor: t.surf,
-      radialaxis: { gridcolor: t.surf3, linecolor: t.bdr, tickfont: { size: 9, color: t.tx3 } },
-      angularaxis: { gridcolor: t.surf3, linecolor: t.bdr, tickfont: { size: 9, color: t.tx3 } },
-    },
-    margin: { l: 60, r: 60, t: 40, b: 40 },
-    height: 380,
+    margin: { l: 80, r: 80, t: 15, b: 40 },
+    xaxis: { gridcolor: t.surf3, zeroline: false, title: "Distance (mm)" },
+    yaxis: { gridcolor: t.surf3, autorange: "reversed" },
+    height: Math.max(200, sorted.length * 28 + 60),
+    annotations: [{
+      x: 0.5, y: 1.02, xref: "paper", yref: "paper",
+      text: "Color = direction (compass)",
+      showarrow: false, font: { size: 9, color: t.tx3 },
+    }],
   };
 
-  return <ChartCard title="Displacement Direction (Polar)" t={t}>
-    <PlotlyChart data={[trace]} layout={layout} style={{ height: 380 }} />
+  return <ChartCard title="Displacement Direction" t={t}>
+    <PlotlyChart data={[trace]} layout={layout} style={{ height: layout.height }} />
+  </ChartCard>;
+}
+
+function DisplacementVectorField({ displacements, t }) {
+  const pts = displacements.filter(d => d.lenMm > 0.01);
+  if (pts.length === 0) return null;
+
+  const scale = 3;
+  const traces = [];
+
+  pts.forEach(d => {
+    const ex = d.baseX + (d.dx || 0) * scale;
+    const ey = d.baseY + (d.dy || 0) * scale;
+    traces.push({
+      type: "scatter", mode: "lines",
+      x: [d.baseX, ex], y: [d.baseY, ey],
+      line: { color: d.lenMm < 2 ? "#22c55e" : d.lenMm < 5 ? "#eab308" : "#ef4444", width: 2 },
+      showlegend: false, hoverinfo: "skip",
+    });
+  });
+
+  traces.push({
+    type: "scatter", mode: "markers",
+    x: pts.map(d => d.baseX),
+    y: pts.map(d => d.baseY),
+    marker: { color: pts.map(d => d.lenMm < 2 ? "#22c55e" : d.lenMm < 5 ? "#eab308" : "#ef4444"), size: 7, symbol: "circle", line: { width: 1, color: t.bg } },
+    text: pts.map(d => `${d.label}: ${d.lenMm.toFixed(2)} mm`),
+    hovertemplate: "%{text}<extra></extra>",
+    showlegend: false,
+  });
+
+  traces.push({
+    type: "scatter", mode: "markers+text",
+    x: pts.map(d => d.baseX + (d.dx || 0) * scale),
+    y: pts.map(d => d.baseY + (d.dy || 0) * scale),
+    marker: { color: pts.map(d => d.lenMm < 2 ? "#22c55e" : d.lenMm < 5 ? "#eab308" : "#ef4444"), size: 4, symbol: "triangle-up" },
+    text: pts.map(d => d.label),
+    textposition: "top center",
+    textfont: { size: 8, color: t.tx2, family: FONT_STACK },
+    showlegend: false, hoverinfo: "skip",
+  });
+
+  const allX = pts.flatMap(d => [d.baseX, d.baseX + (d.dx || 0) * scale]);
+  const allY = pts.flatMap(d => [d.baseY, d.baseY + (d.dy || 0) * scale]);
+  const pad = 20;
+  const xMin = Math.min(...allX) - pad;
+  const xMax = Math.max(...allX) + pad;
+  const yMin = Math.min(...allY) - pad;
+  const yMax = Math.max(...allY) + pad;
+
+  const layout = {
+    paper_bgcolor: t.surf, plot_bgcolor: t.surf,
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
+    margin: { l: 50, r: 30, t: 15, b: 50 },
+    xaxis: { range: [xMin, xMax], gridcolor: t.surf3, zeroline: false, title: "X (mm)" },
+    yaxis: { range: [yMin, yMax], gridcolor: t.surf3, zeroline: false, title: "Y (mm)", scaleanchor: "x" },
+    height: Math.max(350, Math.min(550, (yMax - yMin) / ((xMax - xMin) || 1) * 500)),
+    annotations: [{
+      x: 0.5, y: 1.02, xref: "paper", yref: "paper",
+      text: "Vectors scaled 3\u00d7 for visibility",
+      showarrow: false, font: { size: 9, color: t.tx3 },
+    }],
+  };
+
+  return <ChartCard title="Displacement Vector Field" t={t}>
+    <PlotlyChart data={traces} layout={layout} style={{ height: layout.height }} />
+  </ChartCard>;
+}
+
+function RotationTrackingChart({ rotationTracking, t }) {
+  if (!rotationTracking?.length) return null;
+
+  const TRAUMA_THRESHOLD = 2;
+  const trace = {
+    type: "bar",
+    x: rotationTracking.map(rt => rt.label || rt.id),
+    y: rotationTracking.map(rt => rt.deltaDeg),
+    marker: { color: rotationTracking.map(rt => Math.abs(rt.deltaDeg) > TRAUMA_THRESHOLD ? t.err : t.ok), opacity: 0.7 },
+    text: rotationTracking.map(rt => `${rt.deltaDeg >= 0 ? "+" : ""}${(rt.deltaDeg ?? 0).toFixed(2)}\u00b0`),
+    textposition: "outside",
+    textfont: { size: 10, color: t.tx2, family: FONT_STACK },
+    hovertemplate: rotationTracking.map(rt =>
+      `${rt.label || rt.id}: %{y:.2f}\u00b0<br>Direction: ${rt.direction || (rt.deltaDeg > 0 ? "opening" : "closing")}<extra></extra>`
+    ),
+    showlegend: false,
+  };
+
+  const absMax = Math.max(...rotationTracking.map(rt => Math.abs(rt.deltaDeg ?? 0)), 1) * 1.4;
+
+  const annotations = [{
+    x: 0.5, y: 1.02, xref: "paper", yref: "paper",
+    text: `Threshold \u00b1${TRAUMA_THRESHOLD}\u00b0`,
+    showarrow: false, font: { size: 9, color: t.tx3 },
+  }];
+
+  const layout = {
+    paper_bgcolor: t.surf, plot_bgcolor: t.surf,
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
+    margin: { l: 60, r: 30, t: 30, b: 50 },
+    xaxis: { title: "Reference Plane", gridcolor: t.surf3, showgrid: false, tickfont: { size: 10 } },
+    yaxis: { title: "Angle change (\u00b0)", range: [-absMax, absMax], gridcolor: t.surf3, zeroline: true, zerolinecolor: t.tx3 },
+    height: 300,
+    annotations,
+    shapes: [
+      { type: "line", x0: -0.5, x1: rotationTracking.length - 0.5, y0: TRAUMA_THRESHOLD, y1: TRAUMA_THRESHOLD, line: { color: t.tx3, width: 1, dash: "dash" } },
+      { type: "line", x0: -0.5, x1: rotationTracking.length - 0.5, y0: -TRAUMA_THRESHOLD, y1: -TRAUMA_THRESHOLD, line: { color: t.tx3, width: 1, dash: "dash" } },
+    ],
+  };
+
+  return <ChartCard title="Reference Plane Rotation" t={t}>
+    <PlotlyChart data={[trace]} layout={layout} style={{ height: 300 }} />
+  </ChartCard>;
+}
+
+function PlaneAngleChart({ planeIntersections, t }) {
+  if (!planeIntersections?.length) return null;
+
+  const yLabels = planeIntersections.map(pi => pi.name);
+  const vals = planeIntersections.map(pi => pi.delta);
+  const colors = vals.map(v => Math.abs(v) > 2 ? t.err : Math.abs(v) > 1 ? t.warn : t.ok);
+
+  const trace = {
+    type: "scatter", mode: "markers+text",
+    x: vals, y: yLabels,
+    marker: { color: colors, size: 12, symbol: "diamond", line: { width: 1, color: t.bg } },
+    text: vals.map(v => `${v >= 0 ? "+" : ""}${(v ?? 0).toFixed(2)}\u00b0`),
+    textposition: "right",
+    textfont: { size: 10, color: t.tx2, family: FONT_STACK },
+    hovertemplate: "%{y}: %{x:.2f}\u00b0<extra></extra>",
+    showlegend: false,
+  };
+
+  const absMax = Math.max(...vals.map(Math.abs), 1) * 1.3;
+
+  const layout = {
+    paper_bgcolor: t.surf, plot_bgcolor: t.surf,
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
+    margin: { l: 120, r: 60, t: 15, b: 45 },
+    xaxis: { title: "Angle change (\u00b0)", range: [-absMax, absMax], gridcolor: t.surf3, zeroline: true, zerolinecolor: t.tx3 },
+    yaxis: { autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 10 } },
+    height: Math.max(200, planeIntersections.length * 36 + 50),
+  };
+
+  return <ChartCard title="Reference Plane Intersections" t={t}>
+    <PlotlyChart data={[trace]} layout={layout} style={{ height: layout.height }} />
+  </ChartCard>;
+}
+
+function DeltaNormChart({ deltaNorms, t }) {
+  if (!deltaNorms?.length) return null;
+
+  const yLabels = deltaNorms.map(dn => dn.label);
+  const actual = deltaNorms.map(dn => dn.delta);
+  const expected = deltaNorms.map(dn => dn.norm?.expectedDelta ?? 0);
+  const colors = deltaNorms.map(dn => {
+    if (dn.within1SD) return t.ok;
+    if (dn.within2SD) return t.warn;
+    return t.err;
+  });
+
+  const traces = [
+    {
+      type: "bar", name: "Actual change",
+      y: yLabels, x: actual,
+      orientation: "h",
+      marker: { color: colors, opacity: 0.75 },
+      text: actual.map(v => `${(v ?? 0) >= 0 ? "+" : ""}${(v ?? 0).toFixed(2)}\u00b0`),
+      textposition: "outside",
+      textfont: { size: 10, color: t.tx2, family: FONT_STACK },
+      hovertemplate: "%{y}: Actual %{x:.2f}\u00b0<extra></extra>",
+      showlegend: true,
+    },
+    {
+      type: "bar", name: "Expected change",
+      y: yLabels, x: expected,
+      orientation: "h",
+      marker: { color: t.tx3, opacity: 0.35 },
+      text: expected.map(v => `${(v ?? 0) >= 0 ? "+" : ""}${(v ?? 0).toFixed(2)}\u00b0`),
+      textposition: "outside",
+      textfont: { size: 9, color: t.tx3, family: FONT_STACK },
+      hovertemplate: "%{y}: Expected %{x:.2f}\u00b0<extra></extra>",
+      showlegend: true,
+    },
+  ];
+
+  const absMax = Math.max(...actual.map(v => Math.abs(v ?? 0)), ...expected.map(v => Math.abs(v ?? 0)), 1) * 1.3;
+
+  const layout = {
+    paper_bgcolor: t.surf, plot_bgcolor: t.surf,
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
+    barmode: "group",
+    margin: { l: 100, r: 70, t: 15, b: 45 },
+    xaxis: { title: "Change (\u00b0)", range: [-absMax, absMax], gridcolor: t.surf3, zeroline: true, zerolinecolor: t.tx3 },
+    yaxis: { autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 10 } },
+    height: Math.max(200, deltaNorms.length * 32 + 50),
+    legend: { orientation: "h", y: 1.02, x: 0.5, xanchor: "center", font: { size: 10 } },
+  };
+
+  return <ChartCard title="Delta Norms: Actual vs Expected Change" t={t}>
+    <PlotlyChart data={traces} layout={layout} style={{ height: layout.height }} />
+  </ChartCard>;
+}
+
+function PatternRadarChart({ patterns, t }) {
+  if (!patterns?.length) return null;
+
+  const severityMap = { mild: 1, moderate: 2, severe: 3 };
+  const severityColors = { mild: "#22c55e", moderate: "#eab308", severe: "#ef4444" };
+
+  const sorted = [...patterns].sort((a, b) => (severityMap[b.severity] || 0) - (severityMap[a.severity] || 0));
+
+  const trace = {
+    type: "bar", orientation: "h",
+    y: sorted.map(p => p.label),
+    x: sorted.map(p => severityMap[p.severity] || 0),
+    marker: { color: sorted.map(p => severityColors[p.severity] || t.tx3) },
+    text: sorted.map(p => `${p.severity}: ${p.summary}`),
+    textposition: "outside",
+    textfont: { size: 10, color: t.tx2, family: FONT_STACK },
+    hovertext: sorted.map(p => `${p.label}\nSeverity: ${p.severity}\n${p.summary}\n\n${p.detail}`),
+    hoverinfo: "text",
+    showlegend: false,
+  };
+
+  const layout = {
+    paper_bgcolor: t.surf, plot_bgcolor: t.surf,
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
+    margin: { l: 140, r: 80, t: 15, b: 40 },
+    xaxis: { range: [0, 3.8], gridcolor: t.surf3, zeroline: false, tickvals: [1, 2, 3], ticktext: ["Mild", "Moderate", "Severe"] },
+    yaxis: { gridcolor: t.surf3, autorange: "reversed" },
+    height: Math.max(200, sorted.length * 32 + 60),
+    annotations: [{
+      x: 0.5, y: 1.02, xref: "paper", yref: "paper",
+      text: "Severity: Mild (1) / Moderate (2) / Severe (3)",
+      showarrow: false, font: { size: 9, color: t.tx3 },
+    }],
+  };
+
+  return <ChartCard title="Clinical Pattern Profile" t={t}>
+    <PlotlyChart data={[trace]} layout={layout} style={{ height: layout.height }} />
   </ChartCard>;
 }

@@ -676,7 +676,7 @@ const GUIDES = {
       },
       {
         heading: "Data requirements",
-        body: "≥ 10 cases with ≥ 5 per class. Each case needs the gold-standard label (binary or numeric with threshold) and at least one predictor measurement. Predictors must be different from the gold standard. All cases must have complete data on all predictors and the gold standard.",
+        body: "\u2265 10 cases with \u2265 5 per class. Each case needs the gold-standard label (binary or numeric with threshold) and at least one predictor measurement. Predictors must be different from the gold standard. All cases must have complete data on all predictors and the gold standard.",
         icon: "📊",
       },
       {
@@ -707,6 +707,54 @@ const GUIDES = {
         heading: "Tips & limitations",
         body: "• ROC analysis requires a binary gold standard. Continuous measurements must be dichotomized with a clinically meaningful threshold.\n• Small samples (n < 50 per group) produce wide DeLong CIs — treat AUC estimates as preliminary.\n• The Hosmer-Lemeshow test for calibration has low power in small samples; groups with expected count < 5 trigger a warning.\n• Cross-validated AUC with LOOCV is nearly unbiased but has high variance. k-fold CV (k=10) reduces variance at the cost of slight bias.\n• The composite logistic index is fitted by Newton-Raphson with step-halving — if convergence fails due to separation, collect more data or use fewer predictors.",
         icon: "💡",
+      },
+    ],
+  },
+
+  superimposition: {
+    title: "Superimposition & Growth Study Guide",
+    sections: [
+      {
+        heading: "What it measures",
+        body: "Superimposes two cephalometric tracings (T1 \u2192 T2) to visualize and quantify skeletal/dental change over time. Computes per-landmark displacement vectors, angular changes, linear deltas, growth pattern classification, reference plane rotation tracking, and delta norm comparisons against normative growth data.",
+        icon: "\ud83d\udd00",
+      },
+      {
+        heading: "When to use",
+        body: "Use for: (1) Treatment outcome evaluation \u2014 quantify skeletal/dental change after orthodontic treatment or orthognathic surgery. (2) Growth monitoring \u2014 track natural growth patterns over serial cephalograms. (3) Relapse assessment \u2014 measure post-treatment stability. (4) Clinical research \u2014 compare displacement patterns between groups or against normative standards.",
+        icon: "\ud83d\udcca",
+      },
+      {
+        heading: "Data requirements",
+        body: "\u2265 2 sessions (T1 base, T2 comparison) with matching landmark labels. At least 2 matching point landmarks required for Procrustes or structural alignment. For 2-point alignment, select 2 anchor landmarks present in both sessions. Calibration (pxPerMm) enables mm-based analysis; without it, results are in pixel units. Patient demographics (sex, age) enable delta norm comparisons.",
+        icon: "\ud83d\udce6",
+      },
+      {
+        heading: "Alignment methods",
+        items: [
+          { label: "Procrustes (Best-Fit)", desc: "Uses ALL matching landmarks to compute optimal rotation, translation, and scale via Kabsch algorithm. Best for complete landmark sets." },
+          { label: "2-Point", desc: "Select two landmarks as anchors. Full rigid alignment (translation + rotation + scale). Simple but sensitive to landmark placement error." },
+          { label: "Structural", desc: "Select any two landmarks to define a reference plane. Rotation-only alignment (no scale/translation). Use for cranial-base, palatal-plane, or mandibular-plane registration." },
+        ],
+        icon: "\u2699\ufe0f",
+      },
+      {
+        heading: "Output tabs",
+        items: [
+          { label: "Displacements", desc: "Per-landmark distance (mm) and direction. Color-coded: green (<2mm), yellow (2\u20135mm), red (>5mm). Confidence level based on propagated typical error." },
+          { label: "Patterns", desc: "Automated clinical pattern detection: growth pattern, skeletal class change, maxillary rotation, mandibular autorotation, incisor changes, profile changes." },
+          { label: "Growth", desc: "Reference plane rotation tracking (SN, Ba-N, palatal, mandibular, FH, OP) and plane intersection angles." },
+          { label: "Delta Norms", desc: "Comparison of observed measurement changes against age/sex-stratified normative growth data with z-scores." },
+          { label: "Angular", desc: "Angle measurement changes between sessions (ANB, SNA, SNB, etc.)." },
+          { label: "Linear", desc: "Linear measurement changes (length, distance, area, perimeter)." },
+          { label: "Error", desc: "Propagated typical landmark error analysis with significance ratios and confidence levels." },
+        ],
+        icon: "\ud83d\udcca",
+      },
+      {
+        heading: "Tips & limitations",
+        body: "\u2022 Procrustes alignment is sensitive to landmark quality \u2014 ensure consistent landmark identification across sessions.\n\u2022 Structural alignment is rotation-only; use 2-point if you also need scale correction.\n\u2022 The 'Matched' count shows how many landmarks were found in both sessions \u2014 more matches give more reliable Procrustes alignment.\n\u2022 Delta norms require patient demographics (sex + age at T1/T2). Without them, delta norm comparisons are skipped.\n\u2022 Clinical patterns are derived from rotation tracking and angular changes \u2014 they depend on having the relevant reference-plane landmarks (Sella, Nasion, ANS, etc.) in both sessions.",
+        icon: "\ud83d\udca1",
       },
     ],
   },

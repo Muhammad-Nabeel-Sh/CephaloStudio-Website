@@ -48,6 +48,8 @@ export const INITIAL_UI = {
   refLandmark2: "",
   overlayBlend: 0.5,
   overlayAlignMode: "2pt",
+  overlayVectorScale: 1,
+  showTrackingLines: false,
 
 };
 
@@ -199,6 +201,14 @@ export function useWorkspaceStore() {
     (v) => dispatch({ type: Actions.UI_SET, payload: { overlayAlignMode: typeof v === "function" ? v(ui.overlayAlignMode) : v } }),
     [ui.overlayAlignMode]
   );
+  const setOverlayVectorScale = useCallback(
+    (v) => dispatch({ type: Actions.UI_SET, payload: { overlayVectorScale: typeof v === "function" ? v(ui.overlayVectorScale) : v } }),
+    [ui.overlayVectorScale]
+  );
+  const setShowTrackingLines = useCallback(
+    (v) => dispatch({ type: Actions.UI_SET, payload: { showTrackingLines: typeof v === "function" ? v(ui.showTrackingLines) : v } }),
+    [ui.showTrackingLines]
+  );
 
   return {
     ui,
@@ -224,5 +234,7 @@ export function useWorkspaceStore() {
     setRefLandmark2,
     setOverlayBlend,
     setOverlayAlignMode,
+    setOverlayVectorScale,
+    setShowTrackingLines,
   };
 }

@@ -1,6 +1,6 @@
 # Cephalometry Studio
 
-A web-based cephalometric analysis application for orthodontics and maxillofacial surgery. Built with React 19, Vite 8, and Canvas 2D. Supports image markup, calibration, formula computation, template library, batch import, session metadata management, and four research analysis modules (reliability with guided workflow, descriptive/normative, comparative, longitudinal).
+A web-based cephalometric analysis application for orthodontics and maxillofacial surgery. Built with React 19, Vite 8, and Canvas 2D. Supports image markup, calibration, formula computation, template library, batch import, session metadata management, and seven research analysis modules (reliability with guided workflow, descriptive/normative, comparative, longitudinal, correlation, diagnostic, superimposition/growth).
 
 ---
 
@@ -48,11 +48,11 @@ Requires ES2020 support, Canvas 2D, and IndexedDB. Not supported in Internet Exp
 ├── Data/                       # CSV reference data
 ├── src/
 │   ├── main.jsx
-│   ├── App.jsx                 # Root component (~2190 lines)
+│   ├── App.jsx                 # Root component (~2355 lines)
 │   ├── constants.js            # Themes, tools, predefined analyses, LUT presets
 │   ├── utils.js                # Math, geometry, statistics (1360 lines, 60+ exports)
-│   ├── markups.jsx             # Markup rendering, hit-testing, template parsing (1670 lines)
-│   ├── panels.jsx              # Side panels (1079 lines)
+│   ├── markups.jsx             # Markup rendering, hit-testing, template parsing (~1690 lines)
+│   ├── panels.jsx              # Side panels (1430 lines)
 │   ├── ui.jsx                  # UI primitives (Btn, Tag, InfoBox, etc.)
 │   ├── ToolBtn.jsx             # Toolbar button component
 │   ├── imageUtils.jsx          # Image processing (brightness, contrast, LUT)
@@ -99,13 +99,17 @@ Requires ES2020 support, Canvas 2D, and IndexedDB. Not supported in Internet Exp
 │   │   ├── longitudinal.js     # RM-ANOVA, LMM, sphericity, change scores
 │   │   ├── correlation.js      # Correlation analysis
 │   │   ├── diagnostic.js       # Diagnostic performance metrics
+│   │   ├── superimposition.js  # Procrustes/structural alignment, displacement, patterns, delta norms
+│   │   ├── norms.js            # Canonical cephalometric reference norms
 │   │   ├── ReliabilityPanel.jsx
 │   │   ├── DescriptivePanel.jsx
 │   │   ├── ComparativePanel.jsx
 │   │   ├── LongitudinalPanel.jsx
 │   │   ├── CorrelationPanel.jsx
 │   │   ├── DiagnosticPanel.jsx
+│   │   ├── SuperimpositionPanel.jsx
 │   │   ├── ResearchPanel.jsx
+│   │   ├── StudyGuideModal.jsx
 │   │   ├── ResultsDialog.jsx   # Floating modal with Tables/Charts tabs
 │   │   ├── PlotlyChart.jsx     # Dynamic Plotly.js loader
 │   │   ├── moduleCharts.jsx    # SVG chart rendering
@@ -165,7 +169,7 @@ App
     │   ├── ImagePanel
     │   ├── LayersPanel
     │   ├── SessionsPanel
-    │   ├── ResearchPanel # Tabbed: Reliability / Descriptive / Comparative / Longitudinal / Correlation / Diagnostic
+    │   ├── ResearchPanel # Tabbed: Reliability / Descriptive / Comparative / Longitudinal / Correlation / Diagnostic / Superimposition
     │   ├── InterpretPanel
     │   ├── TemplatesPanel
     │   └── SilhouettesPanel
@@ -339,7 +343,7 @@ Managed value lists stored on the project: `project.groups`, `project.timepoints
 
 ## 11. Research Modules
 
-Four integrated research modules accessed via the Research Panel. Each follows a config → run → results pattern with a shared `ResultsDialog` for tables and charts. All modules support "From Managed" buttons to consume project-level groups/timepoints/operators.
+Seven integrated research modules accessed via the Research Panel. Each follows a config → run → results pattern with a shared `ResultsDialog` for tables and charts. All modules support "From Managed" buttons to consume project-level groups/timepoints/operators.
 
 ### Reliability Module (`ReliabilityPanel.jsx` + `reliability.js`)
 
@@ -392,7 +396,22 @@ Guided multi-operator data collection workflow:
 | LMM | Two-level linear mixed model (random intercept + slope) |
 | Pairwise | Bonferroni-corrected paired comparisons |
 | Change Scores | Mean change, SD, SEM, MDC, p-value per timepoint pair |
-| Model Types | RM-ANOVA only, mixed model, or both |
+ | Model Types | RM-ANOVA only, mixed model, or both |
+ 
+### Superimposition / Growth Module (`superimposition.js`)
+
+| Feature | Description |
+|---------|-------------|
+| Alignment | Procrustes (all matching landmarks) or Structural (rotation-only, 2 user-selected plane points) |
+| Displacement | Per-landmark distance, direction, A/P and S/I decomposition with color coding |
+| Error Propagation | Typical landmark error propagated through displacement; significance ratio and confidence levels |
+| Rotation Tracking | Mandibular, palatal, occlusal plane, Y-axis angle changes |
+| Plane Intersections | Angle between reference planes (SN, mandibular, palatal) |
+| Delta Norms | Age/sex-stratified expected change values for SNA, SNB, ANB, SN-MP, interincisal, U1-NA, L1-NB |
+| Clinical Patterns | 8 pattern types: growth pattern, skeletal class, maxillary rotation, mandibular autorotation, compensation, interincisal, soft tissue, centroid size |
+| Longitudinal | Multi-timepoint pairwise trajectories and displacement velocity |
+| Group-Level | Per-landmark mean, SD, SE, 95% CI across cases |
+| Output Tabs | Displacements, Patterns, Growth, Delta Norms, Angular, Linear, Error |
 
 ---
 

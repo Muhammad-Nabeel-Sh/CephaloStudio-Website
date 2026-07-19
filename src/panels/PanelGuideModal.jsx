@@ -783,7 +783,7 @@ const GUIDES = {
         heading: "Alignment methods",
         items: [
           "Procrustes — Uses ALL matching landmarks to compute optimal rotation, translation, and scale via Generalized Procrustes Analysis (Kabsch algorithm). No manual anchor points needed. Best when both sessions have a complete landmark set",
-          "Structural — Aligns along a defined reference plane (S-N, Ba-N, Palatal, Mandibular, FH, Occlusal). The source session is rotated and translated so its plane matches the destination. Use this when you want the superimposition anchored on a specific anatomical structure",
+          "Structural — Select any two landmarks to define a reference plane. The source session is rotated (no scale/translation) so that plane aligns with the destination. Use this when you want the superimposition anchored on a specific anatomical structure, e.g. Sella–Nasion for cranial base registration",
           "2-Point — Manual alignment using two anchor landmarks. The source is translated, rotated, and scaled so the two anchor points exactly match the destination. Simple but sensitive to landmark placement error",
         ],
         icon: "⚙️",

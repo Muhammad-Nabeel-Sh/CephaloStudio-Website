@@ -11,7 +11,7 @@ import ToolBtn from "./ToolBtn.jsx";
 import { drawMarkup, drawInProgress, drawScaleBar, drawLUTLegend, drawSnapIndicator, drawDisplacementVectors, drawAirwayOverlay, hitTest, getSilhouetteHandlesImage } from "./markups.jsx";
 import { MarkupsPanel, MeasurementsPanel, FormulasPanel, ImagePanel, LayersPanel, MarkupProps, TemplatesPanel, SilhouettesPanel, ExamplesPanel } from "./panels.jsx";
 import { loadNormLibrary, saveNormLibrary } from "./normLibrary.js";
-import { procrustesAlign, structuralAlign, REFERENCE_PLANES } from "./research/superimposition.js";
+import { procrustesAlign } from "./research/superimposition.js";
 import { Modal } from "./panels/Modal.jsx";
 import PanelGuideModal from "./panels/PanelGuideModal.jsx";
 import HomePage from "./panels/HomePage.jsx";
@@ -339,7 +339,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
 
   const{ui,dispatch,setSelectedId,setActiveTool,setRightPanel,
     setPlacingQueue,setShowMobilePanel,
-    setShowLUT,setShowScaleBar,setShowHistogram,setShowDisplacement,setDisplacementOverlay,setRefLandmark1,setRefLandmark2,setOverlayBlend,setOverlayAlignMode}=useWorkspaceStore();
+    setShowLUT,setShowScaleBar,setShowHistogram,setShowDisplacement,setDisplacementOverlay,setRefLandmark1,setRefLandmark2,setOverlayBlend,setOverlayAlignMode,setOverlayVectorScale,setShowTrackingLines}=useWorkspaceStore();
   const{zoom,selectedId,selectedIds,replacingId,currentDraw,
     activeTool,snapEnabled,showScaleBar,showDefTooltips,
     showLUT,showHistogram,showAnnotations,annotationSize,showDisplacement,rightPanel,showCalib,pendingRuler,
@@ -349,7 +349,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     isMobile,showMobilePanel,mobileToolsExpanded,
     toolbarPos,toolbarDragging,rightPanelWidth,rightPanelResizing,
     spotlightMode,
-    displacementOverlay,refLandmark1,refLandmark2,overlayBlend,overlayAlignMode}=ui;
+    displacementOverlay,refLandmark1,refLandmark2,overlayBlend,overlayAlignMode,overlayVectorScale,showTrackingLines,}=ui;
   const [compareSession, setCompareSession] = useState(null);
   const [contextMenu, setContextMenu] = useState(null);
   const [showGrid, setShowGrid] = useState(false);
@@ -437,6 +437,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const multiDragIdsRef=useRef(null);
   const copiedMarkupRef=useRef(null);
   const silhouetteAction=useRef(null);const hoveredPtRef=useRef(null);
+  const mouseCanvasRef=useRef({x:0,y:0});
   const canvasSize=useRef({w:800,h:600});const lastTouchDist=useRef(null);const lastTapRef=useRef(0);
   const undoStackRef=useRef([]);
   const redoStackRef=useRef([]);
@@ -722,11 +723,6 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           }
         });
         if(srcPts.length >= 2) tf = procrustesAlign(dstPts, srcPts);
-      } else if(overlayAlignMode === "structural" && refLandmark1){
-        const plane = REFERENCE_PLANES.find(p => p.id === refLandmark1) || REFERENCE_PLANES[0];
-        const srcPts = [markups.find(m => m.type === "point" && m.label === plane.pt1)?.points?.[0], markups.find(m => m.type === "point" && m.label === plane.pt2)?.points?.[0]].filter(Boolean);
-        const dstPts = [compMarkups.find(m => m.type === "point" && m.label === plane.pt1)?.points?.[0], compMarkups.find(m => m.type === "point" && m.label === plane.pt2)?.points?.[0]].filter(Boolean);
-        if(srcPts.length >= 2 && dstPts.length >= 2) tf = structuralAlign(dstPts, srcPts);
       } else if(overlayAlignMode === "2pt" && refLandmark1 && refLandmark2){
         const p1a = vpts(markups.find(m => m.type === "point" && m.label === refLandmark1)||{});
         const p1b = vpts(markups.find(m => m.type === "point" && m.label === refLandmark2)||{});
@@ -765,10 +761,80 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       if(!compareSession){
         ctx.fillStyle="rgba(0,0,0,0.6)";ctx.fillRect(8,8,220,36);
         ctx.fillStyle="#ffd700";ctx.font="bold 12px 'DM Sans',sans-serif";
-        ctx.fillText("⇝ Select a compare version in Versions panel",16,28);
+        ctx.fillText("\u21DD Select a compare version in Versions panel",16,28);
       } else {
-        drawDisplacementVectors(ctx,drawMarkups,compareSession.markups||[],zoom,pan,drawCalibration);
+        drawDisplacementVectors(ctx,drawMarkups,compareSession.markups||[],zoom,pan,drawCalibration,overlayVectorScale);
       }
+      if(compareSession && activeTool === "select"){
+        const mPos = mouseCanvasRef.current;
+        const compMarkups = compareSession.markups || [];
+        const pxPerMm = drawCalibration?.done ? drawCalibration.pxPerMm : 0;
+        let hoveredDisp = null;
+        drawMarkups.filter(m => m.type === "point").forEach(m1 => {
+          if(hoveredDisp) return;
+          const m2 = compMarkups.find(m => m.type === "point" && m.label === m1.label);
+          if(!m2) return;
+          const vp1 = vpts(m1), vp2 = vpts(m2);
+          if(!vp1.length || !vp2.length) return;
+          const sx1 = vp1[0].x * zoom + pan.x, sy1 = vp1[0].y * zoom + pan.y;
+          const sx2 = vp2[0].x * zoom + pan.x, sy2 = vp2[0].y * zoom + pan.y;
+          const midX = (sx1 + sx2) / 2, midY = (sy1 + sy2) / 2;
+          const dMid = Math.sqrt((mPos.x - midX) ** 2 + (mPos.y - midY) ** 2);
+          const imgDx = vp2[0].x - vp1[0].x, imgDy = vp2[0].y - vp1[0].y;
+          const imgLen = Math.sqrt(imgDx * imgDx + imgDy * imgDy);
+          if(dMid < Math.max(18, imgLen * zoom * 0.5)){
+            const lenMm = pxPerMm > 0 ? imgLen / pxPerMm : null;
+            const dxMm = pxPerMm > 0 ? imgDx / pxPerMm : imgDx;
+            const dyMm = pxPerMm > 0 ? (-imgDy) / pxPerMm : -imgDy;
+            hoveredDisp = { label: m1.label, lenMm, dxMm, dyMm, midX, midY };
+          }
+        });
+        if(hoveredDisp){
+          const tipX = hoveredDisp.midX + 14, tipY = hoveredDisp.midY - 12;
+          const lines = [hoveredDisp.label];
+          if(hoveredDisp.lenMm != null) lines.push(`${hoveredDisp.lenMm.toFixed(2)} mm`);
+          lines.push(`A/P: ${hoveredDisp.dxMm >= 0 ? "+" : ""}${hoveredDisp.dxMm.toFixed(1)}  S/I: ${hoveredDisp.dyMm >= 0 ? "+" : ""}${hoveredDisp.dyMm.toFixed(1)}`);
+          ctx.save();
+          ctx.shadowColor = "rgba(0,0,0,0.4)"; ctx.shadowBlur = 8; ctx.shadowOffsetY = 2;
+          ctx.font = '11px "DM Mono",monospace';
+          const tipW = Math.max(...lines.map(l => ctx.measureText(l).width)) + 16;
+          const tipH = 14 + lines.length * 14;
+          let tx = tipX, ty = tipY;
+          const W2 = canvasSize.current?.w || 800, H2 = canvasSize.current?.h || 600;
+          if(tx + tipW > W2 - 8) tx = hoveredDisp.midX - tipW - 14;
+          if(ty + tipH > H2 - 8) ty = H2 - tipH - 8;
+          if(ty < 8) ty = 8;
+          ctx.fillStyle = t.surf2; ctx.beginPath(); ctx.roundRect(tx, ty, tipW, tipH, 6); ctx.fill();
+          ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+          ctx.fillStyle = t.acc; ctx.beginPath(); ctx.roundRect(tx, ty, tipW, 3, {upperLeft: 6, upperRight: 6}); ctx.fill();
+          ctx.fillStyle = t.tx; ctx.font = 'bold 10px "DM Mono",monospace';
+          ctx.fillText(lines[0], tx + 8, ty + 14);
+          ctx.fillStyle = t.tx2; ctx.font = '9px "DM Mono",monospace';
+          lines.slice(1).forEach((l, i) => ctx.fillText(l, tx + 8, ty + 28 + i * 14));
+          ctx.restore();
+        }
+      }
+    }
+    if(showTrackingLines && compareSession){
+      ctx.save();
+      ctx.setLineDash([4,4]);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "rgba(168,85,247,0.45)";
+      const compMarkups = compareSession.markups || [];
+      drawMarkups.filter(m => m.type === "point").forEach(m1 => {
+        const m2 = compMarkups.find(m => m.type === "point" && m.label === m1.label);
+        if(!m2) return;
+        const vp1 = vpts(m1), vp2 = vpts(m2);
+        if(!vp1.length || !vp2.length) return;
+        const sp1 = { x: vp1[0].x * zoom + pan.x, y: vp1[0].y * zoom + pan.y };
+        const sp2 = { x: vp2[0].x * zoom + pan.x, y: vp2[0].y * zoom + pan.y };
+        ctx.beginPath();
+        ctx.moveTo(sp1.x, sp1.y);
+        ctx.lineTo(sp2.x, sp2.y);
+        ctx.stroke();
+      });
+      ctx.setLineDash([]);
+      ctx.restore();
     }
     drawAirwayOverlay(ctx,drawMarkups,zoom,pan,drawCalibration);
     // Point definition tooltip on hover
@@ -892,7 +958,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       ctx.fillStyle=t.tx2;ctx.fillText(coordTxt,30,H-14);
     }
     ctx.restore(); // F2: end DPR scale
-  },[markups,selectedId,selectedIds,zoom,sessionImage,calibration,t,currentDraw,snapEnabled,showScaleBar,showDefTooltips,showLUT,showAnnotations,annotationSize,showDisplacement,compareSession,getProcessed,angleMode,lutMode,lutInvert,activeTool,displacementOverlay,overlayBlend,overlayAlignMode,refLandmark1,refLandmark2,showCalib,pendingRuler,showGrid]);
+  },[markups,selectedId,selectedIds,zoom,sessionImage,calibration,t,currentDraw,snapEnabled,showScaleBar,showDefTooltips,showLUT,showAnnotations,annotationSize,showDisplacement,compareSession,getProcessed,angleMode,lutMode,lutInvert,activeTool,displacementOverlay,overlayBlend,overlayAlignMode,overlayVectorScale,showTrackingLines,refLandmark1,refLandmark2,showCalib,pendingRuler,showGrid]);
 
   useEffect(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});},[redraw]);
   const scheduleRedraw=useCallback(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});},[redraw]);
@@ -1219,6 +1285,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
 
   const handleMouseMove=useCallback(e=>{
     const sp=getCanvasPos(e);
+    mouseCanvasRef.current=sp;
     // F1: write pointer state to refs — no dispatch, no React re-render
     mousePosRef.current=sp;
     if(snapEnabled&&activeTool!=="select"&&activeTool!=="pan"){const ip=toImage(sp.x,sp.y);const sn=snapPoint(ip,markups,12/zoom,snapEnabled);const prev=snapPosRef.current;snapPosRef.current=(Math.abs(sn.x-ip.x)>0.1||Math.abs(sn.y-ip.y)>0.1)?sn:null;if((prev===null)!==(snapPosRef.current===null)||((prev&&snapPosRef.current)&&(prev.x!==snapPosRef.current.x||prev.y!==snapPosRef.current.y)))scheduleRedrawRef.current();}else{if(snapPosRef.current!==null){snapPosRef.current=null;scheduleRedrawRef.current();}}
@@ -1814,7 +1881,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
                   {rightPanel==="formulas"&&<FormulasPanel formulas={formulas} t={t} scope={measScope} onAdd={()=>{dispatch({type:"SET",payload:{editFormulaId:null}});dispatch({type:"SET",payload:{showFormulaEditor:true}});}} onEdit={id=>{dispatch({type:"SET",payload:{editFormulaId:id}});dispatch({type:"SET",payload:{showFormulaEditor:true}});}} onDelete={id=>updSession({formulas:formulas.filter(f=>f.id!==id)})} pinnedFormulas={pinnedFormulas} onPinFormula={id=>setPinnedFormulas(s=>{const n=new Set(s);if(n.has(id))n.delete(id);else n.add(id);return n;})}/>}
                   {rightPanel==="image"&&<ImagePanel t={t} processing={processing} setProcessing={p=>updSession({processing:p})} lutMode={lutMode} setLutMode={m=>updSession({lutMode:m})} lutInvert={lutInvert} setLutInvert={v=>updSession({lutInvert:v})} showLUT={showLUT} setShowLUT={setShowLUT} showScaleBar={showScaleBar} setShowScaleBar={setShowScaleBar} calibration={calibration} onOpenCalib={()=>dispatch({type:"SET",payload:{showCalib:true}})} onReset={()=>updSession({processing:{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},lutMode:"gray",lutInvert:false})} onShowHist={()=>setShowHistogram(v=>!v)} showHistogram={showHistogram}/>}
                   {rightPanel==="layers"&&<LayersPanel t={t} images={sessionImage} onUpdateImages={imgs=>updSession({images:imgs})} onAddImage={()=>stackImgRef.current?.click()} onShowAlign={()=>{}} onShowTransform={()=>{}}/>}
-                  {rightPanel==="sessions"&&<SessionsPanel project={project} t={t} onUpdateProject={onUpdateProject} activeSession={activeSession} setActiveSession={id=>onUpdateProject({...project,activeSessionId:id})} onExportTemplate={v=>exportCepht({name:`${project.name}`,projection:project.projection,markups:v.markups||[],formulas:v.formulas||[],norms:v.norms||[]})} compareSession={compareSession} setCompareSession={setCompareSession} showDisplacement={showDisplacement} setShowDisplacement={setShowDisplacement} displacementOverlay={displacementOverlay} setDisplacementOverlay={setDisplacementOverlay} refLandmark1={refLandmark1} setRefLandmark1={setRefLandmark1} refLandmark2={refLandmark2} setRefLandmark2={setRefLandmark2} overlayBlend={overlayBlend} setOverlayBlend={setOverlayBlend} overlayAlignMode={overlayAlignMode} setOverlayAlignMode={setOverlayAlignMode} calibration={calibration} formatAngle={formatAngle}/>}
+                  {rightPanel==="sessions"&&<SessionsPanel project={project} t={t} onUpdateProject={onUpdateProject} activeSession={activeSession} setActiveSession={id=>onUpdateProject({...project,activeSessionId:id})} onExportTemplate={v=>exportCepht({name:`${project.name}`,projection:project.projection,markups:v.markups||[],formulas:v.formulas||[],norms:v.norms||[]})} compareSession={compareSession} setCompareSession={setCompareSession} showDisplacement={showDisplacement} setShowDisplacement={setShowDisplacement} displacementOverlay={displacementOverlay} setDisplacementOverlay={setDisplacementOverlay} refLandmark1={refLandmark1} setRefLandmark1={setRefLandmark1} refLandmark2={refLandmark2} setRefLandmark2={setRefLandmark2} overlayBlend={overlayBlend} setOverlayBlend={setOverlayBlend} overlayAlignMode={overlayAlignMode} setOverlayAlignMode={setOverlayAlignMode} overlayVectorScale={overlayVectorScale} setOverlayVectorScale={setOverlayVectorScale} showTrackingLines={showTrackingLines} setShowTrackingLines={setShowTrackingLines} calibration={calibration} formatAngle={formatAngle}/>}
                   {rightPanel==="research"&&<ResearchPanel t={t} project={project} onUpdateProject={onUpdateProject} calibration={calibration}/>}
                   {rightPanel==="interpretation"&&<InterpretationPanel allMeas={allMeas} norms={norms} t={t} formatAngle={formatAngle} calibration={calibration}/>}
                   {rightPanel==="silhouettes"&&<SilhouettesPanel t={t} onInsert={(silhouetteType) => {

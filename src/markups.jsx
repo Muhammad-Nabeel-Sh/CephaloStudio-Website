@@ -1414,10 +1414,11 @@ function displacementColor(px, pxPerMm){
   return "#ef4444";
 }
 
-export function drawDisplacementVectors(ctx, m1arr, m2arr, zoom, pan, calibration){
+export function drawDisplacementVectors(ctx, m1arr, m2arr, zoom, pan, calibration, vectorScale){
   ctx.save();
   const pxPerMm = calibration?.done ? calibration.pxPerMm : 0;
   const scale = Math.sqrt(zoom);
+  const vScale = vectorScale || 1;
 
   const pairs = [];  // { label, type, lenPx, color, from, to }
 
@@ -1427,16 +1428,18 @@ export function drawDisplacementVectors(ctx, m1arr, m2arr, zoom, pan, calibratio
     if(!m2) return;
     const vp1 = vpts(m1), vp2 = vpts(m2);
     if(!vp1.length || !vp2.length) return;
+    const imgDx = vp2[0].x - vp1[0].x, imgDy = vp2[0].y - vp1[0].y;
+    const imgLen = Math.sqrt(imgDx * imgDx + imgDy * imgDy);
+    if(imgLen < 0.1) return;
     const p1 = { x: vp1[0].x * zoom + pan.x, y: vp1[0].y * zoom + pan.y };
-    const p2 = { x: vp2[0].x * zoom + pan.x, y: vp2[0].y * zoom + pan.y };
-    const dx = p2.x - p1.x, dy = p2.y - p1.y;
-    const lenPx = Math.sqrt(dx * dx + dy * dy);
-    if(lenPx < 1) return;
-    const color = displacementColor(lenPx, pxPerMm);
-    const mmStr = pxPerMm > 0 ? (lenPx / pxPerMm).toFixed(1) + "mm" : "";
-    const label = pxPerMm > 0 ? mmStr : lenPx.toFixed(1) + "px";
-    drawDisplacementArrow(ctx, p1.x, p1.y, p2.x, p2.y, lenPx, scale, color, label);
-    pairs.push({ label: m1.label, type: "point", lenPx, color, from: p1, to: p2, labelText: label });
+    const p2raw = { x: vp2[0].x * zoom + pan.x, y: vp2[0].y * zoom + pan.y };
+    const dxRaw = p2raw.x - p1.x, dyRaw = p2raw.y - p1.y;
+    const p2 = vScale === 1 ? p2raw : { x: p1.x + dxRaw * vScale, y: p1.y + dyRaw * vScale };
+    const mmVal = pxPerMm > 0 ? imgLen / pxPerMm : imgLen;
+    const color = displacementColor(imgLen, pxPerMm);
+    const label = pxPerMm > 0 ? mmVal.toFixed(1) + "mm" : imgLen.toFixed(1) + "px";
+    drawDisplacementArrow(ctx, p1.x, p1.y, p2.x, p2.y, imgLen * zoom, scale, color, label);
+    pairs.push({ label: m1.label, type: "point", lenPx: imgLen * zoom, color, from: p1, to: p2, labelText: label });
   });
 
   // ── Lines (endpoints) ──
@@ -1446,16 +1449,18 @@ export function drawDisplacementVectors(ctx, m1arr, m2arr, zoom, pan, calibratio
     const pts1 = vpts(m1), pts2 = vpts(m2);
     if(pts1.length < 2 || pts2.length < 2) return;
     for(let i = 0; i < 2; i++){
+      const imgDx = pts2[i].x - pts1[i].x, imgDy = pts2[i].y - pts1[i].y;
+      const imgLen = Math.sqrt(imgDx * imgDx + imgDy * imgDy);
+      if(imgLen < 0.1) continue;
       const p1 = { x: pts1[i].x * zoom + pan.x, y: pts1[i].y * zoom + pan.y };
-      const p2 = { x: pts2[i].x * zoom + pan.x, y: pts2[i].y * zoom + pan.y };
-      const dx = p2.x - p1.x, dy = p2.y - p1.y;
-      const lenPx = Math.sqrt(dx * dx + dy * dy);
-      if(lenPx < 1) continue;
-      const color = displacementColor(lenPx, pxPerMm);
-      const mmStr = pxPerMm > 0 ? (lenPx / pxPerMm).toFixed(1) + "mm" : "";
-      const label = pxPerMm > 0 ? mmStr : lenPx.toFixed(1) + "px";
-      drawDisplacementArrow(ctx, p1.x, p1.y, p2.x, p2.y, lenPx, scale, color, label);
-      pairs.push({ label: m1.label + "[" + i + "]", type: "line", lenPx, color, from: p1, to: p2, labelText: label });
+      const p2raw = { x: pts2[i].x * zoom + pan.x, y: pts2[i].y * zoom + pan.y };
+      const dxRaw = p2raw.x - p1.x, dyRaw = p2raw.y - p1.y;
+      const p2 = vScale === 1 ? p2raw : { x: p1.x + dxRaw * vScale, y: p1.y + dyRaw * vScale };
+      const mmVal = pxPerMm > 0 ? imgLen / pxPerMm : imgLen;
+      const color = displacementColor(imgLen, pxPerMm);
+      const label = pxPerMm > 0 ? mmVal.toFixed(1) + "mm" : imgLen.toFixed(1) + "px";
+      drawDisplacementArrow(ctx, p1.x, p1.y, p2.x, p2.y, imgLen * zoom, scale, color, label);
+      pairs.push({ label: m1.label + "[" + i + "]", type: "line", lenPx: imgLen * zoom, color, from: p1, to: p2, labelText: label });
     }
   });
 

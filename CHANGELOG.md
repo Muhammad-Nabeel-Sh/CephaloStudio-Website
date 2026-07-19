@@ -1,5 +1,102 @@
 # Changelog
 
+## [1.3.0] - 2026-07-20
+
+### Added — Superimposition / Growth Research Module (F3)
+- Core engine in `src/research/superimposition.js` (~920 lines):
+  - Procrustes alignment (Kabsch 2D with centroid, scale, rotation)
+  - Structural alignment (rotation-only 2-point plane registration)
+  - Alignment-aware displacement computation with error propagation
+  - Rotation tracking (mandibular/palatal/occlusal/Y-axis planes)
+  - Plane intersection angle analysis
+  - Age/sex-stratified delta norms with z-scores (SNA, SNB, ANB, SN-MP, interincisal, U1-NA, L1-NB)
+  - Clinical pattern detection (8 types: growth pattern, skeletal class, maxillary rotation, mandibular autorotation, dentoalveolar compensation, interincisal change, soft tissue profile, centroid size change)
+  - Multi-timepoint longitudinal analysis (pairwise, trajectory, velocity)
+  - Group-level research (per-landmark mean/SD/SE/CI)
+  - Centroid size computation
+- `SuperimpositionPanel.jsx` — Config + Results UI with 7 tabs (Displacements, Patterns, Growth, Delta Norms, Angular, Linear, Error)
+- Integrated into engine.js, studyModel.js, ResultsDialog.jsx
+
+### Added — Superimposition Charts
+- `DisplacementBarPlot` — Horizontal bar of displacements sorted by magnitude
+- `DisplacementPolarPlot` — Direction-coded horizontal bar (compass color)
+- `DisplacementVectorField` — Scatter plot with scaled displacement arrows
+- `RotationTrackingChart` — Bar chart with ±2° clinical threshold lines
+- `PlaneAngleChart` — Dot plot of plane intersection angle changes
+- `DeltaNormChart` — Grouped bars comparing observed vs expected delta
+- `PatternRadarChart` — Severity-coded horizontal bar (mild/moderate/severe)
+- All charts use Plotly basic-dist-compatible traces (scatter, bar)
+
+### Added — Canvas Overlay for Session Comparison
+- Session overlay with 3 alignment modes: 2-Point (manual anchors), Procrustes (all landmarks), Structural (user-selected plane)
+- Displacement vectors with zoom-stable mm labels and color coding
+- Vector scale slider (0.5×–5×) for visual amplification
+- Tracking lines (dashed purple connecting base→compare positions)
+- Hover tooltip with landmark name, mm, A/P, S/I decomposition
+- Blend slider for overlay opacity
+
+### Added — Structural Reference Plane Selection
+- Canvas overlay structural mode: user picks any two landmarks from markups instead of hardcoded REFERENCE_PLANES
+- Research panel structural mode: same two-point-select UI
+- `runLongitudinalSuperimposition` now passes `planePoint1/planePoint2` correctly
+
+### Added — Study Guide Modals
+- `PanelGuideModal.jsx` — 17+ panel-specific guides (incl. superimposition, reliability, workspace)
+- `StudyGuideModal.jsx` — 7 study-type-specific guides with interactive diagrams
+- Superimposition guide covering alignment methods, output tabs, data requirements, tips
+
+### Added — LUT Color Maps
+- Magma, Inferno, Cividis colormaps
+- Grayscale legend fix for all non-gray LUTs
+
+### Added — Normative Database Editor (F7)
+- Full editor for predefined norms in `src/norms.js`
+- Add/edit/delete norm entries with automatic JSON formatting
+
+### Added — Community Norms Contribution
+- `public/contribute.html` subpage with form instructions
+- Norms fetched from GitHub raw repository URL
+- Contribution workflow documented
+
+### Fixed — Superimposition Statistical Correctness (Critical)
+- Angular changes delta was `T1 − T2` instead of `T2 − T1` — inverted in computeAngularChanges
+- Linear changes delta was `T1 − T2` instead of `T2 − T1` — inverted in computeLinearChanges
+- Centroid size `pctChange` was `(T1/T2 − 1)` instead of `(T2/T1 − 1)` — growth gave negative percentage
+- Growth pattern classification labels swapped: clockwise↔counterclockwise, hyperdivergent↔hypodivergent
+- Mandibular autorotation "opening bite"↔"closing bite" swapped
+- Centroid size pattern never fired — `_centroidSize` was never attached to displacements array
+- `structuralAlign` included unwanted scaling factor (changed to rotation-only, scale=1)
+- `runLongitudinalSuperimposition` passed obsolete `referencePlane` key instead of `planePoint1/planePoint2`
+- Panel angular/linear T1/T2 column header labels were swapped
+
+### Fixed — Plotly Chart Compatibility
+- Displacement Direction (Polar) and Clinical Pattern Profile charts used `scatterpolar` trace type which is not available in `plotly.js-basic-dist-min`
+- Converted both to horizontal bar charts (basic-dist compatible)
+
+### Fixed — Displacement Vector Zoom Stability
+- Displacement mm values were computed in screen space (changed with zoom) instead of image space
+- Fixed in `drawDisplacementVectors` (points + lines) and canvas hover tooltip
+- All mm labels now derived from image-space coordinates — zoom-invariant
+
+### Fixed — Sessions Panel Redundancy
+- Removed duplicate "Structural" alignment mode (identical UI to 2-Point mode now that both use two-point selection)
+- Sessions panel now offers 2-Point (manual anchors) and Procrustes (all landmarks)
+
+### Changed — Project Structure
+- `src/research/superimposition.js` added (new research module)
+- `src/research/SuperimpositionPanel.jsx` added
+- `src/research/StudyGuideModal.jsx` — updated superimposition sections
+- `src/panels/PanelGuideModal.jsx` — added superimposition guide
+- `src/state/workspaceStore.js` — added overlay state (alignMode, vectorScale, trackingLines)
+- `src/App.jsx` — canvas draw loop updated for overlay, displacement, tracking lines
+- `src/panels/SessionsPanel.jsx` — overlay UI with alignment, vector scale, tracking lines
+
+### Testing
+- All 300 tests pass (16 test files)
+- 0 lint errors (1 pre-existing exhaustive-deps warning)
+
+---
+
 ## [1.2.0] - 2026-07-14
 
 ### Added — Context Menu System

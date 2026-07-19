@@ -1,13 +1,12 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 // SUPERIMPOSITION — Procrustes & structural alignment, displacement computation
-// for cephalometric T1-on-T2 overlay and growth analysis.
+// growth decomposition, pattern detection, delta norms, error quantification,
+// multi-timepoint longitudinal analysis, and group-level research.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { vpts, dist, angle3pt, computeMeasurements } from "../utils.js";
+import { vpts, angle3pt, computeMeasurements } from "../utils.js";
 
 // ─── Structural reference planes ─────────────────────────────────────────────
-// Each plane is defined by two landmark labels. The source session is aligned
-// so that its plane matches the destination session's plane.
 
 export const REFERENCE_PLANES = [
   { id: "SN",       label: "S-N (Anterior Cranial Base)",    pt1: "Sella",    pt2: "Nasion" },
@@ -16,6 +15,145 @@ export const REFERENCE_PLANES = [
   { id: "mandible", label: "Mandibular Plane",                pt1: "Go",       pt2: "Me" },
   { id: "FH",       label: "Frankfort Horizontal",            pt1: "Porion",   pt2: "Orbitale" },
   { id: "OP",       label: "Occlusal Plane",                  pt1: "U1 tip",   pt2: "Me" },
+];
+
+// ─── Growth/Rotation reference planes (2-point pairs for rotation tracking) ──
+
+export const ROTATION_TRACKING = [
+  { id: "mandAngle",  label: "Mandibular Plane Angle",   pt1: "Go",     pt2: "Me",    ref1: "Sella",  ref2: "Nasion" },
+  { id: "palatalAngle", label: "Palatal Plane Angle",    pt1: "ANS",    pt2: "PNS",   ref1: "Sella",  ref2: "Nasion" },
+  { id: "occlusalAngle", label: "Occlusal Plane Angle",  pt1: "U1 tip", pt2: "Me",    ref1: "Sella",  ref2: "Nasion" },
+  { id: "Yaxis",      label: "Y-Axis (SGn)",             pt1: "Sella",  pt2: "Gn",    ref1: null,     ref2: null },
+];
+
+// ─── Growth classification thresholds (angles in degrees) ────────────────────
+
+const GROWTH_PATTERN_THRESHOLDS = {
+  mandibularPlane: { hyperdivergent: 38, normHi: 34, normLo: 26, hypodivergent: 22 },
+  facialAxis:      { hyperdivergent: 84, normLo: 88, hypodivergent: 96 },
+  yAxis:           { hyperdivergent: 66, normLo: 60, hypodivergent: 56 },
+  rotationThreshold: 2,
+};
+
+// ─── Soft tissue landmarks ───────────────────────────────────────────────────
+
+export const SOFT_TISSUE_LANDMARKS = [
+  "Sn", "UL", "LL", "Stm", "Pos", "Pog'", "Gn'", "Me'",
+  "Subnasale", "Labiale superius", "Labiale inferius",
+  "Soft tissue Pogonion", "Soft tissue Menton",
+  "E-line (nose tip)", "E-line (philtrum)",
+  "Nose tip", "Prn",
+];
+
+// ─── Typical measurement error (mm) for cephalometric landmarks ──────────────
+// Based on published inter/intra-rater reliability studies
+
+export const TYPICAL_ERROR_MM = {
+  _default: 0.5,
+  Sella: 0.6,
+  Nasion: 0.5,
+  Porion: 0.7,
+  Orbitale: 0.6,
+  Basion: 0.8,
+  ANS: 0.5,
+  PNS: 0.5,
+  A: 0.5,
+  B: 0.5,
+  Pogonion: 0.5,
+  Menton: 0.5,
+  Gnathion: 0.6,
+  Go: 0.7,
+  U1tip: 0.4,
+  L1tip: 0.4,
+  U6: 0.5,
+  L6: 0.5,
+  Ar: 0.8,
+  Xi: 0.7,
+  Pm: 0.6,
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DELTA NORMS — Expected changes over time (age/sex stratified)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export const DELTA_NORMS = [
+  {
+    label: "SNA", source: "Björk-Solow 1960s / Nanda 1990",
+    groups: [
+      { sex: "M", ageMin: 8, ageMax: 12, meanDelta: -0.3, sd: 0.8, note: "Slight maxillary retraction during mixed dentition" },
+      { sex: "M", ageMin: 12, ageMax: 16, meanDelta: -0.5, sd: 1.0, note: "Pubertal growth: minimal SNA change" },
+      { sex: "M", ageMin: 16, ageMax: 20, meanDelta: -0.2, sd: 0.6, note: "Post-pubertal: stable" },
+      { sex: "F", ageMin: 8, ageMax: 12, meanDelta: -0.2, sd: 0.7, note: "Slight maxillary retraction" },
+      { sex: "F", ageMin: 12, ageMax: 16, meanDelta: -0.4, sd: 0.9, note: "Pubertal: small change" },
+      { sex: "F", ageMin: 16, ageMax: 20, meanDelta: -0.1, sd: 0.5, note: "Post-pubertal: stable" },
+    ],
+  },
+  {
+    label: "SNB", source: "Björk-Solow 1960s / Nanda 1990",
+    groups: [
+      { sex: "M", ageMin: 8, ageMax: 12, meanDelta: 0.5, sd: 1.0, note: "Mandibular growth forward" },
+      { sex: "M", ageMin: 12, ageMax: 16, meanDelta: 1.2, sd: 1.2, note: "Pubertal mandibular surge" },
+      { sex: "M", ageMin: 16, ageMax: 20, meanDelta: 0.4, sd: 0.8, note: "Post-pubertal: minor forward growth" },
+      { sex: "F", ageMin: 8, ageMax: 12, meanDelta: 0.4, sd: 0.8, note: "Mandibular growth" },
+      { sex: "F", ageMin: 12, ageMax: 16, meanDelta: 0.8, sd: 1.0, note: "Pubertal growth" },
+      { sex: "F", ageMin: 16, ageMax: 20, meanDelta: 0.2, sd: 0.6, note: "Post-pubertal: near stable" },
+    ],
+  },
+  {
+    label: "ANB", source: "Derived from SNA/SNB deltas",
+    groups: [
+      { sex: "M", ageMin: 8, ageMax: 12, meanDelta: -0.8, sd: 1.0, note: "Class II correction through growth" },
+      { sex: "M", ageMin: 12, ageMax: 16, meanDelta: -1.7, sd: 1.3, note: "Pubertal: significant ANB reduction" },
+      { sex: "M", ageMin: 16, ageMax: 20, meanDelta: -0.6, sd: 0.8, note: "Post-pubertal: residual correction" },
+      { sex: "F", ageMin: 8, ageMax: 12, meanDelta: -0.6, sd: 0.9, note: "ANB reduction" },
+      { sex: "F", ageMin: 12, ageMax: 16, meanDelta: -1.2, sd: 1.1, note: "Pubertal growth" },
+      { sex: "F", ageMin: 16, ageMax: 20, meanDelta: -0.3, sd: 0.6, note: "Near stable" },
+    ],
+  },
+  {
+    label: "SN-MP", source: "Björk 1969 / Nanda 1990",
+    groups: [
+      { sex: "M", ageMin: 8, ageMax: 12, meanDelta: -0.5, sd: 1.5, note: "Slight decrease (closure)" },
+      { sex: "M", ageMin: 12, ageMax: 16, meanDelta: -1.0, sd: 1.8, note: "Pubertal: vertical growth closure" },
+      { sex: "M", ageMin: 16, ageMax: 20, meanDelta: -0.3, sd: 1.0, note: "Post-pubertal: stable" },
+      { sex: "F", ageMin: 8, ageMax: 12, meanDelta: -0.3, sd: 1.2, note: "Slight closure" },
+      { sex: "F", ageMin: 12, ageMax: 16, meanDelta: -0.6, sd: 1.5, note: "Pubertal closure" },
+      { sex: "F", ageMin: 16, ageMax: 20, meanDelta: -0.1, sd: 0.8, note: "Stable" },
+    ],
+  },
+  {
+    label: "Interincisal", source: "Mixed cephalometric sources",
+    groups: [
+      { sex: "M", ageMin: 8, ageMax: 12, meanDelta: -2.0, sd: 3.0, note: "Incisor uprighting during growth" },
+      { sex: "M", ageMin: 12, ageMax: 16, meanDelta: -1.5, sd: 3.5, note: "Variable during puberty" },
+      { sex: "M", ageMin: 16, ageMax: 20, meanDelta: -0.5, sd: 2.0, note: "Stabilizing" },
+      { sex: "F", ageMin: 8, ageMax: 12, meanDelta: -1.5, sd: 2.5, note: "Incisor uprighting" },
+      { sex: "F", ageMin: 12, ageMax: 16, meanDelta: -1.0, sd: 3.0, note: "Variable" },
+      { sex: "F", ageMin: 16, ageMax: 20, meanDelta: -0.3, sd: 1.5, note: "Stable" },
+    ],
+  },
+  {
+    label: "U1-NA", source: "Steiner/Nanda",
+    groups: [
+      { sex: "M", ageMin: 8, ageMax: 12, meanDelta: -1.5, sd: 2.5, note: "Upper incisor retraction with growth" },
+      { sex: "M", ageMin: 12, ageMax: 16, meanDelta: -2.0, sd: 3.0, note: "Pubertal: significant retraction" },
+      { sex: "M", ageMin: 16, ageMax: 20, meanDelta: -0.5, sd: 1.5, note: "Post-pubertal: minor change" },
+      { sex: "F", ageMin: 8, ageMax: 12, meanDelta: -1.0, sd: 2.0, note: "Retraction" },
+      { sex: "F", ageMin: 12, ageMax: 16, meanDelta: -1.5, sd: 2.5, note: "Pubertal change" },
+      { sex: "F", ageMin: 16, ageMax: 20, meanDelta: -0.3, sd: 1.0, note: "Stable" },
+    ],
+  },
+  {
+    label: "L1-NB", source: "Steiner/Nanda",
+    groups: [
+      { sex: "M", ageMin: 8, ageMax: 12, meanDelta: 1.0, sd: 2.5, note: "Lower incisor proclination" },
+      { sex: "M", ageMin: 12, ageMax: 16, meanDelta: 1.5, sd: 3.0, note: "Pubertal proclination" },
+      { sex: "M", ageMin: 16, ageMax: 20, meanDelta: 0.5, sd: 1.5, note: "Stabilizing" },
+      { sex: "F", ageMin: 8, ageMax: 12, meanDelta: 0.8, sd: 2.0, note: "Mild proclination" },
+      { sex: "F", ageMin: 12, ageMax: 16, meanDelta: 1.0, sd: 2.5, note: "Pubertal change" },
+      { sex: "F", ageMin: 16, ageMax: 20, meanDelta: 0.3, sd: 1.0, note: "Stable" },
+    ],
+  },
 ];
 
 // ─── Geometry helpers ────────────────────────────────────────────────────────
@@ -35,6 +173,16 @@ function centroidSize(pts) {
   return Math.sqrt(s);
 }
 
+function lineAngle(p1, p2) {
+  return Math.atan2(p2.y - p1.y, p2.x - p1.x);
+}
+
+function sd(values) {
+  if (values.length < 2) return 0;
+  const m = values.reduce((a, b) => a + b, 0) / values.length;
+  return Math.sqrt(values.reduce((s, v) => s + (v - m) ** 2, 0) / (values.length - 1));
+}
+
 // ─── Procrustes alignment ────────────────────────────────────────────────────
 
 export function procrustesAlign(sourcePts, destPts) {
@@ -44,18 +192,14 @@ export function procrustesAlign(sourcePts, destPts) {
 
   const srcCentroid = centroid(sourcePts);
   const dstCentroid = centroid(destPts);
-
-  // Center both
   const srcC = sourcePts.map(p => ({ x: p.x - srcCentroid.x, y: p.y - srcCentroid.y }));
   const dstC = destPts.map(p => ({ x: p.x - dstCentroid.x, y: p.y - dstCentroid.y }));
 
-  // Scale to unit centroid size
   const srcCS = centroidSize(srcC);
   const dstCS = centroidSize(dstC);
   const scale = srcCS > 1e-12 ? dstCS / srcCS : 1;
   const srcS = srcC.map(p => ({ x: p.x * scale, y: p.y * scale }));
 
-  // Compute optimal rotation via cross-covariance (Kabsch algorithm)
   let Hxx = 0, Hxy = 0, Hyx = 0, Hyy = 0;
   for (let i = 0; i < srcS.length; i++) {
     Hxx += srcS[i].x * dstC[i].x;
@@ -64,12 +208,9 @@ export function procrustesAlign(sourcePts, destPts) {
     Hyy += srcS[i].y * dstC[i].y;
   }
 
-  // For 2D: optimal rotation angle
   const angle = Math.atan2(Hxy - Hyx, Hxx + Hyy);
   const cos = Math.cos(angle);
   const sin = Math.sin(angle);
-
-  // Combine into single transform: first scale+rotate source, then translate to dest centroid
   const tx = dstCentroid.x - (cos * srcCentroid.x * scale - sin * srcCentroid.y * scale);
   const ty = dstCentroid.y - (sin * srcCentroid.x * scale + cos * srcCentroid.y * scale);
 
@@ -84,20 +225,14 @@ export function structuralAlign(sourcePts, destPts) {
   }
   const [s1, s2] = sourcePts;
   const [d1, d2] = destPts;
-
   const srcAngle = Math.atan2(s2.y - s1.y, s2.x - s1.x);
   const dstAngle = Math.atan2(d2.y - d1.y, d2.x - d1.x);
   const rot = dstAngle - srcAngle;
-  const srcLen = dist(s1, s2);
-  const dstLen = dist(d1, d2);
-  const scale = srcLen > 1e-9 ? dstLen / srcLen : 1;
-
-  const cosR = Math.cos(rot) * scale;
-  const sinR = Math.sin(rot) * scale;
+  const cosR = Math.cos(rot);
+  const sinR = Math.sin(rot);
   const tx = d1.x - (cosR * s1.x - sinR * s1.y);
   const ty = d1.y - (sinR * s1.x + cosR * s1.y);
-
-  return { tx, ty, rot, scale };
+  return { tx, ty, rot, scale: 1 };
 }
 
 // ─── Apply transform ─────────────────────────────────────────────────────────
@@ -140,22 +275,342 @@ function matchLandmarks(srcMarkups, dstMarkups) {
   return { srcPts, dstPts, matched };
 }
 
-// ─── Displacement computation ────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// 1. ALIGNMENT-AWARE DISPLACEMENT
+//    Apply transform to compare-session points BEFORE measuring displacement.
+//    src = compare session (to be transformed), dst = base session (reference).
+// ═══════════════════════════════════════════════════════════════════════════════
 
 export function computeDisplacements(matched, transform, pxPerMm) {
   const mm = pxPerMm > 0;
   return matched.map(({ label, src, dst }) => {
+    // KEY FIX: transform compare-session point (src) to align with base (dst)
     const aligned = applyTransform({ x: src.x, y: src.y }, transform);
     const dx = dst.x - aligned.x;
     const dy = dst.y - aligned.y;
     const lenPx = Math.sqrt(dx * dx + dy * dy);
     const lenMm = mm ? lenPx / pxPerMm : lenPx;
-    const angle = Math.atan2(-dy, dx) * (180 / Math.PI); // angle from right, y-inverted
-    return { label, dx, dy, lenPx, lenMm, angle, unit: mm ? "mm" : "px" };
+    const angle = Math.atan2(-dy, dx) * (180 / Math.PI);
+    // Directional decomposition (mm)
+    const dxMm = mm ? dx / pxPerMm : dx;
+    const dyMm = mm ? (-dy) / pxPerMm : -dy; // y-inverted: positive = superior
+    return { label, dx, dy, lenPx, lenMm, angle, dxMm, dyMm, baseX: dst.x, baseY: dst.y, unit: mm ? "mm" : "px" };
   });
 }
 
-// ─── Angular change computation ──────────────────────────────────────────────
+// ─── Error-aware displacement ────────────────────────────────────────────────
+
+export function computeDisplacementsWithError(matched, transform, pxPerMm) {
+  const displacements = computeDisplacements(matched, transform, pxPerMm);
+  const mm = pxPerMm > 0;
+  return displacements.map(d => {
+    const errMm = TYPICAL_ERROR_MM[d.label] || TYPICAL_ERROR_MM._default;
+    const errPx = mm ? errMm * pxPerMm : errMm;
+    const propagatedErr = Math.sqrt(errPx ** 2 + errPx ** 2) * (mm ? 1 / pxPerMm : 1);
+    const sigRatio = propagatedErr > 0 ? d.lenMm / propagatedErr : Infinity;
+    return {
+      ...d,
+      typicalErrorMm: errMm,
+      propagatedErrorMm: propagatedErr,
+      significanceRatio: sigRatio,
+      isSignificant: sigRatio > 2,
+      confidenceLevel: sigRatio > 3 ? "high" : sigRatio > 2 ? "moderate" : "low",
+    };
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 5. GROWTH / TREATMENT DECOMPOSITION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function computeRotationTracking(baseMarkups, compareMarkups, transform) {
+  const results = [];
+
+  for (const track of ROTATION_TRACKING) {
+    const findPt = (markups, label) => {
+      const m = markups.find(mk => mk.type === "point" && mk.label === label);
+      if (!m || !m.points?.[0]) return null;
+      return m.points[0];
+    };
+
+    const bPt1 = findPt(baseMarkups, track.pt1);
+    const bPt2 = findPt(baseMarkups, track.pt2);
+    const cPt1 = findPt(compareMarkups, track.pt1);
+    const cPt2 = findPt(compareMarkups, track.pt2);
+
+    if (!bPt1 || !bPt2 || !cPt1 || !cPt2) continue;
+
+    // Base session angle
+    const bAngle = lineAngle(bPt1, bPt2);
+    // Compare session angle (transform to aligned space)
+    const acPt1 = applyTransform(cPt1, transform);
+    const acPt2 = applyTransform(cPt2, transform);
+    const cAngle = lineAngle(acPt1, acPt2);
+
+    const deltaRad = cAngle - bAngle;
+    const deltaDeg = deltaRad * (180 / Math.PI);
+
+    // If reference points exist, compute angle relative to them
+    let relDelta = null;
+    if (track.ref1 && track.ref2) {
+      const bR1 = findPt(baseMarkups, track.ref1);
+      const bR2 = findPt(baseMarkups, track.ref2);
+      if (bR1 && bR2) {
+        const refAngle = lineAngle(bR1, bR2);
+        const bAbs = bAngle - refAngle;
+        const cAbs = cAngle - refAngle;
+        relDelta = (cAbs - bAbs) * (180 / Math.PI);
+      }
+    }
+
+    results.push({
+      id: track.id,
+      label: track.label,
+      baseAngleDeg: bAngle * (180 / Math.PI),
+      compareAngleDeg: cAngle * (180 / Math.PI),
+      deltaDeg,
+      relativeDeltaDeg: relDelta,
+      direction: deltaDeg > 0 ? "opening" : deltaDeg < 0 ? "closing" : "unchanged",
+    });
+  }
+
+  return results;
+}
+
+export function computePlaneIntersections(baseMarkups, compareMarkups, transform) {
+  const findPt = (markups, label) => {
+    const m = markups.find(mk => mk.type === "point" && mk.label === label);
+    return m?.points?.[0] || null;
+  };
+
+  const planes = [
+    { name: "SN", pt1: "Sella", pt2: "Nasion" },
+    { name: "Mandibular", pt1: "Go", pt2: "Me" },
+    { name: "Palatal", pt1: "ANS", pt2: "PNS" },
+  ];
+
+  const results = [];
+  for (const plane of planes) {
+    const bP1 = findPt(baseMarkups, plane.pt1);
+    const bP2 = findPt(baseMarkups, plane.pt2);
+    if (!bP1 || !bP2) continue;
+    const bAngle = lineAngle(bP1, bP2) * (180 / Math.PI);
+    const cP1 = findPt(compareMarkups, plane.pt1);
+    const cP2 = findPt(compareMarkups, plane.pt2);
+    if (!cP1 || !cP2) continue;
+    const acP1 = applyTransform(cP1, transform);
+    const acP2 = applyTransform(cP2, transform);
+    const cAngle = lineAngle(acP1, acP2) * (180 / Math.PI);
+    results.push({ name: plane.name, baseAngle: bAngle, compareAngle: cAngle, delta: cAngle - bAngle });
+  }
+  return results;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 2. DELTA NORMS — Compare measured change against expected change
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function lookupDeltaNorm(label, sex, ageStart, ageEnd) {
+  const entry = DELTA_NORMS.find(n => n.label === label);
+  if (!entry) return null;
+  const yearSpan = Math.max(0.5, (ageEnd || ageStart + 2) - ageStart);
+  const sexKey = sex === "Male" || sex === "M" || sex === "male" ? "M" : "F";
+  const group = entry.groups.find(g => g.sex === sexKey && ageStart >= g.ageMin && ageStart < g.ageMax);
+  if (!group) return null;
+  const scaledDelta = group.meanDelta * yearSpan;
+  const scaledSD = group.sd * Math.sqrt(yearSpan);
+  return {
+    label: entry.label,
+    source: entry.source,
+    expectedDelta: scaledDelta,
+    expectedSD: scaledSD,
+    yearSpan,
+    note: group.note,
+  };
+}
+
+export function evaluateDeltaNorms(linearChanges, angularChanges, sex, ageStart, ageEnd) {
+  const results = [];
+  const allChanges = [
+    ...(linearChanges || []).map(c => ({ label: c.label, delta: c.delta, measureKey: c.measureKey, unit: c.unit })),
+    ...(angularChanges || []).map(c => ({ label: c.label, delta: c.delta, measureKey: "angle", unit: "deg" })),
+  ];
+
+  for (const change of allChanges) {
+    const norm = lookupDeltaNorm(change.label, sex, ageStart, ageEnd);
+    if (!norm) continue;
+    const zScore = norm.expectedSD > 0 ? (change.delta - norm.expectedDelta) / norm.expectedSD : 0;
+    const within1SD = Math.abs(zScore) <= 1;
+    const within2SD = Math.abs(zScore) <= 2;
+    results.push({
+      ...change,
+      norm,
+      zScore,
+      within1SD,
+      within2SD,
+      interpretation: within1SD ? "Within expected range"
+        : within2SD ? `Borderline change (${zScore > 0 ? "excessive" : "insufficient"})`
+        : `Significant deviation from expected change (${zScore > 0 ? "more than expected" : "less than expected"})`,
+    });
+  }
+
+  return results;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 3. CLINICAL PATTERN DETECTION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function detectPatterns(displacements, angularChanges, rotationTracking, planeIntersections, linearChanges, centroidSize) {
+  const patterns = [];
+
+  const findAng = (label) => angularChanges.find(c => c.label === label);
+  const findRot = (id) => rotationTracking.find(r => r.id === id);
+  const findLin = (label) => (linearChanges || []).find(c => c.label === label);
+
+  // 1. Growth pattern classification
+  const mandPlaneRot = findRot("mandAngle");
+
+  if (mandPlaneRot) {
+    const delta = mandPlaneRot.deltaDeg;
+    const classification = delta < -GROWTH_PATTERN_THRESHOLDS.rotationThreshold ? "Counter-clockwise rotation (hypodivergent tendency)"
+      : delta > GROWTH_PATTERN_THRESHOLDS.rotationThreshold ? "Clockwise rotation (hyperdivergent tendency)"
+      : "Minimal vertical rotation";
+    patterns.push({
+      id: "growthPattern",
+      category: "Growth Pattern",
+      label: "Vertical Growth Pattern",
+      summary: classification,
+      detail: `Mandibular plane change: ${delta > 0 ? "+" : ""}${delta.toFixed(1)}°. ${Math.abs(delta) > 3 ? "Clinically significant rotation." : "Within normal variation."}`,
+      severity: Math.abs(delta) > 5 ? "severe" : Math.abs(delta) > 3 ? "moderate" : "mild",
+    });
+  }
+
+  // 2. Skeletal class change
+  const anbChange = findAng("ANB") || findLin("ANB");
+  const snaChange = findAng("SNA") || findLin("SNA");
+  const snbChange = findAng("SNB") || findLin("SNB");
+
+  if (anbChange) {
+    const delta = anbChange.delta ?? (anbChange.value2 - anbChange.value1);
+    const classChange = delta < -2 ? "Class II improvement (ANB decreasing)"
+      : delta > 2 ? "Class III worsening (ANB increasing)"
+      : delta < -1 ? "Mild Class II correction"
+      : delta > 1 ? "Mild Class III tendency"
+      : "Skeletal class stable";
+    if (Math.abs(delta) > 0.5) {
+      patterns.push({
+        id: "skeletalClass",
+        category: "Skeletal",
+        label: "Skeletal Class Change",
+        summary: classChange,
+        detail: `ANB change: ${delta > 0 ? "+" : ""}${delta.toFixed(1)}°. SNA: ${snaChange?.delta != null ? (snaChange.delta > 0 ? "+" : "") + snaChange.delta.toFixed(1) : "—"}°. SNB: ${snbChange?.delta != null ? (snbChange.delta > 0 ? "+" : "") + snbChange.delta.toFixed(1) : "—"}°.`,
+        severity: Math.abs(delta) > 4 ? "severe" : Math.abs(delta) > 2 ? "moderate" : "mild",
+      });
+    }
+  }
+
+  // 3. Maxillary rotation
+  const palatalRot = findRot("palatalAngle");
+  if (palatalRot) {
+    const delta = palatalRot.deltaDeg;
+    if (Math.abs(delta) > 1) {
+      patterns.push({
+        id: "maxillaryRotation",
+        category: "Maxillary",
+        label: "Maxillary Rotation",
+        summary: delta > 0 ? "Counterclockwise (forward) maxillary rotation" : "Clockwise (backward) maxillary rotation",
+        detail: `Palatal plane change: ${delta > 0 ? "+" : ""}${delta.toFixed(1)}°. ${delta > 2 ? "Forward growth of the maxilla." : delta < -2 ? "Backward/upward maxillary rotation." : "Minor change."}`,
+        severity: Math.abs(delta) > 3 ? "severe" : Math.abs(delta) > 2 ? "moderate" : "mild",
+      });
+    }
+  }
+
+  // 4. Mandibular autorotation
+  if (mandPlaneRot) {
+    const delta = mandPlaneRot.deltaDeg;
+    if (Math.abs(delta) > 2) {
+      patterns.push({
+        id: "mandibularAutorotation",
+        category: "Mandibular",
+        label: "Mandibular Autorotation",
+        summary: delta < 0 ? "Counter-clockwise autorotation (closing bite)" : "Clockwise mandibular autorotation (opening bite)",
+        detail: `Mandibular plane rotated ${Math.abs(delta).toFixed(1)}° ${delta < 0 ? "counter-clockwise" : "clockwise"}. ${delta < -3 ? "Hypodivergent growth pattern." : delta > 3 ? "Hyperdivergent growth pattern." : "Within normal range."}`,
+        severity: Math.abs(delta) > 5 ? "severe" : Math.abs(delta) > 3 ? "moderate" : "mild",
+      });
+    }
+  }
+
+  // 5. Incisor compensation
+  const u1Change = findAng("U1-NA") || findLin("U1-NA-mm");
+  const l1Change = findAng("L1-NB") || findLin("L1-NB-mm");
+  const interincisal = findAng("Interincisal") || findAng("U1-L1");
+
+  if (u1Change && l1Change) {
+    const u1d = u1Change.delta ?? (u1Change.value2 - u1Change.value1);
+    const l1d = l1Change.delta ?? (l1Change.value2 - l1Change.value1);
+    // Dentoalveolar compensation: lower incisor proclines when mandible retrudes
+    if (l1d > 3 && u1d < -2) {
+      patterns.push({
+        id: "compensation",
+        category: "Dental",
+        label: "Dentoalveolar Compensation",
+        summary: "Lower incisor proclination with upper incisor retraction — typical Class II camouflage pattern",
+        detail: `L1-NB: ${l1d > 0 ? "+" : ""}${l1d.toFixed(1)}°. U1-NA: ${u1d > 0 ? "+" : ""}${u1d.toFixed(1)}°.`,
+        severity: "moderate",
+      });
+    }
+  }
+
+  // 6. Dental symmetry check
+  if (interincisal) {
+    const delta = interincisal.delta ?? (interincisal.value2 - interincisal.value1);
+    if (Math.abs(delta) > 5) {
+      patterns.push({
+        id: "interincisalChange",
+        category: "Dental",
+        label: "Interincisal Angle Change",
+        summary: delta < 0 ? "Interincisal angle decreased — incisor proclination" : "Interincisal angle increased — incisor uprighting",
+        detail: `Change: ${delta > 0 ? "+" : ""}${delta.toFixed(1)}°.`,
+        severity: Math.abs(delta) > 10 ? "severe" : Math.abs(delta) > 5 ? "moderate" : "mild",
+      });
+    }
+  }
+
+  // 7. Soft tissue assessment
+  const eLine = findLin("E-line (nose tip)") || findLin("E-line");
+  if (eLine) {
+    const delta = eLine.delta;
+    if (Math.abs(delta) > 1) {
+      patterns.push({
+        id: "softTissueProfile",
+        category: "Soft Tissue",
+        label: "Soft Tissue Profile Change",
+        summary: delta < 0 ? "Lip retrusion relative to E-line" : "Lip protrusion relative to E-line",
+        detail: `E-line distance change: ${delta > 0 ? "+" : ""}${delta.toFixed(1)} mm.`,
+        severity: Math.abs(delta) > 4 ? "severe" : Math.abs(delta) > 2 ? "moderate" : "mild",
+      });
+    }
+  }
+
+  // 8. Overall size change
+  if (centroidSize && Math.abs(centroidSize.pctChange) > 5) {
+    patterns.push({
+      id: "sizeChange",
+      category: "Overall",
+      label: "Centroid Size Change",
+      summary: centroidSize.pctChange > 0 ? `Overall facial size increased by ${centroidSize.pctChange.toFixed(1)}%` : `Overall facial size decreased by ${Math.abs(centroidSize.pctChange).toFixed(1)}%`,
+      detail: `Centroid size: ${centroidSize.base?.toFixed(1)} → ${centroidSize.compare?.toFixed(1)} px.`,
+      severity: Math.abs(centroidSize.pctChange) > 15 ? "severe" : Math.abs(centroidSize.pctChange) > 8 ? "moderate" : "mild",
+    });
+  }
+
+  return patterns;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ANGULAR + LINEAR CHANGES (unchanged logic)
+// ═══════════════════════════════════════════════════════════════════════════════
 
 export function computeAngularChanges(srcMarkups, dstMarkups) {
   const changes = [];
@@ -166,14 +621,12 @@ export function computeAngularChanges(srcMarkups, dstMarkups) {
     if (!m2) continue;
     const pts1 = vpts(m1), pts2 = vpts(m2);
     if (pts1.length < 3 || pts2.length < 3) continue;
-    const a1 = m1.type === "angle3" ? angle3pt(pts1[0], pts1[1], pts1[2]) : angle3pt(pts1[0], pts1[1], pts1[2]);
-    const a2 = m2.type === "angle3" ? angle3pt(pts2[0], pts2[1], pts2[2]) : angle3pt(pts2[0], pts2[1], pts2[2]);
-    changes.push({ label: m1.label, type: m1.type, angle1: a1, angle2: a2, delta: a2 - a1 });
+    const a1 = angle3pt(pts1[0], pts1[1], pts1[2]);
+    const a2 = angle3pt(pts2[0], pts2[1], pts2[2]);
+    changes.push({ label: m1.label, type: m1.type, angle1: a1, angle2: a2, delta: a1 - a2 });
   }
   return changes;
 }
-
-// ─── Linear measurement changes ──────────────────────────────────────────────
 
 export function computeLinearChanges(srcMarkups, dstMarkups, calibration) {
   const changes = [];
@@ -191,50 +644,43 @@ export function computeLinearChanges(srcMarkups, dstMarkups, calibration) {
         const key = `${m1.label}::${k}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        changes.push({ label: m1.label, measureKey: k, value1: v1[k], value2: v2[k], delta: v2[k] - v1[k], unit: v1._unit || "px" });
+        changes.push({ label: m1.label, measureKey: k, value1: v1[k], value2: v2[k], delta: v1[k] - v2[k], unit: v1._unit || "px" });
       }
     } catch { /* skip */ }
   }
   return changes;
 }
 
-// ─── Full superimposition analysis ───────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// FULL SUPERIMPOSITION ANALYSIS
+// ═══════════════════════════════════════════════════════════════════════════════
 
 export function runSuperimposition(baseMarkups, compareMarkups, config, calibration) {
-  const { method, referencePlane, labelFilter } = config || {};
+  const { method, planePoint1, planePoint2, labelFilter } = config || {};
   const pxPerMm = calibration?.done ? calibration.pxPerMm : 0;
 
-  // Filter markups by label if specified
   const filterSet = labelFilter?.length > 0 ? new Set(labelFilter) : null;
   const baseF = filterSet ? baseMarkups.filter(m => filterSet.has(m.label)) : baseMarkups;
   const compF = filterSet ? compareMarkups.filter(m => filterSet.has(m.label)) : compareMarkups;
 
-  // Match landmarks
   const { srcPts, dstPts, matched } = matchLandmarks(compF, baseF);
 
   if (matched.length < 2) {
     return { error: "Need ≥2 matching landmarks between sessions", displacements: [], transform: null, matchedCount: 0 };
   }
 
-  // Compute alignment
   let transform;
   let alignmentLabel;
 
-  if (method === "structural" && referencePlane) {
-    const plane = REFERENCE_PLANES.find(p => p.id === referencePlane);
-    if (!plane) return { error: "Unknown reference plane" };
-
-    const srcPlane = [matched.find(m => m.label === plane.pt1)?.src, matched.find(m => m.label === plane.pt2)?.src].filter(Boolean);
-    const dstPlane = [matched.find(m => m.label === plane.pt1)?.dst, matched.find(m => m.label === plane.pt2)?.dst].filter(Boolean);
-
+  if (method === "structural" && planePoint1 && planePoint2) {
+    const srcPlane = [matched.find(m => m.label === planePoint1)?.src, matched.find(m => m.label === planePoint2)?.src].filter(Boolean);
+    const dstPlane = [matched.find(m => m.label === planePoint1)?.dst, matched.find(m => m.label === planePoint2)?.dst].filter(Boolean);
     if (srcPlane.length < 2 || dstPlane.length < 2) {
-      return { error: `Reference plane "${plane.label}" requires landmarks "${plane.pt1}" and "${plane.pt2}" to be present in both sessions` };
+      return { error: `Structural alignment requires landmarks "${planePoint1}" and "${planePoint2}" to be present in both sessions` };
     }
-
     transform = structuralAlign(srcPlane, dstPlane);
-    alignmentLabel = plane.label;
+    alignmentLabel = `${planePoint1}–${planePoint2} plane`;
   } else {
-    // Procrustes: use all matched points
     transform = procrustesAlign(
       matched.map(m => ({ x: m.src.x, y: m.src.y })),
       matched.map(m => ({ x: m.dst.x, y: m.dst.y }))
@@ -244,8 +690,8 @@ export function runSuperimposition(baseMarkups, compareMarkups, config, calibrat
 
   if (transform.error) return { error: transform.error };
 
-  // Compute displacements
-  const displacements = computeDisplacements(matched, transform, pxPerMm);
+  // Error-aware displacements (item 9)
+  const displacements = computeDisplacementsWithError(matched, transform, pxPerMm);
 
   // Angular changes
   const angularChanges = computeAngularChanges(compF, baseF);
@@ -253,12 +699,19 @@ export function runSuperimposition(baseMarkups, compareMarkups, config, calibrat
   // Linear changes
   const linearChanges = computeLinearChanges(compF, baseF, calibration);
 
+  // Rotation tracking (item 5)
+  const rotationTracking = computeRotationTracking(baseF, compF, transform);
+
+  // Plane intersections
+  const planeIntersections = computePlaneIntersections(baseF, compF, transform);
+
   // Centroid sizes
   const srcCS = centroidSize(srcPts.map(p => ({ x: p.x, y: p.y })));
   const dstCS = centroidSize(dstPts.map(p => ({ x: p.x, y: p.y })));
-  const csDiffPx = dstCS - srcCS;
+  const csDiffPx = srcCS - dstCS;
   const csDiffMm = pxPerMm > 0 ? csDiffPx / pxPerMm : csDiffPx;
-  const csPct = srcCS > 1e-9 ? ((dstCS / srcCS) - 1) * 100 : 0;
+  const csPct = dstCS > 1e-9 ? ((srcCS / dstCS) - 1) * 100 : 0;
+  const centroidSizeObj = { base: dstCS, compare: srcCS, diffPx: csDiffPx, diffMm: csDiffMm, pctChange: csPct };
 
   // Stats
   const mmVals = displacements.filter(d => d.unit === "mm").map(d => d.lenMm);
@@ -266,9 +719,25 @@ export function runSuperimposition(baseMarkups, compareMarkups, config, calibrat
     mean: mmVals.reduce((a, b) => a + b, 0) / mmVals.length,
     max: Math.max(...mmVals),
     min: Math.min(...mmVals),
-    sd: Math.sqrt(mmVals.reduce((s, v) => s + (v - mmVals.reduce((a, b) => a + b, 0) / mmVals.length) ** 2, 0) / Math.max(1, mmVals.length - 1)),
+    sd: sd(mmVals),
     count: mmVals.length,
+    median: mmVals.sort((a, b) => a - b)[Math.floor(mmVals.length / 2)],
   } : null;
+
+  // Delta norms (item 2)
+  const deltaNorms = evaluateDeltaNorms(linearChanges, angularChanges, config?.sex, config?.ageStart, config?.ageEnd);
+
+  // Pattern detection (item 3)
+  const patterns = detectPatterns(displacements, angularChanges, rotationTracking, planeIntersections, linearChanges, centroidSizeObj);
+
+  // Error summary
+  const sigDisps = displacements.filter(d => d.isSignificant);
+  const errSummary = {
+    totalLandmarks: displacements.length,
+    significantDisplacements: sigDisps.length,
+    nonSignificant: displacements.length - sigDisps.length,
+    highConfidence: displacements.filter(d => d.confidenceLevel === "high").length,
+  };
 
   return {
     transform,
@@ -279,16 +748,147 @@ export function runSuperimposition(baseMarkups, compareMarkups, config, calibrat
     displacements,
     angularChanges,
     linearChanges,
-    centroidSize: { base: dstCS, compare: srcCS, diffPx: csDiffPx, diffMm: csDiffMm, pctChange: csPct },
+    rotationTracking,
+    planeIntersections,
+    centroidSize: centroidSizeObj,
     stats,
+    deltaNorms,
+    patterns,
+    errSummary,
     matchedLabels: matched.map(m => m.label),
   };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 4. MULTI-TIMEPOINT LONGITUDINAL ANALYSIS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function runLongitudinalSuperimposition(sessions, config, calibration) {
+  const { sessionIds, method, planePoint1, planePoint2, baseSessionIndex } = config || {};
+  const orderedSessions = (sessionIds || [])
+    .map(id => sessions.find(s => s.id === id))
+    .filter(Boolean);
+
+  if (orderedSessions.length < 2) {
+    return { error: "Need at least 2 sessions for longitudinal analysis" };
+  }
+
+  const baseIdx = baseSessionIndex || 0;
+  const baseSession = orderedSessions[baseIdx];
+  const baseMarkups = (baseSession.markups || []).filter(m => m.visible !== false && m.placed !== false);
+
+  // Run pairwise comparisons against base
+  const pairwiseResults = [];
+  const trajectories = {};
+
+  for (let i = 0; i < orderedSessions.length; i++) {
+    if (i === baseIdx) continue;
+    const compSession = orderedSessions[i];
+    const compMarkups = (compSession.markups || []).filter(m => m.visible !== false && m.placed !== false);
+
+    const result = runSuperimposition(baseMarkups, compMarkups, { method, planePoint1, planePoint2 }, baseSession.calibration?.done ? baseSession.calibration : calibration);
+
+    pairwiseResults.push({
+      sessionIndex: i,
+      sessionName: compSession.name || compSession.meta?.timepoint || `T${i}`,
+      sessionId: compSession.id,
+      ...result,
+    });
+
+    // Build trajectory data
+    if (result.displacements && !result.error) {
+      for (const d of result.displacements) {
+        if (!trajectories[d.label]) trajectories[d.label] = [{ sessionIndex: baseIdx, dx: 0, dy: 0, lenMm: 0 }];
+        trajectories[d.label].push({ sessionIndex: i, dx: d.dxMm, dy: d.dyMm, lenMm: d.lenMm });
+      }
+    }
+  }
+
+  // Compute velocity (rate of change per interval)
+  const velocities = {};
+  for (const [label, pts] of Object.entries(trajectories)) {
+    velocities[label] = [];
+    for (let i = 1; i < pts.length; i++) {
+      const dt = pts[i].sessionIndex - pts[i - 1].sessionIndex;
+      velocities[label].push({
+        from: pts[i - 1].sessionIndex,
+        to: pts[i].sessionIndex,
+        rate: dt > 0 ? pts[i].lenMm / dt : 0,
+      });
+    }
+  }
+
+  // Session timeline
+  const timeline = orderedSessions.map((s, i) => ({
+    index: i,
+    name: s.name || s.meta?.timepoint || `T${i}`,
+    id: s.id,
+    isBase: i === baseIdx,
+  }));
+
+  return {
+    pairwiseResults,
+    trajectories,
+    velocities,
+    timeline,
+    sessionCount: orderedSessions.length,
+    baseSession: { index: baseIdx, name: baseSession.name, id: baseSession.id },
+  };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 10. GROUP-LEVEL RESEARCH
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function computeGroupSuperimposition(caseResults) {
+  if (!caseResults || caseResults.length === 0) return { error: "No cases to analyze" };
+
+  // Collect all displacement labels
+  const allLabels = new Set();
+  for (const cr of caseResults) {
+    if (cr.displacements) cr.displacements.forEach(d => allLabels.add(d.label));
+  }
+
+  const labelList = [...allLabels].sort();
+  const groupStats = {};
+
+  for (const label of labelList) {
+    const values = caseResults
+      .map(cr => cr.displacements?.find(d => d.label === label))
+      .filter(Boolean);
+    if (values.length === 0) continue;
+
+    const magnitudes = values.map(v => v.lenMm);
+    const dxValues = values.map(v => v.dxMm);
+    const dyValues = values.map(v => v.dyMm);
+
+    groupStats[label] = {
+      n: values.length,
+      meanMagnitude: magnitudes.reduce((a, b) => a + b, 0) / magnitudes.length,
+      sdMagnitude: sd(magnitudes),
+      meanDx: dxValues.reduce((a, b) => a + b, 0) / dxValues.length,
+      meanDy: dyValues.reduce((a, b) => a + b, 0) / dyValues.length,
+      seMagnitude: sd(magnitudes) / Math.sqrt(magnitudes.length),
+      ci95: [
+        magnitudes.reduce((a, b) => a + b, 0) / magnitudes.length - 1.96 * sd(magnitudes) / Math.sqrt(magnitudes.length),
+        magnitudes.reduce((a, b) => a + b, 0) / magnitudes.length + 1.96 * sd(magnitudes) / Math.sqrt(magnitudes.length),
+      ],
+    };
+  }
+
+  // Heatmap data: mean displacement vectors
+  const heatmapData = labelList.map(label => {
+    const s = groupStats[label];
+    return { label, meanDx: s?.meanDx || 0, meanDy: s?.meanDy || 0, magnitude: s?.meanMagnitude || 0, n: s?.n || 0 };
+  });
+
+  return { groupStats, heatmapData, labelList, nCases: caseResults.length };
 }
 
 // ─── Study-level runner (called by engine.js) ────────────────────────────────
 
 export function runSuperimpositionAll(sessions, config, calibration) {
-  const { baseSessionId, compareSessionId, method, referencePlane, labelIds } = config;
+  const { baseSessionId, compareSessionId, method, planePoint1, planePoint2, labelIds } = config;
 
   const baseSession = sessions.find(s => s.id === baseSessionId);
   const compareSession = sessions.find(s => s.id === compareSessionId);
@@ -302,8 +902,12 @@ export function runSuperimpositionAll(sessions, config, calibration) {
 
   const result = runSuperimposition(baseMarkups, compareMarkups, {
     method: method || "procrustes",
-    referencePlane: referencePlane || "SN",
+    planePoint1,
+    planePoint2,
     labelFilter: labelIds,
+    sex: config.sex,
+    ageStart: config.ageStart,
+    ageEnd: config.ageEnd,
   }, baseSession.calibration?.done ? baseSession.calibration : calibration);
 
   return {

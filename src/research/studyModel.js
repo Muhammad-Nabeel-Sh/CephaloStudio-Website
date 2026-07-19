@@ -78,7 +78,8 @@ export function mkStudy(type, opts = {}) {
     base.config.baseSessionId = opts.config?.baseSessionId || "";
     base.config.compareSessionId = opts.config?.compareSessionId || "";
     base.config.method = opts.config?.method || "procrustes";
-    base.config.referencePlane = opts.config?.referencePlane || "SN";
+    base.config.planePoint1 = opts.config?.planePoint1 || "";
+    base.config.planePoint2 = opts.config?.planePoint2 || "";
   }
 
   return base;

@@ -476,6 +476,7 @@ function buildResearchStudies(doc, project) {
       longitudinal: "Longitudinal Analysis",
       correlation: "Correlation Analysis",
       diagnostic: "Diagnostic Analysis",
+      superimposition: "Superimposition / Growth Analysis",
     };
 
     const title = TYPE_TITLES[study.type] || "Results";
@@ -629,6 +630,182 @@ function buildResearchStudies(doc, project) {
       opts.columnStyles = { 0: { cellWidth: 40, fontStyle: "bold", halign: "center", valign: "middle" }, ...Object.fromEntries(cols.map((c, i) => [i + 1, c])) };
       const headRow = [""].concat(labels).map(l => l.length > 8 ? l.slice(0, 6) + "\u2026" : l);
       doc.autoTable({ startY: 42, head: [headRow], body, ...opts });
+    }
+
+    if (study.type === "superimposition" && res.displacements) {
+      let y = 42;
+
+      // Alignment info
+      if (res.alignmentLabel) {
+        doc.setFontSize(8);
+        doc.setTextColor(C.tx2);
+        doc.setFont("helvetica", "normal");
+        doc.text("Method: " + res.alignmentLabel, MARGIN, y);
+        y += 6;
+      }
+
+      // Displacement table
+      const disps = res.displacements || [];
+      if (disps.length > 0) {
+        doc.setFontSize(9);
+        doc.setTextColor(C.acc);
+        doc.setFont("helvetica", "bold");
+        doc.text("Landmark Displacements", MARGIN, y);
+        y += 5;
+
+        const dBody = disps.sort((a, b) => (b.lenMm || 0) - (a.lenMm || 0)).map(d => [
+          d.label || "\u2014",
+          fmtMm(d.lenMm, d.unit),
+          (d.dxMm != null ? (d.dxMm >= 0 ? "+" : "") + d.dxMm.toFixed(2) : "\u2014"),
+          (d.dyMm != null ? (d.dyMm >= 0 ? "+" : "") + d.dyMm.toFixed(2) : "\u2014"),
+          d.confidenceLevel || "\u2014",
+          d.isSignificant ? "Yes" : "No",
+        ]);
+        doc.autoTable({
+          startY: y, head: [["Landmark", "Displacement", "Ant/Post (mm)", "Sup/Inf (mm)", "Confidence", "Sig."]],
+          body: dBody,
+          theme: "grid",
+          styles: { font: "helvetica", fontSize: 7, textColor: C.tx, fillColor: C.surf, lineColor: C.bdr, lineWidth: 0.3, halign: "center", valign: "middle" },
+          headStyles: { fillColor: C.dark2, textColor: C.txhd, fontSize: 7.5, fontStyle: "bold", halign: "center", valign: "middle" },
+          alternateRowStyles: { fillColor: C.surf2 },
+          columnStyles: {
+            0: { cellWidth: 32, fontStyle: "bold", halign: "center", valign: "middle" },
+            1: { cellWidth: 24, halign: "center", valign: "middle" },
+            2: { cellWidth: 28, halign: "center", valign: "middle" },
+            3: { cellWidth: 28, halign: "center", valign: "middle" },
+            4: { cellWidth: 24, halign: "center", valign: "middle" },
+            5: { cellWidth: 18, halign: "center", valign: "middle" },
+          },
+          margin: { left: MARGIN, right: MARGIN, bottom: 10 },
+          tableWidth: BODY_W,
+        });
+        y = (doc.lastAutoTable?.finalY || y) + 8;
+      }
+
+      // Summary stats
+      if (res.stats) {
+        if (y > BOTTOM_SAFE - 30) { doc.addPage(); darkBg(doc); pageHeader(doc); y = 18; }
+        doc.setFontSize(9);
+        doc.setTextColor(C.acc);
+        doc.setFont("helvetica", "bold");
+        doc.text("Summary Statistics", MARGIN, y);
+        y += 5;
+        doc.setFontSize(8);
+        doc.setTextColor(C.tx);
+        doc.setFont("helvetica", "normal");
+        doc.text(`Mean: ${res.stats.mean.toFixed(2)} mm  |  SD: ${res.stats.sd.toFixed(2)} mm  |  Max: ${res.stats.max.toFixed(2)} mm  |  N: ${res.stats.count}`, MARGIN, y);
+        y += 8;
+      }
+
+      // Rotation tracking
+      if (res.rotationTracking?.length > 0) {
+        if (y > BOTTOM_SAFE - 30) { doc.addPage(); darkBg(doc); pageHeader(doc); y = 18; }
+        doc.setFontSize(9);
+        doc.setTextColor(C.acc);
+        doc.setFont("helvetica", "bold");
+        doc.text("Reference Plane Rotation", MARGIN, y);
+        y += 5;
+        const rBody = res.rotationTracking.map(rt => [
+          rt.label || rt.id,
+          (rt.baseAngleDeg != null ? rt.baseAngleDeg.toFixed(1) + "\u00b0" : "\u2014"),
+          (rt.compareAngleDeg != null ? rt.compareAngleDeg.toFixed(1) + "\u00b0" : "\u2014"),
+          (rt.deltaDeg != null ? (rt.deltaDeg >= 0 ? "+" : "") + rt.deltaDeg.toFixed(2) + "\u00b0" : "\u2014"),
+          rt.direction || "\u2014",
+        ]);
+        doc.autoTable({
+          startY: y, head: [["Plane", "Base", "Compare", "Change", "Direction"]],
+          body: rBody, theme: "grid",
+          styles: { font: "helvetica", fontSize: 7, textColor: C.tx, fillColor: C.surf, lineColor: C.bdr, lineWidth: 0.3, halign: "center", valign: "middle" },
+          headStyles: { fillColor: C.dark2, textColor: C.txhd, fontSize: 7.5, fontStyle: "bold", halign: "center", valign: "middle" },
+          alternateRowStyles: { fillColor: C.surf2 },
+          margin: { left: MARGIN, right: MARGIN, bottom: 10 },
+          tableWidth: BODY_W,
+        });
+        y = (doc.lastAutoTable?.finalY || y) + 8;
+      }
+
+      // Clinical patterns narrative
+      if (res.patterns?.length > 0) {
+        if (y > BOTTOM_SAFE - 50) { doc.addPage(); darkBg(doc); pageHeader(doc); y = 18; }
+        doc.setFontSize(9);
+        doc.setTextColor(C.acc);
+        doc.setFont("helvetica", "bold");
+        doc.text("Clinical Pattern Analysis", MARGIN, y);
+        y += 6;
+
+        for (const p of res.patterns) {
+          if (y > BOTTOM_SAFE - 36) { doc.addPage(); darkBg(doc); pageHeader(doc); y = 18; }
+          const sevC = p.severity === "severe" ? C.err : p.severity === "moderate" ? C.warn : C.ok;
+          const boxH = p.detail ? 30 : 20;
+
+          doc.setFillColor(C.surf);
+          doc.roundedRect(MARGIN, y, BODY_W, boxH, 3, 3, "F");
+          doc.setFillColor(sevC);
+          doc.rect(MARGIN, y, 2.5, boxH, "F");
+
+          doc.setFontSize(8);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(C.tx);
+          doc.text((p.label || p.category || "") + "  \u2014  " + (p.summary || ""), MARGIN + 6, y + 7);
+
+          doc.setFontSize(6.5);
+          doc.setTextColor(sevC);
+          doc.text((p.severity || "").toUpperCase(), MARGIN + BODY_W - 20, y + 7);
+
+          if (p.detail) {
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(7);
+            doc.setTextColor(C.tx2);
+            const det = p.detail.length > 120 ? p.detail.slice(0, 117) + "..." : p.detail;
+            doc.text(det, MARGIN + 6, y + 16);
+          }
+
+          y += boxH + 3;
+        }
+      }
+
+      // Error summary
+      if (res.errSummary) {
+        if (y > BOTTOM_SAFE - 20) { doc.addPage(); darkBg(doc); pageHeader(doc); y = 18; }
+        y += 4;
+        doc.setFontSize(8);
+        doc.setTextColor(C.tx3);
+        doc.setFont("helvetica", "normal");
+        doc.text(`Error: ${res.errSummary.totalLandmarks} landmarks | ${res.errSummary.significantDisplacements} significant | ${res.errSummary.highConfidence} high confidence`, MARGIN, y);
+      }
+
+      // Delta norms
+      if (res.deltaNorms?.length > 0) {
+        if (y > BOTTOM_SAFE - 30) { doc.addPage(); darkBg(doc); pageHeader(doc); y = 18; }
+        doc.setFontSize(9);
+        doc.setTextColor(C.acc);
+        doc.setFont("helvetica", "bold");
+        doc.text("Delta Norm Comparison", MARGIN, y);
+        y += 5;
+        const dnBody = res.deltaNorms.map(dn => [
+          dn.label || "\u2014",
+          (dn.delta != null ? (dn.delta >= 0 ? "+" : "") + dn.delta.toFixed(2) : "\u2014"),
+          (dn.norm?.expectedDelta != null ? (dn.norm.expectedDelta >= 0 ? "+" : "") + dn.norm.expectedDelta.toFixed(2) : "\u2014"),
+          (dn.zScore != null ? (dn.zScore >= 0 ? "+" : "") + dn.zScore.toFixed(2) : "\u2014"),
+          dn.interpretation || "\u2014",
+        ]);
+        doc.autoTable({
+          startY: y, head: [["Measurement", "Actual (\u00b0)", "Expected (\u00b0)", "Z-score", "Interpretation"]],
+          body: dnBody, theme: "grid",
+          styles: { font: "helvetica", fontSize: 7, textColor: C.tx, fillColor: C.surf, lineColor: C.bdr, lineWidth: 0.3, halign: "center", valign: "middle" },
+          headStyles: { fillColor: C.dark2, textColor: C.txhd, fontSize: 7.5, fontStyle: "bold", halign: "center", valign: "middle" },
+          alternateRowStyles: { fillColor: C.surf2 },
+          columnStyles: {
+            0: { cellWidth: 32, fontStyle: "bold", halign: "center", valign: "middle" },
+            1: { cellWidth: 22, halign: "center", valign: "middle" },
+            2: { cellWidth: 22, halign: "center", valign: "middle" },
+            3: { cellWidth: 18, halign: "center", valign: "middle" },
+            4: { cellWidth: 50, fontSize: 6.5, halign: "center", valign: "middle" },
+          },
+          margin: { left: MARGIN, right: MARGIN, bottom: 10 },
+          tableWidth: BODY_W,
+        });
+      }
     }
   }
 }
