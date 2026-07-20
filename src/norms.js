@@ -134,6 +134,28 @@ export const DEFAULT_NORMS = {
       { label: "Eb-PNS", mean: 65, sd: 10, type: "length" },
       { label: "Angle of Nasopharynx", mean: 140, sd: 10, type: "angle" },
       { label: "Adenoid/Nasopharynx Ratio", mean: 0.5, sd: 0.15, type: "ratio" },
+      { label: "R-PAS", mean: 11.2, sd: 2.4, type: "length" },
+      { label: "R-RG", mean: 12.5, sd: 2.8, type: "length" },
+      { label: "N-PH", mean: 24.3, sd: 3.6, type: "length" },
+      { label: "MP-H", mean: 12.3, sd: 3.5, type: "length" },
+      { label: "Tongue Length", mean: 76.9, sd: 5.6, type: "length" },
+      { label: "Soft Palate Length", mean: 32.4, sd: 3.2, type: "length" },
+      { label: "Soft Palate Thickness", mean: 8.5, sd: 1.8, type: "length" },
     ],
   },
+};
+
+export const AIRWAY_NORMS = {
+  "R-PAS": { mean: 11.2, sd: 2.4, source: "McNamara 1984", note: "Retropalatal airway, narrowest width between soft palate and posterior pharyngeal wall" },
+  "R-RG": { mean: 12.5, sd: 2.8, source: "McNamara 1984", note: "Retroglossal airway, narrowest width between tongue base and posterior pharyngeal wall" },
+  "N-PH": { mean: 24.3, sd: 3.6, source: "Solow 1985", note: "Nasopharynx depth from PNS to posterior wall" },
+  "PNS-AD1": { mean: 15.0, sd: 3.0, source: "Schulhof 1977", note: "Superior airway: PNS to nearest adenoid point" },
+  "PNS-AD2": { mean: 18.0, sd: 4.0, source: "Schulhof 1977", note: "Nasopharyngeal depth along Ba-N line" },
+  "SPAS": { mean: 10.5, sd: 2.7, source: "Pracharktam 1994", note: "Superior posterior airway space at PNS-Occ level" },
+  "MAS": { mean: 9.8, sd: 2.5, source: "Pracharktam 1994", note: "Middle airway space at PNS-Pog' midpoint" },
+  "IAS": { mean: 11.6, sd: 3.0, source: "Pracharktam 1994", note: "Inferior airway space at C3-RGN line" },
+  "MP-H": { mean: 12.3, sd: 3.5, source: "Bibby 1984", note: "Perpendicular distance from mandibular plane to hyoidale" },
+  "Tongue Length": { mean: 76.9, sd: 5.6, source: "Lowe 1985", note: "Distance from tongue tip (TT) to epiglottis base (Eb)" },
+  "Soft Palate Length": { mean: 32.4, sd: 3.2, source: "Lowe 1985", note: "Length from PNS to tip of uvula" },
+  "Soft Palate Thickness": { mean: 8.5, sd: 1.8, source: "Lowe 1985", note: "Maximum soft palate thickness perpendicular to PNS-P line" },
 };

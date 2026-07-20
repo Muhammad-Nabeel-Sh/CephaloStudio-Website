@@ -1,3 +1,4 @@
+import { useRef, useEffect } from "react";
 import { ChartCard, FONT, FONT_STACK, PALETTE } from "./moduleChartsUtils.jsx";
 import PlotlyChart, { heatmapLayout, heatmapData } from "./PlotlyChart.jsx";
 
@@ -1506,6 +1507,16 @@ export function SuperimpositionCharts({ results, t }) {
   const displacements = results.displacements || [];
   if (displacements.length === 0) return <div style={{ fontSize: FONT.md, color: t.tx3, textAlign: "center", padding: 20 }}>No displacement data.</div>;
 
+  // Extract T1/T2 measurement pairs for normograms
+  const angularData = (results.angularChanges || [])
+    .filter(c => c.angle2 != null && c.angle1 != null && isFinite(c.angle2) && isFinite(c.angle1))
+    .map(c => ({ label: c.label, t1: c.angle2, t2: c.angle1 }));
+  const linearData = (results.linearChanges || [])
+    .filter(c => c.value2 != null && c.value1 != null && isFinite(c.value2) && isFinite(c.value1))
+    .map(c => ({ label: c.label, t1: c.value2, t2: c.value1, unit: c.unit }));
+  const normogramData = angularData.length >= 3 ? angularData
+    : linearData.length >= 3 ? linearData : null;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <DisplacementBarPlot displacements={displacements} t={t} />
@@ -1515,6 +1526,11 @@ export function SuperimpositionCharts({ results, t }) {
       {results.planeIntersections?.length > 0 && <PlaneAngleChart planeIntersections={results.planeIntersections} t={t} />}
       {results.deltaNorms?.length > 0 && <DeltaNormChart deltaNorms={results.deltaNorms} t={t} />}
       {results.patterns?.length > 0 && <PatternRadarChart patterns={results.patterns} t={t} />}
+      {normogramData && (
+        <ChartCard title="Superimposed Measurement Normogram" t={t}>
+          <NormogramPolygon measurements={normogramData} t={t} />
+        </ChartCard>
+      )}
     </div>
   );
 }
@@ -1844,4 +1860,132 @@ function PatternRadarChart({ patterns, t }) {
   return <ChartCard title="Clinical Pattern Profile" t={t}>
     <PlotlyChart data={[trace]} layout={layout} style={{ height: layout.height }} />
   </ChartCard>;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NOMOGRAM CHART — Canvas-based T1/T2 overlaid polygon
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function drawNormogram(ctx, w, h, data, t) {
+  const p = 60;
+  const cx = w / 2 + 20, cy = h / 2 + 10;
+  const r = Math.min((w - p * 2) / 2, (h - p * 2) / 2);
+  const n = data.length;
+  if (n < 3 || r < 40) return;
+
+  // Normalize all values to 0..1
+  let minV = Infinity, maxV = -Infinity;
+  for (const d of data) {
+    if (d.t1 < minV) minV = d.t1;
+    if (d.t2 < minV) minV = d.t2;
+    if (d.t1 > maxV) maxV = d.t1;
+    if (d.t2 > maxV) maxV = d.t2;
+  }
+  const pad = (maxV - minV || 1) * 0.1;
+  const scaleMin = minV - pad;
+  const scaleR = (maxV + pad - scaleMin) || 1;
+
+  function valToR(v) { return ((v - scaleMin) / scaleR) * r * 0.9; }
+  function angle(i) { return -Math.PI / 2 + (2 * Math.PI * i) / n; }
+
+  // Grid circles
+  for (const g of [0.25, 0.5, 0.75, 1]) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * g, 0, Math.PI * 2);
+    ctx.strokeStyle = t.bdr + "44";
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+  }
+
+  // Axis lines + labels
+  ctx.font = `10px ${FONT_STACK}`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  for (let i = 0; i < n; i++) {
+    const a = angle(i);
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
+    ctx.strokeStyle = t.bdr + "66";
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+
+    const lx = cx + (r + 48) * Math.cos(a), ly = cy + (r + 48) * Math.sin(a);
+    ctx.textAlign = Math.abs(Math.cos(a)) < 0.1 ? "center" : Math.cos(a) > 0 ? "left" : "right";
+    ctx.textBaseline = Math.abs(Math.sin(a)) < 0.1 ? "middle" : Math.sin(a) > 0 ? "top" : "bottom";
+    ctx.fillStyle = t.tx;
+    ctx.fillText(data[i].label, lx, ly);
+  }
+
+  function getPts(field) {
+    return data.map((d, i) => {
+      const a = angle(i);
+      const vr = valToR(d[field]);
+      return { x: cx + vr * Math.cos(a), y: cy + vr * Math.sin(a) };
+    });
+  }
+
+  function drawPolygon(pts, color, dashed) {
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < n; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.closePath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    if (dashed) ctx.setLineDash([4, 3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    for (const p of pts) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+    }
+  }
+
+  const t1Pts = getPts("t1");
+  const t2Pts = getPts("t2");
+
+  drawPolygon(t2Pts, "#D55E00", false);  // T2 solid orange
+  drawPolygon(t1Pts, "#0072B2", true);   // T1 dashed blue
+
+  // Legend
+  const legX = 12, legY = 12;
+  ctx.fillStyle = t.bg + "cc";
+  ctx.beginPath();
+  ctx.roundRect(legX, legY, 90, 44, 4);
+  ctx.fill();
+
+  ctx.fillStyle = "#0072B2";
+  ctx.fillRect(legX + 8, legY + 8, 12, 3);
+  ctx.fillStyle = t.tx2;
+  ctx.font = `9px ${FONT_STACK}`;
+  ctx.textAlign = "left";
+  ctx.textBaseline = "middle";
+  ctx.fillText("T1 (Base)", legX + 24, legY + 10);
+
+  ctx.fillStyle = "#D55E00";
+  ctx.fillRect(legX + 8, legY + 26, 12, 3);
+  ctx.fillText("T2 (Compare)", legX + 24, legY + 28);
+}
+
+function NormogramPolygon({ measurements, t }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas || measurements.length < 3) return;
+    const rect = canvas.parentElement.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const w = rect.width, h = 350;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+    canvas.style.width = w + "px";
+    canvas.style.height = h + "px";
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, w, h);
+    drawNormogram(ctx, w, h, measurements, t);
+  }, [measurements, t]);
+  return <canvas ref={ref} style={{ width: "100%", height: 350 }} />;
 }

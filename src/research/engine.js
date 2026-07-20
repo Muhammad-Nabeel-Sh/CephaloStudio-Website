@@ -5,6 +5,7 @@ import { runLongitudinalAll } from "./longitudinal.js";
 import { runCorrelationAll, runRegression, runLogisticRegression } from "./correlation.js";
 import { runDiagnosticAll } from "./diagnostic.js";
 import { runSuperimpositionAll } from "./superimposition.js";
+import { computeAirwayMeasurements } from "./airway.js";
 import { logError } from "../logger.js";
 
 // `onProgress` is an optional coarse-grained callback (fraction 0..1, label).
@@ -56,6 +57,17 @@ export function runStudy(study, sessions, calibration, onProgress) {
       case "superimposition":
         prog(0.2, "superimposition");
         results = runSuperimpositionAll(sessions, config, calibration);
+        break;
+
+      case "airway":
+        prog(0.2, "airway");
+        {
+          const session = sessions.find(s => s.id === config.sessionId);
+          const markups = session?.markups || [];
+          const cal = session?.calibration?.done ? session.calibration : calibration;
+          const measurements = computeAirwayMeasurements(markups, cal);
+          results = { measurements, sessionName: session?.name || "", calibrationUsed: cal?.done || false };
+        }
         break;
 
       default:

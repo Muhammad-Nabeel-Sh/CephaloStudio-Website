@@ -8,6 +8,7 @@ export const STUDY_TYPES = [
   { id: "correlation",  name: "Correlation",                   icon: SI + "M440-280H280q-83 0-141.5-58.5T80-480q0-83 58.5-141.5T280-680h160v80H280q-50 0-85 35t-35 85q0 50 35 85t85 35h160v80ZM320-440v-80h320v80H320Zm200 160v-80h160q50 0 85-35t35-85q0-50-35-85t-85-35H520v-80h160q83 0 141.5 58.5T880-480q0 83-58.5 141.5T680-280H520Z\"/></svg>",  desc: "Pearson/Spearman, regression",                   color: "#a78bfa", needsGroups: false },
   { id: "diagnostic",   name: "Diagnostic",                    icon: SI + "M420-120v-300H120v-120h300v-300h120v300h300v120H540v300H420Z\"/></svg>",  desc: "Sensitivity, specificity, ROC",                  color: "#f59e0b", needsGroups: true  },
   { id: "superimposition", name: "Superimposition / Growth",  icon: SI + "M480-80q-50 0-85-35t-35-85q0-49 33-82t82-34h4q-7-18-10.5-37T468-374q0-56 35-99t92-43q18 0 35 3.5t35 10.5q7-18 10.5-37t10.5-37H680q-7 18-10.5 37T659-529q0 56-35 99t-92 43q-18 0-35-3.5T497-395q-7 18-10.5 37T476-321h-4q-49 0-82.5 33.5T356-208q0 49 33.5 84.5T475-88l5 8Z\"/></svg>", desc: "T1-on-T2 Procrustes/structural overlay, displacement", color: "#e879f9", needsGroups: false },
+  { id: "airway",       name: "Airway Analysis",              icon: SI + "M160-240q-33 0-56.5-23.5T80-320v-80h80v80h80v80H160Zm0-400h80v-80h80v-80H160v80q-33 0-56.5 23.5T80-720v80h80v-80Zm480 480v-80h80v-80h80v80q0 33-23.5 56.5T720-240h-80Zm80-400h80v-80h-80v-80h80q33 0 56.5 23.5T880-720v80h-80v-80ZM440-200v-160H280v-80h400v80H520v160h-80Zm-80-320-80-80 56-56 104 104 104-104 56 56-80 80H360Z\"/></svg>", desc: "Pharyngeal airway measurements, norms, z-scores", color: "#38bdf8", needsGroups: false },
 ];
 
 function uid() {
@@ -80,6 +81,11 @@ export function mkStudy(type, opts = {}) {
     base.config.method = opts.config?.method || "procrustes";
     base.config.planePoint1 = opts.config?.planePoint1 || "";
     base.config.planePoint2 = opts.config?.planePoint2 || "";
+  }
+
+  if (type === "airway") {
+    base.config.sessionId = opts.config?.sessionId || "";
+    base.config.showOverlay = opts.config?.showOverlay !== false;
   }
 
   return base;

@@ -72,6 +72,7 @@ All items marked ✅ below have been fixed and verified (300 tests pass, lint cl
 - ✅ W12: Object URLs revoked after all exports
 - ✅ W13: Light theme contrast fixed (WCAG AA)
 - ✅ W18: Clear All Markups calls pushUndo
+- ✅ R11: Airway overlay uses `norms.js` with age/sex stratification via dedicated AirwayPanel
 - ⬜ W2: Delete confirmation for referenced markups — deferred
 - ⬜ W5: Offscreen static canvas cache — deferred (major perf refactor)
 - ⬜ W6: Spatial index for hit-testing — deferred
@@ -157,11 +158,9 @@ Every research results table renders raw numbers (meanDiff, sdDiff, LoA, Dahlber
 
 **Remediation:** Deep-copy images with new IDs in `mkReliabilitySession`, matching `duplicateSession`.
 
-### R11. Airway overlay hardcodes non-adjustable adult norms
-**Severity: Medium (clinical)**
-`markups.jsx:1327` — fixed adult thresholds drive color-coding. Not age-stratified, not editable.
-
-**Remediation:** Look up airway norms from the `norms` array with fallback defaults; allow age/sex stratification.
+### R11. Airway overlay hardcodes non-adjustable adult norms — FIXED
+**Severity: Was Medium — now fixed**
+`markups.jsx:1327` — fixed adult thresholds drove color-coding. Now the airway overlay receives measurements from `computeAirwayMeasurements()` with age/sex-stratified norms from `norms.js`, and the dedicated AirwayPanel provides full normative comparison with traffic-light z-score display.
 
 ### R12. State-mirroring refs pattern (A1)
 **Severity: Low (maintainability)**
@@ -250,6 +249,8 @@ The following are enhancement opportunities (not bug fixes), ranked by impact an
 | F8 | **Growth prediction (CVMS / Fishman)** | Cervical vertebral maturation staging from C2-C4; hand-wrist bone-age scoring. | `PREDEFINED.handwrist`; markup model |
 | F9 | **Automated report templates** | User-uploaded logo, editable header/footer, saved per-practice report presets. | `reportGenerator.js` section selection; logo support |
 | F10 | **Airway volume estimation** | Compute 2D airway polygon area, estimate sagittal airway area, apply 2D→3D formulae. | `drawAirwayOverlay`; `polyArea` utility |
+| F11 | **Extended Airway Analysis** — IMPLEMENTED | 12-standard airway measurements (R-PAS, R-RG, SPAS, MAS, IAS, MP-H, PNS-AD1/2, tongue length, palate length/thickness, N-PH) with normative comparison, z-scores, traffic-light coloring, auto-tracing from landmarks, dedicated AirwayPanel | `drawAirwayOverlay`; existing silhouette/point markup types; `norms.js` airway norms |
+| F12 | **Side-by-side comparison mode** | Two synchronized canvases with linked pan/zoom for visual T1/T2 comparison. | Session filmstrip; overlay infrastructure |
 | F11 | **Side-by-side comparison mode** | Two synchronized canvases with linked pan/zoom for visual T1/T2 comparison. | Session filmstrip; overlay infrastructure |
 | F12 | **Measurement confidence indicators** | Estimate per-landmark confidence from local image quality (contrast/noise/edge strength); display as colored halo. | `imageProcessor.worker.js` pixel access |
 | F13 | **PACS integration** | DICOM C-FIND/C-MOVE query/retrieve via WebSocket proxy (orthanc/dcm4che). | None (needs backend) |
