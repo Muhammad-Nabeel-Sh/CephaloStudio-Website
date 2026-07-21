@@ -1399,6 +1399,10 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     const newMarkups=[];
     const pointIds={};
     analysis.pts.forEach(pt=>{
+      const alreadyPlaced = markups.some(m =>
+        m.type === "point" && m.label?.toLowerCase() === pt.l.toLowerCase() && m.placed && m.visible !== false
+      );
+      if (alreadyPlaced) return;
       const id=uid();
       pointIds[pt.l]=id;
       newMarkups.push({id,type:"point",points:[{x:-99999,y:-99999}],label:pt.l,definition:pt.def,color:pt.color,size:6,visible:true,placed:false});
