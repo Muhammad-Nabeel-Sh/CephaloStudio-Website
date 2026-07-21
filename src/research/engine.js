@@ -65,8 +65,17 @@ export function runStudy(study, sessions, calibration, onProgress) {
           const session = sessions.find(s => s.id === config.sessionId);
           const markups = session?.markups || [];
           const cal = session?.calibration?.done ? session.calibration : calibration;
-          const measurements = computeAirwayMeasurements(markups, cal);
-          results = { measurements, sessionName: session?.name || "", calibrationUsed: cal?.done || false };
+          const sex = config.sex || session?.meta?.gender || "";
+          const age = config.age ?? session?.meta?.age ?? null;
+          const measurements = computeAirwayMeasurements(markups, cal, sex, age);
+          results = {
+            measurements,
+            sessionName: session?.name || "",
+            sessionId: session?.id || "",
+            calibrationUsed: cal?.done || false,
+            sex,
+            age,
+          };
         }
         break;
 

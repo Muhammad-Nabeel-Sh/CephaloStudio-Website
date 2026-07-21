@@ -467,6 +467,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const lutMode=activeSession?.lutMode||"gray";const lutInvert=activeSession?.lutInvert||false;
   const formulas=useMemo(()=>activeSession?.formulas||[],[activeSession?.formulas]);const norms=useMemo(()=>activeSession?.norms||[],[activeSession?.norms]);
   const analysisTemplate=activeSession?.analysisTemplate||"blank";
+  const patientSex=activeSession?.meta?.sex||null;
+  const patientAge=activeSession?.meta?.age!==undefined&&activeSession?.meta?.age!==null?Number(activeSession.meta.age):null;
   const selectedMarkup=markups.find(m=>m.id===selectedId);
 
   const [userPresets,setUserPresets]=useState(()=>loadNormLibrary());
@@ -1400,6 +1402,9 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     pushUndo();
     updSession({markups:[...markups,...newMarkups],analysisTemplate:analysis.name});
     setPlacingQueue(newMarkups.map(m=>m.id));dispatch({type:"SET",payload:{placingIdx:0}});dispatch({type:"SET",payload:{placingMode:true}});dispatch({type:"SET",payload:{rightPanel:"markups"}});
+    if(analysis.name?.toLowerCase().includes("airway")){
+      dispatch({type:"SET",payload:{rightPanel:"airway"}});
+    }
   };
 
   autoCreateMeasurementsRef.current=(markups,templateName)=>{
@@ -1892,7 +1897,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
                   {rightPanel==="formulas"&&<FormulasPanel formulas={formulas} t={t} scope={measScope} onAdd={()=>{dispatch({type:"SET",payload:{editFormulaId:null}});dispatch({type:"SET",payload:{showFormulaEditor:true}});}} onEdit={id=>{dispatch({type:"SET",payload:{editFormulaId:id}});dispatch({type:"SET",payload:{showFormulaEditor:true}});}} onDelete={id=>updSession({formulas:formulas.filter(f=>f.id!==id)})} pinnedFormulas={pinnedFormulas} onPinFormula={id=>setPinnedFormulas(s=>{const n=new Set(s);if(n.has(id))n.delete(id);else n.add(id);return n;})}/>}
                   {rightPanel==="image"&&<ImagePanel t={t} processing={processing} setProcessing={p=>updSession({processing:p})} lutMode={lutMode} setLutMode={m=>updSession({lutMode:m})} lutInvert={lutInvert} setLutInvert={v=>updSession({lutInvert:v})} showLUT={showLUT} setShowLUT={setShowLUT} showScaleBar={showScaleBar} setShowScaleBar={setShowScaleBar} calibration={calibration} onOpenCalib={()=>dispatch({type:"SET",payload:{showCalib:true}})} onReset={()=>updSession({processing:{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},lutMode:"gray",lutInvert:false})} onShowHist={()=>setShowHistogram(v=>!v)} showHistogram={showHistogram}/>}
                   {rightPanel==="layers"&&<LayersPanel t={t} images={sessionImage} onUpdateImages={imgs=>updSession({images:imgs})} onAddImage={()=>stackImgRef.current?.click()} onShowAlign={()=>{}} onShowTransform={()=>{}}/>}
-                  {rightPanel==="airway"&&<AirwayPanel t={t} markups={markups} calibration={calibration} norms={norms} onAddPoint={handleAirwayAddPoint} showOverlay={showAirwayOverlay} onToggleOverlay={()=>setShowAirwayOverlay(v=>!v)} onUpdateMarkups={updSession}/>}
+                  {rightPanel==="airway"&&<AirwayPanel t={t} markups={markups} calibration={calibration} norms={norms} onAddPoint={handleAirwayAddPoint} showOverlay={showAirwayOverlay} onToggleOverlay={()=>setShowAirwayOverlay(v=>!v)} onUpdateMarkups={updSession} onLoadTemplate={loadTemplate} dispatch={dispatch} sex={patientSex} age={patientAge}/>}
                   {rightPanel==="sessions"&&<SessionsPanel project={project} t={t} onUpdateProject={onUpdateProject} activeSession={activeSession} setActiveSession={id=>onUpdateProject({...project,activeSessionId:id})} onExportTemplate={v=>exportCepht({name:`${project.name}`,projection:project.projection,markups:v.markups||[],formulas:v.formulas||[],norms:v.norms||[]})} compareSession={compareSession} setCompareSession={setCompareSession} showDisplacement={showDisplacement} setShowDisplacement={setShowDisplacement} displacementOverlay={displacementOverlay} setDisplacementOverlay={setDisplacementOverlay} refLandmark1={refLandmark1} setRefLandmark1={setRefLandmark1} refLandmark2={refLandmark2} setRefLandmark2={setRefLandmark2} overlayBlend={overlayBlend} setOverlayBlend={setOverlayBlend} overlayAlignMode={overlayAlignMode} setOverlayAlignMode={setOverlayAlignMode} overlayVectorScale={overlayVectorScale} setOverlayVectorScale={setOverlayVectorScale} showTrackingLines={showTrackingLines} setShowTrackingLines={setShowTrackingLines} calibration={calibration} formatAngle={formatAngle}/>}
                   {rightPanel==="research"&&<ResearchPanel t={t} project={project} onUpdateProject={onUpdateProject} calibration={calibration}/>}
                   {rightPanel==="interpretation"&&<InterpretationPanel allMeas={allMeas} norms={norms} t={t} formatAngle={formatAngle} calibration={calibration}/>}

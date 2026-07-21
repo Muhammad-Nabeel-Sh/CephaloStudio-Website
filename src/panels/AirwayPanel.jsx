@@ -1,14 +1,16 @@
 import { useMemo } from "react";
 import { computeAirwayMeasurements } from "../research/airway.js";
 import { InfoBox, Tag, Btn } from "../ui.jsx";
+import { PREDEFINED } from "../constants.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const REQUIRED_LANDMARKS = [
-  "PNS", "Ba", "C3", "H", "Eb", "TT", "SP", "Ad1",
-  "Ad2", "Ad3", "Ad4", "Vallecula", "Epiglottis", "PASbot",
+  "PNS", "Ba", "N", "PH", "C3", "H", "Me", "Go",
+  "Eb", "TT", "SP", "Ad1", "Ad2", "Ad3", "Ad4",
+  "UP", "Vallecula", "Epiglottis", "PASbot",
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -49,13 +51,13 @@ function fmtVal(v) {
 // COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export default function AirwayPanel({ t, markups, calibration, norms, onAddPoint, onUpdateMarkups, showOverlay, onToggleOverlay }) {
+export default function AirwayPanel({ t, markups, calibration, norms, onAddPoint, onUpdateMarkups, showOverlay, onToggleOverlay, onLoadTemplate, dispatch, sex, age }) {
   void norms;
   void onUpdateMarkups;
 
   const measurements = useMemo(
-    () => computeAirwayMeasurements(markups, calibration),
-    [markups, calibration],
+    () => computeAirwayMeasurements(markups, calibration, sex, age),
+    [markups, calibration, sex, age],
   );
 
   const summary = useMemo(() => {
@@ -78,6 +80,48 @@ export default function AirwayPanel({ t, markups, calibration, norms, onAddPoint
         Computes pharyngeal airway dimensions from placed cephalometric landmarks.
         Place required landmarks below to enable measurements.
       </InfoBox>
+
+      {/* ─── Load Airway Template ─── */}
+      {(() => {
+        const airwayAnalysis = (PREDEFINED.lateral || []).find(
+          (a) => a.name && a.name.toLowerCase().includes("airway")
+        );
+        const hasAirwayLandmarks = airwayAnalysis
+          ? ["PNS", "Ad1", "SP"].filter((l) =>
+              markups.some(
+                (m) =>
+                  m.visible !== false &&
+                  m.placed &&
+                  m.label?.toLowerCase() === l.toLowerCase()
+              )
+            ).length >= 3
+          : false;
+        if (airwayAnalysis && !hasAirwayLandmarks) {
+          return (
+            <Btn
+              t={t}
+              onClick={() => {
+                onLoadTemplate && onLoadTemplate(airwayAnalysis);
+                dispatch && dispatch({ type: "SET", payload: { rightPanel: "airway" } });
+              }}
+              style={{
+                background: t.acc,
+                color: "#fff",
+                border: "none",
+                borderRadius: 6,
+                padding: "8px 12px",
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: "pointer",
+                textAlign: "center",
+              }}
+            >
+              Load Airway Template
+            </Btn>
+          );
+        }
+        return null;
+      })()}
 
       {/* ─── Calibration warning ─── */}
       {!calDone && (

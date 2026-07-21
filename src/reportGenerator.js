@@ -450,6 +450,110 @@ async function buildNormogram(doc, allMeas, norms) {
   // Summary table removed — charts only
 }
 
+function buildAirway(doc, project) {
+  const studies = project.researchStudies || [];
+  const airwayStudy = studies.find(s => s.type === "airway" && s.results?.measurements?.length > 0);
+  if (!airwayStudy) {
+    doc.addPage();
+    darkBg(doc);
+    pageHeader(doc);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(C.tx);
+    doc.text("Airway Assessment", MARGIN, 20);
+    doc.setFontSize(9);
+    doc.setTextColor(C.tx2);
+    doc.setFont("helvetica", "normal");
+    doc.text("No airway analysis data available", MARGIN, 30);
+    return;
+  }
+
+  doc.addPage();
+  darkBg(doc);
+  pageHeader(doc);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.setTextColor(C.tx);
+  doc.text("Airway Assessment", MARGIN, 20);
+
+  const res = airwayStudy.results;
+  let y = 30;
+  if (res.sessionName) {
+    doc.setFontSize(8);
+    doc.setTextColor(C.tx2);
+    doc.setFont("helvetica", "normal");
+    doc.text("Session: " + res.sessionName, MARGIN, y);
+    y += 5;
+  }
+
+  const measurements = (res.measurements || []).filter(m => m.id !== "_global");
+  const body = measurements.map(m => [
+    m.label || "\u2014",
+    m.value != null ? m.value.toFixed(2) + " " + (m.unit || "") : "\u2014",
+    m.normMean != null ? m.normMean.toFixed(1) + " \u00b1 " + (m.normSD != null ? m.normSD.toFixed(1) : "\u2014") : "\u2014",
+    m.zScore != null ? (m.zScore >= 0 ? "+" : "") + m.zScore.toFixed(2) : "\u2014",
+    m.interpretation || "\u2014",
+  ]);
+
+  doc.autoTable({
+    startY: y, head: [["Measurement", "Value", "Norm", "Z-score", "Interpretation"]],
+    body,
+    theme: "grid",
+    styles: { font: "helvetica", fontSize: 7, textColor: C.tx, fillColor: C.surf, lineColor: C.bdr, lineWidth: 0.3, halign: "center", valign: "middle" },
+    headStyles: { fillColor: C.dark2, textColor: C.txhd, fontSize: 7.5, fontStyle: "bold", halign: "center", valign: "middle" },
+    alternateRowStyles: { fillColor: C.surf2 },
+    columnStyles: {
+      0: { cellWidth: 38, fontStyle: "bold", halign: "center", valign: "middle" },
+      1: { cellWidth: 24, halign: "center", valign: "middle" },
+      2: { cellWidth: 28, textColor: C.tx2, halign: "center", valign: "middle" },
+      3: { cellWidth: 20, fontStyle: "bold", halign: "center", valign: "middle" },
+      4: { cellWidth: 40, halign: "center", valign: "middle" },
+    },
+    margin: { left: MARGIN, right: MARGIN, bottom: 10 },
+    tableWidth: BODY_W,
+  });
+  y = (doc.lastAutoTable?.finalY || y) + 8;
+
+  // Clinical findings
+  const clinicalNotes = measurements.filter(m => m.clinicalNote);
+  if (clinicalNotes.length > 0) {
+    if (y > BOTTOM_SAFE - 50) { doc.addPage(); darkBg(doc); pageHeader(doc); y = 18; }
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(C.acc);
+    doc.text("Clinical Findings", MARGIN, y);
+    y += 6;
+
+    for (const m of clinicalNotes) {
+      if (y > BOTTOM_SAFE - 30) { doc.addPage(); darkBg(doc); pageHeader(doc); y = 18; }
+      doc.setFillColor(C.surf);
+      doc.roundedRect(MARGIN, y, BODY_W, 20, 3, 3, "F");
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(C.tx);
+      doc.text(m.label, MARGIN + 4, y + 7);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7);
+      doc.setTextColor(C.tx2);
+      doc.text(m.clinicalNote, MARGIN + 4, y + 14);
+      y += 22;
+    }
+  }
+
+  // Global summary note
+  const global = (res.measurements || []).find(m => m.id === "_global");
+  if (global?.interpretation) {
+    if (y > BOTTOM_SAFE - 20) { doc.addPage(); darkBg(doc); pageHeader(doc); y = 18; }
+    y += 4;
+    doc.setFillColor(C.surf2);
+    doc.roundedRect(MARGIN, y, BODY_W, 14, 3, 3, "F");
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(C.tx);
+    doc.text(global.interpretation, MARGIN + 4, y + 9);
+  }
+}
+
 function buildResearchStudies(doc, project) {
   const studies = project.researchStudies || [];
   if (!studies.length) return;
@@ -477,6 +581,7 @@ function buildResearchStudies(doc, project) {
       correlation: "Correlation Analysis",
       diagnostic: "Diagnostic Analysis",
       superimposition: "Superimposition / Growth Analysis",
+      airway: "Airway Analysis",
     };
 
     const title = TYPE_TITLES[study.type] || "Results";
@@ -1036,7 +1141,7 @@ export async function generateReport({
   interpretation,
   sections = {
     cover: true, images: true, measurements: true, normograms: true,
-    research: true, formulas: true, interpretation: true,
+    research: true, formulas: true, interpretation: true, airway: true,
   },
 }) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
@@ -1054,6 +1159,7 @@ export async function generateReport({
     buildFormulas(doc, formulas, formulaValues);
   }
   if (sections.normograms !== false) await buildNormogram(doc, allMeas, norms);
+  if (sections.airway !== false) buildAirway(doc, project);
   if (sections.research !== false) buildResearchStudies(doc, project);
   if (sections.interpretation !== false) buildInterpretation(doc, interpretation);
 

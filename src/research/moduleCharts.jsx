@@ -1863,6 +1863,94 @@ function PatternRadarChart({ patterns, t }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// AIRWAY CHARTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function AirwayCharts({ results, t }) {
+  const measurements = (results.measurements || []).filter(m => m.id !== "_global");
+  if (measurements.length === 0) {
+    return <div style={{ fontSize: FONT.md, color: t.tx3, textAlign: "center", padding: 20 }}>No airway data to chart.</div>;
+  }
+
+  const clinicalNotes = measurements.filter(m => m.clinicalNote);
+
+  const trace = {
+    type: "bar",
+    orientation: "h",
+    y: measurements.map(m => m.label),
+    x: measurements.map(m => m.value != null ? m.value : 0),
+    marker: {
+      color: measurements.map(m => {
+        if (m.zScore == null || !isFinite(m.zScore)) return t.tx3;
+        if (Math.abs(m.zScore) <= 1) return "#22c55e";
+        if (Math.abs(m.zScore) <= 2) return "#eab308";
+        return "#ef4444";
+      }),
+    },
+    text: measurements.map(m => m.value != null ? m.value.toFixed(2) + " " + (m.unit || "") : "—"),
+    textposition: "outside",
+    textfont: { size: 10, color: t.tx2, family: FONT_STACK },
+    hovertemplate: "%{y}: %{x:.2f} %{customdata}<extra></extra>",
+    customdata: measurements.map(m => (m.normMean != null ? `norm ${m.normMean.toFixed(1)} ± ${(m.normSD != null ? m.normSD.toFixed(1) : "—")}` : "")),
+    showlegend: false,
+  };
+
+  const normTrace = {
+    type: "scatter",
+    mode: "lines",
+    x: measurements.map(m => m.normMean || 0),
+    y: measurements.map(m => m.label),
+    line: { color: t.tx3, width: 1, dash: "dash" },
+    showlegend: false,
+    hoverinfo: "skip",
+  };
+
+  const layout = {
+    paper_bgcolor: t.surf, plot_bgcolor: t.surf,
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
+    margin: { l: 150, r: 80, t: 15, b: 45 },
+    xaxis: { title: "Measurement (" + (measurements[0]?.unit || "mm") + ")", gridcolor: t.surf3, zeroline: false },
+    yaxis: { autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 10 } },
+    height: Math.max(220, measurements.length * 24 + 50),
+    shapes: [{
+      type: "line",
+      x0: 0, x1: 0,
+      y0: -0.5, y1: measurements.length - 0.5,
+      line: { color: t.tx3, width: 0.5 },
+    }],
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      <ChartCard title="Airway Measurement Profile" t={t}>
+        <PlotlyChart data={[normTrace, trace]} layout={layout} style={{ height: layout.height }} />
+      </ChartCard>
+
+      {clinicalNotes.length > 0 && (
+        <ChartCard title="Clinical Findings" t={t}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {clinicalNotes.map(m => (
+              <div key={m.id} style={{
+                padding: "6px 8px", borderRadius: 4, background: t.surf2,
+                borderLeft: `3px solid ${m.zScore != null && Math.abs(m.zScore) > 2 ? "#ef4444" : m.zScore != null && Math.abs(m.zScore) > 1 ? "#eab308" : "#22c55e"}`,
+              }}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: t.tx }}>{m.label}</div>
+                <div style={{ fontSize: 10, color: t.tx2, marginTop: 2 }}>{m.clinicalNote}</div>
+                {m.value != null && (
+                  <div style={{ fontSize: 9, color: t.tx3, marginTop: 2, fontFamily: "'DM Mono',monospace" }}>
+                    Value: {m.value.toFixed(2)} {m.unit}  |  Z-score: {(m.zScore >= 0 ? "+" : "") + m.zScore.toFixed(2)}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </ChartCard>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // NOMOGRAM CHART — Canvas-based T1/T2 overlaid polygon
 // ═══════════════════════════════════════════════════════════════════════════════
 

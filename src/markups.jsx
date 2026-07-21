@@ -1260,6 +1260,13 @@ export function drawSnapIndicator(ctx, sn, zoom, pan, markups, mouseImg, snapRad
   ctx.restore();
 }
 
+function getZColor(z) {
+  const a = Math.abs(z);
+  if (a <= 1) return "#22c55e";
+  if (a <= 2) return "#eab308";
+  return "#ef4444";
+}
+
 export function drawAirwayOverlay(ctx, markups, zoom, pan, cal) {
   if (!cal?.done) return;
   const ppm = cal.pxPerMm;
@@ -1276,6 +1283,7 @@ export function drawAirwayOverlay(ctx, markups, zoom, pan, cal) {
   const sp = findPt("SP"), ad3 = findPt("Ad3");
   const val = findPt("Vallecula"), ad4 = findPt("Ad4");
   const epi = findPt("Epiglottis"), pasbot = findPt("PASbot");
+  const go = findPt("Go"), me = findPt("Me"), h = findPt("H");
   if (!pns || !ad1 || !ad2 || !sp) return;
 
   const anteriorPoints = [pns];
@@ -1290,9 +1298,18 @@ export function drawAirwayOverlay(ctx, markups, zoom, pan, cal) {
   const n = Math.min(anteriorPoints.length, posteriorPoints.length);
   if (n < 2) return;
 
+  const normKeyMap = {
+    "PNS-Ad1": "PNS-AD1",
+    "SP-Ad2": "PNS-AD2",
+    "McUP": "SPAS",
+    "MAS": "MAS",
+    "McLP": "IAS",
+    "IAS": "IAS",
+    "MP-H": "MP-H",
+  };
+
   ctx.save();
 
-  // Build the column path — anterior then reverse posterior
   ctx.beginPath();
   ctx.moveTo(sc(anteriorPoints[0]).x, sc(anteriorPoints[0]).y);
   for (let i = 1; i < n; i++) ctx.lineTo(sc(anteriorPoints[i]).x, sc(anteriorPoints[i]).y);
@@ -1306,8 +1323,6 @@ export function drawAirwayOverlay(ctx, markups, zoom, pan, cal) {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Cross-sectional width markers at each level
-  let minWidth = Infinity, minIdx = -1;
   const levelLabels = [];
 
   if (pns && ad1) { levelLabels.push({ ant: pns, post: ad1, label: "PNS-Ad1" }); }
@@ -1316,52 +1331,120 @@ export function drawAirwayOverlay(ctx, markups, zoom, pan, cal) {
   if (val && ad4) { levelLabels.push({ ant: val, post: ad4, label: "MAS" }); }
   if (epi && pasbot) { levelLabels.push({ ant: epi, post: pasbot, label: "McLP" }); }
   if (epi && ad4) { levelLabels.push({ ant: epi, post: ad4, label: "IAS" }); }
+  if (go && me && h) { levelLabels.push({ ant: h, post: { x: h.x, y: h.y }, label: "MP-H", isPerp: true, lineP1: go, lineP2: me }); }
 
-  levelLabels.forEach((ll, i) => {
-    const w = dist(ll.ant, ll.post) / ppm;
-    const spA = sc(ll.ant), spP = sc(ll.post);
-    const mx = (spA.x + spP.x) / 2, my = (spA.y + spP.y) / 2;
+  const allAnt = [...anteriorPoints], allPost = [...posteriorPoints];
 
-    if (w < minWidth) { minWidth = w; minIdx = i; }
+  levelLabels.forEach((ll) => {
+    let w, spA, spP, mx, my;
 
-    // Color gradient: green >= norm, yellow ~75%, red <50%
-    const normVal = { "PNS-Ad1": 15, "SP-Ad2": 11, "McUP": 10, "MAS": 15, "McLP": 11, "IAS": 12 }[ll.label] || 10;
-    const ratio = w / normVal;
-    const r = ratio < 0.5 ? 255 : ratio < 0.75 ? 255 : Math.round(255 * (1 - (ratio - 0.5) / 0.5));
-    const g = ratio > 1 ? 200 : ratio > 0.75 ? 255 : Math.round(255 * (ratio / 0.75));
-    const color = `rgb(${Math.min(255, r)}, ${Math.min(255, g)}, 80)`;
+    let dxPerp, dyPerp, denPerp, projX, projY;
+    if (ll.isPerp && ll.lineP1 && ll.lineP2) {
+      dxPerp = ll.lineP2.x - ll.lineP1.x;
+      dyPerp = ll.lineP2.y - ll.lineP1.y;
+      denPerp = Math.sqrt(dxPerp * dxPerp + dyPerp * dyPerp);
+      const num = Math.abs(
+        (ll.lineP2.y - ll.lineP1.y) * ll.ant.x -
+        (ll.lineP2.x - ll.lineP1.x) * ll.ant.y +
+        ll.lineP2.x * ll.lineP1.y -
+        ll.lineP2.y * ll.lineP1.x
+      );
+      w = denPerp < 1e-9 ? 0 : num / denPerp / ppm;
+      const t = denPerp < 1e-9 ? 0 : ((ll.ant.x - ll.lineP1.x) * dxPerp + (ll.ant.y - ll.lineP1.y) * dyPerp) / (denPerp * denPerp);
+      projX = ll.lineP1.x + t * dxPerp;
+      projY = ll.lineP1.y + t * dyPerp;
+      spA = sc({ x: (ll.ant.x + projX) / 2, y: (ll.ant.y + projY) / 2 });
+      spP = sc({ x: (ll.ant.x + projX) / 2, y: (ll.ant.y + projY) / 2 });
+      mx = spA.x;
+      my = spA.y;
+    } else {
+      w = dist(ll.ant, ll.post) / ppm;
+      spA = sc(ll.ant);
+      spP = sc(ll.post);
+      mx = (spA.x + spP.x) / 2;
+      my = (spA.y + spP.y) / 2;
+    }
 
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2 * Math.sqrt(zoom);
-    ctx.beginPath();
-    ctx.moveTo(spA.x, spA.y);
-    ctx.lineTo(spP.x, spP.y);
-    ctx.stroke();
+    const nk = normKeyMap[ll.label] || ll.label;
+    const norm = AIRWAY_NORMS[nk];
+    const z = norm && norm.sd > 0 ? (w - norm.mean) / norm.sd : null;
+    const color = z !== null ? getZColor(z) : "#fff";
 
-    // Label with width value
+    if (!ll.isPerp) {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2 * Math.sqrt(zoom);
+      ctx.beginPath();
+      ctx.moveTo(spA.x, spA.y);
+      ctx.lineTo(spP.x, spP.y);
+      ctx.stroke();
+    } else {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2 * Math.sqrt(zoom);
+      ctx.setLineDash([5 * Math.sqrt(zoom), 3 * Math.sqrt(zoom)]);
+      ctx.beginPath();
+      ctx.moveTo(sc({ x: ll.ant.x, y: ll.ant.y }).x, sc({ x: ll.ant.x, y: ll.ant.y }).y);
+      ctx.lineTo(sc({ x: projX, y: projY }).x, sc({ x: projX, y: projY }).y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    ctx.fillStyle = "#ccc";
+    ctx.font = `${clamp(8 * Math.sqrt(zoom), 6, 11)}px "DM Mono",monospace`;
+    ctx.textAlign = "center";
+    ctx.fillText(`${ll.label}`, mx, my - 10 * Math.sqrt(zoom));
     ctx.fillStyle = "#fff";
     ctx.font = `bold ${clamp(9 * Math.sqrt(zoom), 7, 12)}px "DM Mono",monospace`;
-    ctx.textAlign = "center";
-    ctx.fillText(`${w.toFixed(1)} mm`, mx, my - 6 * Math.sqrt(zoom));
+    ctx.fillText(`${w.toFixed(1)} mm`, mx, my + 14 * Math.sqrt(zoom));
     ctx.textAlign = "left";
   });
 
-  // Narrowest point indicator
-  if (minIdx >= 0) {
-    const ll = levelLabels[minIdx];
-    const spA = sc(ll.ant), spP = sc(ll.post);
-    const mx = (spA.x + spP.x) / 2, my = (spA.y + spP.y) / 2;
-    ctx.strokeStyle = "#f87171";
-    ctx.lineWidth = 3 * Math.sqrt(zoom);
-    ctx.setLineDash([]);
-    ctx.beginPath();
-    ctx.arc(mx, my, 8 * Math.sqrt(zoom), 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.fillStyle = "#f87171";
-    ctx.font = `bold ${clamp(10 * Math.sqrt(zoom), 8, 14)}px "DM Mono",monospace`;
-    ctx.textAlign = "center";
-    ctx.fillText(`⬇ Narrowest`, mx, my - 14 * Math.sqrt(zoom));
-    ctx.textAlign = "left";
+  const sortedAnt = [...allAnt].sort((a, b) => a.y - b.y);
+  const sortedPost = [...allPost].sort((a, b) => a.y - b.y);
+  const yMin = Math.max(sortedAnt[0]?.y || 0, sortedPost[0]?.y || 0);
+  const yMax = Math.min(sortedAnt[sortedAnt.length - 1]?.y || 0, sortedPost[sortedPost.length - 1]?.y || 0);
+
+  if (yMax > yMin) {
+    let dynMinW = Infinity, dynMinX = 0, dynMinY = 0, dynFound = false;
+    const dynSteps = 50;
+    for (let i = 0; i <= dynSteps; i++) {
+      const y = yMin + (yMax - yMin) * (i / dynSteps);
+      let antX = null, postX = null;
+      for (let j = 1; j < sortedAnt.length; j++) {
+        if (y >= sortedAnt[j - 1].y && y <= sortedAnt[j].y) {
+          const dy = sortedAnt[j].y - sortedAnt[j - 1].y;
+          const t = dy === 0 ? 0 : (y - sortedAnt[j - 1].y) / dy;
+          antX = sortedAnt[j - 1].x + t * (sortedAnt[j].x - sortedAnt[j - 1].x);
+          break;
+        }
+      }
+      for (let j = 1; j < sortedPost.length; j++) {
+        if (y >= sortedPost[j - 1].y && y <= sortedPost[j].y) {
+          const dy = sortedPost[j].y - sortedPost[j - 1].y;
+          const t = dy === 0 ? 0 : (y - sortedPost[j - 1].y) / dy;
+          postX = sortedPost[j - 1].x + t * (sortedPost[j].x - sortedPost[j - 1].x);
+          break;
+        }
+      }
+      if (antX !== null && postX !== null) {
+        const w = Math.abs(postX - antX) / ppm;
+        if (w < dynMinW) { dynMinW = w; dynMinX = (antX + postX) / 2; dynMinY = y; dynFound = true; }
+      }
+    }
+
+    if (dynFound && dynMinW < Infinity) {
+      const sx = dynMinX * zoom + pan.x;
+      const sy = dynMinY * zoom + pan.y;
+      ctx.strokeStyle = "#f87171";
+      ctx.lineWidth = 3 * Math.sqrt(zoom);
+      ctx.beginPath();
+      ctx.arc(sx, sy, 8 * Math.sqrt(zoom), 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = "#f87171";
+      ctx.font = `bold ${clamp(10 * Math.sqrt(zoom), 8, 14)}px "DM Mono",monospace`;
+      ctx.textAlign = "center";
+      ctx.fillText(`⬇ Narrowest (${dynMinW.toFixed(1)} mm)`, sx, sy - 14 * Math.sqrt(zoom));
+      ctx.textAlign = "left";
+    }
   }
 
   ctx.restore();

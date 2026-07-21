@@ -7,7 +7,8 @@ import { LongitudinalResults } from "./LongitudinalPanel.jsx";
 import { CorrelationResults } from "./CorrelationPanel.jsx";
 import { DiagnosticResults } from "./DiagnosticPanel.jsx";
 import { SuperimpositionResults } from "./SuperimpositionPanel.jsx";
-import { ReliabilityCharts, DescriptiveCharts, ComparativeCharts, LongitudinalCharts, CorrelationCharts, DiagnosticCharts, SuperimpositionCharts } from "./moduleCharts.jsx";
+import { AirwayStudyResults } from "./AirwayStudyPanel.jsx";
+import { ReliabilityCharts, DescriptiveCharts, ComparativeCharts, LongitudinalCharts, CorrelationCharts, DiagnosticCharts, SuperimpositionCharts, AirwayCharts } from "./moduleCharts.jsx";
 import { exportResultsCSV } from "./resultsExport.js";
 
 export default function ResultsDialog({ study, t, onClose }) {
@@ -21,6 +22,7 @@ export default function ResultsDialog({ study, t, onClose }) {
     correlation: { name: "Correlation", tabLabel: "Tables", results: CorrelationResults, charts: CorrelationCharts },
     diagnostic: { name: "Diagnostic", tabLabel: "Tables", results: DiagnosticResults, charts: DiagnosticCharts },
     superimposition: { name: "Superimposition / Growth", tabLabel: "Displacement", results: SuperimpositionResults, charts: SuperimpositionCharts },
+    airway: { name: "Airway Analysis", tabLabel: "Measurements", results: AirwayStudyResults, charts: AirwayCharts },
   };
   const m = meta[study.type];
   if (!m) return null;

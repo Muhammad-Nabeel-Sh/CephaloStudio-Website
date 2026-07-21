@@ -1,6 +1,7 @@
 Analysis,Markup type,Landmark,Definition,Refs,Norm mean,Norm SD
 Airway Analysis,Point,PNS,Posterior nasal spine - intersection of the palatum durum and the pterygopalatine fossa.,,,
 Airway Analysis,Point,Ba,Basion - most inferior posterior point of the occipital bone.,,,
+Airway Analysis,Point,N,Nasion - most anterior point of the frontonasal suture.,,,
 Airway Analysis,Point,So,Midpoint of Sella and Basion (S-Ba midpoint) for Ad2 vertical level reference.,,,
 Airway Analysis,Point,Ad1,"Intersection of the posterior pharyngeal wall with the line from PNS to Basion (PNS-Ba).",,,
 Airway Analysis,Point,Ad2,"Posterior pharyngeal wall at the level of the So point (midpoint of S-Ba), projected horizontally.",,,
@@ -15,7 +16,11 @@ Airway Analysis,Point,LP,Lower pharyngeal wall point at the level of C3-C4 inter
 Airway Analysis,Point,Eb,Base of the epiglottis - most posterior point at the junction of the epiglottis and tongue base.,,,
 Airway Analysis,Point,TT,Tip of the tongue - most anterior point of the tongue body.,,,
 Airway Analysis,Point,Go,Gonion - the point of intersection of the ramus plane and the mandibular plane.,,,
+Airway Analysis,Point,Me,Menton - the most inferior point on the mandibular symphysis.,,,
 Airway Analysis,Point,B,Point B - the deepest midline point on the mandible between infradentale and pogonion.,,,
+Airway Analysis,Point,C3,The most anteroinferior point on the body of the third cervical vertebra.,,,
+Airway Analysis,Point,H,"Hyoidale - the most anterosuperior point of the hyoid bone.",,,
+Airway Analysis,Point,PH,Posterior pharyngeal wall point at the level of Nasion-PNS midpoint for nasopharyngeal depth.,,,
 Airway Analysis,Polygon Area,Nasopharynx,Nasopharyngeal airway area enclosed by PNS-Ad1-Ad2-SP.,"PNS,Ad1,Ad2,SP",250,50
 Airway Analysis,Polygon Area,Oropharynx,Oropharyngeal airway area enclosed by SP-Ad3-Vallecula-Epiglottis-UP.,"SP,Ad3,Vallecula,Epiglottis,UP",350,60
 Airway Analysis,Polygon Area,Hypopharynx,Hypopharyngeal airway area enclosed by Vallecula-Epiglottis-PASbot-Ad4.,"Vallecula,Epiglottis,PASbot,Ad4",200,40
