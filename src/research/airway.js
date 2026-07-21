@@ -543,3 +543,68 @@ export function computeAirwayMeasurements(markups, calibration, sex, age) {
     return results;
   } catch { return []; }
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REC 1: Generate smooth airway boundaries from placed landmarks
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function generateAirwayBoundaries(markups) {
+  try {
+    const find = (label) => {
+      const m = markups.find(mk => mk.type === "point" && mk.label === label && mk.visible !== false && mk.placed !== false);
+      if (!m) return null;
+      const pts = vpts(m);
+      return pts.length ? { x: pts[0].x, y: pts[0].y } : null;
+    };
+
+    // Anterior boundary: PNS → SP → Vallecula → Epiglottis → TT
+    const anteriorRaw = ["PNS", "SP", "Vallecula", "Epiglottis", "TT"]
+      .map(find).filter(Boolean);
+    // Posterior boundary: Ad1 → Ad2 → Ad3 → Ad4 → PASbot (sorted by Y descending)
+    const posteriorRaw = ["Ad1", "Ad2", "Ad3", "Ad4", "PASbot"]
+      .map(find).filter(Boolean)
+      .sort((a, b) => b.y - a.y);
+
+    if (anteriorRaw.length < 2 && posteriorRaw.length < 2) return null;
+
+    return {
+      anterior: anteriorRaw.length >= 2 ? sampleCatmullRom(anteriorRaw, 50) : [],
+      posterior: posteriorRaw.length >= 2 ? sampleCatmullRom(posteriorRaw, 50) : [],
+    };
+  } catch { return null; }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REC 2: OSA risk score
+// ═══════════════════════════════════════════════════════════════════════════════
+
+export function computeAirwayRiskScore(measurements) {
+  try {
+    if (!measurements || measurements.length === 0) return null;
+
+    const keys = { "R-PAS": 1, "R-RG": 1, "MP-H": 1, "SP-Length": 1, "SP-Thickness": 1 };
+    const scores = [];
+    for (const m of measurements) {
+      if (keys[m.id] && m.zScore != null && isFinite(m.zScore)) {
+        scores.push(m.zScore);
+      }
+    }
+    if (scores.length === 0) return null;
+
+    const meanZ = scores.reduce((a, b) => a + b, 0) / scores.length;
+    const mostNeg = Math.min(...scores);
+    const flagged = scores.filter(z => z < -1).length;
+    const critical = scores.filter(z => z < -2).length;
+
+    let risk = "low";
+    if (critical >= 2 || meanZ < -1.5 || mostNeg < -2.5) risk = "high";
+    else if (critical >= 1 || flagged >= 2 || meanZ < -0.8) risk = "moderate";
+
+    let summary;
+    if (risk === "high") summary = "Elevated airway risk — multiple measurements significantly below normal. Comprehensive airway evaluation recommended, including sleep study referral if OSA suspected.";
+    else if (risk === "moderate") summary = "Borderline airway measurements — some dimensions below expected range. Consider clinical correlation with symptoms.";
+    else summary = "Airway measurements within expected range — no significant narrowing detected.";
+
+    return { score: meanZ, risk, summary, measuredCount: scores.length, flaggedCount: flagged, criticalCount: critical };
+  } catch { return null; }
+}

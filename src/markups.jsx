@@ -1267,10 +1267,14 @@ function getZColor(z) {
   return "#ef4444";
 }
 
-export function drawAirwayOverlay(ctx, markups, zoom, pan, cal) {
+export function drawAirwayOverlay(ctx, markups, zoom, pan, cal, colorMode) {
   if (!cal?.done) return;
   const ppm = cal.pxPerMm;
   const sc = p => ({ x: p.x * zoom + pan.x, y: p.y * zoom + pan.y });
+
+  const colors = colorMode === "orange"
+    ? { fill: "rgba(213, 94, 0, 0.06)", stroke: "rgba(213, 94, 0, 0.3)", widthLine: "rgba(213, 94, 0, 0.7)" }
+    : { fill: "rgba(56, 189, 248, 0.06)", stroke: "rgba(56, 189, 248, 0.25)", widthLine: "rgba(56, 189, 248, 0.7)" };
 
   const findPt = (label) => {
     const m = markups.find(mk => mk.type === "point" && mk.label === label && mk.visible !== false);
@@ -1315,9 +1319,9 @@ export function drawAirwayOverlay(ctx, markups, zoom, pan, cal) {
   for (let i = 1; i < n; i++) ctx.lineTo(sc(anteriorPoints[i]).x, sc(anteriorPoints[i]).y);
   for (let i = n - 1; i >= 0; i--) ctx.lineTo(sc(posteriorPoints[i]).x, sc(posteriorPoints[i]).y);
   ctx.closePath();
-  ctx.fillStyle = "rgba(56, 189, 248, 0.06)";
+  ctx.fillStyle = colors.fill;
   ctx.fill();
-  ctx.strokeStyle = "rgba(56, 189, 248, 0.25)";
+  ctx.strokeStyle = colors.stroke;
   ctx.lineWidth = 1;
   ctx.setLineDash([4 * zoom, 4 * zoom]);
   ctx.stroke();

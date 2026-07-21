@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { computeAirwayMeasurements } from "../research/airway.js";
+import { computeAirwayMeasurements, generateAirwayBoundaries, computeAirwayRiskScore } from "../research/airway.js";
 import { InfoBox, Tag, Btn } from "../ui.jsx";
 import { PREDEFINED } from "../constants.js";
 
@@ -225,6 +225,86 @@ export default function AirwayPanel({ t, markups, calibration, norms, onAddPoint
           {showOverlay ? "Visible" : "Hidden"}
         </span>
       </div>
+
+      {/* ─── REC 2: OSA Risk Scorecard ─── */}
+      {(() => {
+        const risk = computeAirwayRiskScore(measurements);
+        if (!risk) return null;
+        const color = risk.risk === "high" ? t.err : risk.risk === "moderate" ? t.warn : t.ok;
+        const bg = risk.risk === "high" ? t.err + "18" : risk.risk === "moderate" ? t.warn + "18" : t.ok + "18";
+        return (
+          <div style={{ padding: 10, borderRadius: 6, background: bg, border: `1px solid ${color}44` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              <span style={{ fontSize: 10, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: 0.6 }}>OSA Risk Score</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color, fontFamily: "'DM Mono',monospace" }}>{risk.risk.toUpperCase()}</span>
+            </div>
+            <div style={{ fontSize: 10, color: t.tx2, lineHeight: 1.5 }}>{risk.summary}</div>
+            <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 9, color: t.tx3 }}>
+              <span>Mean z: {risk.score?.toFixed(2)}</span>
+              <span>Flagged: {risk.flaggedCount}/{risk.measuredCount}</span>
+              <span>Critical: {risk.criticalCount}</span>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ─── REC 1: Auto-Trace Airway Boundaries ─── */}
+      {(() => {
+        const hasKeyPts = ["PNS", "SP", "Ad1", "Ad3"].filter(l =>
+          markups.some(m => m.visible !== false && m.placed && m.label?.toLowerCase() === l.toLowerCase())
+        ).length >= 3;
+        if (!hasKeyPts) return null;
+        return (
+          <Btn
+            t={t}
+            onClick={() => {
+              const bounds = generateAirwayBoundaries(markups);
+              if (!bounds) return;
+              const curves = [];
+              if (bounds.anterior.length >= 2) {
+                curves.push({
+                  id: Math.random().toString(36).slice(2, 10),
+                  type: "curve",
+                  label: "Anterior Airway Boundary",
+                  points: bounds.anterior,
+                  color: "#38bdf8",
+                  visible: true,
+                  locked: false,
+                  curveStyle: "catmull",
+                });
+              }
+              if (bounds.posterior.length >= 2) {
+                curves.push({
+                  id: Math.random().toString(36).slice(2, 10),
+                  type: "curve",
+                  label: "Posterior Airway Boundary",
+                  points: bounds.posterior,
+                  color: "#38bdf8",
+                  visible: true,
+                  locked: false,
+                  curveStyle: "catmull",
+                });
+              }
+              if (curves.length > 0 && onUpdateMarkups) {
+                onUpdateMarkups({ markups: [...markups, ...curves] });
+              }
+            }}
+            style={{
+              background: t.surf3,
+              color: t.tx,
+              border: `1px solid ${t.bdr}`,
+              borderRadius: 6,
+              padding: "6px 10px",
+              fontSize: 10,
+              fontWeight: 600,
+              cursor: "pointer",
+              textAlign: "center",
+            }}
+          >
+            Generate Smooth Airway Boundaries
+          </Btn>
+        );
+      })()}
 
       {/* ─── Measurements ─── */}
       <div>

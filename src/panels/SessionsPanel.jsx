@@ -18,6 +18,7 @@ export default function SessionsPanel({
   overlayAlignMode, setOverlayAlignMode,
   overlayVectorScale, setOverlayVectorScale,
   showTrackingLines, setShowTrackingLines,
+  showAirwayOverlay, setShowAirwayOverlay,
 }) {
   const [newName, setNewName] = useState("");
   const [showBatchImport, setShowBatchImport] = useState(false);
@@ -247,6 +248,11 @@ export default function SessionsPanel({
                           <input type="checkbox" id="trackingLines" checked={showTrackingLines} onChange={e => setShowTrackingLines(e.target.checked)}
                             style={{ accentColor: t.acc }} />
                           <label htmlFor="trackingLines" style={{ fontSize: 9, color: t.tx2, cursor: "pointer" }}>Show tracking lines</label>
+                        </div>
+                        <div style={{ marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                          <input type="checkbox" id="airwayOverlay" checked={showAirwayOverlay} onChange={e => setShowAirwayOverlay(e.target.checked)}
+                            style={{ accentColor: t.acc }} />
+                          <label htmlFor="airwayOverlay" style={{ fontSize: 9, color: t.tx2, cursor: "pointer" }}>Show airway overlay</label>
                         </div>
                       </div>
                     )}
