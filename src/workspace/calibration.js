@@ -1,0 +1,41 @@
+import { dist, vpts, computeMeasurements } from "../utils.js";
+
+export function finalizeCalibRuler(ruler, mm, markups, { pushUndo, updSession, dispatch }) {
+  const rp = ruler || markups.find(m => m.type === "ruler");
+  if (!rp) return;
+  const vp = vpts(rp);
+  if (vp.length < 2) return;
+  const pixelDist = dist(vp[0], vp[1]);
+  if (pixelDist < 10) return;
+  const ppm = pixelDist / mm;
+  if (!isFinite(ppm) || ppm <= 0 || ppm > 1000) return;
+  pushUndo();
+  updSession({ calibration: { done: true, pxPerMm: ppm, knownMm: mm || "" } });
+  dispatch({ type: "SET", payload: { showCalib: false } });
+}
+
+export function finalizeCalibManual(ppmValue, pushUndo, updSession, dispatch) {
+  const p = parseFloat(ppmValue);
+  if (!isFinite(p) || p <= 0 || p > 1000) return;
+  pushUndo();
+  updSession({ calibration: { done: true, pxPerMm: p, knownMm: "" } });
+  dispatch({ type: "SET", payload: { showCalib: false } });
+}
+
+export function exportCSV(markups, calibration, formatAngle, projectName) {
+  const rows = [["ID", "Type", "Label", "Definition", "Points_px", "Measurement", "Value", "Unit"]];
+  markups.forEach(m => {
+    const meas = computeMeasurements(m, calibration);
+    const ps = vpts(m).map(p => `(${p.x.toFixed(1)},${p.y.toFixed(1)})`).join(";");
+    if (!Object.keys(meas).length) rows.push([m.id, m.type, m.label || "", m.definition || "", ps, "", "", ""]);
+    else Object.entries(meas).forEach(([k, v]) => {
+      if (k.startsWith("_")) return;
+      rows.push([m.id, m.type, m.label || "", m.definition || "", ps, k, v.toFixed(2), k === "angle" ? formatAngle(v) : (meas._unit === "mm" ? "mm" : "px")]);
+    });
+  });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([rows.map(r => r.map(c => `"${c}"`).join(",")).join("\n")], { type: "text/csv" }));
+  a.download = `${projectName}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+}

@@ -13,7 +13,11 @@ import { MarkupsPanel, MeasurementsPanel, FormulasPanel, ImagePanel, LayersPanel
 import { loadNormLibrary, saveNormLibrary } from "./normLibrary.js";
 import { createRedraw } from "./canvas/redraw.js";
 import { useWorkspaceUIState } from "./hooks/useWorkspaceUIState.js";
-import { autoCreateMeasurements, getMeasValue } from "./workspace/template.js";
+import { autoCreateMeasurements } from "./workspace/template.js";
+import { pushUndoSnapshot, undoAction, redoAction } from "./workspace/undo.js";
+import { refreshAutoMeasurements, markupDefaults } from "./workspace/markupHelpers.js";
+import { finalizeCalibRuler, finalizeCalibManual, exportCSV as exportCSVData } from "./workspace/calibration.js";
+import { loadImageFile, handleImageDrop } from "./workspace/images.js";
 import { Modal } from "./panels/Modal.jsx";
 import PanelGuideModal from "./panels/PanelGuideModal.jsx";
 import HomePage from "./panels/HomePage.jsx";
@@ -512,48 +516,26 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   snapshotRef.current=()=>JSON.stringify({markups,norms,placingMode,placingIdx,placingQueue,calibration,formulas,processing});
   // ══════════════════════════════════════
   // UNDO / REDO
-  const pushUndoRef=useRef();
-  pushUndoRef.current=()=>{
-    undoStackRef.current.push(snapshotRef.current());
-    if(undoStackRef.current.length>200)undoStackRef.current.shift();
-    redoStackRef.current=[];
-    setUndoVersion(v=>v+1);
-  };
-  const pushUndo=useCallback(()=>pushUndoRef.current(),[]);
-  undoRef.current=()=>{
-    if(undoStackRef.current.length===0)return;
-    redoStackRef.current.push(snapshotRef.current());
-    if(redoStackRef.current.length>200)redoStackRef.current.shift();
-    const prev=undoStackRef.current.pop();
-    if(!prev)return;
+  const setPlacing=(mode,queue,idx)=>dispatch({type:"SET",payload:{placingMode:mode,placingQueue:queue,placingIdx:idx}});
+  const restoreSnapshot=(prev)=>{
     const parsed=JSON.parse(prev);
     if(Array.isArray(parsed)){
       updSession({markups:parsed});
     }else{
       updSession({markups:parsed.markups,norms:parsed.norms,calibration:parsed.calibration,formulas:parsed.formulas,processing:parsed.processing});
-      dispatch({type:"SET",payload:{placingMode:parsed.placingMode,placingIdx:parsed.placingIdx,placingQueue:parsed.placingQueue}});
     }
-    setUndoVersion(v=>v+1);
   };
+  const pushUndoRef=useRef();
+  pushUndoRef.current=()=>{
+    pushUndoSnapshot(snapshotRef,undoStackRef,redoStackRef,setUndoVersion,snapshotRef.current());
+  };
+  const pushUndo=useCallback(()=>pushUndoRef.current(),[]);
+  undoRef.current=()=>{undoAction(snapshotRef,undoStackRef,redoStackRef,setUndoVersion,setPlacing,restoreSnapshot);};
   const undo=useCallback(()=>undoRef.current(),[]);
-  redoRef.current=()=>{
-    if(redoStackRef.current.length===0)return;
-    undoStackRef.current.push(snapshotRef.current());
-    if(undoStackRef.current.length>200)undoStackRef.current.shift();
-    const next=redoStackRef.current.pop();
-    if(!next)return;
-    const parsed=JSON.parse(next);
-    if(Array.isArray(parsed)){
-      updSession({markups:parsed});
-    }else{
-      updSession({markups:parsed.markups,norms:parsed.norms,calibration:parsed.calibration,formulas:parsed.formulas,processing:parsed.processing});
-      dispatch({type:"SET",payload:{placingMode:parsed.placingMode,placingIdx:parsed.placingIdx,placingQueue:parsed.placingQueue}});
-    }
-    setUndoVersion(v=>v+1);
-  };
+  redoRef.current=()=>{redoAction(snapshotRef,undoStackRef,redoStackRef,setUndoVersion,restoreSnapshot,setPlacing);};
   const redo=useCallback(()=>redoRef.current(),[]);
   const refreshAutoMeasRef=useRef();
-  refreshAutoMeasRef.current=(ms)=>{const placed={};const markupMap={};for(const m of ms){if(m.placed&&m.label)placed[m.label]=m;if(m.label)markupMap[m.label]=m;}return ms.map(m=>{if(!m.refLabels||m.refLabels.length===0)return m;if(m.type==="ratio"||m.type==="sum"||m.type==="difference"||m.type==="percentage"){const allRefsExist=m.refLabels.every(rl=>markupMap[rl]);if(!allRefsExist)return m;let nv=0;if(m.type==="ratio"){const v0=getMeasValue(markupMap[m.refLabels[0]]);const v1=getMeasValue(markupMap[m.refLabels[1]]);nv=v1!==0?v0/v1:0;}else if(m.type==="difference"){nv=getMeasValue(markupMap[m.refLabels[0]])-getMeasValue(markupMap[m.refLabels[1]]);}else if(m.type==="percentage"){const v0=getMeasValue(markupMap[m.refLabels[0]]);const v1=getMeasValue(markupMap[m.refLabels[1]]);nv=v1!==0?(v0/v1)*100:0;}else{nv=m.refLabels.reduce((s,rl)=>s+getMeasValue(markupMap[rl]),0);}if(m.computedValue!==nv)return{...m,computedValue:nv};return m;}const allPlaced=m.refLabels.every(rl=>placed[rl]);if(!allPlaced)return m;const np=m.refLabels.map(rl=>placed[rl].points[0]);if(np.some((p,i)=>p.x!==m.points[i]?.x||p.y!==m.points[i]?.y))return{...m,points:np};return m;});};
+  refreshAutoMeasRef.current=refreshAutoMeasurements;
   const refreshAutoMeas=useCallback(ms=>refreshAutoMeasRef.current(ms),[]);
   const updMarkups=useCallback(fn=>{pushUndo();updSession({markups:refreshAutoMeas(fn(markups))});},[pushUndo,updSession,refreshAutoMeas,markups]);
   updMarkupRef.current=(id,patch)=>{
@@ -569,23 +551,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   // MARKUP CRUD
   const addMarkupRef=useRef();
   addMarkupRef.current=partial=>{
-    const typeCount=(type)=>markups.filter(m=>m.type===type).length;
-    const m={id:uid(),color:t.acc,width:1.5,style:"solid",size:6,label:"",definition:"",showLength:true,strokeColor:t.acc,fillColor:t.acc+"22",strokeWidth:1.5,visible:true,placed:true,...partial};
-    if(partial.type==="point")m.label=`P${typeCount("point")+1}`;
-    if(partial.type==="line"||partial.type==="parallel")m.label=partial.label||`Line ${typeCount("line")+typeCount("parallel")+1}`;
-    if(partial.type==="curve")m.label=partial.label||`Trace ${typeCount("curve")+1}`;
-    if(partial.type==="angle3")m.label=partial.label||`Angle ${typeCount("angle3")+1}`;
-    if(partial.type==="angle4")m.label=partial.label||`Inc_Angle ${typeCount("angle4")+1}`;
-    if(partial.type==="ellipse")m.label=partial.label||`Ellipse ${typeCount("ellipse")+1}`;
-    if(partial.type==="arc")m.label=partial.label||`Arc ${typeCount("arc")+1}`;
-    if(partial.type==="circle")m.label=partial.label||`Circle ${typeCount("circle")+1}`;
-    if(partial.type==="bezier")m.label=partial.label||`Bezier ${typeCount("bezier")+1}`;
-    if(partial.type==="tangent")m.label=partial.label||`Tangent ${typeCount("tangent")+1}`;
-    if(partial.type==="concentric")m.label=partial.label||`Concentric ${typeCount("concentric")+1}`;
-    if(!m.refLabels&&m.type!=="point"&&m.points&&m.points.length>=1&&m.points.every(p=>p.x>-9000)){
-      const refs=m.points.map(p=>{for(const src of markups)if(src.type==="point"&&src.label&&src.points?.length&&src.visible!==false&&Math.abs(src.points[0].x-p.x)<3&&Math.abs(src.points[0].y-p.y)<3)return src.label;return null;});
-      if(refs.every(l=>l))m.refLabels=refs;
-    }
+    const m=markupDefaults(partial,markups,t);
     updMarkups(ms=>[...ms,m]);dispatch({type:"SET",payload:{selectedId:m.id}});return m;
   };
   const addMarkup=useCallback(partial=>addMarkupRef.current(partial),[]);
@@ -740,39 +706,11 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
 
   // ══════════════════════════════════════
   // IMAGE LOADING
-  const loadImage=(file,addToStack=false)=>{
-    if(!file||!file.type.startsWith("image/"))return;
-    if(file.size>100*1024*1024){alert(`"${file.name}" is too large (${(file.size/1024/1024).toFixed(1)} MB). Maximum image size is 100 MB.`);return;}
-    dispatch({type:"SET",payload:{loadingImages:true}});
-    const reader=new FileReader();
-    reader.onload=e=>{
-      const dataUrl=e.target.result;const img=new Image();
-      img.onload=()=>{
-        const id=uid();imgRefs.current[id]=img;
-        const entry={id,name:file.name,dataUrl,dx:0,dy:0,opacity:1,blendMode:"normal",visible:true,color:"none",transform:{tx:0,ty:0,rot:0,scale:1}};
-        const currentImages = activeSession?.images || [];
-        if(addToStack){
-          updSession({images: [...currentImages, entry]});
-        } else {
-          updSession({images: [entry]});
-        }
-        dispatch({type:"SET",payload:{loadingImages:false}});
-        if(!addToStack){
-          const cw=canvasSize.current.w-80,ch=canvasSize.current.h-80;const sc=Math.min(cw/(img.naturalWidth||600),ch/(img.naturalHeight||500),1);dispatch({type:"SET",payload:{zoom:sc}});panRef.current={x:40,y:40};dispatch({type:"SET",payload:{pan:{x:40,y:40}}});
-          updSession({calibration:{done:false,pxPerMm:1,knownMm:""}});
-        }
-      };
-      // D8: a corrupt/permission-denied image decode used to hang the
-      // "Loading images…" overlay forever. Clear it and tell the user.
-      img.onerror=()=>{ dispatch({type:"SET",payload:{loadingImages:false}}); logError("Image decode failed:",null); alert(`Could not decode "${file?.name||"image"}". The file may be corrupt or in an unsupported format.`); };
-      img.src=dataUrl;
-    };
-    // D8: same for the FileReader itself (file unreadable / revoked).
-    reader.onerror=()=>{ dispatch({type:"SET",payload:{loadingImages:false}}); logError("File read failed:",reader.error); alert(`Could not read "${file?.name||"file"}".`); };
-    reader.readAsDataURL(file);
-  };
+  const loadImage=useCallback((file,addToStack=false)=>{
+    loadImageFile(file, addToStack, { sessionImages: activeSession?.images || [], dispatch, updSession, imgRefs, canvasSize, panRef });
+  },[activeSession?.images, dispatch, updSession, imgRefs, canvasSize, panRef]);
 
-  const handleDrop=e=>{e.preventDefault();const files=Array.from(e.dataTransfer.files).filter(f=>f.type.startsWith("image/"));files.forEach((f,i)=>loadImage(f,i>0));};
+  const handleDrop=useCallback(e=>{handleImageDrop(e, loadImage);},[loadImage]);
 
   useEffect(()=>{
     const fn=e=>{
@@ -1128,25 +1066,13 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
 
   // ══════════════════════════════════════
   // CALIBRATION + TEMPLATE + EXPORT
-  const finalizeCalib=(mm,manualPpm)=>{
+  const finalizeCalib=useCallback((mm,manualPpm)=>{
     if(manualPpm){
-      const p = parseFloat(manualPpm);
-      if(!isFinite(p)||p<=0||p>1000)return;
-      pushUndo();
-      updSession({calibration:{done:true,pxPerMm:p,knownMm:mm||""}});
-      dispatch({type:"SET",payload:{showCalib:false}});
+      finalizeCalibManual(manualPpm, pushUndo, updSession, dispatch);
       return;
     }
-    const ruler=pendingRuler||markups.find(m=>m.type==="ruler");if(!ruler)return;
-    const vp=vpts(ruler);if(vp.length<2)return;
-    const pixelDist=dist(vp[0],vp[1]);
-    if(pixelDist<10)return;
-    const ppm = pixelDist / mm;
-    if(!isFinite(ppm)||ppm<=0||ppm>1000)return;
-    pushUndo();
-    updSession({calibration:{done:true,pxPerMm:ppm,knownMm:mm||""}});
-    dispatch({type:"SET",payload:{showCalib:false}});
-  };
+    finalizeCalibRuler(pendingRuler, mm, markups, { pushUndo, updSession, dispatch });
+  },[pendingRuler, markups, pushUndo, updSession, dispatch]);
 
   const loadTemplate=(analysis)=>{
     const newMarkups=[];
@@ -1168,11 +1094,9 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     }
   };
 
-  const exportCSV=()=>{
-    const rows=[["ID","Type","Label","Definition","Points_px","Measurement","Value","Unit"]];
-    markups.forEach(m=>{const meas=computeMeasurements(m,calibration);const ps=vpts(m).map(p=>`(${p.x.toFixed(1)},${p.y.toFixed(1)})`).join(";");if(!Object.keys(meas).length)rows.push([m.id,m.type,m.label||"",m.definition||"",ps,"","",""]);else Object.entries(meas).forEach(([k,v])=>{if(k.startsWith("_"))return;rows.push([m.id,m.type,m.label||"",m.definition||"",ps,k,v.toFixed(2),k==="angle"?formatAngle(v):(meas._unit==="mm"?"mm":"px")]);});});
-    const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([rows.map(r=>r.map(c=>`"${c}"`).join(",")).join("\n")],{type:"text/csv"}));a.download=`${project.name}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),60000);
-  };
+  const exportCSV=useCallback(()=>{
+    exportCSVData(markups, calibration, formatAngle, project.name);
+  },[markups, calibration, formatAngle, project.name]);
 
   const captureMarkupImage = useCallback(async () => {
     const imgEl = sessionImage?.[0] ? imgRefs.current[sessionImage[0].id] : null;
