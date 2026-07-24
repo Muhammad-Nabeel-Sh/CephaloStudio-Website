@@ -11,13 +11,20 @@ import ToolBtn from "./ToolBtn.jsx";
 import { drawMarkup, drawInProgress, drawScaleBar, drawLUTLegend, drawSnapIndicator, drawDisplacementVectors, drawAirwayOverlay, hitTest, getSilhouetteHandlesImage } from "./markups.jsx";
 import { MarkupsPanel, MeasurementsPanel, FormulasPanel, ImagePanel, LayersPanel, MarkupProps, TemplatesPanel, SilhouettesPanel, ExamplesPanel } from "./panels.jsx";
 import { loadNormLibrary, saveNormLibrary } from "./normLibrary.js";
-import { procrustesAlign } from "./research/superimposition.js";
+import { createRedraw } from "./canvas/redraw.js";
+import { useWorkspaceUIState } from "./hooks/useWorkspaceUIState.js";
+import { autoCreateMeasurements, getMeasValue } from "./workspace/template.js";
 import { Modal } from "./panels/Modal.jsx";
 import PanelGuideModal from "./panels/PanelGuideModal.jsx";
 import HomePage from "./panels/HomePage.jsx";
+import Toolbar from "./panels/Toolbar.jsx";
+import TopBar from "./panels/TopBar.jsx";
 import ErrorBoundary from "./ErrorBoundary.jsx";
 import SessionsPanel from "./panels/SessionsPanel.jsx";
 import AirwayPanel from "./panels/AirwayPanel.jsx";
+import { PanelContent } from "./panels/PanelContent.jsx";
+import { PANEL_ICONS, PANEL_TABS } from "./panels/panelIcons.jsx";
+import { RightPanelSidebar } from "./panels/RightPanelSidebar.jsx";
 import SessionFilmstrip from "./panels/SessionFilmstrip.jsx";
 import AnonModal from "./panels/AnonModal.jsx";
 import ResearchPanel from "./research/ResearchPanel.jsx";
@@ -322,6 +329,8 @@ function FormulaEditor({t,formula,scope,onSave,onClose}){
 // WORKSPACE
 // ═══════════════════════════════════════════════════════════════════════════════
 function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImport}){
+  // ══════════════════════════════════════
+  // CANVAS + REFS
   const canvasRef=useRef(null);const containerRef=useRef(null);
   const procCache=useRef(new Map());const imgRefs=useRef({});const rafRef=useRef(null);
   // F1: pointer state lives in refs (not reducer state) so mousemove skips React re-render
@@ -351,14 +360,17 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     toolbarPos,toolbarDragging,rightPanelWidth,rightPanelResizing,
     spotlightMode,
     displacementOverlay,refLandmark1,refLandmark2,overlayBlend,overlayAlignMode,overlayVectorScale,showTrackingLines,}=ui;
-  const [compareSession, setCompareSession] = useState(null);
-  const [contextMenu, setContextMenu] = useState(null);
-  const [showGrid, setShowGrid] = useState(false);
-  const [showReportOptions, setShowReportOptions] = useState(false);
-  const [guideKey, setGuideKey] = useState(null);
-  const [showAirwayOverlay, setShowAirwayOverlay] = useState(false);
-  const defaultSections = { cover: true, images: true, measurements: true, normograms: true, research: true, formulas: true, interpretation: true };
-  const [reportSections, setReportSections] = useState({ ...defaultSections });
+  const {
+    compareSession, setCompareSession,
+    contextMenu, setContextMenu,
+    showGrid, setShowGrid,
+    showAirwayOverlay, setShowAirwayOverlay,
+    showReportOptions, setShowReportOptions,
+    filmstripOpen, setFilmstripOpen,
+    guideKey, setGuideKey,
+    defaultSections, reportSections, setReportSections,
+    pinnedFormulas, setPinnedFormulas,
+  } = useWorkspaceUIState();
   const rightPanelWidthRef=useRef(rightPanelWidth);rightPanelWidthRef.current=rightPanelWidth;
   const toolbarPosRef=useRef(toolbarPos);toolbarPosRef.current=toolbarPos;
   // Panel collapse state — useRef + DOM manipulation to avoid canvas re-renders
@@ -416,6 +428,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   },[toolbarDragging,dispatch]);
 
   // ─── These must be declared before any useEffect that references them ──────
+  // ══════════════════════════════════════
+  // SESSION STATE
   const activeSession=project.sessions?.find(s=>s.id===project.activeSessionId)||project.sessions?.[0];
   const markups=useMemo(()=>activeSession?.markups||[],[activeSession?.markups]);
 
@@ -433,6 +447,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     legacyMigrationDoneRef.current=true;
   },[activeSession, project, onUpdateProject, activeSession?.id]);
 
+  // ══════════════════════════════════════
+  // DRAG + EVENT REFS
   const isPanning=useRef(false);const panStart=useRef(null);
   const isDragging=useRef(false);const dragStart=useRef(null);const dragStartState=useRef(null);
   const dragMid=useRef(null);const dragPtIdx=useRef(null);
@@ -494,6 +510,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const updMarkupRef=useRef();
   const delMarkupRef=useRef();
   snapshotRef.current=()=>JSON.stringify({markups,norms,placingMode,placingIdx,placingQueue,calibration,formulas,processing});
+  // ══════════════════════════════════════
+  // UNDO / REDO
   const pushUndoRef=useRef();
   pushUndoRef.current=()=>{
     undoStackRef.current.push(snapshotRef.current());
@@ -547,6 +565,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     if(selectedId===id)dispatch({type:"SET",payload:{selectedId:null}});
   };
   const delMarkup=useCallback(id=>delMarkupRef.current(id),[]);
+  // ══════════════════════════════════════
+  // MARKUP CRUD
   const addMarkupRef=useRef();
   addMarkupRef.current=partial=>{
     const typeCount=(type)=>markups.filter(m=>m.type===type).length;
@@ -625,6 +645,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     });
   },[sessionImage]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ══════════════════════════════════════
+  // CANVAS DRAW PIPELINE
   const getProcessed=useCallback(imgEntry=>{
     const key=`${imgEntry.id}-${JSON.stringify(processing)}-${lutMode}-${lutInvert}`;
     if(!procCache.current.has(key)){for(const k of procCache.current.keys())if(k.startsWith(imgEntry.id+"-")&&k!==key)procCache.current.delete(k);procCache.current.set(key,processImageToCanvas(imgRefs.current[imgEntry.id],processing,lutMode,lutInvert));}
@@ -684,296 +706,23 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   },[]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const redraw=useCallback(()=>{
-    const canvas=canvasRef.current;if(!canvas)return;
-    const ctx=canvas.getContext("2d");if(!ctx)return;
-    // F2: DPR-aware coordinate space — all drawing in CSS pixels
-    const dpr=dprRef.current;
-    ctx.save();ctx.scale(dpr,dpr);
-    const W=canvas.width/dpr,H=canvas.height/dpr;
-    // F1: read hot pointer state from refs (not React state) — avoids re-render on mousemove
-    const mousePos=mousePosRef.current;
-    const snapPos=snapPosRef.current;
-    const boxSelectRect=boxSelectRectRef.current;
-    const pan=panRef.current;
-
-    ctx.clearRect(0,0,W,H);
-    ctx.fillStyle=t.bg;ctx.fillRect(0,0,W,H);
-    
-    if(sessionImage.length===0 && markups.length===0){
-      ctx.fillStyle=t.surf;ctx.fillRect(pan.x,pan.y,600*zoom,500*zoom);ctx.strokeStyle=t.bdr;ctx.lineWidth=1;ctx.strokeRect(pan.x,pan.y,600*zoom,500*zoom);
-      ctx.fillStyle=t.tx3;ctx.font=`15px "DM Sans",sans-serif`;ctx.textAlign="center";ctx.fillText("Drop or open a cephalogram image",pan.x+300*zoom,pan.y+240*zoom);ctx.fillText("Open Image  •  drag & drop",pan.x+300*zoom,pan.y+265*zoom);ctx.textAlign="left";
-    } else {
-      sessionImage.forEach(imgE=>{
-        if(!imgE.visible)return;const src=getProcessed(imgE)||imgRefs.current[imgE.id];if(!src)return;
-        const tf=imgE.transform||{tx:0,ty:0,rot:0,scale:1};const nw=src.naturalWidth||src.width||600,nh=src.naturalHeight||src.height||500;
-        ctx.save();ctx.globalAlpha=imgE.opacity??1;ctx.globalCompositeOperation=imgE.blendMode||"normal";
-        ctx.translate(pan.x+(imgE.dx||0)*zoom,pan.y+(imgE.dy||0)*zoom);
-        ctx.translate((nw/2+tf.tx)*zoom,(nh/2+tf.ty)*zoom);ctx.rotate(tf.rot||0);ctx.scale((tf.scale||1)*zoom,(tf.scale||1)*zoom);
-        ctx.drawImage(src,-nw/2,-nh/2);
-        if(imgE.color&&imgE.color!=="none"){ctx.globalCompositeOperation="color";ctx.fillStyle=imgE.color+"77";ctx.fillRect(-nw/2,-nh/2,nw,nh);}
-        ctx.restore();
-      });
-    }
-    const drawMarkups=markups;
-    const drawCalibration=calibration;
-    // Overlay mode: draw compare version's markups first with reduced opacity
-    if(displacementOverlay && compareSession){
-      ctx.save();
-      ctx.globalAlpha = overlayBlend;
-      const compMarkups = compareSession.markups || [];
-      let tf = null;
-      if(overlayAlignMode === "procrustes"){
-        const srcPts = [], dstPts = [];
-        const seen = new Set();
-        compMarkups.forEach(m => {
-          if(m.type !== "point" || !m.label || seen.has(m.label)) return;
-          seen.add(m.label);
-          const match = markups.find(o => o.type === "point" && o.label === m.label);
-          if(match && match.points[0] && m.points[0]) {
-            dstPts.push(m.points[0]);
-            srcPts.push(match.points[0]);
-          }
-        });
-        if(srcPts.length >= 2) tf = procrustesAlign(dstPts, srcPts);
-      } else if(overlayAlignMode === "2pt" && refLandmark1 && refLandmark2){
-        const p1a = vpts(markups.find(m => m.type === "point" && m.label === refLandmark1)||{});
-        const p1b = vpts(markups.find(m => m.type === "point" && m.label === refLandmark2)||{});
-        const p2a = vpts(compMarkups.find(m => m.type === "point" && m.label === refLandmark1)||{});
-        const p2b = vpts(compMarkups.find(m => m.type === "point" && m.label === refLandmark2)||{});
-        if(p1a.length && p1b.length && p2a.length && p2b.length) tf = alignTwoPoints(p2a[0], p2b[0], p1a[0], p1b[0]);
-      }
-      if(tf && !tf.error){
-        ctx.translate(pan.x, pan.y);
-        ctx.scale(zoom, zoom);
-        ctx.translate(tf.tx, tf.ty);
-        ctx.rotate(tf.rot);
-        ctx.scale(tf.scale, tf.scale);
-        compMarkups.forEach(m => drawMarkup(ctx, m, 1, {x:0,y:0}, drawCalibration, null, t, false, canvasSize.current, angleMode, false, annotationSize, null));
-      } else {
-        compMarkups.forEach(m => drawMarkup(ctx, m, zoom, pan, drawCalibration, null, t, false, canvasSize.current, angleMode, false, annotationSize, null));
-      }
-      ctx.restore();
-    }
-    // REC 3: Pre/post airway overlay — draw compare session's airway if enabled
-    if(showAirwayOverlay && compareSession){
-      drawAirwayOverlay(ctx, compareSession.markups || [], zoom, pan, drawCalibration, "orange");
-    }
-    drawMarkups.forEach(m=>drawMarkup(ctx,m,zoom,pan,drawCalibration,selectedId,t,false,canvasSize.current,angleMode,showAnnotations,annotationSize,hoveredPtRef.current));
-    // U3: In-canvas calibration guidance — highlight the ruler used for calibration
-    if(showCalib&&pendingRuler){
-      const rp=drawMarkups.find(m=>m.id===pendingRuler.id);
-      if(rp){
-        const vp=vpts(rp);if(vp.length>=2){
-          const sp0={x:vp[0].x*zoom+pan.x,y:vp[0].y*zoom+pan.y};
-          const sp1={x:vp[1].x*zoom+pan.x,y:vp[1].y*zoom+pan.y};
-          const now=Date.now(),pulse=0.5+0.5*Math.sin(now/200);
-          ctx.save();ctx.strokeStyle=`rgba(255,215,0,${0.4+0.4*pulse})`;ctx.lineWidth=4;ctx.setLineDash([8,4]);ctx.beginPath();ctx.moveTo(sp0.x,sp0.y);ctx.lineTo(sp1.x,sp1.y);ctx.stroke();ctx.setLineDash([]);ctx.restore();
-          const mx=(sp0.x+sp1.x)/2,my=(sp0.y+sp1.y)/2;
-          ctx.save();ctx.fillStyle=`rgba(255,215,0,${0.7+0.3*pulse})`;ctx.font="bold 11px 'DM Sans',sans-serif";ctx.textAlign="center";ctx.fillText("Calibration ruler",mx,my-10);ctx.restore();
-        }
-      }
-    }
-    if(showDisplacement){
-      if(!compareSession){
-        ctx.fillStyle="rgba(0,0,0,0.6)";ctx.fillRect(8,8,220,36);
-        ctx.fillStyle="#ffd700";ctx.font="bold 12px 'DM Sans',sans-serif";
-        ctx.fillText("\u21DD Select a compare version in Versions panel",16,28);
-      } else {
-        drawDisplacementVectors(ctx,drawMarkups,compareSession.markups||[],zoom,pan,drawCalibration,overlayVectorScale);
-      }
-      if(compareSession && activeTool === "select"){
-        const mPos = mouseCanvasRef.current;
-        const compMarkups = compareSession.markups || [];
-        const pxPerMm = drawCalibration?.done ? drawCalibration.pxPerMm : 0;
-        let hoveredDisp = null;
-        drawMarkups.filter(m => m.type === "point").forEach(m1 => {
-          if(hoveredDisp) return;
-          const m2 = compMarkups.find(m => m.type === "point" && m.label === m1.label);
-          if(!m2) return;
-          const vp1 = vpts(m1), vp2 = vpts(m2);
-          if(!vp1.length || !vp2.length) return;
-          const sx1 = vp1[0].x * zoom + pan.x, sy1 = vp1[0].y * zoom + pan.y;
-          const sx2 = vp2[0].x * zoom + pan.x, sy2 = vp2[0].y * zoom + pan.y;
-          const midX = (sx1 + sx2) / 2, midY = (sy1 + sy2) / 2;
-          const dMid = Math.sqrt((mPos.x - midX) ** 2 + (mPos.y - midY) ** 2);
-          const imgDx = vp2[0].x - vp1[0].x, imgDy = vp2[0].y - vp1[0].y;
-          const imgLen = Math.sqrt(imgDx * imgDx + imgDy * imgDy);
-          if(dMid < Math.max(18, imgLen * zoom * 0.5)){
-            const lenMm = pxPerMm > 0 ? imgLen / pxPerMm : null;
-            const dxMm = pxPerMm > 0 ? imgDx / pxPerMm : imgDx;
-            const dyMm = pxPerMm > 0 ? (-imgDy) / pxPerMm : -imgDy;
-            hoveredDisp = { label: m1.label, lenMm, dxMm, dyMm, midX, midY };
-          }
-        });
-        if(hoveredDisp){
-          const tipX = hoveredDisp.midX + 14, tipY = hoveredDisp.midY - 12;
-          const lines = [hoveredDisp.label];
-          if(hoveredDisp.lenMm != null) lines.push(`${hoveredDisp.lenMm.toFixed(2)} mm`);
-          lines.push(`A/P: ${hoveredDisp.dxMm >= 0 ? "+" : ""}${hoveredDisp.dxMm.toFixed(1)}  S/I: ${hoveredDisp.dyMm >= 0 ? "+" : ""}${hoveredDisp.dyMm.toFixed(1)}`);
-          ctx.save();
-          ctx.shadowColor = "rgba(0,0,0,0.4)"; ctx.shadowBlur = 8; ctx.shadowOffsetY = 2;
-          ctx.font = '11px "DM Mono",monospace';
-          const tipW = Math.max(...lines.map(l => ctx.measureText(l).width)) + 16;
-          const tipH = 14 + lines.length * 14;
-          let tx = tipX, ty = tipY;
-          const W2 = canvasSize.current?.w || 800, H2 = canvasSize.current?.h || 600;
-          if(tx + tipW > W2 - 8) tx = hoveredDisp.midX - tipW - 14;
-          if(ty + tipH > H2 - 8) ty = H2 - tipH - 8;
-          if(ty < 8) ty = 8;
-          ctx.fillStyle = t.surf2; ctx.beginPath(); ctx.roundRect(tx, ty, tipW, tipH, 6); ctx.fill();
-          ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-          ctx.fillStyle = t.acc; ctx.beginPath(); ctx.roundRect(tx, ty, tipW, 3, {upperLeft: 6, upperRight: 6}); ctx.fill();
-          ctx.fillStyle = t.tx; ctx.font = 'bold 10px "DM Mono",monospace';
-          ctx.fillText(lines[0], tx + 8, ty + 14);
-          ctx.fillStyle = t.tx2; ctx.font = '9px "DM Mono",monospace';
-          lines.slice(1).forEach((l, i) => ctx.fillText(l, tx + 8, ty + 28 + i * 14));
-          ctx.restore();
-        }
-      }
-    }
-    if(showTrackingLines && compareSession){
-      ctx.save();
-      ctx.setLineDash([4,4]);
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = "rgba(168,85,247,0.45)";
-      const compMarkups = compareSession.markups || [];
-      drawMarkups.filter(m => m.type === "point").forEach(m1 => {
-        const m2 = compMarkups.find(m => m.type === "point" && m.label === m1.label);
-        if(!m2) return;
-        const vp1 = vpts(m1), vp2 = vpts(m2);
-        if(!vp1.length || !vp2.length) return;
-        const sp1 = { x: vp1[0].x * zoom + pan.x, y: vp1[0].y * zoom + pan.y };
-        const sp2 = { x: vp2[0].x * zoom + pan.x, y: vp2[0].y * zoom + pan.y };
-        ctx.beginPath();
-        ctx.moveTo(sp1.x, sp1.y);
-        ctx.lineTo(sp2.x, sp2.y);
-        ctx.stroke();
-      });
-      ctx.setLineDash([]);
-      ctx.restore();
-    }
-    if(showAirwayOverlay) drawAirwayOverlay(ctx,drawMarkups,zoom,pan,drawCalibration);
-    // Point definition tooltip on hover
-    if(showDefTooltips&&hoveredPtRef.current?.type==="point"&&activeTool==="select"){
-      const hp=drawMarkups.find(m=>m.id===hoveredPtRef.current.mid);
-      if(hp&&hp.definition){
-        const vp=vpts(hp);
-        if(vp.length){
-          const sp={x:vp[0].x*zoom+pan.x,y:vp[0].y*zoom+pan.y};
-          const tipW=Math.max(120,Math.min(340,W-sp.x-20));
-          ctx.font=`11px "DM Sans",sans-serif`;
-          const lines=[];let line="";
-          for(const word of hp.definition.split(" ")){
-            const test=line?line+" "+word:word;
-            if(ctx.measureText(test).width>tipW-24&&line){lines.push(line);line=word;}else line=test;
-          }
-          if(line)lines.push(line);
-          const tipH=Math.max(54,38+lines.length*18);
-          let tx=sp.x+14,ty=sp.y-10;
-          if(tx+tipW>W-8)tx=sp.x-tipW-14;
-          if(ty+tipH>H-8)ty=H-tipH-8;
-          if(ty<8)ty=8;
-          ctx.save();
-          ctx.shadowColor="rgba(0,0,0,0.4)";ctx.shadowBlur=10;ctx.shadowOffsetY=2;
-          ctx.fillStyle=t.surf2;ctx.beginPath();ctx.roundRect(tx,ty,tipW,tipH,8);ctx.fill();
-          ctx.shadowColor="transparent";ctx.shadowBlur=0;ctx.shadowOffsetY=0;
-          ctx.fillStyle=t.acc;ctx.beginPath();ctx.roundRect(tx,ty,tipW,3,{upperLeft:8,upperRight:8});ctx.fill();
-          ctx.fillStyle=t.tx;ctx.font=`bold 12px "DM Sans",sans-serif`;
-          ctx.fillText(hp.label,tx+12,ty+20);
-          ctx.fillStyle=t.tx2;ctx.font=`11px "DM Sans",sans-serif`;
-          lines.forEach((l,i)=>ctx.fillText(l,tx+12,ty+38+i*16));
-          ctx.restore();
-        }
-      }
-    }
-    if(currentDraw){drawInProgress(ctx,currentDraw,mousePos,zoom,pan,t);}
-    if(snapEnabled&&snapPos){const _mouseImg={x:(mousePos.x-pan.x)/zoom,y:(mousePos.y-pan.y)/zoom};drawSnapIndicator(ctx,snapPos,zoom,pan,drawMarkups,_mouseImg,12/zoom);}
-    if(boxSelectRect){
-      const{x1,y1,x2,y2}=boxSelectRect;
-      ctx.save();
-      ctx.strokeStyle=t.acc;ctx.lineWidth=1.5/zoom;ctx.setLineDash([4/zoom,4/zoom]);
-      ctx.strokeRect(x1*zoom+pan.x,y1*zoom+pan.y,(x2-x1)*zoom,(y2-y1)*zoom);
-      ctx.fillStyle=t.acc+"22";ctx.fillRect(x1*zoom+pan.x,y1*zoom+pan.y,(x2-x1)*zoom,(y2-y1)*zoom);
-      ctx.setLineDash([]);
-      ctx.restore();
-    }
-    if(selectedIds.length>0){
-      let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-      selectedIds.forEach(id=>{
-        const m=markups.find(x=>x.id===id);
-        if(!m||m.visible===false)return;
-        let pts=[];
-        if(m.type==="silhouette"){
-          const pos=m.position||{x:0,y:0};
-          if(pos.x>-9000)pts.push(pos);
-          const paths=m.paths||SILHOUETTES[m.silhouetteType]?.paths;
-          if(paths){
-            const rot=m.rotation||0;const sc=m.scale||1;const baseSize=100;
-            const cosR=Math.cos(rot);const sinR=Math.sin(rot);
-            paths.forEach(path=>{path.points.forEach(p=>{
-              const sx=p.x*sc*baseSize;const sy=p.y*sc*baseSize;
-              pts.push({x:sx*cosR-sy*sinR+pos.x,y:sx*sinR+sy*cosR+pos.y});
-            });});
-          }
-        }else{pts=vpts(m);}
-        pts.forEach(p=>{if(p.x>-9000){if(p.x<minX)minX=p.x;if(p.y<minY)minY=p.y;if(p.x>maxX)maxX=p.x;if(p.y>maxY)maxY=p.y;}});
-      });
-      if(isFinite(minX)){
-        ctx.save();
-        const bx=minX*zoom+pan.x,by=minY*zoom+pan.y,bw=(maxX-minX)*zoom,bh=(maxY-minY)*zoom;
-        const pad=4/zoom;
-        ctx.strokeStyle=t.acc;ctx.lineWidth=1.5/zoom;ctx.setLineDash([5/zoom,4/zoom]);
-        ctx.strokeRect(bx-pad,by-pad,bw+pad*2,bh+pad*2);
-        ctx.setLineDash([]);
-        const hs=6/zoom;
-        const hc=[[bx-pad,by-pad],[bx+bw+pad,by-pad],[bx-pad,by+bh+pad],[bx+bw+pad,by+bh+pad]];
-        hc.forEach(([cx,cy])=>{
-          ctx.fillStyle=t.surf;ctx.strokeStyle=t.acc;ctx.lineWidth=1/zoom;
-          ctx.fillRect(cx-hs/2,cy-hs/2,hs,hs);
-          ctx.strokeRect(cx-hs/2,cy-hs/2,hs,hs);
-        });
-        ctx.restore();
-      }
-    }
-    // Grid overlay
-    if(showGrid){
-      ctx.save();
-      ctx.strokeStyle=t.bdr+"33";ctx.lineWidth=0.5/zoom;
-      const gs=50/zoom;const ox=pan.x%gs;const oy=pan.y%gs;
-      for(let gx=-ox;gx<W;gx+=gs){ctx.beginPath();ctx.moveTo(gx,0);ctx.lineTo(gx,H);ctx.stroke();}
-      for(let gy=-oy;gy<H;gy+=gs){ctx.beginPath();ctx.moveTo(0,gy);ctx.lineTo(W,gy);ctx.stroke();}
-      ctx.restore();
-    }
-    if(showScaleBar)drawScaleBar(ctx,zoom,drawCalibration,W,H);
-    // Flash highlight: animate a pulsing ring around the clicked markup
-    if(flashMarkupIdRef.current){
-      const _fm=markups.find(m=>m.id===flashMarkupIdRef.current);
-      if(_fm){
-        const _fp=vpts(_fm);if(_fp.length){
-          const _fcx=_fp.reduce((s,p)=>s+p.x,0)/_fp.length,_fcy=_fp.reduce((s,p)=>s+p.y,0)/_fp.length;
-          const _el=(performance.now()-flashStartTimeRef.current)/1500;
-          const _op=0.7*(1-_el),_sc=1+_el*0.5;
-          const _sx=_fcx*zoom+pan.x,_sy=_fcy*zoom+pan.y,_br=Math.max(20,5*Math.sqrt(zoom))*_sc;
-          ctx.save();
-          ctx.strokeStyle=`rgba(255,215,0,${_op})`;ctx.lineWidth=3*Math.sqrt(zoom);
-          for(let _i=0;_i<2;_i++){const _r=_br+_i*8*Math.sqrt(zoom)*_sc;ctx.beginPath();ctx.arc(_sx,_sy,_r,0,Math.PI*2);ctx.stroke();}
-          ctx.restore();
-        }
-      }
-    }
-    if(showLUT)drawLUTLegend(ctx,lutMode,lutInvert,W,H,t);
-    // A5: Placing-mode card moved to floating React panel — no longer drawn on canvas
-    // F1: draw coordinates on canvas (replaces DOM overlay — no React re-render needed)
-    if(mousePos){
-      const ip={x:(mousePos.x-pan.x)/zoom,y:(mousePos.y-pan.y)/zoom};
-      const coordTxt=`${ip.x.toFixed(1)}, ${ip.y.toFixed(1)} px${calibration.done?` · (${(ip.x/calibration.pxPerMm).toFixed(1)}, ${(ip.y/calibration.pxPerMm).toFixed(1)} mm)`:""}`;
-      ctx.font=`11px "DM Mono",monospace`;
-      const tw=ctx.measureText(coordTxt).width;
-      ctx.fillStyle=t.surf+"ee";ctx.strokeStyle=t.bdr;ctx.lineWidth=1;
-      ctx.beginPath();ctx.roundRect(22,H-30,tw+16,22,6);ctx.fill();ctx.stroke();
-      ctx.fillStyle=t.tx2;ctx.fillText(coordTxt,30,H-14);
-    }
-    ctx.restore(); // F2: end DPR scale
+    const dc={
+      canvasRef,dprRef,mousePosRef,snapPosRef,boxSelectRectRef,panRef,
+      mouseCanvasRef,flashMarkupIdRef,flashStartTimeRef,
+      canvasSize,imgRefs,hoveredPtRef,
+      drawMarkup,drawInProgress,drawScaleBar,drawLUTLegend,
+      drawSnapIndicator,drawDisplacementVectors,drawAirwayOverlay,
+      markups,selectedId,selectedIds,zoom,sessionImage,calibration,t,
+      currentDraw,snapEnabled,showScaleBar,showDefTooltips,showLUT,
+      showAnnotations,annotationSize,showDisplacement,compareSession,
+      getProcessed,angleMode,lutMode,lutInvert,activeTool,
+      displacementOverlay,overlayBlend,overlayAlignMode,overlayVectorScale,
+      showTrackingLines,refLandmark1,refLandmark2,showCalib,pendingRuler,
+      showGrid,showAirwayOverlay,
+      alignTwoPoints,
+      silhouettes:SILHOUETTES,
+    };
+    createRedraw(dc)();
   },[markups,selectedId,selectedIds,zoom,sessionImage,calibration,t,currentDraw,snapEnabled,showScaleBar,showDefTooltips,showLUT,showAnnotations,annotationSize,showDisplacement,compareSession,getProcessed,angleMode,lutMode,lutInvert,activeTool,displacementOverlay,overlayBlend,overlayAlignMode,overlayVectorScale,showTrackingLines,refLandmark1,refLandmark2,showCalib,pendingRuler,showGrid,showAirwayOverlay]);
 
   useEffect(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});},[redraw]);
@@ -989,6 +738,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   // U3: Keep redrawing while calibration modal is open (pulsing highlight animation)
   useEffect(()=>{if(!showCalib||!pendingRuler)return;let raf;const loop=()=>{scheduleRedrawRef.current();raf=requestAnimationFrame(loop);};raf=requestAnimationFrame(loop);return()=>cancelAnimationFrame(raf);},[showCalib,pendingRuler]);
 
+  // ══════════════════════════════════════
+  // IMAGE LOADING
   const loadImage=(file,addToStack=false)=>{
     if(!file||!file.type.startsWith("image/"))return;
     if(file.size>100*1024*1024){alert(`"${file.name}" is too large (${(file.size/1024/1024).toFixed(1)} MB). Maximum image size is 100 MB.`);return;}
@@ -1048,8 +799,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     window.addEventListener("keydown",fn);return()=>window.removeEventListener("keydown",fn);
   },[selectedId,selectedIds,placingMode,placingIdx,placingQueue,markups,delMarkup,redo,undo,dispatch,pushUndo,refreshAutoMeas,updSession,mobileToolsExpanded]);
 
-  const autoCreateMeasurementsRef=useRef();
-  const autoCreateMeasurements=useCallback((markups,templateName)=>autoCreateMeasurementsRef.current(markups,templateName),[]);
+  // ══════════════════════════════════════
+  // EVENT HANDLERS
   const handleMouseDown=useCallback(e=>{
     if(e.button===1){e.preventDefault();isPanning.current=true;panStart.current={mx:e.clientX,my:e.clientY,px:panRef.current.x,py:panRef.current.y};return;}
     if(e.button!==0)return;
@@ -1058,7 +809,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
      if(placingMode&&placingQueue.length>0&&placingIdx<placingQueue.length){
        const qid=placingQueue[placingIdx];
        const updatedMarkups=markups.map(m=>m.id===qid?{...m,points:[ip],placed:true}:m);
-        const newAuto=autoCreateMeasurements(updatedMarkups,analysisTemplate);
+        const newAuto=autoCreateMeasurements(updatedMarkups,analysisTemplate,calibration);
        const newNorms=[];
        for(const m of newAuto){
          if(m.norm){
@@ -1294,7 +1045,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     if(["line","angle3","angle4","polygon","curve","perp"].includes(activeTool)){
       if(!currentDraw)dispatch({type:"SET",payload:{currentDraw:{type:activeTool,points:[ip],curveStyle:"linear",replacingId}}});
       else{const nps=[...currentDraw.points,ip];const need={line:2,angle3:3,angle4:4,perp:3}[activeTool];if(need&&nps.length>=need){finalizeMarkup({...currentDraw,points:nps});dispatch({type:"SET",payload:{currentDraw:null}});}else dispatch({type:"SET",payload:{currentDraw:{...currentDraw,points:nps}}});}return;}
-  },[activeTool,markups,zoom,snapEnabled,currentDraw,selectedMarkup,selectedIds,placingMode,placingQueue,placingIdx,replacingId,setSelectedId,updMarkup,addMarkup,finalizeMarkup,toImage,getCanvasPos,t,analysisTemplate,autoCreateMeasurements,dispatch,norms,pushUndo,refreshAutoMeas,updSession]);
+  },[activeTool,markups,zoom,snapEnabled,currentDraw,selectedMarkup,selectedIds,placingMode,placingQueue,placingIdx,replacingId,setSelectedId,updMarkup,addMarkup,finalizeMarkup,toImage,getCanvasPos,t,analysisTemplate,autoCreateMeasurements,dispatch,norms,pushUndo,refreshAutoMeas,updSession,calibration]);
 
   const syncTangents=(curveId,dx,dy)=>{markups.forEach(tm=>{if(tm.type==="tangent"&&tm.tangentCurveId===curveId){const pts=tm.points||[];if(tm.tangentAngle!=null){const newPts=[{x:pts[0].x+dx,y:pts[0].y+dy},{x:pts[1].x+dx,y:pts[1].y+dy}];updMarkup(tm.id,{points:newPts});}else{updMarkup(tm.id,{points:pts.map(p=>({x:p.x+dx,y:p.y+dy}))});}}});};
   const syncRefDeps=(label,dx,dy)=>{if(!label)return;markups.forEach(dm=>{if(dm.type==="point"||!dm.refLabels)return;const rl=dm.refLabels;let changed=false;const pts=(dm.points||[]).map((p,i)=>{if(rl[i]===label){changed=true;return{x:p.x+dx,y:p.y+dy};}return p;});if(changed){const patch={points:pts};if(dm.type==="bezier"&&dm.cp)patch.cp=dm.cp.map(cp=>({x:cp.x+dx,y:cp.y+dy}));updMarkup(dm.id,patch);}});};
@@ -1375,6 +1126,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   touchEndRef.current=()=>{if(longPressTimerRef.current){clearTimeout(longPressTimerRef.current);longPressTimerRef.current=null;}handleMouseUp();lastTouchDist.current=null;};
   useEffect(()=>{const c=canvasRef.current;if(!c)return;const opts={passive:false};const onStart=e=>{e.preventDefault();touchStartRef.current(e);};const onMove=e=>{e.preventDefault();touchMoveRef.current(e);};const onEnd=e=>{touchEndRef.current(e);};c.addEventListener("touchstart",onStart,opts);c.addEventListener("touchmove",onMove,opts);c.addEventListener("touchend",onEnd,opts);return()=>{c.removeEventListener("touchstart",onStart);c.removeEventListener("touchmove",onMove);c.removeEventListener("touchend",onEnd);};},[]);
 
+  // ══════════════════════════════════════
+  // CALIBRATION + TEMPLATE + EXPORT
   const finalizeCalib=(mm,manualPpm)=>{
     if(manualPpm){
       const p = parseFloat(manualPpm);
@@ -1415,88 +1168,6 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     }
   };
 
-  autoCreateMeasurementsRef.current=(markups,templateName)=>{
-    const analysis=PREDEFINED.lateral.find(a=>a.name===templateName)
-      ||PREDEFINED.ap.find(a=>a.name===templateName)
-      ||PREDEFINED.smv.find(a=>a.name===templateName)
-      ||PREDEFINED.opg.find(a=>a.name===templateName)
-      ||PREDEFINED.handwrist.find(a=>a.name===templateName)
-      ||PREDEFINED.photolateral.find(a=>a.name===templateName)
-      ||PREDEFINED.photofrontal.find(a=>a.name===templateName);
-    if(!analysis||!analysis.measurements||analysis.measurements.length===0)return[];
-    const placed={};
-    for(const m of markups){
-      if(m.placed&&m.label)placed[m.label]=m;
-    }
-    const existingLabels=new Set(markups.map(m=>m.label));
-    const result=[];
-    for(const meas of analysis.measurements){
-      if(meas.type==="ratio"||meas.type==="sum"||meas.type==="difference"||meas.type==="percentage")continue;
-      if(!meas.pts||meas.pts.length<2)continue;
-      if(existingLabels.has(meas.l))continue;
-      const allPlaced=meas.pts.every(rl=>placed[rl]);
-      if(!allPlaced)continue;
-      const points=meas.pts.map(rl=>placed[rl].points[0]);
-      const extraProps={};
-      if(meas.type==="line"&&!meas.norm){
-        extraProps.mode="infinite";
-        extraProps.style="dashed";
-      }
-      if(meas.type==="polygon"){
-        extraProps.fillColor="rgba(56,189,248,0.08)";
-        extraProps.curveStyle="linear";
-      }
-      result.push({
-        id:uid(),type:meas.type,points,
-        label:meas.l,definition:meas.def||"",
-        color:meas.color||"#888",
-        visible:true,locked:true,autoCreated:true,placed:true,
-        refLabels:meas.pts,norm:meas.norm,measure:meas.l,...extraProps,
-      });
-    }
-    const updatedLabels=new Set([...existingLabels,...result.map(m=>m.label)]);
-    const markupMap={};
-    for(const m of[...markups,...result]){
-      if(m.label)markupMap[m.label]=m;
-    }
-    for(const meas of analysis.measurements){
-      if(meas.type!=="ratio"&&meas.type!=="sum"&&meas.type!=="difference"&&meas.type!=="percentage")continue;
-      if(!meas.pts||meas.pts.length<2)continue;
-      if(updatedLabels.has(meas.l))continue;
-      const allRefsExist=meas.pts.every(rl=>markupMap[rl]);
-      if(!allRefsExist)continue;
-      let computedValue=0;
-      if(meas.type==="ratio"){
-        const v0=getMeasValue(markupMap[meas.pts[0]]);
-        const v1=getMeasValue(markupMap[meas.pts[1]]);
-        computedValue=v1!==0?v0/v1:0;
-      }else if(meas.type==="difference"){
-        const v0=getMeasValue(markupMap[meas.pts[0]]);
-        const v1=getMeasValue(markupMap[meas.pts[1]]);
-        computedValue=v0-v1;
-      }else if(meas.type==="percentage"){
-        const v0=getMeasValue(markupMap[meas.pts[0]]);
-        const v1=getMeasValue(markupMap[meas.pts[1]]);
-        computedValue=v1!==0?(v0/v1)*100:0;
-      }else{
-        computedValue=meas.pts.reduce((s,rl)=>s+getMeasValue(markupMap[rl]),0);
-      }
-      result.push({
-        id:uid(),type:meas.type,points:[],
-        label:meas.l,definition:meas.def||"",
-        color:meas.color||"#888",
-        visible:true,locked:true,autoCreated:true,
-        refLabels:meas.pts,computedValue,norm:meas.norm,
-      });
-    }
-    return result;
-  };
-  const getMeasValue=(m)=>{
-    const ms=computeMeasurements(m,calibration);
-    const vals=Object.values(ms).filter(v=>typeof v==="number"&&isFinite(v));
-    return vals.length>0?vals[0]:0;
-  };
-
   const exportCSV=()=>{
     const rows=[["ID","Type","Label","Definition","Points_px","Measurement","Value","Unit"]];
     markups.forEach(m=>{const meas=computeMeasurements(m,calibration);const ps=vpts(m).map(p=>`(${p.x.toFixed(1)},${p.y.toFixed(1)})`).join(";");if(!Object.keys(meas).length)rows.push([m.id,m.type,m.label||"",m.definition||"",ps,"","",""]);else Object.entries(meas).forEach(([k,v])=>{if(k.startsWith("_"))return;rows.push([m.id,m.type,m.label||"",m.definition||"",ps,k,v.toFixed(2),k==="angle"?formatAngle(v):(meas._unit==="mm"?"mm":"px")]);});});
@@ -1519,8 +1190,6 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
 
   const measScope=useMemo(()=>buildScope(markups,calibration),[markups,calibration]);
   const allMeas=useMemo(()=>markups.map(m=>({m,meas:computeMeasurements(m,calibration)})).filter(x=>Object.keys(x.meas).length>0),[markups,calibration]);
-  const [pinnedFormulas, setPinnedFormulas] = useState(new Set());
-  const [filmstripOpen, setFilmstripOpen] = useState(true);
   const formulaMeas = useMemo(() => {
     const res = [];
     formulas.forEach(f => {
@@ -1538,32 +1207,33 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const cursorStyle={select:"default",boxselect:"crosshair",pan:"grab",point:"crosshair",line:"crosshair",angle3:"crosshair",angle4:"crosshair",polygon:"crosshair",curve:"crosshair",perp:"crosshair",parallel:"crosshair",midpoint:"crosshair",perppoint:"crosshair",arrow:"crosshair",text:"text",ruler:"crosshair"}[activeTool]||"default";
   const _availAnalyses=PREDEFINED[project.projection]||[];
 
-  const panelIcons={
-    markups:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M621.5-338.5Q680-397 680-480t-58.5-141.5Q563-680 480-680t-141.5 58.5Q280-563 280-480t58.5 141.5Q397-280 480-280t141.5-58.5ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Z"/></svg>,
-    measurements:<svg fill="currentColor" height="24px" width="24px" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512" xmlSpace="preserve"> <g><g>
-		<path d="M418.364,0L0,418.364L93.636,512L512,93.636L418.364,0z M22.153,418.364l16.443-16.443l54.875,54.875l11.076-11.076
-			l-54.875-54.875l10.939-10.939l16.477,16.477l11.076-11.077l-16.477-16.477l10.939-10.939l27.485,27.485l11.077-11.076
-			l-27.485-27.485l10.939-10.939l16.477,16.477l11.076-11.077l-16.477-16.477l10.939-10.939l54.874,54.875l11.076-11.077
-			l-54.875-54.875l10.939-10.939l16.477,16.477l11.076-11.076l-16.476-16.474l10.939-10.939l27.485,27.485l11.076-11.076
-			l-27.485-27.485l10.939-10.939l16.477,16.477l11.076-11.076l-16.477-16.477l10.939-10.939l54.874,54.875l11.077-11.076
-			l-54.874-54.875l10.939-10.939l16.477,16.477l11.076-11.076l-16.477-16.477l10.939-10.939l27.485,27.485l11.076-11.076
-			L269.83,170.69l10.939-10.939l16.477,16.477l11.077-11.076l-16.477-16.477l10.939-10.939l54.875,54.875l11.077-11.076
-			l-54.875-54.874l10.939-10.939l16.477,16.477l11.077-11.076l-16.477-16.477l10.939-10.939l27.485,27.485l11.076-11.076
-			l-27.489-27.487l10.939-10.939l16.477,16.477l11.077-11.076l-16.478-16.477l10.939-10.939l54.875,54.875l11.076-11.076
-			l-54.875-54.875l16.443-16.443l71.482,71.482L93.636,489.847L22.153,418.364z"/>
-	</g></g></svg>,
-    formulas:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M240-160v-80l260-240-260-240v-80h480v120H431l215 200-215 200h289v120H240Z"/></svg>,
-    image:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm40-80h480L570-480 450-320l-90-120-120 160Zm-40 80v-560 560Z"/></svg>,
-    layers:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M480-118 120-398l66-50 294 228 294-228 66 50-360 280Zm0-202L120-600l360-280 360 280-360 280Zm0-280Zm0 178 230-178-230-178-230 178 230 178Z"/></svg>,
-    sessions:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M200-80q-33 0-56.5-23.5T120-160v-560q0-33 23.5-56.5T200-800h40v-80h80v80h320v-80h80v80h40q33 0 56.5 23.5T840-720v560q0 33-23.5 56.5T760-80H200Zm0-80h560v-400H200v400Zm0-480h560v-80H200v80Zm0 0v-80 80Zm280 240q-17 0-28.5-11.5T440-440q0-17 11.5-28.5T480-480q17 0 28.5 11.5T520-440q0 17-11.5 28.5T480-400Zm-188.5-11.5Q280-423 280-440t11.5-28.5Q303-480 320-480t28.5 11.5Q360-457 360-440t-11.5 28.5Q337-400 320-400t-28.5-11.5ZM640-400q-17 0-28.5-11.5T600-440q0-17 11.5-28.5T640-480q17 0 28.5 11.5T680-440q0 17-11.5 28.5T640-400ZM480-240q-17 0-28.5-11.5T440-280q0-17 11.5-28.5T480-320q17 0 28.5 11.5T520-280q0 17-11.5 28.5T480-240Zm-188.5-11.5Q280-263 280-280t11.5-28.5Q303-320 320-320t28.5 11.5Q360-297 360-280t-11.5 28.5Q337-240 320-240t-28.5-11.5ZM640-240q-17 0-28.5-11.5T600-280q0-17 11.5-28.5T640-320q17 0 28.5 11.5T680-280q0 17-11.5 28.5T640-240Z"/></svg>,
-    research:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M316-80q-52 0-88-38t-36-90q0-36 17-64t45-44l-14-464q-2-62 40-105t104-43q62 0 104 43t40 105l-14 464q28 16 45 44t17 64q0 52-36 90t-88 38H316Zm2-560h124l2-60q1-26-16-45t-43-19q-26 0-43 17t-19 43l-5 64Zm-2 480h128q14 0 24-11t10-25q0-14-9-24t-23-10l-36-2 6-188H344l-4 188-36 2q-14 0-23 10t-9 24q0 14 10 25t24 11Zm-2-80Zm258-20q-14-14-20-30.5t-4-33.5l82-456q5-28 25-48t48-20q32 0 54 24.5t18 56.5l-38 458q-2 26-20.5 44.5T672-200q-26 0-46-17t-24-43h-28Z"/></svg>,
-    interpretation:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M280-280h280v-80H280v80Zm0-160h400v-80H280v80Zm0-160h400v-80H280v80Zm-80 480q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm0-560v560-560Z"/></svg>,
-    templates:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M480-60q-50 0-85-35t-35-85q0-39 22.5-70t57.5-43v-73q-11-4-21-9.5T401-389l-63 37q1 5 1.5 10.5t.5 11.5q0 50-35 85t-85 35q-50 0-85-35t-35-85q0-50 35-85t85-35q23 0 43 7.5t36 21.5l62-36q-1-5-1.5-11t-.5-12q0-6 .5-11.5T361-502l-62-37q-16 14-36 21.5t-43 7.5q-50 0-85-35t-35-85q0-50 35-85t85-35q50 0 85 35t35 85q0 6-.5 12t-1.5 11l63 36q8-8 18-13t21-9v-73q-35-12-57.5-43.5T360-780q0-50 35-85t85-35q50 0 85 35t35 85q0 39-22.5 70.5T520-666v73q11 4 20.5 9.5T558-570l64-38q-1-5-1.5-10.5T620-630q0-50 35-85t85-35q50 0 85 35t35 85q0 50-35 85t-85 35q-23 0-42.5-7.5T662-539l-65 38q1 5 1.5 10.5t.5 10.5q0 5-.5 11t-1.5 11l65 37q16-14 35.5-21.5T740-450q50 0 85 35t35 85q0 50-35 85t-85 35q-50 0-85-35t-35-85q0-6 .5-11.5T622-352l-64-37q-8 8-17.5 13t-20.5 9v74q35 12 57.5 43t22.5 70q0 50-35 85t-85 35Zm0-80q17 0 28.5-11.5T520-180q0-17-11.5-28.5T480-220q-17 0-28.5 11.5T440-180q0 17 11.5 28.5T480-140ZM220-290q17 0 28.5-11.5T260-330q0-17-11.5-28.5T220-370q-17 0-28.5 11.5T180-330q0 17 11.5 28.5T220-290Zm520 0q17 0 28.5-11.5T780-330q0-17-11.5-28.5T740-370q-17 0-28.5 11.5T700-330q0 17 11.5 28.5T740-290ZM480-440q17 0 28.5-11.5T520-480q0-17-11.5-28.5T480-520q-17 0-28.5 11.5T440-480q0 17 11.5 28.5T480-440ZM220-590q17 0 28.5-11.5T260-630q0-17-11.5-28.5T220-670q-17 0-28.5 11.5T180-630q0 17 11.5 28.5T220-590Zm520 0q17 0 28.5-11.5T780-630q0-17-11.5-28.5T740-670q-17 0-28.5 11.5T700-630q0 17 11.5 28.5T740-590ZM480-740q17 0 28.5-11.5T520-780q0-17-11.5-28.5T480-820q-17 0-28.5 11.5T440-780q0 17 11.5 28.5T480-740Z"/></svg>,
-    silhouettes:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M240-80v-170q-39-17-68.5-45.5t-50-64.5q-20.5-36-31-77T80-520q0-158 112-259t288-101q176 0 288 101t112 259q0 42-10.5 83t-31 77q-20.5 36-50 64.5T720-250v170H240Zm80-80h40v-80h80v80h80v-80h80v80h40v-142q38-9 67.5-30t50-50q20.5-29 31.5-64t11-74q0-125-88.5-202.5T480-800q-143 0-231.5 77.5T160-520q0 39 11 74t31.5 64q20.5 29 50.5 50t67 30v142Zm100-200h120l-60-120-60 120Zm-80-80q33 0 56.5-23.5T420-520q0-33-23.5-56.5T340-600q-33 0-56.5 23.5T260-520q0 33 23.5 56.5T340-440Zm280 0q33 0 56.5-23.5T700-520q0-33-23.5-56.5T620-600q-33 0-56.5 23.5T540-520q0 33 23.5 56.5T620-440ZM480-160Z"/></svg>,
-    examples:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M382-240 154-468l57-56 171 171 367-367 57 57-424 424Z"/></svg>,
-    airway:<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.4999 2V8.91693C10.4999 9.57769 10.1218 10.1791 9.52884 10.4663M13.5001 2V8.91693C13.5001 9.57769 13.8782 10.1791 14.4712 10.4663M9.52884 10.4663L9.44504 8.80191C9.40961 8.09813 9.14467 7.36499 8.48047 7.12961C7.3348 6.72361 5.47114 6.99708 3.29204 9.81626C1.26663 12.4366 0.876278 16.5582 1.03002 19.662C1.11847 21.4477 2.92913 22.4379 4.60612 21.818L7.93312 20.5882C9.16298 20.1336 9.95513 18.933 9.88919 17.6235L9.71207 14.1055M9.52884 10.4663L9.71207 14.1055M14.2879 14.1057L12.5164 13.22C12.1911 13.0574 11.8084 13.0574 11.4832 13.22L9.71207 14.1055M14.2879 14.1057L14.1108 17.6235C14.0449 18.933 14.837 20.1336 16.0669 20.5882L19.3939 21.818C21.0709 22.4379 22.8815 21.4477 22.97 19.662C23.1237 16.5582 22.7334 12.4366 20.708 9.81626C18.5289 6.99708 16.6652 6.72361 15.5195 7.12961C14.8553 7.36499 14.5904 8.09813 14.555 8.80191L14.4712 10.4663M14.2879 14.1057L14.4712 10.4663" stroke="currentcolor" stroke-width="1.5" stroke-linecap="round"/></svg>
+  const panelIcons = PANEL_ICONS;
+  const panelTabs = PANEL_TABS;
+
+  // ── Panel prop bundles ──
+  const pMarkups={markups,t,theme,selectedId,onSelect:selectAndFocusMarkup,onDelete:delMarkup,calibration,placingMode,placingQueue,placingIdx,norms,formatAngle,angleMode,setAngleMode,replacingId,
+    onToggleVisible:id=>updMarkup(id,{visible:markups.find(m=>m.id===id)?.visible===false}),
+    onToggleLock:id=>updMarkup(id,{locked:!markups.find(m=>m.id===id)?.locked}),
+    onToggleLabel:id=>updMarkup(id,{noLabel:!markups.find(m=>m.id===id)?.noLabel}),
+    onStopPlacing:()=>{dispatch({type:"SET",payload:{placingMode:false,placingQueue:[],placingIdx:0}});},
+    onPausePlacing:()=>dispatch({type:"SET",payload:{placingMode:false}}),
+    onResumePlacing:()=>dispatch({type:"SET",payload:{placingMode:true}}),
+    onClear:()=>{pushUndo();updSession({markups:[]})},
+    onAddPoint:()=>{dispatch({type:"SET",payload:{activeTool:"point",currentDraw:null}});},
+    onReplace:(type,id)=>{if(replacingId===id){dispatch({type:"SET",payload:{replacingId:null,activeTool:"select"}});}else{dispatch({type:"SET",payload:{replacingId:id,activeTool:type}});}dispatch({type:"SET",payload:{currentDraw:null}});},
   };
-  const panelTabs=[["markups","Markups"],["measurements","Measure"],["formulas","Formulas"],["interpretation","Interpret"],["image","Image"],["layers","Layers"],["sessions","Sessions"],["research","Research"],["airway","Airway"],["templates","Templates"],["silhouettes","Silhouettes"],["examples","Examples"]];
+  const pSessions={project,t,onUpdateProject,activeSession,compareSession,setCompareSession,
+    showDisplacement,setShowDisplacement,
+    displacementOverlay,setDisplacementOverlay,
+    refLandmark1,setRefLandmark1,refLandmark2,setRefLandmark2,
+    overlayBlend,setOverlayBlend,overlayAlignMode,setOverlayAlignMode,
+    overlayVectorScale,setOverlayVectorScale,
+    showTrackingLines,setShowTrackingLines,
+    showAirwayOverlay,setShowAirwayOverlay,
+    calibration,formatAngle,
+    setActiveSession:id=>onUpdateProject({...project,activeSessionId:id}),
+    onExportTemplate:v=>exportCepht({name:`${project.name}`,projection:project.projection,markups:v.markups||[],formulas:v.formulas||[],norms:v.norms||[]}),
+  };
 
   return(
     <div style={{height:"100vh",display:"flex",flexDirection:"column",background:t.bg,color:t.tx,fontFamily:"'DM Sans',sans-serif",overflow:"hidden"}}>
@@ -1573,224 +1243,39 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       <input ref={importRef} type="file" accept=".cephx" style={{display:"none"}} onChange={e=>{if(e.target.files[0])onImport(e.target.files[0]);e.target.value="";}}/>
 
       {/* TOP BAR */}
-      <div style={{display:"flex",alignItems:"center",gap:6,padding:"5px 10px 5px",height:isMobile?42:46,background:t.surf,flexShrink:0,overflowX:"auto"}}>
-        <button onClick={onHome} title="Back to Home" style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:4,padding:"4px 8px",borderRadius:6,flexShrink:0,color:t.tx}}>
-          <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M240-200h120v-240h240v240h120v-360L480-740 240-560v360Zm-80 80v-480l320-240 320 240v480H520v-240h-80v240H160Zm320-350Z"/></svg>
-        </button>
-        <button onClick={onHome} style={{background:"none",border:"none",cursor:"pointer",display:"flex",alignItems:"center",gap:5,padding:"4px 8px",borderRadius:6,flexShrink:0}}>
-          <span><img src="/favicon.svg" alt="Website Icon" width="48" height="48"/> </span>
-          {!isMobile&&<span style={{fontFamily:"'Syne',sans-serif",fontWeight:800,color:t.tx,fontSize:17,display:"inline-flex",alignItems:"center",gap:6}}>Cephalometry Studio<span style={{fontSize:8,fontWeight:700,color:t.acc,background:t.accMuted,borderRadius:5,padding:"1px 5px",letterSpacing:0.8}}>BETA</span></span>}
-        </button>
-        <div style={{width:1,height:20,background:t.bdr,flexShrink:0}}/>
-        <Tag color={t.acc}>{project.projection?.toUpperCase()}</Tag>
-        {project.meta?.anonymized&&<Tag color={t.ok}>🔒 Anon</Tag>}
-        {calibration.done&&<Tag color={t.ok}>⟺{"\u00A0"}{calibration.pxPerMm.toFixed(2)}px/mm</Tag>}
-        {placingMode&&<Tag color={t.warn}>📍 {placingIdx+1}/{placingQueue.length}</Tag>}
-        <div style={{flex:1}}/>
-        {!isMobile&&<>
-           <Btn ghost t={t} small active={snapEnabled} title="Snap to grid" onClick={()=>dispatch({type:"SET",payload:{snapEnabled:!snapEnabled}})}>
-            <svg fill={t.tx} width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M21.7,12.818a1.022,1.022,0,0,1,0,1.445L20.154,15.81l-3.589-3.589,1.547-1.548a1.022,1.022,0,0,1,1.444,0ZM9.737,2.3,8.19,3.846l3.59,3.589,1.546-1.547a1.021,1.021,0,0,0,0-1.444L11.181,2.3A1.021,1.021,0,0,0,9.737,2.3ZM4.478,19.522a8.458,8.458,0,0,0,11.963,0l2.269-2.268-3.589-3.589-2.269,2.268a3.384,3.384,0,0,1-4.785-4.785l2.269-2.269L6.747,5.29,4.478,7.559A8.458,8.458,0,0,0,4.478,19.522Z"/></svg>
-            </Btn>
-           <Btn ghost t={t} small active={showScaleBar} title="Toggle scale bar" onClick={()=>dispatch({type:"SET",payload:{showScaleBar:!showScaleBar}})}>
-              <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M160-240q-33 0-56.5-23.5T80-320v-320q0-33 23.5-56.5T160-720h640q33 0 56.5 23.5T880-640v320q0 33-23.5 56.5T800-240H160Zm0-80h640v-320H680v160h-80v-160h-80v160h-80v-160h-80v160h-80v-160H160v320Zm120-160h80-80Zm160 0h80-80Zm160 0h80-80Zm-120 0Z"/></svg>
-            </Btn>
-           <Btn ghost t={t} small active={showDefTooltips} title="Toggle definition tooltips" onClick={()=>dispatch({type:"SET",payload:{showDefTooltips:!showDefTooltips}})}>
-              <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M440-280h80v-240h-80v240Zm40-320q17 0 28.5-11.5T520-640q0-17-11.5-28.5T480-680q-17 0-28.5 11.5T440-640q0 17 11.5 28.5T480-600Zm0 520q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Zm0-320Z"/></svg>
-            </Btn>
-           <Btn ghost t={t} small active={showAnnotations} title="Toggle annotations" onClick={()=>dispatch({type:"SET",payload:{showAnnotations:!showAnnotations}})}>
-            <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M338-241q16 0 23-10.5t9-24.5q2-10 3.5-20t3.5-22q2-11 4.5-24t5.5-30q23-5 45-8.5t43-5.5q23-3 45.5-4.5T564-394q5 24 10.5 43t11.5 36q8 23 17.5 38t23.5 26q14 11 30.5 12t28.5-9q9-7 9-21t-8-35q-5-11-8.5-22.5T670-350q-5-14-9-25.5t-7-22.5q13-1 23.5-4.5T695-412q7-6 10.5-14.5T709-445q0-11-4.5-18.5T691-476q-9-5-22.5-6.5t-30.5.5q-2-18-4-35.5t-5-35.5q-3-17-5.5-35t-7.5-35q-6-26-17-44.5T574-698q-13-11-28.5-16.5T511-720q-22 0-42 9t-40 27q-11 11-22 23.5T386-631q-8-6-14.5-8t-14.5-2q-11 0-18.5 6t-7.5 20q0 18-2 36t-6 36q-5 26-11 51.5T301-440q-11 2-19.5 5.5T267-427q-8 5-11.5 12.5T252-399q0 7 2 13t7 11q5 5 12 7.5t16 3.5q-1 12-1.5 22.5T287-321q0 21 3 36t9 25q6 10 15.5 14.5T338-241Zm71-223q6-23 14-44.5t18-44.5q16-37 34-59t32-22q11 0 19 17t13 51q3 20 5 43t4 43q-17 1-35 2.5t-35 3.5q-17 2-34.5 4.5T409-464ZM160-80q-33 0-56.5-23.5T80-160v-640q0-33 23.5-56.5T160-880h640q33 0 56.5 23.5T880-800v640q0 33-23.5 56.5T800-80H160Zm0-80h640v-640H160v640Zm0 0v-640 640Z"/></svg>
-          </Btn>
-          {showAnnotations&&<input type="range" min="0.5" max="2" step="0.1" value={annotationSize} onChange={e=>dispatch({type:"SET",payload:{annotationSize:+e.target.value}})} style={{width:60,marginLeft:4,accentColor:t.acc}} title={`Annotation size: ${annotationSize.toFixed(1)}`}/>}
-          {compareSession&&<Btn ghost t={t} small active={showDisplacement} title="Toggle displacement vectors" onClick={()=>dispatch({type:"SET",payload:{showDisplacement:!showDisplacement}})}>⇝ Vec</Btn>}
-          <div style={{width:1,height:20,background:t.bdr}}/>
-        </>}
-        <Btn ghost t={t} small title="Open image" onClick={()=>openImgRef.current?.click()}>
-          <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}>
-          <path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm40-80h480L570-480 450-320l-90-120-120 160Zm-40 80v-560 560Z"/> 
-          </svg>
-        </Btn>
-        <Btn ghost t={t} small title="Import (.cephx)" onClick={()=>importRef.current?.click()}>
-          <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}>
-            <path d="M440-320v-326L336-542l-56-58 200-200 200 200-56 58-104-104v326h-80ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z"/>
-          </svg>
-        </Btn>
-        <Btn ghost t={t} small title="Save project" onClick={()=>{
-          if(hasUnanonymizedPHI(project)&&!window.confirm("This project still contains patient identifiers (name, DOB, age, etc.). Exporting will include them. Continue? Use the Export dialog for an anonymized export."))return;
-          const patched={...project,sessions:project.sessions?.map(s=>({...s,images:s.images?.map(img=>({...img,dataUrl:imgRefs.current[img.id]?.src||img.dataUrl}))}))};
-          onSave?.(patched);
-        }}>
-          <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}>
-            <path d="M840-680v480q0 33-23.5 56.5T760-120H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h480l160 160Zm-80 34L646-760H200v560h560v-446ZM565-275q35-35 35-85t-35-85q-35-35-85-35t-85 35q-35 35-35 85t35 85q35 35 85 35t85-35ZM240-560h360v-160H240v160Zm-40-86v446-560 114Z"/>
-          </svg>
-        </Btn>
-        {!isMobile&&<Btn ghost t={t} small title="Session Manager" onClick={()=>dispatch({type:"SET",payload:{rightPanel:"sessions"}})}>
-            <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}>
-            <path d="M480-120q-151 0-255.5-46.5T120-280v-400q0-66 105.5-113T480-840q149 0 254.5 47T840-680v400q0 67-104.5 113.5T480-120Zm0-479q89 0 179-25.5T760-679q-11-29-100.5-55T480-760q-91 0-178.5 25.5T200-679q14 30 101.5 55T480-599Zm0 199q42 0 81-4t74.5-11.5q35.5-7.5 67-18.5t57.5-25v-120q-26 14-57.5 25t-67 18.5Q600-528 561-524t-81 4q-42 0-82-4t-75.5-11.5Q287-543 256-554t-56-25v120q25 14 56 25t66.5 18.5Q358-408 398-404t82 4Zm0 200q46 0 93.5-7t87.5-18.5q40-11.5 67-26t32-29.5v-98q-26 14-57.5 25t-67 18.5Q600-328 561-324t-81 4q-42 0-82-4t-75.5-11.5Q287-343 256-354t-56-25v99q5 15 31.5 29t66.5 25.5q40 11.5 88 18.5t94 7Z"/></svg>
-          </Btn>}
-        {<Btn ghost t={t} small title="Export" onClick={()=>dispatch({type:"SET",payload:{showExport:true}})}>
-          <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M160-80v-80h640v80H160Zm320-160L200-600h160v-280h240v280h160L480-240Zm0-130 116-150h-76v-280h-80v280h-76l116 150Zm0-150Z"/></svg>
-          </Btn>}
-        {<Btn ghost t={t} small title="Normogram" onClick={()=>dispatch({type:"SET",payload:{showNormogram:true}})}>
-          <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M200-120q-33 0-56.5-23.5T120-200v-640h80v640h640v80H200Zm40-120v-360h160v360H240Zm200 0v-560h160v560H440Zm200 0v-200h160v200H640Z"/></svg>
-          </Btn>}
-        {!isMobile&&<Btn ghost t={t} small title="Anonymize" onClick={()=>dispatch({type:"SET",payload:{showAnon:true}})}>
-          <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="m644-428-58-58q9-47-27-88t-93-32l-58-58q17-8 34.5-12t37.5-4q75 0 127.5 52.5T660-500q0 20-4 37.5T644-428Zm128 126-58-56q38-29 67.5-63.5T832-500q-50-101-143.5-160.5T480-720q-29 0-57 4t-55 12l-62-62q41-17 84-25.5t90-8.5q151 0 269 83.5T920-500q-23 59-60.5 109.5T772-302Zm20 246L624-222q-35 11-70.5 16.5T480-200q-151 0-269-83.5T40-500q21-53 53-98.5t73-81.5L56-792l56-56 736 736-56 56ZM222-624q-29 26-53 57t-41 67q50 101 143.5 160.5T480-280q20 0 39-2.5t39-5.5l-36-38q-11 3-21 4.5t-21 1.5q-75 0-127.5-52.5T300-500q0-11 1.5-21t4.5-21l-84-82Zm319 93Zm-151 75Z"/></svg>
-          </Btn>}
-        <div style={{width:1,height:20,background:t.bdr,flexShrink:0}}/>
-        {Object.values(THEMES).map(th=>(
-          <button key={th.id} onClick={()=>setTheme(th.id)} title={th.name} aria-label={th.name} aria-pressed={theme===th.id} style={{width:22,height:22,borderRadius:6,border:theme===th.id?`2px solid ${t.acc}`:`1px solid ${t.bdr}`,background:th.bg,cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-            <div style={{width:10,height:10,borderRadius:3,background:th.acc}}/>
-          </button>
-        ))}
-        {isMobile&&<Btn ghost t={t} small active={showMobilePanel} title="Toggle panel" onClick={()=>setShowMobilePanel(v=>!v)}>≡</Btn>}
-      </div>
+      <TopBar t={t} theme={theme} project={project} isMobile={isMobile} onHome={onHome}
+        compareSession={compareSession} showAnnotations={showAnnotations} annotationSize={annotationSize}
+        showDisplacement={showDisplacement} onSave={onSave}
+        openImgRef={openImgRef} importRef={importRef} dispatch={dispatch} calibration={calibration}
+        snapEnabled={snapEnabled} showScaleBar={showScaleBar} showDefTooltips={showDefTooltips}
+        placingMode={placingMode} placingQueue={placingQueue} placingIdx={placingIdx}
+        showMobilePanel={showMobilePanel} setShowMobilePanel={setShowMobilePanel}
+        imgRefs={imgRefs} setTheme={setTheme}
+      />
 
       {/* BODY */}
       <div style={{flex:1,display:"flex",overflow:"hidden",position:"relative"}}>
-        {/* TOOL SIDEBAR — desktop */}
-        {!isMobile&&(
-          <div style={{width:88,background:t.surf,display:"flex",flexDirection:"column",alignItems:"center",padding:"8px 4px",gap:1,flexShrink:0,overflowY:"auto",scrollbarWidth:"thin"}}>
-            <div style={{display:"flex",flexDirection:"column",gap:1,width:"100%"}}>
-              {/* Row 1: Select | Pan */}
-              <div style={{display:"flex",gap:1}}>
-                <ToolBtn tool={{id:"select",icon:"⊹",label:"Select/Move"}} active={activeTool==="select"} onClick={()=>{dispatch({type:"SET",payload:{activeTool:"select"}});dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
-                <ToolBtn tool={{id:"pan",icon:"⊕",label:"Pan"}} active={activeTool==="pan"} onClick={()=>{dispatch({type:"SET",payload:{activeTool:"pan"}});dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
-              </div>
-              {/* Row 2: Landmark | Midpoint */}
-              <div style={{display:"flex",gap:1}}>
-                <ToolBtn tool={{id:"point",icon:"◉",label:"Landmark"}} active={activeTool==="point"} onClick={()=>{dispatch({type:"SET",payload:{activeTool:"point"}});dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
-                <ToolBtn tool={{id:"midpoint",icon:"◈",label:"Midpoint"}} active={activeTool==="midpoint"} onClick={()=>{setActiveTool("midpoint");dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
-              </div>
-              {/* Row 3: Line | Parallel */}
-              <div style={{display:"flex",gap:1}}>
-                <ToolBtn tool={{id:"line",icon:"⟋",label:"Line"}} active={activeTool==="line"} onClick={()=>{dispatch({type:"SET",payload:{activeTool:"line"}});dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
-                <ToolBtn tool={{id:"parallel",icon:"⫿",label:"Parallel"}} active={activeTool==="parallel"} onClick={()=>{dispatch({type:"SET",payload:{activeTool:"parallel"}});dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
-              </div>
-              {/* Row 4: Perp Point | Perp Dist */}
-              <div style={{display:"flex",gap:1}}>
-                <ToolBtn tool={{id:"perppoint",icon:"⊦",label:"Perp Point"}} active={activeTool==="perppoint"} onClick={()=>{setActiveTool("perppoint");dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
-                <ToolBtn tool={{id:"perp",icon:"⊥",label:"Perp Dist"}} active={activeTool==="perp"} onClick={()=>{dispatch({type:"SET",payload:{activeTool:"perp"}});dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
-              </div>
-              {/* Row 5: Angle3pt | Angle4pt */}
-              <div style={{display:"flex",gap:1}}>
-                <ToolBtn tool={{id:"angle3",icon:"∠",label:"Angle 3-pt"}} active={activeTool==="angle3"} onClick={()=>{setActiveTool("angle3");dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
-                <ToolBtn tool={{id:"angle4",icon:"∡",label:"Angle 4-pt"}} active={activeTool==="angle4"} onClick={()=>{setActiveTool("angle4");dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
-              </div>
-              {/* Row 6: Polygon | Curve */}
-              <div style={{display:"flex",gap:1}}>
-                <ToolBtn tool={{id:"polygon",icon:"⬡",label:"Polygon"}} active={activeTool==="polygon"} onClick={()=>{setActiveTool("polygon");dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
-                <ToolBtn tool={{id:"curve",icon:"∿",label:"Curve"}} active={activeTool==="curve"} onClick={()=>{setActiveTool("curve");dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
-              </div>
-              {/* Row 7: Arrow | Text */}
-              <div style={{display:"flex",gap:1}}>
-                <ToolBtn tool={{id:"arrow",icon:"→",label:"Arrow"}} active={activeTool==="arrow"} onClick={()=>{setActiveTool("arrow");dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
-                <ToolBtn tool={{id:"text",icon:"T",label:"Text"}} active={activeTool==="text"} onClick={()=>{setActiveTool("text");dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
-              </div>
-              {/* Row 7b: Ellipse | Arc */}
-              <div style={{display:"flex",gap:1}}>
-                <ToolBtn tool={{id:"ellipse",icon:"◯",label:"Ellipse"}} active={activeTool==="ellipse"} onClick={()=>{setActiveTool("ellipse");dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
-                <ToolBtn tool={{id:"arc",icon:"◠",label:"Arc"}} active={activeTool==="arc"} onClick={()=>{setActiveTool("arc");dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
-              </div>
-              {/* Row 7c: Circle | Bezier */}
-              <div style={{display:"flex",gap:1}}>
-                <ToolBtn tool={{id:"circle",icon:"⊙",label:"Circle"}} active={activeTool==="circle"} onClick={()=>{setActiveTool("circle");dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
-                <ToolBtn tool={{id:"bezier",icon:"≂",label:"Bezier"}} active={activeTool==="bezier"} onClick={()=>{setActiveTool("bezier");dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
-              </div>
-              {/* Row 7d: Tangent | Concentric */}
-              <div style={{display:"flex",gap:1}}>
-                <ToolBtn tool={{id:"tangent",icon:"⊸",label:"Tangent"}} active={activeTool==="tangent"} onClick={()=>{setActiveTool("tangent");dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
-                <ToolBtn tool={{id:"concentric",icon:"◎",label:"Concentric"}} active={activeTool==="concentric"} onClick={()=>{setActiveTool("concentric");dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t} style={{flex:1}}/>
-              </div>
-              {/* Row 8: Ruler (centered) */}
-              <div style={{display:"flex",justifyContent:"center"}}>
-                <ToolBtn tool={{id:"ruler",icon:"⟺",label:"Ruler"}} active={activeTool==="ruler"} onClick={()=>{setActiveTool("ruler");dispatch({type:"SET",payload:{currentDraw:null}});}} theme={theme} t={t}/>
-              </div>
-              {/* Row 8b: Spotlight mode */}
-              <div style={{display:"flex",justifyContent:"center"}}>
-                <button onClick={()=>{const next=!spotlightMode;dispatch({type:"SET",payload:{spotlightMode:next}});if(sessionImage.length>0){const img=sessionImage[0];const upd=next?{...img,opacityBeforeSpotlight:img.opacity||1,opacity:0.5}:{...img,opacity:img.opacityBeforeSpotlight||1};updSession({images:sessionImage.map((x,i)=>i===0?upd:x)});}}} title="Spotlight (reduce image opacity)" aria-label="Spotlight" style={{width:42,height:42,borderRadius:8,border:"none",background:spotlightMode?t.acc:t.surf2,color:spotlightMode?(theme==="light"?"#fff":t.bg):t.tx,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:spotlightMode?`0 0 0 2px ${t.acc}`:"none"}}>💡</button>
-              </div>
-              {/* Separator */}
-              <div style={{width:"100%",height:1,background:t.bdr,margin:"4px 0"}}/>
-              {/* Row 9: Undo | Redo — undoVersion forces re-render on stack changes */}
-              {(()=>{const canUndo=undoVersion>=0&&undoStackRef.current.length>0,canRedo=undoVersion>=0&&redoStackRef.current.length>0;return(
-              <div style={{display:"flex",gap:1}}>
-                <button onClick={undo} disabled={!canUndo} aria-label="Undo (Ctrl+Z)" style={{flex:1,height:32,borderRadius:6,border:"none",background:"transparent",color:canUndo?t.tx2:t.bdr,cursor:canUndo?"pointer":"not-allowed",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Undo (Ctrl+Z)">↶</button>
-                <button onClick={redo} disabled={!canRedo} aria-label="Redo (Ctrl+Y)" style={{flex:1,height:32,borderRadius:6,border:"none",background:"transparent",color:canRedo?t.tx2:t.bdr,cursor:canRedo?"pointer":"not-allowed",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Redo (Ctrl+Y)">↷</button>
-              </div>);})()}
-              {/* Row 10: Zoom in | Zoom out */}
-              <div style={{display:"flex",gap:1}}>
-                <button onClick={()=>dispatch({type:"SET",payload:{zoom:z=>clamp(z*1.3,0.05,15)}})} aria-label="Zoom In" style={{flex:1,height:32,borderRadius:6,border:"none",background:"transparent",color:t.tx2,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Zoom In">＋</button>
-                <button onClick={()=>dispatch({type:"SET",payload:{zoom:z=>clamp(z/1.3,0.05,15)}})} aria-label="Zoom Out" style={{flex:1,height:32,borderRadius:6,border:"none",background:"transparent",color:t.tx2,cursor:"pointer",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Zoom Out">－</button>
-              </div>
-              {/* Row 11: Fit to Window */}
-              <div style={{display:"flex",justifyContent:"center"}}>
-                <button onClick={()=>{dispatch({type:"SET",payload:{zoom:1}});panRef.current={x:40,y:40};dispatch({type:"SET",payload:{pan:{x:40,y:40}}});}} aria-label="Fit to Window" style={{width:38,height:32,borderRadius:6,border:"none",background:"transparent",color:t.tx2,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Fit to Window (⊙)">⊙</button>
-              </div>
-              {/* Separator */}
-              <div style={{width:"100%",height:1,background:t.bdr,margin:"4px 0"}}/>
-              {/* Cal indicator */}
-              {calibration.done&&<div style={{display:"flex",justifyContent:"center"}}><div style={{fontSize:8,color:t.ok,fontFamily:"'DM Mono',monospace",fontWeight:700,textAlign:"center",padding:"2px 0"}}>⟺{calibration.pxPerMm.toFixed(1)}</div></div>}
-              {/* Zoom % */}
-              <div style={{display:"flex",justifyContent:"center"}}><div style={{fontSize:9,color:t.tx3,fontFamily:"'DM Mono',monospace",textAlign:"center",padding:"2px 0"}}>{(zoom*100).toFixed(0)}%</div></div>
-            </div>
-          </div>
-        )}
+        {/* TOOL SIDEBAR */}
+        {!isMobile&&<Toolbar activeTool={activeTool} theme={theme} t={t} dispatch={dispatch}
+          setActiveTool={setActiveTool} sessionImage={sessionImage} calibration={calibration}
+          zoom={zoom} spotlightMode={spotlightMode} updSession={updSession}
+          isMobile={isMobile} showMobilePanel={showMobilePanel}
+          panRef={panRef} undo={undo} redo={redo} undoVersion={undoVersion}
+          undoStackRef={undoStackRef} redoStackRef={redoStackRef}
+          handleDblClick={handleDblClick} currentDraw={currentDraw}
+          mobileToolsExpanded={mobileToolsExpanded}
+        />}
 
-        {/* TOOL SIDEBAR — mobile: collapsed horizontal bar + expandable sheet */}
-        {isMobile&&!showMobilePanel&&(()=>{
-          const selTool=(id)=>{dispatch({type:"SET",payload:{activeTool:id}});dispatch({type:"SET",payload:{currentDraw:null}});dispatch({type:"SET",payload:{mobileToolsExpanded:false}});};
-          const canUndo=undoVersion>=0&&undoStackRef.current.length>0;
-          const canRedo=undoVersion>=0&&redoStackRef.current.length>0;
-          const primaryTools=[
-            {id:"select",icon:"⊹",label:"Select"},{id:"pan",icon:"⊕",label:"Pan"},{id:"point",icon:"◉",label:"Landmark"},
-            {id:"line",icon:"⟋",label:"Line"},{id:"angle3",icon:"∠",label:"Angle 3"},{id:"ruler",icon:"⟺",label:"Ruler"},{id:"arrow",icon:"→",label:"Arrow"}
-          ];
-          const secondaryTools=[
-            [{id:"midpoint",icon:"◈",label:"Midpoint"},{id:"angle4",icon:"∡",label:"Angle 4"}],
-            [{id:"parallel",icon:"⫿",label:"Parallel"},{id:"perppoint",icon:"⊦",label:"Perp Pt"}],
-            [{id:"perp",icon:"⊥",label:"Perp Dist"},{id:"text",icon:"T",label:"Text"}],
-            [{id:"curve",icon:"∿",label:"Curve"},{id:"polygon",icon:"⬡",label:"Polygon"}],
-            [{id:"ellipse",icon:"◯",label:"Ellipse"},{id:"arc",icon:"◠",label:"Arc"}],
-            [{id:"circle",icon:"⊙",label:"Circle"},{id:"bezier",icon:"≂",label:"Bezier"}],
-            [{id:"tangent",icon:"⊸",label:"Tangent"},{id:"concentric",icon:"◎",label:"Concentric"}],
-          ];
-          return(<>
-            {/* Collapsed bar — horizontal scroll row */}
-            <div style={{position:"absolute",bottom:0,left:0,right:0,height:52,display:"flex",alignItems:"center",borderTop:`1px solid ${t.bdr}`,zIndex:20,background:t.surf,padding:"0 4px",gap:2,overflowX:"auto",overflowY:"hidden",scrollbarWidth:"none",WebkitOverflowScrolling:"touch"}}>
-              {primaryTools.map(tool=>(
-                <ToolBtn key={tool.id} tool={tool} active={activeTool===tool.id} onClick={()=>selTool(tool.id)} theme={theme} t={t} style={{flexShrink:0}}/>
-              ))}
-              <div style={{width:1,height:28,background:t.bdr,flexShrink:0}}/>
-              <button onClick={undo} disabled={!canUndo} aria-label="Undo" style={{width:42,height:42,borderRadius:8,border:"none",background:"transparent",color:canUndo?t.tx2:t.bdr,cursor:canUndo?"pointer":"not-allowed",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Undo">↶</button>
-              <button onClick={redo} disabled={!canRedo} aria-label="Redo" style={{width:42,height:42,borderRadius:8,border:"none",background:"transparent",color:canRedo?t.tx2:t.bdr,cursor:canRedo?"pointer":"not-allowed",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Redo">↷</button>
-              <div style={{width:1,height:28,background:t.bdr,flexShrink:0}}/>
-              <button onClick={()=>dispatch({type:"SET",payload:{zoom:z=>clamp(z*1.3,0.05,15)}})} aria-label="Zoom In" style={{width:42,height:42,borderRadius:8,border:"none",background:"transparent",color:t.tx2,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>＋</button>
-              <button onClick={()=>dispatch({type:"SET",payload:{zoom:z=>clamp(z/1.3,0.05,15)}})} aria-label="Zoom Out" style={{width:42,height:42,borderRadius:8,border:"none",background:"transparent",color:t.tx2,cursor:"pointer",fontSize:14,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>－</button>
-              <button onClick={()=>{dispatch({type:"SET",payload:{zoom:1}});panRef.current={x:40,y:40};dispatch({type:"SET",payload:{pan:{x:40,y:40}}});}} aria-label="Fit" style={{width:42,height:42,borderRadius:8,border:"none",background:"transparent",color:t.tx2,cursor:"pointer",fontSize:13,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>⊙</button>
-              <div style={{width:1,height:28,background:t.bdr,flexShrink:0}}/>
-              <button onClick={()=>dispatch({type:"SET",payload:{mobileToolsExpanded:v=>!v}})} aria-label="More tools" style={{width:42,height:42,borderRadius:8,border:"none",background:mobileToolsExpanded?t.acc:t.surf2,color:mobileToolsExpanded?(theme==="light"?"#fff":t.bg):t.tx,cursor:"pointer",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,boxShadow:mobileToolsExpanded?`0 0 0 2px ${t.acc}`:"none"}} title="More tools">⋯</button>
-              {currentDraw&&["polygon","curve"].includes(activeTool)&&(<>
-                <div style={{width:1,height:28,background:t.bdr,flexShrink:0}}/>
-                <button onClick={handleDblClick} aria-label="Finish shape" style={{width:42,height:42,borderRadius:8,border:"none",background:t.ok,color:"#fff",cursor:"pointer",fontSize:16,fontWeight:700,display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}} title="Finish">✓</button>
-              </>)}
-            </div>
-            {/* Expanded bottom sheet — full tool grid */}
-            {mobileToolsExpanded&&(<>
-              <div onClick={()=>dispatch({type:"SET",payload:{mobileToolsExpanded:false}})} style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.3)",zIndex:19}}/>
-              <div style={{position:"fixed",bottom:52,left:0,right:0,maxHeight:"55vh",background:t.surf,borderTop:`1px solid ${t.bdr}`,borderRadius:"12px 12px 0 0",zIndex:20,overflowY:"auto",padding:"12px 8px 16px",boxShadow:`0 -4px 20px ${t.shadow}`}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8,padding:"0 8px"}}>
-                  <span style={{fontSize:13,fontWeight:600,color:t.tx2,fontFamily:"'DM Sans',sans-serif"}}>All Tools</span>
-                  <span style={{fontSize:9,color:t.tx3,fontFamily:"'DM Mono',monospace"}}>{(zoom*100).toFixed(0)}%{calibration.done?` · ⟺${calibration.pxPerMm.toFixed(1)}`:""}</span>
-                </div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:4}}>
-                  {secondaryTools.map((row)=>row.map(tool=>(
-                    <ToolBtn key={tool.id} tool={tool} active={activeTool===tool.id} onClick={()=>selTool(tool.id)} theme={theme} t={t} style={{flex:1,height:46}}/>
-                  )))}
-                </div>
-              </div>
-            </>)}
-          </>);
-        })()}
+        {/* TOOL SIDEBAR — mobile */}
+        {isMobile&&!showMobilePanel&&<Toolbar activeTool={activeTool} theme={theme} t={t} dispatch={dispatch}
+          setActiveTool={setActiveTool} sessionImage={sessionImage} calibration={calibration}
+          zoom={zoom} spotlightMode={spotlightMode} updSession={updSession}
+          isMobile={isMobile} showMobilePanel={showMobilePanel}
+          panRef={panRef} undo={undo} redo={redo} undoVersion={undoVersion}
+          undoStackRef={undoStackRef} redoStackRef={redoStackRef}
+          handleDblClick={handleDblClick} currentDraw={currentDraw}
+          mobileToolsExpanded={mobileToolsExpanded}
+        />}
 
         {/* CANVAS */}
         <div ref={containerRef} style={{flex:1,position:"relative",overflow:"hidden",background:t.bg,paddingBottom:isMobile&&!showMobilePanel?52:0}} onDrop={handleDrop} onDragOver={e=>e.preventDefault()}>
@@ -1844,100 +1329,25 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         {/* RIGHT PANEL — VSCode-style vertical tabs on left */}
         {(!isMobile||(isMobile&&showMobilePanel))&&(
           <div ref={panelRef} style={{...(isMobile?{position:"fixed",top:42,right:0,bottom:52,width:"85vw",maxWidth:300,zIndex:15,boxShadow:`-4px 0 20px ${t.shadow}`}:{width:rightPanelWidth,flexShrink:0}),background:t.surf,display:"flex",flexDirection:"row",userSelect:rightPanelResizing?"none":"auto",cursor:rightPanelResizing?"col-resize":"auto",transition:"width 0.25s ease"}}>
-            {/* Vertical tabs on left side */}
-            <div style={{display:"flex",flexDirection:"column",alignItems:"center",paddingTop:8,flexShrink:0,background:t.surf2}}>
-              {panelTabs.map(([id,label])=>{
-                const icons={
-                  markups:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M621.5-338.5Q680-397 680-480t-58.5-141.5Q563-680 480-680t-141.5 58.5Q280-563 280-480t58.5 141.5Q397-280 480-280t141.5-58.5ZM480-80q-83 0-156-31.5T197-197q-54-54-85.5-127T80-480q0-83 31.5-156T197-763q54-54 127-85.5T480-880q83 0 156 31.5T763-763q54 54 85.5 127T880-480q0 83-31.5 156T763-197q-54 54-127 85.5T480-80Zm0-80q134 0 227-93t93-227q0-134-93-227t-227-93q-134 0-227 93t-93 227q0 134 93 227t227 93Z"/></svg>,
-                  measurements: <svg fill="currentColor" height="24px" width="24px" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512" xmlSpace="preserve"> <g><g><path d="M418.364,0L0,418.364L93.636,512L512,93.636L418.364,0z M22.153,418.364l16.443-16.443l54.875,54.875l11.076-11.076l-54.875-54.875l10.939-10.939l16.477,16.477l11.076-11.077l-16.477-16.477l10.939-10.939l27.485,27.485l11.077-11.076l-27.485-27.485l10.939-10.939l16.477,16.477l11.076-11.077l-16.477-16.477l10.939-10.939l54.874,54.875l11.076-11.077l-54.875-54.875l10.939-10.939l16.477,16.477l11.076-11.076l-16.476-16.474l10.939-10.939l27.485,27.485l11.076-11.076l-27.485-27.485l10.939-10.939l16.477,16.477l11.076-11.076l-16.477-16.477l10.939-10.939l54.874,54.875l11.077-11.076l-54.874-54.875l10.939-10.939l16.477,16.477l11.076-11.076l-16.477-16.477l10.939-10.939l27.485,27.485l11.076-11.076L269.83,170.69l10.939-10.939l16.477,16.477l11.077-11.076l-16.477-16.477l10.939-10.939l54.875,54.875l11.077-11.076l-54.875-54.874l10.939-10.939l16.477,16.477l11.077-11.076l-16.477-16.477l10.939-10.939l27.485,27.485l11.076-11.076l-27.489-27.487l10.939-10.939l16.477,16.477l11.077-11.076l-16.478-16.477l10.939-10.939l54.875,54.875l11.076-11.076l-54.875-54.875l16.443-16.443l71.482,71.482L93.636,489.847L22.153,418.364z"/></g></g></svg>,
-                  formulas:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M240-160v-80l260-240-260-240v-80h480v120H431l215 200-215 200h289v120H240Z"/></svg>,
-                  image:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm40-80h480L570-480 450-320l-90-120-120 160Zm-40 80v-560 560Z"/></svg>,
-                  layers:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M480-118 120-398l66-50 294 228 294-228 66 50-360 280Zm0-202L120-600l360-280 360 280-360 280Zm0-280Zm0 178 230-178-230-178-230 178 230 178Z"/></svg>,
-                  sessions:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M200-80q-33 0-56.5-23.5T120-160v-560q0-33 23.5-56.5T200-800h40v-80h80v80h320v-80h80v80h40q33 0 56.5 23.5T840-720v560q0 33-23.5 56.5T760-80H200Zm0-80h560v-400H200v400Zm0-480h560v-80H200v80Zm0 0v-80 80Zm280 240q-17 0-28.5-11.5T440-440q0-17 11.5-28.5T480-480q17 0 28.5 11.5T520-440q0 17-11.5 28.5T480-400Zm-188.5-11.5Q280-423 280-440t11.5-28.5Q303-480 320-480t28.5 11.5Q360-457 360-440t-11.5 28.5Q337-400 320-400t-28.5-11.5ZM640-400q-17 0-28.5-11.5T600-440q0-17 11.5-28.5T640-480q17 0 28.5 11.5T680-440q0 17-11.5 28.5T640-400ZM480-240q-17 0-28.5-11.5T440-280q0-17 11.5-28.5T480-320q17 0 28.5 11.5T520-280q0 17-11.5 28.5T480-240Zm-188.5-11.5Q280-263 280-280t11.5-28.5Q303-320 320-320t28.5 11.5Q360-297 360-280t-11.5 28.5Q337-240 320-240t-28.5-11.5ZM640-240q-17 0-28.5-11.5T600-280q0-17 11.5-28.5T640-320q17 0 28.5 11.5T680-280q0 17-11.5 28.5T640-240Z"/></svg>,
-                  research:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M316-80q-52 0-88-38t-36-90q0-36 17-64t45-44l-14-464q-2-62 40-105t104-43q62 0 104 43t40 105l-14 464q28 16 45 44t17 64q0 52-36 90t-88 38H316Zm2-560h124l2-60q1-26-16-45t-43-19q-26 0-43 17t-19 43l-5 64Zm-2 480h128q14 0 24-11t10-25q0-14-9-24t-23-10l-36-2 6-188H344l-4 188-36 2q-14 0-23 10t-9 24q0 14 10 25t24 11Zm-2-80Zm258-20q-14-14-20-30.5t-4-33.5l82-456q5-28 25-48t48-20q32 0 54 24.5t18 56.5l-38 458q-2 26-20.5 44.5T672-200q-26 0-46-17t-24-43h-28Z"/></svg>,
-                  interpretation:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M280-280h280v-80H280v80Zm0-160h400v-80H280v80Zm0-160h400v-80H280v80Zm-80 480q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm0-560v560-560Z"/></svg>,
-                  templates:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M480-60q-50 0-85-35t-35-85q0-39 22.5-70t57.5-43v-73q-11-4-21-9.5T401-389l-63 37q1 5 1.5 10.5t.5 11.5q0 50-35 85t-85 35q-50 0-85-35t-35-85q0-50 35-85t85-35q23 0 43 7.5t36 21.5l62-36q-1-5-1.5-11t-.5-12q0-6 .5-11.5T361-502l-62-37q-16 14-36 21.5t-43 7.5q-50 0-85-35t-35-85q0-50 35-85t85-35q50 0 85 35t35 85q0 6-.5 12t-1.5 11l63 36q8-8 18-13t21-9v-73q-35-12-57.5-43.5T360-780q0-50 35-85t85-35q50 0 85 35t35 85q0 39-22.5 70.5T520-666v73q11 4 20.5 9.5T558-570l64-38q-1-5-1.5-10.5T620-630q0-50 35-85t85-35q50 0 85 35t35 85q0 50-35 85t-85 35q-23 0-42.5-7.5T662-539l-65 38q1 5 1.5 10.5t.5 10.5q0 5-.5 11t-1.5 11l65 37q16-14 35.5-21.5T740-450q50 0 85 35t35 85q0 50-35 85t-85 35q-50 0-85-35t-35-85q0-6 .5-11.5T622-352l-64-37q-8 8-17.5 13t-20.5 9v74q35 12 57.5 43t22.5 70q0 50-35 85t-85 35Zm0-80q17 0 28.5-11.5T520-180q0-17-11.5-28.5T480-220q-17 0-28.5 11.5T440-180q0 17 11.5 28.5T480-140ZM220-290q17 0 28.5-11.5T260-330q0-17-11.5-28.5T220-370q-17 0-28.5 11.5T180-330q0 17 11.5 28.5T220-290Zm520 0q17 0 28.5-11.5T780-330q0-17-11.5-28.5T740-370q-17 0-28.5 11.5T700-330q0 17 11.5 28.5T740-290ZM480-440q17 0 28.5-11.5T520-480q0-17-11.5-28.5T480-520q-17 0-28.5 11.5T440-480q0 17 11.5 28.5T480-440ZM220-590q17 0 28.5-11.5T260-630q0-17-11.5-28.5T220-670q-17 0-28.5 11.5T180-630q0 17 11.5 28.5T220-590Zm520 0q17 0 28.5-11.5T780-630q0-17-11.5-28.5T740-670q-17 0-28.5 11.5T700-630q0 17 11.5 28.5T740-590ZM480-740q17 0 28.5-11.5T520-780q0-17-11.5-28.5T480-820q-17 0-28.5 11.5T440-780q0 17 11.5 28.5T480-740Z"/></svg>,
-                  airway:<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.4999 2V8.91693C10.4999 9.57769 10.1218 10.1791 9.52884 10.4663M13.5001 2V8.91693C13.5001 9.57769 13.8782 10.1791 14.4712 10.4663M9.52884 10.4663L9.44504 8.80191C9.40961 8.09813 9.14467 7.36499 8.48047 7.12961C7.3348 6.72361 5.47114 6.99708 3.29204 9.81626C1.26663 12.4366 0.876278 16.5582 1.03002 19.662C1.11847 21.4477 2.92913 22.4379 4.60612 21.818L7.93312 20.5882C9.16298 20.1336 9.95513 18.933 9.88919 17.6235L9.71207 14.1055M9.52884 10.4663L9.71207 14.1055M14.2879 14.1057L12.5164 13.22C12.1911 13.0574 11.8084 13.0574 11.4832 13.22L9.71207 14.1055M14.2879 14.1057L14.1108 17.6235C14.0449 18.933 14.837 20.1336 16.0669 20.5882L19.3939 21.818C21.0709 22.4379 22.8815 21.4477 22.97 19.662C23.1237 16.5582 22.7334 12.4366 20.708 9.81626C18.5289 6.99708 16.6652 6.72361 15.5195 7.12961C14.8553 7.36499 14.5904 8.09813 14.555 8.80191L14.4712 10.4663M14.2879 14.1057L14.4712 10.4663" stroke="currentcolor" stroke-width="1.5" stroke-linecap="round"/></svg>,
-                  silhouettes:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M240-80v-170q-39-17-68.5-45.5t-50-64.5q-20.5-36-31-77T80-520q0-158 112-259t288-101q176 0 288 101t112 259q0 42-10.5 83t-31 77q-20.5 36-50 64.5T720-250v170H240Zm80-80h40v-80h80v80h80v-80h80v80h40v-142q38-9 67.5-30t50-50q20.5-29 31.5-64t11-74q0-125-88.5-202.5T480-800q-143 0-231.5 77.5T160-520q0 39 11 74t31.5 64q20.5 29 50.5 50t67 30v142Zm100-200h120l-60-120-60 120Zm-80-80q33 0 56.5-23.5T420-520q0-33-23.5-56.5T340-600q-33 0-56.5 23.5T260-520q0 33 23.5 56.5T340-440Zm280 0q33 0 56.5-23.5T700-520q0-33-23.5-56.5T620-600q-33 0-56.5 23.5T540-520q0 33 23.5 56.5T620-440ZM480-160Z"/></svg>,
-                  examples:<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="currentColor"><path d="M382-240 154-468l57-56 171 171 367-367 57 57-424 424Z"/></svg>,
-                 };
-                 return(
-                  <button key={id} onClick={()=>setRightPanel(id)} aria-label={label} title={label}
-                    onMouseEnter={e=>{if(rightPanel!==id)e.currentTarget.style.background=t.accMuted;e.currentTarget.style.color=t.acc;}}
-                    onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.color=rightPanel===id?t.acc:t.tx;}}
-                    style={{width:52,minHeight:52,padding:"6px 4px",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:2,border:"none",background:"transparent",color:rightPanel===id?t.acc:t.tx,cursor:"pointer",borderRadius:8,marginBottom:4,transition:"all 0.15s",boxShadow:rightPanel===id?`inset 2px 0 0 ${t.acc}`:"none"}}>
-                    <span style={{fontSize:24}}>{icons[id]||"O"}</span>
-                  </button>
-                );
-              })}
-              {/* Collapse/expand toggle */}
-              <div style={{flex:1,display:"flex",flexDirection:"column",justifyContent:"flex-end",paddingBottom:8}}>
-                <button ref={toggleBtnRef} onClick={toggleCollapsed} aria-label="Toggle panel" title="Toggle panel"
-                  style={{width:44,height:36,margin:"0 auto",display:"flex",alignItems:"center",justifyContent:"center",border:`1px solid ${t.bdr}`,borderRadius:6,background:t.surf3,color:t.tx2,cursor:"pointer",fontSize:16,transition:"all 0.15s"}}>
-                  ▶
-                </button>
-              </div>
-            </div>
+            <RightPanelSidebar t={t} rightPanel={rightPanel} setRightPanel={setRightPanel}
+              panelTabs={panelTabs} toggleBtnRef={toggleBtnRef} toggleCollapsed={toggleCollapsed}
+              isMobile={isMobile} showMobilePanel={showMobilePanel} />
               {/* Panel content — scrollbar hidden but scrollable */}
             <div ref={contentRef} style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0,maxWidth:800,opacity:1,transition:"max-width 0.25s ease, opacity 0.2s ease"}}>
-              {/* Panel header — double-click to collapse/expand */}
-              <div style={{padding:"12px 14px 10px",borderBottom:`1px solid ${t.bdr}`,flexShrink:0,display:"flex",alignItems:"center",justifyContent:"space-between"}}>
-                <div style={{display:"flex",alignItems:"center",gap:10,minWidth:0}}>
-                 <span style={{fontSize:18}}>{panelIcons[rightPanel]||"𝛜"}</span>
-                  <span style={{fontSize:13,fontWeight:700,color:t.tx,textTransform:"capitalize",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{panelTabs.find(([id])=>id===rightPanel)?.[1]}</span>
-                </div>
-              </div>
-              <div style={{flex:1,overflowY:"auto",scrollbarWidth:"none"}}>
-                <style>{`.panel-scroll::-webkit-scrollbar{display:none}`}</style>
-                <div className="panel-scroll">
-                  {rightPanel==="markups"&&<MarkupsPanel markups={markups} t={t} theme={theme} selectedId={selectedId} onSelect={selectAndFocusMarkup} onDelete={delMarkup} onToggleVisible={id=>updMarkup(id,{visible:markups.find(m=>m.id===id)?.visible===false})} onToggleLock={id=>updMarkup(id,{locked:!markups.find(m=>m.id===id)?.locked})} onToggleLabel={id=>updMarkup(id,{noLabel:!markups.find(m=>m.id===id)?.noLabel})} calibration={calibration} placingMode={placingMode} placingQueue={placingQueue} placingIdx={placingIdx} onStopPlacing={()=>{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}} onPausePlacing={()=>{dispatch({type:"SET",payload:{placingMode:false}});}} onResumePlacing={()=>{dispatch({type:"SET",payload:{placingMode:true}});}} onClear={()=>{pushUndo();updSession({markups:[]})}} onAddPoint={()=>{dispatch({type:"SET",payload:{activeTool:"point"}});dispatch({type:"SET",payload:{currentDraw:null}});}} norms={norms} formatAngle={formatAngle} angleMode={angleMode} setAngleMode={setAngleMode} onReplace={(type,id)=>{if(replacingId===id){dispatch({type:"SET",payload:{replacingId:null}});dispatch({type:"SET",payload:{activeTool:"select"}});}else{dispatch({type:"SET",payload:{replacingId:id}});dispatch({type:"SET",payload:{activeTool:type}});}dispatch({type:"SET",payload:{currentDraw:null}});}} replacingId={replacingId}/>}
-                  {rightPanel==="measurements"&&<MeasurementsPanel allMeas={allMeas} formulaMeas={formulaMeas} t={t} calibration={calibration} norms={norms} onUpdateNorms={ns=>updSession({norms:ns})} onExportCSV={exportCSV} onOpenCalib={()=>dispatch({type:"SET",payload:{showCalib:true}})} formatAngle={formatAngle} userPresets={userPresets} onSavePreset={handleSavePreset} onDeletePreset={handleDeletePreset}/>}
-                  {rightPanel==="formulas"&&<FormulasPanel formulas={formulas} t={t} scope={measScope} onAdd={()=>{dispatch({type:"SET",payload:{editFormulaId:null}});dispatch({type:"SET",payload:{showFormulaEditor:true}});}} onEdit={id=>{dispatch({type:"SET",payload:{editFormulaId:id}});dispatch({type:"SET",payload:{showFormulaEditor:true}});}} onDelete={id=>updSession({formulas:formulas.filter(f=>f.id!==id)})} pinnedFormulas={pinnedFormulas} onPinFormula={id=>setPinnedFormulas(s=>{const n=new Set(s);if(n.has(id))n.delete(id);else n.add(id);return n;})}/>}
-                  {rightPanel==="image"&&<ImagePanel t={t} processing={processing} setProcessing={p=>updSession({processing:p})} lutMode={lutMode} setLutMode={m=>updSession({lutMode:m})} lutInvert={lutInvert} setLutInvert={v=>updSession({lutInvert:v})} showLUT={showLUT} setShowLUT={setShowLUT} showScaleBar={showScaleBar} setShowScaleBar={setShowScaleBar} calibration={calibration} onOpenCalib={()=>dispatch({type:"SET",payload:{showCalib:true}})} onReset={()=>updSession({processing:{brightness:0,contrast:0,windowWidth:0,windowCenter:128,edgeEnhance:0},lutMode:"gray",lutInvert:false})} onShowHist={()=>setShowHistogram(v=>!v)} showHistogram={showHistogram}/>}
-                  {rightPanel==="layers"&&<LayersPanel t={t} images={sessionImage} onUpdateImages={imgs=>updSession({images:imgs})} onAddImage={()=>stackImgRef.current?.click()} onShowAlign={()=>{}} onShowTransform={()=>{}}/>}
-                  {rightPanel==="sessions"&&<SessionsPanel project={project} t={t} onUpdateProject={onUpdateProject} activeSession={activeSession} setActiveSession={id=>onUpdateProject({...project,activeSessionId:id})} onExportTemplate={v=>exportCepht({name:`${project.name}`,projection:project.projection,markups:v.markups||[],formulas:v.formulas||[],norms:v.norms||[]})} compareSession={compareSession} setCompareSession={setCompareSession} showDisplacement={showDisplacement} setShowDisplacement={setShowDisplacement} displacementOverlay={displacementOverlay} setDisplacementOverlay={setDisplacementOverlay} refLandmark1={refLandmark1} setRefLandmark1={setRefLandmark1} refLandmark2={refLandmark2} setRefLandmark2={setRefLandmark2} overlayBlend={overlayBlend} setOverlayBlend={setOverlayBlend} overlayAlignMode={overlayAlignMode} setOverlayAlignMode={setOverlayAlignMode} overlayVectorScale={overlayVectorScale} setOverlayVectorScale={setOverlayVectorScale} showTrackingLines={showTrackingLines} setShowTrackingLines={setShowTrackingLines} showAirwayOverlay={showAirwayOverlay} setShowAirwayOverlay={setShowAirwayOverlay} calibration={calibration} formatAngle={formatAngle}/>}
-                  {rightPanel==="research"&&<ResearchPanel t={t} project={project} onUpdateProject={onUpdateProject} calibration={calibration}/>}
-                  {rightPanel==="interpretation"&&<InterpretationPanel allMeas={allMeas} norms={norms} t={t} formatAngle={formatAngle} calibration={calibration}/>}
-                  {rightPanel==="airway"&&<AirwayPanel t={t} markups={markups} calibration={calibration} norms={norms} onAddPoint={handleAirwayAddPoint} showOverlay={showAirwayOverlay} onToggleOverlay={()=>setShowAirwayOverlay(v=>!v)} onUpdateMarkups={updSession} onLoadTemplate={loadTemplate} dispatch={dispatch} sex={patientSex} age={patientAge} canvasRef={canvasRef}/>}
-                  {rightPanel==="silhouettes"&&<SilhouettesPanel t={t} onInsert={(silhouetteType) => {
-                    try {
-                      const def = SILHOUETTES[silhouetteType];
-                      if (!def) return;
-                      const cw = canvasSize.current?.w || 800, ch = canvasSize.current?.h || 600;
-                      const center = toImage(cw / 2, ch / 2);
-                      const scale = def.onInsertFit ? Math.min(cw, ch) / 100 : 1;
-                      addMarkup({
-                        type: "silhouette",
-                        silhouetteType,
-                        position: center,
-                        scale,
-                        rotation: 0,
-                        color: def.color,
-                        fillColor: def.color + "22",
-                        width: 1.5,
-                        label: def.name,
-                        paths: def.paths.map(p => ({
-                          ...p,
-                          points: p.points.map(pt => ({ ...pt })),
-                        })),
-                      });
-                    } catch(e) { logError("Silhouette insert error:", e); }
-                  }}/>}
-                  {rightPanel==="templates"&&<TemplatesPanel t={t} projection={project.projection} onLoadTemplate={loadTemplate} onImportCepht={data=>{
-          const err=validateCepht(data);if(err){alert(err);return;}
-          const hasCoords=data.version==="2.0"&&hasPlacedCoords(data.markups);
-          const newMarkups=data.markups.map(m=>{
-            const base={...m,id:uid(),definition:m.definition||m.def||"",visible:m.visible!==false};
-            if(hasCoords)return{...base,placed:m.placed!==false,points:m.points||[{x:-99999,y:-99999}]};
-            return{...base,placed:false,points:m.type==="silhouette"?m.points:[{x:-99999,y:-99999}]};
-          });
-          updSession({markups:[...markups,...newMarkups],formulas:[...formulas,...(data.formulas||[])],norms:[...norms,...(data.norms||[])],analysisTemplate:data.name||"Imported"});
-          if(!hasCoords){setPlacingQueue(newMarkups.filter(m=>!m.placed).map(m=>m.id));dispatch({type:"SET",payload:{placingIdx:0,placingMode:true,rightPanel:"markups"}});}
-         }        }/>}
-                   {rightPanel==="examples"&&<ExamplesPanel t={t}/>}
-                 </div>
-              </div>
-              {selectedMarkup&&<div style={{borderTop:`1px solid ${t.bdr}`,padding:12,flexShrink:0,maxHeight:isMobile?180:260,overflowY:"auto",scrollbarWidth:"none"}}>
+              <PanelContent rightPanel={rightPanel} panelIcons={panelIcons} panelTabs={panelTabs} t={t}
+                pMarkups={pMarkups} pSessions={pSessions}
+                allMeas={allMeas} formulaMeas={formulaMeas} calibration={calibration} norms={norms} formatAngle={formatAngle}
+                exportCSV={exportCSV} userPresets={userPresets} handleSavePreset={handleSavePreset} handleDeletePreset={handleDeletePreset}
+                updSession={updSession} dispatch={dispatch}
+                formulas={formulas} measScope={measScope} pinnedFormulas={pinnedFormulas} setPinnedFormulas={setPinnedFormulas}
+                processing={processing} lutMode={lutMode} lutInvert={lutInvert} showLUT={showLUT} setShowLUT={setShowLUT} showScaleBar={showScaleBar} setShowScaleBar={setShowScaleBar} showHistogram={showHistogram} setShowHistogram={setShowHistogram}
+                sessionImage={sessionImage} stackImgRef={stackImgRef}
+                project={project} onUpdateProject={onUpdateProject}
+                markups={markups} handleAirwayAddPoint={handleAirwayAddPoint} showAirwayOverlay={showAirwayOverlay} setShowAirwayOverlay={setShowAirwayOverlay}
+                loadTemplate={loadTemplate} patientSex={patientSex} patientAge={patientAge} canvasRef={canvasRef}
+                canvasSize={canvasSize} toImage={toImage} addMarkup={addMarkup} pushUndo={pushUndo}
+              />
+            {selectedMarkup&&<div style={{borderTop:`1px solid ${t.bdr}`,padding:12,flexShrink:0,maxHeight:isMobile?180:260,overflowY:"auto",scrollbarWidth:"none"}}>
                 <MarkupProps m={selectedMarkup} t={t} theme={theme} onUpdate={p=>updMarkup(selectedMarkup.id,p)} onDelete={()=>delMarkup(selectedMarkup.id)} calibration={calibration} onParallel={()=>dispatch({type:"SET",payload:{activeTool:"parallel"}})} formatAngle={formatAngle} norms={norms} onUpdateNorms={ns=>updSession({norms:ns})}/>
               </div>}
             </div>
