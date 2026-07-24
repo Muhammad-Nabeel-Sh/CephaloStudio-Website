@@ -51,7 +51,7 @@ function fmtVal(v) {
 // COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export default function AirwayPanel({ t, markups, calibration, norms, onAddPoint, onUpdateMarkups, showOverlay, onToggleOverlay, onLoadTemplate, dispatch, sex, age }) {
+export default function AirwayPanel({ t, markups, calibration, norms, onAddPoint, onUpdateMarkups, showOverlay, onToggleOverlay, onLoadTemplate, dispatch, sex, age, canvasRef }) {
   void norms;
   void onUpdateMarkups;
 
@@ -258,7 +258,8 @@ export default function AirwayPanel({ t, markups, calibration, norms, onAddPoint
           <Btn
             t={t}
             onClick={() => {
-              const bounds = generateAirwayBoundaries(markups);
+              const imageData = canvasRef?.current?.getContext("2d")?.getImageData(0, 0, canvasRef.current.width, canvasRef.current.height);
+              const bounds = generateAirwayBoundaries(markups, imageData);
               if (!bounds) return;
               const curves = [];
               if (bounds.anterior.length >= 2) {

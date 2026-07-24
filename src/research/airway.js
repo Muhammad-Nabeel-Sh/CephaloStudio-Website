@@ -132,8 +132,16 @@ export const AIRWAY_MEASUREMENTS = [
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-export function findPt(markups, label) {
+export function findPt(markups, label, ptMap) {
   try {
+    if (ptMap) {
+      const m = ptMap.get(label.toLowerCase());
+      if (m && m.visible !== false) {
+        const pts = vpts(m);
+        if (pts.length > 0) return { x: pts[0].x, y: pts[0].y };
+      }
+      return null;
+    }
     for (const m of markups) {
       if (m.visible === false) continue;
       if (m.label === label || m.label?.toLowerCase() === label.toLowerCase()) {
@@ -143,6 +151,14 @@ export function findPt(markups, label) {
     }
     return null;
   } catch { return null; }
+}
+
+function buildPtMap(markups) {
+  const map = new Map();
+  for (const m of markups) {
+    if (m.label) map.set(m.label.toLowerCase(), m);
+  }
+  return map;
 }
 
 export function sampleBoundaryAtY(pts, y) {
@@ -432,11 +448,15 @@ export function computeAirwayMeasurements(markups, calibration, sex, age) {
     const calDone = calibration?.done === true;
     const ppm = calDone ? (calibration.pxPerMm || 1) : 1;
 
+    // Build O(1) point lookup map
+    const ptMap = buildPtMap(markups);
+    const find = (label) => findPt(markups, label, ptMap);
+
     const results = [];
 
     for (const def of AIRWAY_MEASUREMENTS) {
       try {
-        const pts = def.points.map((label) => findPt(markups, label));
+        const pts = def.points.map((label) => find(label));
         const validPts = pts.filter((p) => p !== null);
         const reqLen = def.type === "length" ? 2 : def.points.length;
 
@@ -548,7 +568,7 @@ export function computeAirwayMeasurements(markups, calibration, sex, age) {
 // REC 1: Generate smooth airway boundaries from placed landmarks
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export function generateAirwayBoundaries(markups) {
+export function generateAirwayBoundaries(markups, imageData) {
   try {
     const find = (label) => {
       const m = markups.find(mk => mk.type === "point" && mk.label === label && mk.visible !== false && mk.placed !== false);
@@ -567,9 +587,19 @@ export function generateAirwayBoundaries(markups) {
 
     if (anteriorRaw.length < 2 && posteriorRaw.length < 2) return null;
 
+    let anteriorSmooth = anteriorRaw.length >= 2 ? sampleCatmullRom(anteriorRaw, 50) : [];
+    let posteriorSmooth = posteriorRaw.length >= 2 ? sampleCatmullRom(posteriorRaw, 50) : [];
+
+    // Auto-snap to radiolucent/radiopaque boundary if image data available
+    if (imageData) {
+      const ww = 2000, wc = 500;
+      if (anteriorSmooth.length > 0) anteriorSmooth = autoSnapBoundary(imageData, anteriorSmooth, ww, wc);
+      if (posteriorSmooth.length > 0) posteriorSmooth = autoSnapBoundary(imageData, posteriorSmooth, ww, wc);
+    }
+
     return {
-      anterior: anteriorRaw.length >= 2 ? sampleCatmullRom(anteriorRaw, 50) : [],
-      posterior: posteriorRaw.length >= 2 ? sampleCatmullRom(posteriorRaw, 50) : [],
+      anterior: anteriorSmooth,
+      posterior: posteriorSmooth,
     };
   } catch { return null; }
 }
