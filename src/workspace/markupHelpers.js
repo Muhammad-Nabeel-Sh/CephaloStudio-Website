@@ -1,4 +1,4 @@
-import { uid } from "../utils.js";
+import { uid } from "../lib/utils.js";
 import { getMeasValue } from "./template.js";
 
 export function refreshAutoMeasurements(markups) {

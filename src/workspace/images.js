@@ -1,5 +1,5 @@
-import { uid } from "../utils.js";
-import { logError } from "../logger.js";
+import { uid } from "../lib/utils.js";
+import { logError } from "../lib/logger.js";
 
 export function loadImageFile(file, addToStack, { sessionImages, dispatch, updSession, imgRefs, canvasSize, panRef }) {
   if (!file || !file.type.startsWith("image/")) return;

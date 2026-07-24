@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { useState } from "react";
-import { InfoBox } from "../ui.jsx";
+import { InfoBox } from "../ui/ui.jsx";
 import PlotlyChart, { heatmapLayout, heatmapData } from "./PlotlyChart.jsx";
 
 function LabelSelector({ sessions, selected, onToggle, t }) {

@@ -27,7 +27,7 @@ const DB_NAME = "CephaloStudio";
 const DB_VERSION = 1;
 const STORE_NAME = "images";
 
-import { logWarn } from "../logger.js";
+import { logWarn } from "../lib/logger.js";
 
 let dbPromise = null;
 let _idbAvailable = null; // null = untested; boolean once probed

@@ -1,5 +1,5 @@
-import { computeMeasurements, chi2CDF, tDistributeCDF } from "../utils.js";
-import { logError } from "../logger.js";
+import { computeMeasurements, chi2CDF, tDistributeCDF } from "../lib/utils.js";
+import { logError } from "../lib/logger.js";
 
 // ─── Statistical helpers ──────────────────────────────────────────────────
 function stdNormalCdf(x) {
@@ -165,7 +165,7 @@ function computeZScore(value, norm) {
 //   2. Mismatch warning: when no stratum matches and the patient's age falls
 //      outside the norm's `ageRange`, a warning is attached to the z-score
 //      so the UI can flag a likely-misapplied norm.
-import { DEFAULT_NORMS } from "../norms.js";
+import { DEFAULT_NORMS } from "../data/norms.js";
 
 function _normsToValues(norms) {
   const values = {};

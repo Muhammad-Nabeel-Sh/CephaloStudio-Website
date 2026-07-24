@@ -2,15 +2,22 @@
 // Panel content router — maps rightPanel id to the correct component
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { SILHOUETTES } from "../silhouettes.js";
+import { SILHOUETTES } from "../data/silhouettes.js";
 import { validateCepht } from "../storage/cephxFormat.js";
 
 function hasPlacedCoords(markups) {
   return (markups || []).some(m => m.type === "point" && m.placed && m.points?.[0]?.x > -9000);
 }
-import { uid } from "../utils.js";
-import { logError } from "../logger.js";
-import { MarkupsPanel, MeasurementsPanel, FormulasPanel, ImagePanel, LayersPanel, TemplatesPanel, SilhouettesPanel, ExamplesPanel } from "../panels.jsx";
+import { uid } from "../lib/utils.js";
+import { logError } from "../lib/logger.js";
+import { MarkupsPanel } from "./MarkupsPanel.jsx";
+import { MeasurementsPanel } from "./MeasurementsPanel.jsx";
+import { FormulasPanel } from "./FormulasPanel.jsx";
+import { ImagePanel } from "./ImagePanel.jsx";
+import { LayersPanel } from "./LayersPanel.jsx";
+import { TemplatesPanel } from "./TemplatesPanel.jsx";
+import { SilhouettesPanel } from "./SilhouettesPanel.jsx";
+import { ExamplesPanel } from "./ExamplesPanel.jsx";
 import SessionsPanel from "./SessionsPanel.jsx";
 import ResearchPanel from "../research/ResearchPanel.jsx";
 import InterpretationPanel from "./InterpretationPanel.jsx";

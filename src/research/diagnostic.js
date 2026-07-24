@@ -1,5 +1,5 @@
 import { collectMeasurements, pivotMeasurements } from "./collect.js";
-import { chi2CDF } from "../utils.js";
+import { chi2CDF } from "../lib/utils.js";
 import { normalCdf as normalCDF, dot, matVecMul, matMul, matInverse, transposeMatrix, addIntercept } from "./statsCore.js";
 // ─── Math helpers ────────────────────────────────────────────────────────────
 function zCritical(alpha) {

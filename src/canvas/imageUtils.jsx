@@ -3,8 +3,8 @@
 // IMAGE UTILS - LUT, Image Processing, Histogram
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { clamp } from "./utils.js";
-import { Sld } from "./ui.jsx";
+import { clamp } from "../lib/utils.js";
+import { Sld } from "../ui/ui.jsx";
 
 export function getLUTColor(v, mode, invert = false) {
   v = clamp(Math.round(v), 0, 255);

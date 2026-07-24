@@ -3,7 +3,7 @@
 // Accepts a "draw context" object bundling all refs, state, and draw helpers.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { vpts } from "../utils.js";
+import { vpts } from "../lib/utils.js";
 import { procrustesAlign } from "../research/superimposition.js";
 
 export function createRedraw(dc) {

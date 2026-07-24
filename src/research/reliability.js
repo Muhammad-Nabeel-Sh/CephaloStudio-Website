@@ -1,6 +1,6 @@
-import { computeMeasurements, tDistributeCDF, fCDF } from "../utils.js";
+import { computeMeasurements, tDistributeCDF, fCDF } from "../lib/utils.js";
 import { checkReliabilityTimeSeparation } from "./validation.js";
-import { logError } from "../logger.js";
+import { logError } from "../lib/logger.js";
 
 // ─── Statistical helpers ──────────────────────────────────────────────────
 function fCritical(p, df1, df2) {

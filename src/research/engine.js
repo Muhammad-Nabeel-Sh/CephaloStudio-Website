@@ -6,7 +6,7 @@ import { runCorrelationAll, runRegression, runLogisticRegression } from "./corre
 import { runDiagnosticAll } from "./diagnostic.js";
 import { runSuperimpositionAll } from "./superimposition.js";
 import { computeAirwayMeasurements } from "./airway.js";
-import { logError } from "../logger.js";
+import { logError } from "../lib/logger.js";
 
 // `onProgress` is an optional coarse-grained callback (fraction 0..1, label).
 // It exists so the Web Worker wrapper (engineClient.js) can stream progress to

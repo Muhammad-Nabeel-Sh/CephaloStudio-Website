@@ -22,7 +22,7 @@
 // user's data over a strict schema check. Only structurally broken payloads
 // (no project, no sessions array) are rejected.
 
-import { uid } from "../utils.js";
+import { uid } from "../lib/utils.js";
 
 export const CEPHX_FORMAT = "cephx";
 // v2.0 → v2.1: `session.image` (singular) deprecated in favour of

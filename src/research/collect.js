@@ -1,5 +1,5 @@
-import { computeMeasurements } from "../utils.js";
-import { logError } from "../logger.js";
+import { computeMeasurements } from "../lib/utils.js";
+import { logError } from "../lib/logger.js";
 
 let _collectCacheKey = "";
 let _collectCacheResult = null;

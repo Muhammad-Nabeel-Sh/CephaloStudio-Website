@@ -1,11 +1,11 @@
 import { useState, useRef, useMemo, useCallback } from "react";
 import { Modal } from "./Modal.jsx";
-import { Btn } from "../ui.jsx";
-import { logError } from "../logger.js";
+import { Btn } from "../ui/ui.jsx";
+import { logError } from "../lib/logger.js";
 import { mkSession } from "../model/session.js";
 import { mkSubject, addSubject, addSession } from "../model/project.js";
 import { parseCsv } from "../model/csv.js";
-import { uid } from "../utils.js";
+import { uid } from "../lib/utils.js";
 import PanelGuideModal from "./PanelGuideModal.jsx";
 
 const META_KEYS = new Set([

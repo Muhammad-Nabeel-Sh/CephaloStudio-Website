@@ -1,6 +1,6 @@
 import { useRef, useMemo, useCallback, useState } from "react";
-import { normDeviation } from "../utils.js";
-import { RULES } from "../interpretation.js";
+import { normDeviation } from "../lib/utils.js";
+import { RULES } from "../lib/interpretation.js";
 import PanelGuideModal from "./PanelGuideModal.jsx";
 
 const ROW_H = 40;

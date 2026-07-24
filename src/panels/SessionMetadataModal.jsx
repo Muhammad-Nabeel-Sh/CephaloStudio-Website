@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Btn, Tag } from "../ui.jsx";
+import { Btn, Tag } from "../ui/ui.jsx";
 import PanelGuideModal from "./PanelGuideModal.jsx";
 
 export default function SessionMetadataModal({ project, t, onUpdateProject, onClose }) {

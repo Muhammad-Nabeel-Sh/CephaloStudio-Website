@@ -2,8 +2,8 @@
 // Template loading + auto-measurement creation
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { uid, computeMeasurements } from "../utils.js";
-import { PREDEFINED } from "../constants.js";
+import { uid, computeMeasurements } from "../lib/utils.js";
+import { PREDEFINED } from "../data/constants.js";
 
 export function getMeasValue(m, calibration) {
   const ms = computeMeasurements(m, calibration);

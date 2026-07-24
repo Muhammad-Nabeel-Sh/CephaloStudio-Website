@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from "react";
-import { PREDEFINED } from "../constants.js";
-import { Btn, Tag } from "../ui.jsx";
+import { PREDEFINED } from "../data/constants.js";
+import { Btn, Tag } from "../ui/ui.jsx";
 import PanelGuideModal from "./PanelGuideModal.jsx";
 
 const projectionKeyMap={

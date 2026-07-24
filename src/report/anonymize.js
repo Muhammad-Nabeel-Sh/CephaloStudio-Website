@@ -21,7 +21,7 @@
 //     later verify a claimed original without the app retaining the value.
 //     (Salted so low-entropy fields like a short name are not rainbow-tabled.)
 
-import { uid } from "./utils.js";
+import { uid } from "../lib/utils.js";
 
 const PROJECT_CLEAR = ["patientName", "dob", "age", "clinician", "facility", "referral", "notes"];
 const SESSION_CLEAR = ["patientId", "age", "sex"];

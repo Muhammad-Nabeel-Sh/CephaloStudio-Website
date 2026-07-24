@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { mean } from "../utils.js";
-import { InfoBox } from "../ui.jsx";
+import { mean } from "../lib/utils.js";
+import { InfoBox } from "../ui/ui.jsx";
 
 function uid() {
   return Math.random().toString(36).slice(2, 10);

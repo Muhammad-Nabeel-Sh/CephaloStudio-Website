@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { useState } from "react";
-import { InfoBox } from "../ui.jsx";
+import { InfoBox } from "../ui/ui.jsx";
 import { DELTA_NORMS } from "./superimposition.js";
 
 const TAB_DEFS = [

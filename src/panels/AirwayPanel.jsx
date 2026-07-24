@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { computeAirwayMeasurements, generateAirwayBoundaries, computeAirwayRiskScore } from "../research/airway.js";
-import { InfoBox, Tag, Btn } from "../ui.jsx";
-import { PREDEFINED } from "../constants.js";
+import { InfoBox, Tag, Btn } from "../ui/ui.jsx";
+import { PREDEFINED } from "../data/constants.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONSTANTS

@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { create, all } from "mathjs";
-import { SILHOUETTES } from "./silhouettes.js";
+import { SILHOUETTES } from "../data/silhouettes.js";
 
 const math = create(all, { number: "number", precision: 14 });
 math.import({

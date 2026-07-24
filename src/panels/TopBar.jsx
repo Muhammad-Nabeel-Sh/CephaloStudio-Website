@@ -1,6 +1,6 @@
-import { THEMES } from "../constants.js";
-import { hasUnanonymizedPHI } from "../anonymize.js";
-import { Btn, Tag } from "../ui.jsx";
+import { THEMES } from "../data/constants.js";
+import { hasUnanonymizedPHI } from "../report/anonymize.js";
+import { Btn, Tag } from "../ui/ui.jsx";
 
 export default function TopBar({
   t, theme, project, isMobile, onHome,

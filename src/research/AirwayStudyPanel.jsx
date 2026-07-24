@@ -2,7 +2,7 @@
 // AIRWAY STUDY PANEL — Config & Results UI for Airway Analysis
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { InfoBox, Btn } from "../ui.jsx";
+import { InfoBox, Btn } from "../ui/ui.jsx";
 
 // ─── Config Panel ─────────────────────────────────────────────────────────
 

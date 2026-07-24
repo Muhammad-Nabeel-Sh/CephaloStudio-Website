@@ -1,5 +1,5 @@
-import { PropRow, Btn } from "../ui.jsx";
-import { anonymizeProject } from "../anonymize.js";
+import { PropRow, Btn } from "../ui/ui.jsx";
+import { anonymizeProject } from "../report/anonymize.js";
 import { useState } from "react";
 import PanelGuideModal from "./PanelGuideModal.jsx";
 

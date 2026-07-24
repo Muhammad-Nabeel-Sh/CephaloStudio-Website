@@ -2,8 +2,8 @@
 // AIRWAY — Cephalometric airway measurement computation engine
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { vpts, dist } from "../utils.js";
-import { AIRWAY_NORMS } from "../norms.js";
+import { vpts, dist } from "../lib/utils.js";
+import { AIRWAY_NORMS } from "../data/norms.js";
 
 // ─── Airway measurement definitions ──────────────────────────────────────────
 

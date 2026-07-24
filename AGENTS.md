@@ -38,11 +38,134 @@ npm run lint -- --fix
 
 ## Code Style Guidelines
 
+### Directory Structure
+```
+src/
+├── App.jsx                     Root component (~1700 lines)
+├── main.jsx                    Entry point
+├── index.css                   Global styles
+│
+├── canvas/                     Canvas rendering + image processing
+│   ├── redraw.js               Draw pipeline (createRedraw factory)
+│   ├── drawMarkups.js          drawMarkup, drawMeasLabel, hitTest, drawAirwayOverlay
+│   ├── imageUtils.jsx          LUT processing, getProcessed
+│   └── imageProcessor.worker.js Web worker for image processing
+│
+├── data/                       Constants, norms, presets
+│   ├── constants.js            THEMES, TOOLS, UNITS, PREDEFINED analyses
+│   ├── norms.js                Normative data definitions
+│   ├── normLibrary.js          Library norm browsing
+│   ├── communityNorms.js       GitHub-fetched community norms
+│   ├── silhouettes.js          Silhouette overlay data
+│   └── examplesData.js         Example project data
+│
+├── hooks/                      Custom React hooks
+│   ├── useKatex.js             KaTeX rendering (useKatex, KatexSpan, LatexFloatingPanel)
+│   └── useWorkspaceUIState.js  Bundled useState calls for workspace UI
+│
+├── lib/                        Core utilities
+│   ├── utils.js                Geometry, math, formatting, export (dist, angle3pt, buildPDF, etc.)
+│   ├── interpretation.js       Clinical interpretation engine
+│   └── logger.js               Logging utility
+│
+├── model/                      Data models
+│   ├── csv.js                  CSV parsing
+│   ├── project.js              Project data model
+│   └── session.js              Session data model
+│
+├── panels/                     All UI panel components
+│   ├── PanelContent.jsx        11-panel router
+│   ├── panelIcons.jsx          PANEL_ICONS + PANEL_TABS (single source of truth)
+│   ├── Toolbar.jsx             Desktop + mobile toolbar
+│   ├── TopBar.jsx              Top bar (home, logo, save)
+│   ├── RightPanelSidebar.jsx   Vertical tab sidebar
+│   ├── SessionFilmstrip.jsx    Bottom-center thumbnail bar
+│   ├── PanelGuideModal.jsx     Contextual help guides
+│   ├── AirwayPanel.jsx         Airway analysis panel
+│   ├── InterpretationPanel.jsx Clinical interpretation
+│   ├── NormogramPanel.jsx      Normogram visualization
+│   ├── HomePage.jsx            Home/start screen
+│   ├── StartupWizard.jsx       First-run wizard
+│   ├── Modal.jsx               Reusable modal
+│   ├── AnonModal.jsx           Anonymization dialog
+│   ├── BatchImportModal.jsx    Multi-image import
+│   ├── SessionMetadataModal.jsx Session metadata editor
+│   ├── SessionsPanel.jsx       Session management + comparison
+│   ├── MarkupsPanel.jsx        Markup list + properties
+│   ├── MeasurementsPanel.jsx   Measurement table + norms
+│   ├── FormulasPanel.jsx       Formula editor
+│   ├── ImagePanel.jsx          Image processing controls
+│   ├── LayersPanel.jsx         Layer management
+│   ├── TemplatesPanel.jsx      Template browser
+│   ├── SilhouettesPanel.jsx    Silhouette overlays
+│   ├── MarkupProps.jsx         Markup property editor
+│   ├── ExamplesPanel.jsx       Example projects browser
+│   └── NormsReferenceModal.jsx Norm database browser
+│
+├── report/                     Export/PDF generation
+│   ├── reportGenerator.js      PDF/DOCX/PNG export
+│   ├── csvParser.js            CSV sidecar parsing
+│   └── anonymize.js            PHI anonymization
+│
+├── research/                   Statistical analysis modules
+│   ├── engine.js               Study runner (Web Worker)
+│   ├── engine.worker.js        Worker thread
+│   ├── engineClient.js         Worker client
+│   ├── studyModel.js           Study type definitions
+│   ├── statsCore.js            Core statistical functions
+│   ├── validation.js           Input validation
+│   ├── collect.js              Data collection
+│   ├── resultsExport.js        Results export
+│   ├── airway.js               Airway measurements + norms
+│   ├── descriptive.js          Descriptive statistics
+│   ├── reliability.js          ICC, Bland-Altman, Dahlberg
+│   ├── comparative.js          t-tests, ANOVA, MANOVA
+│   ├── correlation.js          Correlation + regression
+│   ├── longitudinal.js         RM-ANOVA, LMM
+│   ├── diagnostic.js           ROC/AUC, calibration
+│   ├── superimposition.js      Procrustes, displacement, growth
+│   ├── DescriptivePanel.jsx    Descriptive config + results
+│   ├── ReliabilityPanel.jsx    Reliability config + results
+│   ├── ComparativePanel.jsx    Comparative config + results
+│   ├── CorrelationPanel.jsx    Correlation config + results
+│   ├── LongitudinalPanel.jsx   Longitudinal config + results
+│   ├── DiagnosticPanel.jsx     Diagnostic config + results
+│   ├── SuperimpositionPanel.jsx Superimposition config + results (7 tabs)
+│   ├── AirwayStudyPanel.jsx    Airway study config + results
+│   ├── ResearchPanel.jsx       Research module router
+│   ├── ResultsDialog.jsx       Floating results modal
+│   ├── StudyGuideModal.jsx     Study-type guides
+│   ├── PlotlyChart.jsx         Plotly wrapper
+│   ├── moduleCharts.jsx        All chart components
+│   └── moduleChartsUtils.jsx   Chart utility functions
+│
+├── state/                      Global state management
+│   └── workspaceStore.js       useWorkspaceStore (Zustand)
+│
+├── storage/                    Data persistence
+│   ├── cephxFormat.js          Import/export validation
+│   ├── imageStore.js           IndexedDB image storage
+│   └── secureStorage.js        Encrypted local storage
+│
+├── ui/                         Shared UI components
+│   ├── Modal.jsx               Reusable modal
+│   ├── ToolBtn.jsx             Toolbar button
+│   └── ErrorBoundary.jsx       React error boundary
+│
+├── workspace/                  Workspace state logic
+│   ├── undo.js                 Undo/redo stack management
+│   ├── markupHelpers.js        refreshAutoMeasurements, markupDefaults
+│   ├── calibration.js          Ruler/manual calibration, CSV export
+│   ├── template.js             autoCreateMeasurements, getMeasValue
+│   └── images.js               Image loading + drop handling
+│
+└── test/                       Vitest test files (300 tests)
+```
+
 ### File Organization
 - React components: `.jsx` extension
 - Utility functions: `.js` extension
 - Main app entry: `src/App.jsx`
-- Secondary modules: `src/panels.jsx`
 - Entry point: `src/main.jsx`
 
 ### Imports
@@ -190,23 +313,23 @@ Located in `eslint.config.js`:
 ## Common Development Tasks
 
 ### Adding a new markup type
-1. Add to `TOOLS` array with id, icon, label, key
-2. Add rendering logic in `drawMarkup()` function
-3. Add measurement logic in `computeMeasurements()` if applicable
-4. Add hit-testing in `hitTest()` function
-5. Add drawing-in-progress in `drawInProgress()` if multi-point
+1. Add to `TOOLS` array in `data/constants.js` with id, icon, label, key
+2. Add rendering logic in `canvas/drawMarkups.js` (`drawMarkup()` function)
+3. Add measurement logic in `lib/utils.js` (`computeMeasurements()`) if applicable
+4. Add hit-testing in `canvas/drawMarkups.js` (`hitTest()` function)
+5. Add drawing-in-progress in `canvas/drawMarkups.js` (`drawInProgress()`) if multi-point
 
 ### Adding a new theme
-1. Add entry to `THEMES` object with all color properties
-2. Add theme button in header/toolbar
+1. Add entry to `THEMES` object in `data/constants.js` with all color properties
+2. Add theme button in `panels/Toolbar.jsx`
 
 ### Modifying formula system
-1. Formula evaluation in `panels.jsx`
-2. Formula display in `FormulasPanel` component
-3. Scope building in `buildScope()` function
+1. Formula evaluation in `App.jsx` (mathjs compile/evaluate)
+2. Formula display in `panels/FormulasPanel.jsx`
+3. Scope building in `lib/utils.js` (`buildScope()` function)
 
 ### Adding a context menu action
-1. Add handler function inside the context menu IIFE in App.jsx
+1. Add handler function inside the context menu IIFE in `App.jsx`
 2. Add `item(label, onClick, danger?)` call in the appropriate section
 3. Wire through any required state/refs
 
@@ -233,6 +356,10 @@ Recommended settings for `.vscode/settings.json`:
 ## Progress Summary
 
 ### Done
+- **Folder reorganization**: Root-level 22 files → 3 files (App.jsx, main.jsx, index.css). All modules organized into `canvas/`, `data/`, `hooks/`, `lib/`, `model/`, `panels/`, `report/`, `research/`, `state/`, `storage/`, `ui/`, `workspace/`
+- **Code refactoring**: App.jsx 2400 → 1700 lines. Extracted: `canvas/redraw.js` (draw pipeline), `panels/PanelContent.jsx` (11-panel router), `panels/panelIcons.jsx` (single source of truth), `panels/Toolbar.jsx` + `TopBar.jsx` + `RightPanelSidebar.jsx` (layout), `hooks/useWorkspaceUIState.js` (bundled state), `workspace/undo.js` + `markupHelpers.js` + `calibration.js` + `template.js` + `images.js` (workspace logic)
+- **Panel extraction**: `panels.jsx` split into 10 individual files in `panels/` (MarkupsPanel, MeasurementsPanel, ImagePanel, LayersPanel, FormulasPanel, TemplatesPanel, SilhouettesPanel, MarkupProps, ExamplesPanel, NormsReferenceModal)
+- **Hooks extraction**: `hooks.jsx` split into `hooks/useKatex.js` (useKatex, KatexSpan, LatexFloatingPanel)
 - **Phase 4 — Research Module Framework**: Created `src/research/` with `studyModel.js`, `engine.js`
 - **Reliability module**: ICC(2,1) with 95% CI (F-based, exact fCDF inversion), Bland-Altman (with VIF for 3+ occasion bias CI), Dahlberg/SEM/MDC, landmark error mapping via 2×2 eigendecomposition — config + results UI (`ReliabilityPanel.jsx`)
 - **Descriptive/Normative module**: descriptive stats, reference intervals, z-scores, predefined norms (single source in `src/norms.js`) — config + results UI (`DescriptivePanel.jsx`)
@@ -278,5 +405,5 @@ Recommended settings for `.vscode/settings.json`:
 
 ### Build Status
 - `npm run build` — OK (chunk size warning is pre-existing, mathjs is large; plotly loaded as dynamic import)
-- `npm run lint` — 1 warning in App.jsx only (`react-hooks/exhaustive-deps` for `currentDraw.type`, pre-existing)
+- `npm run lint` — 0 errors, 6 pre-existing warnings in App.jsx only (`react-hooks/exhaustive-deps`)
 - `npm test` — 300 tests pass (16 test files, 0 failures)

@@ -4,7 +4,7 @@
 
 import { useState, Fragment } from "react";
 import { RESEARCH_NORMS } from "./descriptive.js";
-import { InfoBox } from "../ui.jsx";
+import { InfoBox } from "../ui/ui.jsx";
 
 function sid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);

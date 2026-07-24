@@ -3,7 +3,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { useState } from "react";
-import { InfoBox } from "../ui.jsx";
+import { InfoBox } from "../ui/ui.jsx";
 import { mkReliabilitySession } from "../model/session.js";
 import { addSession } from "../model/project.js";
 

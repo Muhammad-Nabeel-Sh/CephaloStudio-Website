@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { mkSession } from "../model/session.js";
 import { mkSubject, addSession, removeSession, duplicateSessionInProject, addSubject, removeSubject, updateSubject } from "../model/project.js";
-import { Btn, Tag, InfoBox } from "../ui.jsx";
+import { Btn, Tag, InfoBox } from "../ui/ui.jsx";
 import BatchImportModal from "./BatchImportModal.jsx";
 import SessionMetadataModal from "./SessionMetadataModal.jsx";
 import PanelGuideModal from "./PanelGuideModal.jsx";

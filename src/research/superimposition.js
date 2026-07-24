@@ -4,7 +4,7 @@
 // multi-timepoint longitudinal analysis, and group-level research.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { vpts, angle3pt, computeMeasurements } from "../utils.js";
+import { vpts, angle3pt, computeMeasurements } from "../lib/utils.js";
 
 // ─── Structural reference planes ─────────────────────────────────────────────
 

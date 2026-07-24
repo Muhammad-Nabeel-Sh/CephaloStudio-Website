@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { MarkupsPanel } from "../panels.jsx";
+import { MarkupsPanel } from "../panels/MarkupsPanel.jsx";
 
 describe("MarkupsPanel", () => {
   const defaultProps = {

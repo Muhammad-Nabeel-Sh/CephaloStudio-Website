@@ -2,16 +2,16 @@
 // CONSTANTS - Themes, Tools, Predefined Analyses
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import smvCsv from "../Data/SMV.csv?raw";
-import opgCsv from "../Data/OPG.csv?raw";
-import lateralCsv from "../Data/LateralCeph.csv?raw";
-import paCsv from "../Data/PA_Ceph.csv?raw";
-import handwristCsv from "../Data/HandWrist.csv?raw";
-import photolateralCsv from "../Data/Photo_Lateral.csv?raw";
-import photofrontalCsv from "../Data/Photo_Frontal.csv?raw";
-import airwayCsv from "../Data/Airway.csv?raw";
-import analysisMeasurementsCsv from "../Data/AnalysisMeasurements.csv?raw";
-import { parseAnalysisCsv } from "./csvParser.js";
+import smvCsv from "../../Data/SMV.csv?raw";
+import opgCsv from "../../Data/OPG.csv?raw";
+import lateralCsv from "../../Data/LateralCeph.csv?raw";
+import paCsv from "../../Data/PA_Ceph.csv?raw";
+import handwristCsv from "../../Data/HandWrist.csv?raw";
+import photolateralCsv from "../../Data/Photo_Lateral.csv?raw";
+import photofrontalCsv from "../../Data/Photo_Frontal.csv?raw";
+import airwayCsv from "../../Data/Airway.csv?raw";
+import analysisMeasurementsCsv from "../../Data/AnalysisMeasurements.csv?raw";
+import { parseAnalysisCsv } from "../report/csvParser.js";
 import { DEFAULT_NORMS } from "./norms.js";
 
 const _smvAnalyses = parseAnalysisCsv(smvCsv);

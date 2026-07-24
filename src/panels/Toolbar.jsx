@@ -1,5 +1,5 @@
-import { clamp } from "../utils.js";
-import ToolBtn from "../ToolBtn.jsx";
+import { clamp } from "../lib/utils.js";
+import ToolBtn from "../ui/ToolBtn.jsx";
 
 export default function Toolbar({
   activeTool, theme, t, dispatch, setActiveTool,

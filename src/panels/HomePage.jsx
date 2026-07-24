@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
-import { THEMES } from "../constants.js";
-import { Btn, Tag } from "../ui.jsx";
-import { onEnter } from "../utils.js";
+import { THEMES } from "../data/constants.js";
+import { Btn, Tag } from "../ui/ui.jsx";
+import { onEnter } from "../lib/utils.js";
 import StartupWizard from "./StartupWizard.jsx";
 
 function NewCaseForm({t,onSubmit,onCancel}){

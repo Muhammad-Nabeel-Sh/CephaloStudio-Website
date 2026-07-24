@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { InfoBox } from "../ui.jsx";
+import { InfoBox } from "../ui/ui.jsx";
 
 function uid() {
   return Math.random().toString(36).slice(2, 10);

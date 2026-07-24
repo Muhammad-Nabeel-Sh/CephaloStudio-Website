@@ -1,8 +1,4 @@
 /* eslint-disable react-refresh/only-export-components */
-// ═══════════════════════════════════════════════════════════════════════════════
-// HOOKS - Custom React hooks
-// ═══════════════════════════════════════════════════════════════════════════════
-
 import { useEffect, useRef } from "react";
 // KaTeX is now BUNDLED from the npm package (was loaded at runtime from
 // cdnjs.cloudflare.com with no integrity/SRI — a supply-chain and offline

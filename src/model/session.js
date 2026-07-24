@@ -1,4 +1,4 @@
-import { uid } from "../utils.js";
+import { uid } from "../lib/utils.js";
 
 export function mkSession(opts = {}) {
   return {

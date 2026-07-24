@@ -1,5 +1,5 @@
 import { Component } from "react";
-import { logError } from "./logger.js";
+import { logError } from "../lib/logger.js";
 
 const STORAGE_KEY = "cephalometry_projects";
 

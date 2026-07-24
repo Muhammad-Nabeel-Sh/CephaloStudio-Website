@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { mkSession } from "../model/session.js";
 import { addSession, removeSession } from "../model/project.js";
-import { onEnter } from "../utils.js";
+import { onEnter } from "../lib/utils.js";
 
 export default function SessionFilmstrip({ project, t, onUpdateProject }) {
   const sessions = project?.sessions || [];

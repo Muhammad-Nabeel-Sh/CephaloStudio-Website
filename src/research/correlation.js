@@ -1,5 +1,5 @@
 import { collectMeasurements, pivotMeasurements } from "./collect.js";
-import { shapiroWilk as swFromUtils, tDistributeCDF, fCDF, chi2CDF } from "../utils.js";
+import { shapiroWilk as swFromUtils, tDistributeCDF, fCDF, chi2CDF } from "../lib/utils.js";
 import { delongAUC_CI } from "./diagnostic.js";
 import { normalCdf, benjaminiHochberg, matInverse, matMul, matVecMul, transposeMatrix, dot, addIntercept } from "./statsCore.js";
 

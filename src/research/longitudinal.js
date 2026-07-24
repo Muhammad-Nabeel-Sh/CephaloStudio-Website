@@ -1,7 +1,7 @@
-import { computeMeasurements, mean, stdev, variance, tTestPaired, fCDF, chi2CDF, tDistributeCDF, clamp } from "../utils.js";
+import { computeMeasurements, mean, stdev, variance, tTestPaired, fCDF, chi2CDF, tDistributeCDF, clamp } from "../lib/utils.js";
 import { matInverse } from "./statsCore.js";
 import { checkLongitudinalTimeSeparation } from "./validation.js";
-import { logError } from "../logger.js";
+import { logError } from "../lib/logger.js";
 
 // ─── Matrix helpers ─────────────────────────────────────────────────────────
 function sum(arr) {

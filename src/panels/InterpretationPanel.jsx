@@ -1,6 +1,6 @@
 import { useMemo, useState, useRef, useCallback } from "react";
-import { generateInterpretation } from "../interpretation.js";
-import { deviationColor } from "../utils.js";
+import { generateInterpretation } from "../lib/interpretation.js";
+import { deviationColor } from "../lib/utils.js";
 import PanelGuideModal from "./PanelGuideModal.jsx";
 
 const CATEGORY_ORDER = ["skeletal", "dental", "soft-tissue", "airway", "other"];

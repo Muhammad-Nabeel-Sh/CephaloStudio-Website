@@ -1,6 +1,6 @@
-import { computeMeasurements, mean, stdev, variance, shapiroWilk, oneWayAnova, tTestPaired, tDistributeCDF, fCDF, chi2CDF } from "../utils.js";
+import { computeMeasurements, mean, stdev, variance, shapiroWilk, oneWayAnova, tTestPaired, tDistributeCDF, fCDF, chi2CDF } from "../lib/utils.js";
 import { normalCdf, matMul, matInverse, benjaminiHochberg } from "./statsCore.js";
-import { logError } from "../logger.js";
+import { logError } from "../lib/logger.js";
 
 // ─── Statistical helpers ──────────────────────────────────────────────────
 function rankArray(arr) {

@@ -1,7 +1,7 @@
-import { clamp, dist, angle3pt, angle4pt, perpDist, polyArea, polyLen, vpts, catmullRom, splineArea, splineLen, getInfiniteLinePoints, projectedDistance, fitEllipse, circleFrom3pts, autoControlPoints, distToMultiBezier, distToEllipse, distToArc } from "./utils.js";
-import { SILHOUETTES } from "./silhouettes.js";
-import { LUT_PRESETS } from "./constants.js";
-import { AIRWAY_NORMS } from "./norms.js";
+import { clamp, dist, angle3pt, angle4pt, perpDist, polyArea, polyLen, vpts, catmullRom, splineArea, splineLen, getInfiniteLinePoints, projectedDistance, fitEllipse, circleFrom3pts, autoControlPoints, distToMultiBezier, distToEllipse, distToArc } from "../lib/utils.js";
+import { SILHOUETTES } from "../data/silhouettes.js";
+import { LUT_PRESETS } from "../data/constants.js";
+import { AIRWAY_NORMS } from "../data/norms.js";
 
 function isReproPointVisible(m, reproCollecting){
   if(!reproCollecting || !m.repro) return true;

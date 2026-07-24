@@ -1,4 +1,4 @@
-import { uid } from "../utils.js";
+import { uid } from "../lib/utils.js";
 import { mkSession, duplicateSession } from "./session.js";
 
 export function mkSubject(opts = {}) {
