@@ -655,13 +655,28 @@ export function computeLinearChanges(srcMarkups, dstMarkups, calibration) {
 // FULL SUPERIMPOSITION ANALYSIS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export function runSuperimposition(baseMarkups, compareMarkups, config, calibration) {
-  const { method, planePoint1, planePoint2, labelFilter } = config || {};
-  const pxPerMm = calibration?.done ? calibration.pxPerMm : 0;
+export function runSuperimposition(baseMarkups, compareMarkups, config) {
+  const { method, planePoint1, planePoint2, labelFilter, basePxPerMm, compPxPerMm } = config || {};
+
+  // Normalize both sessions to physical mm using their own calibrations
+  // This prevents magnification mismatch when T1 and T2 have different pxPerMm
+  function scalePts(markups, pxPerMm) {
+    if (pxPerMm <= 0) return markups;
+    return markups.map(m => {
+      if (!m.points) return m;
+      const inv = 1 / pxPerMm;
+      return { ...m, points: m.points.map(p => ({ x: p.x * inv, y: p.y * inv })) };
+    });
+  }
+  const baseNorm = basePxPerMm > 0 ? scalePts(baseMarkups, basePxPerMm) : baseMarkups;
+  const compNorm = compPxPerMm > 0 ? scalePts(compareMarkups, compPxPerMm) : compareMarkups;
+  // After normalization, coordinates are in mm — pxPerMm becomes 1
+  const normCal = { done: true, pxPerMm: 1 };
+  const pxPerMm = 1;
 
   const filterSet = labelFilter?.length > 0 ? new Set(labelFilter) : null;
-  const baseF = filterSet ? baseMarkups.filter(m => filterSet.has(m.label)) : baseMarkups;
-  const compF = filterSet ? compareMarkups.filter(m => filterSet.has(m.label)) : compareMarkups;
+  const baseF = filterSet ? baseNorm.filter(m => filterSet.has(m.label)) : baseNorm;
+  const compF = filterSet ? compNorm.filter(m => filterSet.has(m.label)) : compNorm;
 
   const { srcPts, dstPts, matched } = matchLandmarks(compF, baseF);
 
@@ -697,7 +712,7 @@ export function runSuperimposition(baseMarkups, compareMarkups, config, calibrat
   const angularChanges = computeAngularChanges(compF, baseF);
 
   // Linear changes
-  const linearChanges = computeLinearChanges(compF, baseF, calibration);
+  const linearChanges = computeLinearChanges(compF, baseF, normCal);
 
   // Rotation tracking (item 5)
   const rotationTracking = computeRotationTracking(baseF, compF, transform);
@@ -786,7 +801,11 @@ export function runLongitudinalSuperimposition(sessions, config, calibration) {
     const compSession = orderedSessions[i];
     const compMarkups = (compSession.markups || []).filter(m => m.visible !== false && m.placed !== false);
 
-    const result = runSuperimposition(baseMarkups, compMarkups, { method, planePoint1, planePoint2 }, baseSession.calibration?.done ? baseSession.calibration : calibration);
+    const result = runSuperimposition(baseMarkups, compMarkups, {
+      method, planePoint1, planePoint2,
+      basePxPerMm: baseSession.calibration?.done ? baseSession.calibration.pxPerMm : (calibration?.pxPerMm || 0),
+      compPxPerMm: compSession.calibration?.done ? compSession.calibration.pxPerMm : (calibration?.pxPerMm || 0),
+    }, baseSession.calibration?.done ? baseSession.calibration : calibration);
 
     pairwiseResults.push({
       sessionIndex: i,
@@ -900,6 +919,9 @@ export function runSuperimpositionAll(sessions, config, calibration) {
   const baseMarkups = (baseSession.markups || []).filter(m => m.visible !== false && m.placed !== false);
   const compareMarkups = (compareSession.markups || []).filter(m => m.visible !== false && m.placed !== false);
 
+  const baseCal = baseSession.calibration?.done ? baseSession.calibration : calibration;
+  const compCal = compareSession.calibration?.done ? compareSession.calibration : calibration;
+
   const result = runSuperimposition(baseMarkups, compareMarkups, {
     method: method || "procrustes",
     planePoint1,
@@ -908,7 +930,9 @@ export function runSuperimpositionAll(sessions, config, calibration) {
     sex: config.sex,
     ageStart: config.ageStart,
     ageEnd: config.ageEnd,
-  }, baseSession.calibration?.done ? baseSession.calibration : calibration);
+    basePxPerMm: baseCal?.pxPerMm || 0,
+    compPxPerMm: compCal?.pxPerMm || 0,
+  }, baseCal);
 
   return {
     ...result,
