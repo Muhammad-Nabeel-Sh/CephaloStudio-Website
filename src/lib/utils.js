@@ -39,6 +39,14 @@ export const perpDist = (pt, a, b) => {
   return den < 1e-9 ? 0 : num / den;
 };
 
+export const distToSeg = (p, a, b) => {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq < 1e-9) return dist(p, a);
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq));
+  return dist(p, { x: a.x + t * dx, y: a.y + t * dy });
+};
+
 export const polyArea = pts => {
   let a = 0;
   for (let i = 0, j = pts.length - 1; i < pts.length; j = i++)
@@ -195,6 +203,24 @@ export const catmullRom = (ctx, pts, closed = false) => {
   if (closed) ctx.closePath();
 };
 
+export const sampleCatmullRom = (pts, closed = false) => {
+  if (pts.length < 2) return pts.slice();
+  const ext = closed ? [pts[pts.length - 1], ...pts, pts[0], pts[1]] : [pts[0], ...pts, pts[pts.length - 1], pts[pts.length - 1]];
+  const out = [pts[0]];
+  const N = closed ? pts.length : pts.length - 1;
+  for (let i = 1; i <= N; i++) {
+    const p0 = ext[i - 1], p1 = ext[i], p2 = ext[i + 1] || ext[ext.length - 1], p3 = ext[i + 2] || ext[ext.length - 1];
+    for (let j = 1; j <= 12; j++) {
+      const t = j / 12, t2 = t * t, t3 = t2 * t;
+      out.push({
+        x: 0.5 * ((2 * p1.x) + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
+        y: 0.5 * ((2 * p1.y) + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3),
+      });
+    }
+  }
+  return out;
+};
+
 export const projectedDistance = (ptA, ptB, lineP1, lineP2) => {
   const dx = lineP2.x - lineP1.x, dy = lineP2.y - lineP1.y;
   const len2 = dx * dx + dy * dy;
@@ -211,34 +237,49 @@ export const perpPoint = (p, a, b) => {
   return { x: a.x + t * dx, y: a.y + t * dy };
 };
 
-export const snapPoint = (ip, markups, r, enabled) => {
-  if (!enabled) return ip;
-  let best = ip, bestD = r;
-  for (const m of markups) {
-    if (m.visible === false) continue;
-    for (const p of (m.points || [])) {
-      if (p.x < -9000) continue;
-      const d = dist(p, ip);
-      if (d < bestD) { bestD = d; best = p; }
+export function sampleCurvePoints(pts, n) {
+  if (!pts || pts.length < 2) return pts || [];
+  const lens = [0];
+  for (let i = 1; i < pts.length; i++) lens.push(lens[i - 1] + dist(pts[i - 1], pts[i]));
+  const totalLen = lens[lens.length - 1];
+  if (totalLen < 1e-9) return [pts[0]];
+  const samples = [];
+  for (let i = 0; i <= n; i++) {
+    const target = (i / n) * totalLen;
+    let seg = 0;
+    for (let j = 1; j < lens.length; j++) {
+      if (lens[j] >= target) { seg = j - 1; break; }
+      if (j === lens.length - 1) seg = j - 1;
     }
+    const segLen = lens[seg + 1] - lens[seg];
+    const t = segLen < 1e-9 ? 0 : (target - lens[seg]) / segLen;
+    samples.push({ x: pts[seg].x + t * (pts[seg + 1].x - pts[seg].x), y: pts[seg].y + t * (pts[seg + 1].y - pts[seg].y) });
   }
-  return { ...best };
-};
+  return samples;
+}
 
-export const snapToLine = (ip, markups, r) => {
-  let bestPt = ip, bestD = r;
+export const snapPoint = (ip, markups, r, enabled) => {
+  if (!enabled || (!enabled.points && !enabled.lines)) return ip;
+  let best = ip, bestD = r;
+
   for (const m of markups) {
     if (m.visible === false) continue;
-    if (m.type === "line" || m.type === "parallel") {
-      const vp = m.points.filter(p => p.x > -9000);
-      if (vp.length >= 2) {
-        const pr = perpPoint(ip, vp[0], vp[1]);
-        const d = dist(pr, ip);
-        if (d < bestD) { bestD = d; bestPt = pr; }
+    const vp = vpts(m);
+
+    if (enabled.points) {
+      for (const p of vp) {
+        const d = dist(p, ip);
+        if (d < bestD) { bestD = d; best = p; }
       }
     }
+
+    if (enabled.lines && (m.type === "line" || m.type === "parallel") && vp.length >= 2) {
+      const pr = perpPoint(ip, vp[0], vp[1]);
+      const d = dist(pr, ip);
+      if (d < bestD) { bestD = d; best = pr; }
+    }
   }
-  return { ...bestPt };
+  return best === ip ? ip : { ...best };
 };
 
 export const alignOnePoint = (src, dst) => ({ tx: dst.x - src.x, ty: dst.y - src.y, rot: 0, scale: 1 });

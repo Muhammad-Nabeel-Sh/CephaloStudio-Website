@@ -11,7 +11,6 @@ import {
   vpts,
   computeMeasurements,
   snapPoint,
-  snapToLine,
   perpPoint,
   projectedDistance,
   calculateICC,
@@ -40,6 +39,7 @@ import {
   getMissingVars,
   ellipseFromAxes,
   mirrorPoint,
+  sampleCurvePoints,
 } from "../lib/utils.js";
 
 // ═════════════════════════════════════════════════════════════════
@@ -215,30 +215,75 @@ describe("snapPoint", () => {
     { type: "point", label: "N", points: [{ x: 100, y: 200 }], visible: true },
     { type: "point", label: "S", points: [{ x: 300, y: 400 }], visible: true },
   ];
+  const snap = { points: true, lines: true };
+  const snapPts = { points: true, lines: false };
+  const snapLn = { points: false, lines: true };
 
   it("snaps to nearest point within radius", () => {
-    const result = snapPoint({ x: 101, y: 201 }, markups, 5, true);
+    const result = snapPoint({ x: 101, y: 201 }, markups, 5, snap);
     expect(result).toEqual({ x: 100, y: 200 });
   });
 
   it("returns input if no point is close", () => {
-    const result = snapPoint({ x: 0, y: 0 }, markups, 5, true);
+    const result = snapPoint({ x: 0, y: 0 }, markups, 5, snap);
     expect(result).toEqual({ x: 0, y: 0 });
   });
 
   it("returns input if snap is disabled", () => {
-    const result = snapPoint({ x: 101, y: 201 }, markups, 5, false);
+    const result = snapPoint({ x: 101, y: 201 }, markups, 5, { points: false, lines: false });
     expect(result).toEqual({ x: 101, y: 201 });
+  });
+
+  it("ignores points when only line snap is enabled", () => {
+    const result = snapPoint({ x: 101, y: 201 }, markups, 5, snapLn);
+    expect(result).toEqual({ x: 101, y: 201 });
+  });
+
+  it("ignores lines when only point snap is enabled", () => {
+    const lineMarkups = [{ type: "line", points: [{ x: 0, y: 0 }, { x: 10, y: 0 }], visible: true }];
+    const result = snapPoint({ x: 5, y: 3 }, lineMarkups, 2, snapPts);
+    expect(result).toEqual({ x: 5, y: 3 });
   });
 });
 
 describe("snapToLine", () => {
-  it("snaps to nearest point on a line", () => {
+  const snap = { points: true, lines: true };
+
+  it("snaps to nearest point on a line via snapPoint", () => {
     const markups = [
       { type: "line", points: [{ x: 0, y: 0 }, { x: 10, y: 0 }], visible: true },
     ];
-    const result = snapToLine({ x: 5, y: 3 }, markups, 10);
+    const result = snapPoint({ x: 5, y: 3 }, markups, 10, snap);
     expect(result.x).toBeCloseTo(5, 5);
+    expect(result.y).toBeCloseTo(0, 5);
+  });
+
+  it("snaps perpendicular to a parallel markup", () => {
+    const markups = [
+      { type: "parallel", points: [{ x: 0, y: 5 }, { x: 10, y: 5 }], visible: true },
+    ];
+    const result = snapPoint({ x: 5, y: 8 }, markups, 10, snap);
+    expect(result.x).toBeCloseTo(5, 5);
+    expect(result.y).toBeCloseTo(5, 5);
+  });
+
+  it("prefers point snap over line snap when closer to point", () => {
+    const markups = [
+      { type: "line", points: [{ x: 0, y: 0 }, { x: 100, y: 0 }], visible: true },
+      { type: "point", points: [{ x: 50, y: 1.5 }], visible: true },
+    ];
+    const result = snapPoint({ x: 50, y: 1 }, markups, 10, snap);
+    expect(result.x).toBeCloseTo(50, 5);
+    expect(result.y).toBeCloseTo(1.5, 5);
+  });
+
+  it("snaps to line when closer than any point", () => {
+    const markups = [
+      { type: "line", points: [{ x: 0, y: 0 }, { x: 100, y: 0 }], visible: true },
+      { type: "point", points: [{ x: 50, y: 8 }], visible: true },
+    ];
+    const result = snapPoint({ x: 50, y: 1 }, markups, 10, snap);
+    expect(result.x).toBeCloseTo(50, 5);
     expect(result.y).toBeCloseTo(0, 5);
   });
 });
@@ -771,5 +816,44 @@ describe("mirrorPoint", () => {
     const result = mirrorPoint({ x: 5, y: 0 }, { x: 0, y: 0 }, { x: 10, y: 0 });
     expect(result.x).toBeCloseTo(5, 5);
     expect(result.y).toBeCloseTo(0, 5);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════
+// sampleCurvePoints
+// ═════════════════════════════════════════════════════════════════
+
+describe("sampleCurvePoints", () => {
+  it("returns empty for null/empty input", () => {
+    expect(sampleCurvePoints(null, 5)).toEqual([]);
+    expect(sampleCurvePoints([], 5)).toEqual([]);
+  });
+
+  it("returns single point for single-point input", () => {
+    expect(sampleCurvePoints([{ x: 1, y: 1 }], 5)).toEqual([{ x: 1, y: 1 }]);
+  });
+
+  it("samples evenly along a straight line", () => {
+    const pts = [{ x: 0, y: 0 }, { x: 10, y: 0 }];
+    const samples = sampleCurvePoints(pts, 4);
+    expect(samples).toHaveLength(5);
+    expect(samples[0]).toEqual({ x: 0, y: 0 });
+    expect(samples[2].x).toBeCloseTo(5, 5);
+    expect(samples[4]).toEqual({ x: 10, y: 0 });
+  });
+
+  it("samples along an L-shaped path", () => {
+    const pts = [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 10 }];
+    const samples = sampleCurvePoints(pts, 4);
+    expect(samples).toHaveLength(5);
+    expect(samples[0]).toEqual({ x: 0, y: 0 });
+    expect(samples[4]).toEqual({ x: 10, y: 10 });
+  });
+
+  it("handles coincident points without crashing", () => {
+    const pts = [{ x: 5, y: 5 }, { x: 5, y: 5 }];
+    const samples = sampleCurvePoints(pts, 3);
+    expect(samples).toHaveLength(1);
+    expect(samples[0].x).toBeCloseTo(5, 5);
   });
 });

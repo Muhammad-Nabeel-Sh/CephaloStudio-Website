@@ -1,4 +1,4 @@
-import { clamp, dist, angle3pt, angle4pt, perpDist, polyArea, polyLen, vpts, catmullRom, splineArea, splineLen, getInfiniteLinePoints, projectedDistance, ellipseFromAxes, circleFrom3pts, autoControlPoints, distToMultiBezier, distToEllipse, distToArc } from "../lib/utils.js";
+import { clamp, dist, angle3pt, angle4pt, perpDist, polyArea, polyLen, vpts, catmullRom, sampleCatmullRom, splineArea, splineLen, getInfiniteLinePoints, projectedDistance, ellipseFromAxes, circleFrom3pts, autoControlPoints, distToMultiBezier, distToEllipse, distToArc, perpPoint, distToSeg } from "../lib/utils.js";
 import { SILHOUETTES } from "../data/silhouettes.js";
 import { LUT_PRESETS } from "../data/constants.js";
 import { AIRWAY_NORMS } from "../data/norms.js";
@@ -1269,7 +1269,7 @@ export function drawLUTLegend(ctx, lutMode, lutInvert, cw, ch, t){
   ctx.restore();
 }
 
-export function drawSnapIndicator(ctx, sn, zoom, pan, markups, mouseImg, snapRadius){
+export function drawSnapIndicator(ctx, sn, zoom, pan, markups, mouseImg, snapRadius, snapEnabled){
   const sx = sn.x * zoom + pan.x;
   const sy = sn.y * zoom + pan.y;
   
@@ -1293,14 +1293,35 @@ export function drawSnapIndicator(ctx, sn, zoom, pan, markups, mouseImg, snapRad
     ctx.lineWidth = 1.5;
     for(const m of markups){
       if(m.visible === false) continue;
-      for(const p of (m.points || [])){
-        if(p.x < -9000) continue;
-        const dx = p.x - mouseImg.x, dy = p.y - mouseImg.y;
-        if(Math.sqrt(dx*dx + dy*dy) < snapRadius){
-          const psx = p.x * zoom + pan.x, psy = p.y * zoom + pan.y;
+      const vp = vpts(m);
+
+      if(snapEnabled?.points){
+        for(const p of vp){
+          const dx = p.x - mouseImg.x, dy = p.y - mouseImg.y;
+          if(Math.sqrt(dx*dx + dy*dy) < snapRadius){
+            const psx = p.x * zoom + pan.x, psy = p.y * zoom + pan.y;
+            ctx.beginPath();
+            ctx.arc(psx, psy, 8, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+        }
+      }
+
+      if(snapEnabled?.lines && (m.type === "line" || m.type === "parallel") && vp.length >= 2){
+        const pr = perpPoint(mouseImg, vp[0], vp[1]);
+        const d = dist(pr, mouseImg);
+        if(d < snapRadius){
+          const psx = pr.x * zoom + pan.x, psy = pr.y * zoom + pan.y;
           ctx.beginPath();
           ctx.arc(psx, psy, 8, 0, Math.PI * 2);
           ctx.stroke();
+          const x1 = vp[0].x * zoom + pan.x, y1 = vp[0].y * zoom + pan.y;
+          const x2 = vp[1].x * zoom + pan.x, y2 = vp[1].y * zoom + pan.y;
+          ctx.strokeStyle = "#ffd700" + "55";
+          ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+          ctx.strokeStyle = "#ffd700" + "33";
+          ctx.lineWidth = 1.5;
         }
       }
     }
@@ -1790,15 +1811,19 @@ export function hitTest(markups, ip, zoom, reproCollecting){
     if(m.type === "point" && m.repro && !isReproPointVisible(m, reproCollecting)) continue;
     
     const vp = vpts(m);
-    if((m.type === "line" || m.type === "parallel" || m.type === "ruler") && vp.length >= 2 && perpDist(ip, vp[0], vp[1]) < thr) return m.id;
+    if((m.type === "line" || m.type === "parallel" || m.type === "ruler") && vp.length >= 2 && distToSeg(ip, vp[0], vp[1]) < thr) return m.id;
     if((m.type === "angle3" || m.type === "angle4") && vp.some(p => dist(p, ip) < thr * 2)) return m.id;
     if((m.type === "polygon" || m.type === "curve" || m.type === "polyline") && vp.length >= 2){
-      for(let j = 1; j < vp.length; j++){
-        if(perpDist(ip, vp[j-1], vp[j]) < thr && dist(ip, vp[j-1]) < dist(vp[j-1], vp[j]) + thr) return m.id;
+      const isClosed = m.type === "polygon";
+      const useSpline = m.curveStyle === "bspline" && vp.length >= 3;
+      const segs = useSpline ? sampleCatmullRom(vp, isClosed) : vp;
+      const n = isClosed ? segs.length : segs.length - 1;
+      for(let j = 0; j < n; j++){
+        if(distToSeg(ip, segs[j], segs[(j + 1) % segs.length]) < thr) return m.id;
       }
     }
-    if(m.type === "perp" && vp.length >= 2 && perpDist(ip, vp[0], vp[1]) < thr) return m.id;
-    if(m.type === "projDist" && vp.length >= 4 && perpDist(ip, vp[2], vp[3]) < thr) return m.id;
+    if(m.type === "perp" && vp.length >= 2 && distToSeg(ip, vp[0], vp[1]) < thr) return m.id;
+    if(m.type === "projDist" && vp.length >= 4 && distToSeg(ip, vp[2], vp[3]) < thr) return m.id;
     if(m.type === "perp" && vp.length >= 3 && dist(vp[2], ip) < thr * 2) return m.id;
     if(m.type === "text" && vp.length && dist(vp[0], ip) < thr * 4) return m.id;
     if(m.type === "silhouette" && silhouetteHitTest(m, ip, zoom)) return m.id;
@@ -1820,7 +1845,7 @@ export function hitTest(markups, ip, zoom, reproCollecting){
       const d = distToMultiBezier(ip, vp, cp);
       if(d < thr) return m.id;
     }
-    if(m.type === "tangent" && vp.length >= 2 && perpDist(ip, vp[0], vp[1]) < thr) return m.id;
+    if(m.type === "tangent" && vp.length >= 2 && distToSeg(ip, vp[0], vp[1]) < thr) return m.id;
     if(m.type === "concentric" && vp.length >= 3){
       const c = circleFrom3pts(vp[0], vp[1], vp[2]);
       if(c){

@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from "react";
 import { THEMES } from "../data/constants.js";
 import { hasUnanonymizedPHI } from "../report/anonymize.js";
 import { Btn, Tag } from "../ui/ui.jsx";
@@ -13,8 +14,20 @@ export default function TopBar({
   imgRefs,
   setTheme,
 }) {
+  const [snapDrop, setSnapDrop] = useState(false);
+  const [snapRect, setSnapRect] = useState(null);
+  const snapRef = useRef(null);
+  useEffect(() => {
+    if (!snapDrop) return;
+    if (snapRef.current) setSnapRect(snapRef.current.getBoundingClientRect());
+    const fn = e => { if (snapRef.current && !snapRef.current.contains(e.target)) setSnapDrop(false); };
+    window.addEventListener("mousedown", fn);
+    return () => window.removeEventListener("mousedown", fn);
+  }, [snapDrop]);
+  const anySnap = snapEnabled.points || snapEnabled.lines;
+  const toggleSnap = (key) => dispatch({ type: "SET", payload: { snapEnabled: { ...snapEnabled, [key]: !snapEnabled[key] } } });
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 10px 5px", height: isMobile ? 42 : 46, background: t.surf, flexShrink: 0, overflowX: "auto" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 10px 5px", height: isMobile ? 42 : 46, background: t.surf, flexShrink: 0, overflowX: "auto", position: "relative", zIndex: 10 }}>
       <button onClick={onHome} title="Back to Home" style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, padding: "4px 8px", borderRadius: 6, flexShrink: 0, color: t.tx }}>
         <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M240-200h120v-240h240v240h120v-360L480-740 240-560v360Zm-80 80v-480l320-240 320 240v480H520v-240h-80v240H160Zm320-350Z" /></svg>
       </button>
@@ -29,9 +42,22 @@ export default function TopBar({
       {placingMode && <Tag color={t.warn}>📍 {placingIdx + 1}/{placingQueue.length}</Tag>}
       <div style={{ flex: 1 }} />
       {!isMobile && <>
-        <Btn ghost t={t} small active={snapEnabled} title="Snap to grid" onClick={() => dispatch({ type: "SET", payload: { snapEnabled: !snapEnabled } })}>
-          <svg fill={t.tx} width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M21.7,12.818a1.022,1.022,0,0,1,0,1.445L20.154,15.81l-3.589-3.589,1.547-1.548a1.022,1.022,0,0,1,1.444,0ZM9.737,2.3,8.19,3.846l3.59,3.589,1.546-1.547a1.021,1.021,0,0,0,0-1.444L11.181,2.3A1.021,1.021,0,0,0,9.737,2.3ZM4.478,19.522a8.458,8.458,0,0,0,11.963,0l2.269-2.268-3.589-3.589-2.269,2.268a3.384,3.384,0,0,1-4.785-4.785l2.269-2.269L6.747,5.29,4.478,7.559A8.458,8.458,0,0,0,4.478,19.522Z" /></svg>
-        </Btn>
+        <div ref={snapRef} style={{ position: "relative" }}>
+          <Btn ghost t={t} small active={anySnap} title="Snap settings" onClick={() => setSnapDrop(v => !v)}>
+            <svg fill={t.tx} width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M21.7,12.818a1.022,1.022,0,0,1,0,1.445L20.154,15.81l-3.589-3.589,1.547-1.548a1.022,1.022,0,0,1,1.444,0ZM9.737,2.3,8.19,3.846l3.59,3.589,1.546-1.547a1.021,1.021,0,0,0,0-1.444L11.181,2.3A1.021,1.021,0,0,0,9.737,2.3ZM4.478,19.522a8.458,8.458,0,0,0,11.963,0l2.269-2.268-3.589-3.589-2.269,2.268a3.384,3.384,0,0,1-4.785-4.785l2.269-2.269L6.747,5.29,4.478,7.559A8.458,8.458,0,0,0,4.478,19.522Z" /></svg>
+          </Btn>
+          {snapDrop && snapRect && <div style={{ position: "fixed", top: snapRect.bottom + 4, right: window.innerWidth - snapRect.right, background: t.surf2, border: `1px solid ${t.bdr}`, borderRadius: 8, padding: "6px 0", minWidth: 160, zIndex: 9999, boxShadow: "0 4px 16px rgba(0,0,0,0.25)" }}>
+            <div style={{ padding: "4px 12px", fontSize: 11, color: t.tx3, fontWeight: 600, letterSpacing: 0.5 }}>SNAP TO</div>
+            {[["points", "Points"], ["lines", "Lines"]].map(([key, label]) => (
+              <button key={key} onClick={() => toggleSnap(key)} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "6px 12px", background: "none", border: "none", cursor: "pointer", color: t.tx, fontSize: 13 }}>
+                <span style={{ width: 16, height: 16, borderRadius: 4, border: `1.5px solid ${snapEnabled[key] ? t.acc : t.tx3}`, background: snapEnabled[key] ? t.acc : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  {snapEnabled[key] && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
+                </span>
+                {label}
+              </button>
+            ))}
+          </div>}
+        </div>
         <Btn ghost t={t} small active={showScaleBar} title="Toggle scale bar" onClick={() => dispatch({ type: "SET", payload: { showScaleBar: !showScaleBar } })}>
           <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M160-240q-33 0-56.5-23.5T80-320v-320q0-33 23.5-56.5T160-720h640q33 0 56.5 23.5T880-640v320q0 33-23.5 56.5T800-240H160Zm0-80h640v-320H680v160h-80v-160h-80v160h-80v-160h-80v160h-80v-160H160v320Zm120-160h80-80Zm160 0h80-80Zm160 0h80-80Zm-120 0Z" /></svg>
         </Btn>

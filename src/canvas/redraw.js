@@ -308,9 +308,9 @@ export function createRedraw(dc) {
     if (currentDraw) dc.drawInProgress(ctx2d, currentDraw, mousePos, zoom, pan, t);
 
     // ── Snap indicator ──
-    if (snapEnabled && snapPos) {
+    if ((snapEnabled.points || snapEnabled.lines) && snapPos) {
       const _mouseImg = { x: (mousePos.x - pan.x) / zoom, y: (mousePos.y - pan.y) / zoom };
-      dc.drawSnapIndicator(ctx2d, snapPos, zoom, pan, drawMarkups, _mouseImg, 12 / zoom);
+      dc.drawSnapIndicator(ctx2d, snapPos, zoom, pan, drawMarkups, _mouseImg, 12 / zoom, snapEnabled);
     }
 
     // ── Box select rectangle ──

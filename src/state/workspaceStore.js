@@ -11,7 +11,7 @@ export const INITIAL_UI = {
   replacingId: null,
   currentDraw: null,
   activeTool: "select",
-  snapEnabled: true,
+  snapEnabled: { points: true, lines: true },
   showScaleBar: false,
   showDefTooltips: true,
   showLUT: false,
