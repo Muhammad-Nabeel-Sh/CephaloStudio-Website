@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } from "react";
-import { THEMES, TOOLS, PREDEFINED, LUT_PRESETS } from "./data/constants.js";
+import { THEMES, PREDEFINED, LUT_PRESETS } from "./data/constants.js";
+import { KEYBINDINGS } from "./data/keybindings.js";
 import { SILHOUETTES } from "./data/silhouettes.js";
 import { uid, clamp, dist, vpts, computeMeasurements, snapPoint, alignTwoPoints, buildScope, evalFormula, getMissingVars, autoControlPoints, findTangentOnCurve, snapTangentToCurve } from "./lib/utils.js";
 import { generateInterpretation } from "./lib/interpretation.js";
@@ -736,24 +737,28 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   useEffect(()=>{
     const fn=e=>{
       if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA")return;
-      if((e.ctrlKey||e.metaKey)&&e.key==="z"){undo();return;}
-      if((e.ctrlKey||e.metaKey)&&e.key==="y"){redo();return;}
-      if(e.key==="Escape"){boxSelectRectRef.current=null;dispatch({type:"SET",payload:{currentDraw:null,selectedId:null,selectedIds:[]}});if(mobileToolsExpanded)dispatch({type:"SET",payload:{mobileToolsExpanded:false}});else if(placingMode){if(placingIdx<placingQueue.length-1)dispatch({type:"SET",payload:{placingIdx:placingIdx+1}});else{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}}return;}
-      if(e.key==="F10"&&e.shiftKey){e.preventDefault();const hitMarkup=selectedId||null;setContextMenu({x:window.innerWidth/2,y:window.innerHeight/2,markupId:hitMarkup,imageX:0,imageY:0});return;}
-      if(e.key==="ContextMenu"||e.key==="Apps"){e.preventDefault();const hitMarkup=selectedId||null;setContextMenu({x:window.innerWidth/2,y:window.innerHeight/2,markupId:hitMarkup,imageX:0,imageY:0});return;}
-      const tool=TOOLS.filter(Boolean).find(t2=>t2.key===e.key.toLowerCase());
-      if(tool){dispatch({type:"SET",payload:{activeTool:tool.id}});dispatch({type:"SET",payload:{currentDraw:null}});return;}
-      if(e.key==="Backspace"&&placingMode&&placingQueue.length>0){if(placingIdx>0)dispatch({type:"SET",payload:{placingIdx:placingIdx-1}});else{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}return;}
-      if((e.key==="Delete"||e.key==="Backspace")&&(selectedId||selectedIds.length)){
-        const idsToDelete=selectedIds.length?selectedIds:selectedId?[selectedId]:[];
-        const lockedIds=new Set(markups.filter(m=>m.locked).map(m=>m.id));
-        const filtered=idsToDelete.filter(id=>!lockedIds.has(id));
-        if(filtered.length){pushUndo();updSession({markups:refreshAutoMeas(markups.filter(m=>!filtered.includes(m.id)))});}
-        dispatch({type:"SET",payload:{selectedIds:[],selectedId:null}});return;
+      const ctrl=e.ctrlKey||e.metaKey;
+      const shift=e.shiftKey;
+      const key=e.key.toLowerCase();
+      const matched=KEYBINDINGS.find(b=>{
+        if(b.ctrl&&!ctrl)return false;
+        if(b.shift&&!shift)return false;
+        return b.key===key;
+      });
+      if(matched){
+        switch(matched.id){
+          case"undo":undo();return;
+          case"redo":redo();return;
+          case"escape":{boxSelectRectRef.current=null;dispatch({type:"SET",payload:{currentDraw:null,selectedId:null,selectedIds:[]}});if(mobileToolsExpanded)dispatch({type:"SET",payload:{mobileToolsExpanded:false}});else if(placingMode){if(placingIdx<placingQueue.length-1)dispatch({type:"SET",payload:{placingIdx:placingIdx+1}});else{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}}return;}
+          case"contextMenu":{e.preventDefault();const hitMarkup=selectedId||null;setContextMenu({x:window.innerWidth/2,y:window.innerHeight/2,markupId:hitMarkup,imageX:0,imageY:0});return;}
+          case"placeUndo":{if(placingMode&&placingQueue.length>0){if(placingIdx>0)dispatch({type:"SET",payload:{placingIdx:placingIdx-1}});else{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}return;}const idsToDelete=selectedIds.length?selectedIds:selectedId?[selectedId]:[];const lockedIds=new Set(markups.filter(m=>m.locked).map(m=>m.id));const filtered=idsToDelete.filter(id=>!lockedIds.has(id));if(filtered.length){pushUndo();updSession({markups:refreshAutoMeas(markups.filter(m=>!filtered.includes(m.id)))});}dispatch({type:"SET",payload:{selectedIds:[],selectedId:null}});return;}
+          case"deleteSelected":{const idsToDelete=selectedIds.length?selectedIds:selectedId?[selectedId]:[];const lockedIds=new Set(markups.filter(m=>m.locked).map(m=>m.id));const filtered=idsToDelete.filter(id=>!lockedIds.has(id));if(filtered.length){pushUndo();updSession({markups:refreshAutoMeas(markups.filter(m=>!filtered.includes(m.id)))});}dispatch({type:"SET",payload:{selectedIds:[],selectedId:null}});return;}
+          case"zoomIn":dispatch({type:"SET",payload:{zoom:z=>clamp(z*1.15,0.05,15)}});return;
+          case"zoomOut":dispatch({type:"SET",payload:{zoom:z=>clamp(z/1.15,0.05,15)}});return;
+          case"zoomReset":{dispatch({type:"SET",payload:{zoom:1}});panRef.current={x:40,y:40};dispatch({type:"SET",payload:{pan:{x:40,y:40}}});return;}
+          case"tool":{dispatch({type:"SET",payload:{activeTool:matched.toolId}});dispatch({type:"SET",payload:{currentDraw:null}});return;}
+        }
       }
-      if(e.key==="+"||e.key==="=")dispatch({type:"SET",payload:{zoom:z=>clamp(z*1.15,0.05,15)}});
-      if(e.key==="-")dispatch({type:"SET",payload:{zoom:z=>clamp(z/1.15,0.05,15)}});
-      if(e.key==="0"){dispatch({type:"SET",payload:{zoom:1}});panRef.current={x:40,y:40};dispatch({type:"SET",payload:{pan:{x:40,y:40}}});}
     };
     window.addEventListener("keydown",fn);return()=>window.removeEventListener("keydown",fn);
   },[selectedId,selectedIds,placingMode,placingIdx,placingQueue,markups,delMarkup,redo,undo,dispatch,pushUndo,refreshAutoMeas,updSession,mobileToolsExpanded]);
