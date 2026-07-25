@@ -589,13 +589,26 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   };
   const finalizeMarkup=useCallback(draw=>finalizeMarkupRef.current(draw),[]);
 
-  const handleAirwayAddPoint=useCallback(label=>{
-    const id=uid();
-    const newMarkup={id,type:"point",points:[],label,visible:true,placed:false,color:t.acc};
+  const loadAirwayTier=useCallback((landmarkLabels)=>{
+    const airwayAnalysis=(PREDEFINED.lateral||[]).find(a=>a.name&&a.name.toLowerCase().includes("airway"));
+    const defMap={};
+    if(airwayAnalysis){airwayAnalysis.pts.forEach(pt=>{defMap[pt.l.toLowerCase()]=pt;});}
+    const newMarkups=[];
+    landmarkLabels.forEach(label=>{
+      const alreadyPlaced=markups.some(m=>m.type==="point"&&m.label?.toLowerCase()===label.toLowerCase()&&m.placed&&m.visible!==false);
+      if(alreadyPlaced)return;
+      const def=defMap[label.toLowerCase()];
+      const id=uid();
+      newMarkups.push({id,type:"point",points:[{x:-99999,y:-99999}],label,definition:def?.def||"",color:def?.color||t.acc,size:6,visible:true,placed:false});
+    });
+    if(!newMarkups.length)return;
     pushUndo();
-    updSession({markups:refreshAutoMeas([...markups,newMarkup])});
-    dispatch({type:"SET",payload:{placingMode:true,placingQueue:[id],placingIdx:0,activeTool:"point"}});
-  },[markups,t,pushUndo,updSession,refreshAutoMeas,dispatch]);
+    updSession({markups:[...markups,...newMarkups]});
+    setPlacingQueue(newMarkups.map(m=>m.id));
+    dispatch({type:"SET",payload:{placingIdx:0}});
+    dispatch({type:"SET",payload:{placingMode:true}});
+    dispatch({type:"SET",payload:{rightPanel:"airway"}});
+  },[markups,t.acc,pushUndo,updSession,setPlacingQueue,dispatch]);
 
   // load images — from dataUrl (just imported) or from IndexedDB (restored from auto-save)
   useEffect(()=>{
@@ -1147,6 +1160,13 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     onToggleVisible:id=>updMarkup(id,{visible:markups.find(m=>m.id===id)?.visible===false}),
     onToggleLock:id=>updMarkup(id,{locked:!markups.find(m=>m.id===id)?.locked}),
     onToggleLabel:id=>updMarkup(id,{noLabel:!markups.find(m=>m.id===id)?.noLabel}),
+    onToggleGroupVisible:types=>{
+      const group=markups.filter(m=>types.includes(m.type));
+      if(!group.length)return;
+      const allVisible=group.every(m=>m.visible!==false);
+      pushUndo();
+      updSession({markups:refreshAutoMeas(markups.map(m=>types.includes(m.type)?{...m,visible:allVisible?false:true}:m))});
+    },
     onStopPlacing:()=>{dispatch({type:"SET",payload:{placingMode:false,placingQueue:[],placingIdx:0}});},
     onPausePlacing:()=>dispatch({type:"SET",payload:{placingMode:false}}),
     onResumePlacing:()=>dispatch({type:"SET",payload:{placingMode:true}}),
@@ -1275,7 +1295,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
                 processing={processing} lutMode={lutMode} lutInvert={lutInvert} showLUT={showLUT} setShowLUT={setShowLUT} showScaleBar={showScaleBar} setShowScaleBar={setShowScaleBar} showHistogram={showHistogram} setShowHistogram={setShowHistogram}
                 sessionImage={sessionImage} stackImgRef={stackImgRef}
                 project={project} onUpdateProject={onUpdateProject}
-                markups={markups} handleAirwayAddPoint={handleAirwayAddPoint} showAirwayOverlay={showAirwayOverlay} setShowAirwayOverlay={setShowAirwayOverlay}
+                markups={markups} loadAirwayTier={loadAirwayTier} showAirwayOverlay={showAirwayOverlay} setShowAirwayOverlay={setShowAirwayOverlay}
                 loadTemplate={loadTemplate} patientSex={patientSex} patientAge={patientAge} canvasRef={canvasRef}
                 canvasSize={canvasSize} toImage={toImage} addMarkup={addMarkup} pushUndo={pushUndo}
               />

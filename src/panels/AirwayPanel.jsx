@@ -42,7 +42,7 @@ function fmtVal(v) {
 // COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 
-export default function AirwayPanel({ t, markups, calibration, norms, onAddPoint, onUpdateMarkups, showOverlay, onToggleOverlay, onLoadTemplate, dispatch, sex, age, canvasRef }) {
+export default function AirwayPanel({ t, markups, calibration, norms, loadAirwayTier, onUpdateMarkups, showOverlay, onToggleOverlay, onLoadTemplate, dispatch, sex, age, canvasRef }) {
   void norms;
   void onUpdateMarkups;
   const [guideKey, setGuideKey] = useState(null);
@@ -158,7 +158,6 @@ export default function AirwayPanel({ t, markups, calibration, norms, onAddPoint
             return (
               <div
                 key={label}
-                onClick={() => !placed && onAddPoint && onAddPoint(label)}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -167,13 +166,13 @@ export default function AirwayPanel({ t, markups, calibration, norms, onAddPoint
                   borderRadius: 4,
                   background: placed ? t.ok + "0a" : t.surf3 + "66",
                   border: `1px solid ${placed ? t.ok + "30" : t.bdr}`,
-                  cursor: placed ? "default" : "pointer",
+                  cursor: "default",
                   fontSize: 10,
                   color: t.tx,
                   transition: "all 0.12s",
                   fontFamily: "'DM Mono', monospace",
                 }}
-                title={placed ? `${label} placed` : `Click to place ${label}`}
+                title={placed ? `${label} placed` : `${label} — not yet placed`}
               >
                 {placed ? (
                   <span style={{ color: t.ok, fontSize: 12 }}>✓</span>
@@ -181,13 +180,30 @@ export default function AirwayPanel({ t, markups, calibration, norms, onAddPoint
                   <span style={{ color: t.warn, fontSize: 12 }}>⚠</span>
                 )}
                 <span style={{ flex: 1 }}>{label}</span>
-                {!placed && (
-                  <span style={{ fontSize: 8, color: t.tx3 }}>place</span>
-                )}
               </div>
             );
           })}
         </div>
+        {AIRWAY_LANDMARKS_CORE.some(l => !isPlaced(markups, l)) && (
+          <button
+            onClick={() => loadAirwayTier && loadAirwayTier(AIRWAY_LANDMARKS_CORE)}
+            style={{
+              marginTop: 6,
+              width: "100%",
+              background: t.acc,
+              color: "#fff",
+              border: "none",
+              borderRadius: 5,
+              padding: "6px 10px",
+              fontSize: 10,
+              fontWeight: 700,
+              cursor: "pointer",
+              fontFamily: "'DM Mono', monospace",
+            }}
+          >
+            Place All Core
+          </button>
+        )}
       </div>
 
       {/* ─── Advanced Landmarks ─── */}
@@ -217,7 +233,6 @@ export default function AirwayPanel({ t, markups, calibration, norms, onAddPoint
             return (
               <div
                 key={label}
-                onClick={() => !placed && !disabled && onAddPoint && onAddPoint(label)}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -226,14 +241,14 @@ export default function AirwayPanel({ t, markups, calibration, norms, onAddPoint
                   borderRadius: 4,
                   background: placed ? t.ok + "0a" : disabled ? t.surf3 + "33" : t.surf3 + "66",
                   border: `1px solid ${placed ? t.ok + "30" : disabled ? t.bdr + "66" : t.bdr}`,
-                  cursor: placed ? "default" : disabled ? "not-allowed" : "pointer",
+                  cursor: "default",
                   fontSize: 10,
                   color: disabled ? t.tx3 : t.tx,
                   transition: "all 0.12s",
                   fontFamily: "'DM Mono', monospace",
                   opacity: disabled ? 0.5 : 1,
                 }}
-                title={disabled ? "Place all core landmarks first" : placed ? `${label} placed` : `Click to place ${label}`}
+                title={disabled ? "Place all core landmarks first" : placed ? `${label} placed` : `${label} — not yet placed`}
               >
                 {placed ? (
                   <span style={{ color: t.ok, fontSize: 12 }}>✓</span>
@@ -241,13 +256,30 @@ export default function AirwayPanel({ t, markups, calibration, norms, onAddPoint
                   <span style={{ color: disabled ? t.tx3 : t.warn, fontSize: 12 }}>{disabled ? "🔒" : "⚠"}</span>
                 )}
                 <span style={{ flex: 1 }}>{label}</span>
-                {!placed && !disabled && (
-                  <span style={{ fontSize: 8, color: t.tx3 }}>place</span>
-                )}
               </div>
             );
           })}
         </div>
+        {coreComplete && AIRWAY_LANDMARKS_ADVANCED.some(l => !isPlaced(markups, l)) && (
+          <button
+            onClick={() => loadAirwayTier && loadAirwayTier(AIRWAY_LANDMARKS_ADVANCED)}
+            style={{
+              marginTop: 6,
+              width: "100%",
+              background: t.acc,
+              color: "#fff",
+              border: "none",
+              borderRadius: 5,
+              padding: "6px 10px",
+              fontSize: 10,
+              fontWeight: 700,
+              cursor: "pointer",
+              fontFamily: "'DM Mono', monospace",
+            }}
+          >
+            Place All Advanced
+          </button>
+        )}
       </div>
 
       {/* ─── Divider ─── */}

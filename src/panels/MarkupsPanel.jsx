@@ -6,7 +6,7 @@ import PanelGuideModal from "./PanelGuideModal.jsx";
 // ═══════════════════════════════════════════════════════════════════════════════
 // MARKUPS PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
-export function MarkupsPanel({ markups, t, theme, selectedId, onSelect, onDelete, onToggleVisible, onToggleLock, onToggleLabel, onReplace, replacingId, calibration, placingMode, placingQueue, placingIdx, onStopPlacing, onPausePlacing, onResumePlacing, onClear, onAddPoint, norms, formatAngle, angleMode, setAngleMode }) {
+export function MarkupsPanel({ markups, t, theme, selectedId, onSelect, onDelete, onToggleVisible, onToggleLock, onToggleLabel, onToggleGroupVisible, onReplace, replacingId, calibration, placingMode, placingQueue, placingIdx, onStopPlacing, onPausePlacing, onResumePlacing, onClear, onAddPoint, norms, formatAngle, angleMode, setAngleMode }) {
   const [collapsed, setCollapsed] = useState({});
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [guideKey, setGuideKey] = useState(null);
@@ -75,13 +75,19 @@ export function MarkupsPanel({ markups, t, theme, selectedId, onSelect, onDelete
         const items = markups.filter(m => sec.types.includes(m.type));
         if (items.length === 0) return null;
         const isCollapsed = collapsed[sec.id];
+        const allVisible = items.every(m => m.visible !== false);
         return (
           <div key={sec.id}>
-            <div role="button" tabIndex={0} onClick={() => toggle(sec.id)} onKeyDown={onEnter(() => toggle(sec.id))} style={{ padding: "6px 10px", display: "flex", alignItems: "center", gap: 6, cursor: "pointer", background: t.surf2, borderBottom: `1px solid ${t.bdr}`, borderTop: `1px solid ${t.bdr}`, userSelect: "none" }}>
-              <span style={{ color: sec.color, fontSize: 12 }}>{sec.icon}</span>
-              <span style={{ fontSize: 11, fontWeight: 700, color: t.tx, flex: 1, textTransform: "uppercase", letterSpacing: 0.5 }}>{sec.label}</span>
-              <span style={{ fontSize: 10, color: t.tx3, fontFamily: "'DM Mono',monospace" }}>{items.length}</span>
-              <span style={{ color: t.tx3, fontSize: 10, transition: "transform 0.15s", transform: isCollapsed ? "rotate(-90deg)" : "rotate(0deg)" }}>▾</span>
+            <div style={{ padding: "6px 10px", display: "flex", alignItems: "center", gap: 6, background: t.surf2, borderBottom: `1px solid ${t.bdr}`, borderTop: `1px solid ${t.bdr}`, userSelect: "none" }}>
+              <div role="button" tabIndex={0} onClick={() => toggle(sec.id)} onKeyDown={onEnter(() => toggle(sec.id))} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", flex: 1, minWidth: 0 }}>
+                <span style={{ color: sec.color, fontSize: 12 }}>{sec.icon}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: t.tx, textTransform: "uppercase", letterSpacing: 0.5 }}>{sec.label}</span>
+                <span style={{ fontSize: 10, color: t.tx3, fontFamily: "'DM Mono',monospace" }}>{items.length}</span>
+                <span style={{ color: t.tx3, fontSize: 10, transition: "transform 0.15s", transform: isCollapsed ? "rotate(-90deg)" : "rotate(0deg)" }}>▾</span>
+              </div>
+              <button onClick={(e) => { e.stopPropagation(); onToggleGroupVisible && onToggleGroupVisible(sec.types); }} title={allVisible ? `Hide all ${sec.label}` : `Show all ${sec.label}`} style={{ background: "none", border: "none", cursor: "pointer", padding: "2px 4px", flexShrink: 0, display: "flex", alignItems: "center" }}>
+                <div style={{ width: 10, height: 10, borderRadius: "50%", background: allVisible ? sec.color : "transparent", border: `2px solid ${sec.color}`, opacity: allVisible ? 1 : 0.3, transition: "all 0.15s" }} />
+              </button>
             </div>
             {!isCollapsed && items.map(m => {
               const meas = computeMeasurements(m, calibration);
