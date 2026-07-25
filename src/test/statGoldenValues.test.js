@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fCDF, tDistributeCDF, chi2CDF, betaIncomplete } from "../utils.js";
+import { fCDF, tDistributeCDF, chi2CDF, betaIncomplete } from "../lib/utils.js";
 
 const CLOSE = (a, b, tol = 0.005) => Math.abs(a - b) < tol;
 

@@ -7,7 +7,19 @@ import { AIRWAY_NORMS } from "../data/norms.js";
 
 // ─── Airway measurement definitions ──────────────────────────────────────────
 
-export const AIRWAY_MEASUREMENTS = [
+// ─── Core landmarks (always shown) ──────────────────────────────────────────
+export const AIRWAY_LANDMARKS_CORE = [
+  "PNS", "N", "PH", "C3", "H", "Me", "Go", "SP", "Eb", "TT",
+];
+
+// ─── Advanced landmarks (shown when core is complete) ────────────────────────
+// SP_mid, Ad2, Ad4 are needed for advanced measurements
+export const AIRWAY_LANDMARKS_ADVANCED = [
+  "SP_mid", "Ba", "Ad1", "Ad2", "Ad3", "Ad4", "Vallecula", "Epiglottis", "PAS_lowest",
+];
+
+// ─── Core measurements (always computed — only need core landmarks) ────────────
+const CORE_MEASUREMENTS = [
   {
     id: "N-PH",
     label: "N-PH (Nasion to Pharyngeal Wall)",
@@ -17,6 +29,8 @@ export const AIRWAY_MEASUREMENTS = [
     normSD: 3.6,
     normSource: "Solow 1985",
     clinicalNote: "Distance from nasion to posterior pharyngeal wall; reduced in adenoid hypertrophy",
+    tier: "core",
+    description: "Nasion to posterior pharyngeal wall distance — adenoid screening",
   },
   {
     id: "R-PAS",
@@ -27,66 +41,8 @@ export const AIRWAY_MEASUREMENTS = [
     normSD: 2.4,
     normSource: "McNamara 1984",
     clinicalNote: "Narrowest sagittal dimension at retropalatal level; <5mm suggests severe narrowing",
-  },
-  {
-    id: "R-RG",
-    label: "R-RG (Retroglossal Airway Space)",
-    type: "length",
-    points: ["Eb", "PASbot"],
-    normMean: 12.5,
-    normSD: 2.8,
-    normSource: "McNamara 1984",
-    clinicalNote: "Narrowest sagittal dimension at retroglossal level; <5mm associated with OSA",
-  },
-  {
-    id: "PNS-AD1",
-    label: "PNS-AD1 (PNS to Adenoid Point 1)",
-    type: "length",
-    points: ["PNS", "Ad1"],
-    normMean: 15,
-    normSD: 3,
-    normSource: "Schulhof 1977",
-    clinicalNote: "Distance from PNS to adenoid on PNS-Ba line; decreased in adenoid hypertrophy",
-  },
-  {
-    id: "PNS-AD2",
-    label: "PNS-AD2 (PNS to Adenoid Point 2)",
-    type: "length",
-    points: ["PNS", "Ad2"],
-    normMean: 18,
-    normSD: 4,
-    normSource: "Schulhof 1977",
-    clinicalNote: "Distance from PNS to adenoid perpendicular to PNS-Ba line",
-  },
-  {
-    id: "SPAS",
-    label: "SPAS (Superior Posterior Airway Space)",
-    type: "length",
-    points: ["SP", "Ad3"],
-    normMean: 10.5,
-    normSD: 2.7,
-    normSource: "Pracharktam 1994",
-    clinicalNote: "Superior pharyngeal width at PNS-Occ level",
-  },
-  {
-    id: "MAS",
-    label: "MAS (Middle Airway Space)",
-    type: "length",
-    points: ["Vallecula", "Ad4"],
-    normMean: 9.8,
-    normSD: 2.5,
-    normSource: "Pracharktam 1994",
-    clinicalNote: "Middle pharyngeal width at PNS-Pog' midpoint level",
-  },
-  {
-    id: "IAS",
-    label: "IAS (Inferior Airway Space)",
-    type: "length",
-    points: ["Epiglottis", "PASbot"],
-    normMean: 11.6,
-    normSD: 3.0,
-    normSource: "Pracharktam 1994",
-    clinicalNote: "Inferior pharyngeal width at C3-RGN level",
+    tier: "core",
+    description: "Retropalatal airway width — most critical for OSA screening",
   },
   {
     id: "MP-H",
@@ -97,16 +53,8 @@ export const AIRWAY_MEASUREMENTS = [
     normSD: 3.5,
     normSource: "Bibby 1984",
     clinicalNote: "Perpendicular distance from hyoid to mandibular plane (Go-Me); increased in OSA",
-  },
-  {
-    id: "Tongue-Length",
-    label: "Tongue Length (TT to Eb)",
-    type: "length",
-    points: ["TT", "Eb"],
-    normMean: 76.9,
-    normSD: 5.6,
-    normSource: "Lowe 1985",
-    clinicalNote: "Distance from tongue tip to vallecula/epiglottis base",
+    tier: "core",
+    description: "Hyoid position relative to mandibular plane — OSA indicator",
   },
   {
     id: "SP-Length",
@@ -117,18 +65,155 @@ export const AIRWAY_MEASUREMENTS = [
     normSD: 3.2,
     normSource: "Lowe 1985",
     clinicalNote: "Distance from posterior nasal spine to tip of soft palate; elongated in OSA",
+    tier: "core",
+    description: "Soft palate length — elongation associated with OSA",
+  },
+  {
+    id: "Tongue-Length",
+    label: "Tongue Length (TT to Eb)",
+    type: "length",
+    points: ["TT", "Eb"],
+    normMean: 76.9,
+    normSD: 5.6,
+    normSource: "Lowe 1985",
+    clinicalNote: "Distance from tongue tip to vallecula/epiglottis base",
+    tier: "core",
+    description: "Tongue length — relevant for tongue-related airway obstruction",
+  },
+];
+
+// ─── Advanced measurements (computed when advanced landmarks are placed) ──────
+// R-RG moved here: requires PAS_lowest (advanced landmark)
+// SP-Thickness moved here: requires SP_mid (advanced landmark)
+const ADVANCED_MEASUREMENTS = [
+  {
+    id: "R-RG",
+    label: "R-RG (Retroglossal Airway Space)",
+    type: "length",
+    points: ["Eb", "PAS_lowest"],
+    normMean: 12.5,
+    normSD: 2.8,
+    normSource: "McNamara 1984",
+    clinicalNote: "Narrowest sagittal dimension at retroglossal level; <5mm associated with OSA",
+    tier: "advanced",
+    description: "Retroglossal airway width — tongue base level",
   },
   {
     id: "SP-Thickness",
     label: "Soft Palate Thickness",
     type: "length",
-    points: ["UP", "Ad3"],
+    points: ["SP_mid", "Ad3"],
     normMean: 8.5,
     normSD: 1.8,
     normSource: "Lowe 1985",
-    clinicalNote: "Maximum thickness of soft palate approximated by UP-Ad3 distance",
+    clinicalNote: "Maximum thickness of soft palate approximated by SP_mid-Ad3 distance",
+    tier: "advanced",
+    description: "Soft palate thickness — thickening associated with OSA",
+  },
+  {
+    id: "PNS-AD1",
+    label: "PNS-AD1 (PNS to Adenoid Point 1)",
+    type: "length",
+    points: ["PNS", "Ad1"],
+    normMean: 15,
+    normSD: 3,
+    normSource: "Schulhof 1977",
+    clinicalNote: "Distance from PNS to adenoid on PNS-Ba line; decreased in adenoid hypertrophy",
+    tier: "advanced",
+    description: "Adenoid thickness along PNS-Ba line — adenoid hypertrophy",
+  },
+  {
+    id: "PNS-AD2",
+    label: "PNS-AD2 (PNS to Adenoid Point 2)",
+    type: "length",
+    points: ["PNS", "Ad2"],
+    normMean: 18,
+    normSD: 4,
+    normSource: "Schulhof 1977",
+    clinicalNote: "Distance from PNS to adenoid perpendicular to PNS-Ba line",
+    tier: "advanced",
+    description: "Adenoid depth perpendicular to PNS-Ba — adenoid size",
+  },
+  {
+    id: "MAS",
+    label: "MAS (Middle Airway Space)",
+    type: "length",
+    points: ["Vallecula", "Ad4"],
+    normMean: 9.8,
+    normSD: 2.5,
+    normSource: "Pracharktam 1994",
+    clinicalNote: "Middle pharyngeal width at PNS-Pog' midpoint level",
+    tier: "advanced",
+    description: "Middle airway width — oropharyngeal region",
+  },
+  {
+    id: "IAS",
+    label: "IAS (Inferior Airway Space)",
+    type: "length",
+    points: ["Epiglottis", "PAS_lowest"],
+    normMean: 11.6,
+    normSD: 3.0,
+    normSource: "Pracharktam 1994",
+    clinicalNote: "Inferior pharyngeal width at C3-RGN level",
+    tier: "advanced",
+    description: "Inferior airway width — hypopharyngeal region",
+  },
+  {
+    id: "Oropharyngeal-Depth",
+    label: "Oropharyngeal Depth (PNS to Eb)",
+    type: "length",
+    points: ["PNS", "Eb"],
+    normMean: 65.0,
+    normSD: 10.0,
+    normSource: "McNamara 1984",
+    clinicalNote: "Total oropharyngeal depth from PNS to epiglottis base; useful for treatment planning",
+    tier: "advanced",
+    description: "Total oropharyngeal depth — comprehensive airway assessment",
+  },
+  {
+    id: "Hyoid-C3",
+    label: "Hyoid-C3 Distance",
+    type: "length",
+    points: ["H", "C3"],
+    normMean: 20.0,
+    normSD: 4.0,
+    normSource: "Estimated",
+    clinicalNote: "Vertical distance from hyoid to C3; alternative to MP-H for hyoid position assessment",
+    tier: "advanced",
+    description: "Hyoid vertical position — alternative OSA indicator",
+  },
+  {
+    id: "Mandibular-Body",
+    label: "Mandibular Body Length (Go to Me)",
+    type: "length",
+    points: ["Go", "Me"],
+    normMean: 70.0,
+    normSD: 5.0,
+    normSource: "Estimated",
+    clinicalNote: "Length of mandibular body; provides context for interpreting MP-H (short mandible may elevate hyoid)",
+    tier: "advanced",
+    description: "Mandibular body length — context for airway interpretation",
   },
 ];
+
+// ─── Exported measurement list (core + advanced) ──────────────────────────────
+export const AIRWAY_MEASUREMENTS = [...CORE_MEASUREMENTS, ...ADVANCED_MEASUREMENTS];
+
+// ─── Measurements where HIGHER z-score = more pathological (OSA risk) ────────
+// MP-H: elevated hyoid = OSA risk; SP-Length: elongated soft palate = OSA risk
+const HIGHER_IS_WORSE = new Set(["MP-H", "SP-Length", "SP-Thickness"]);
+
+// ─── Measurements where LOWER z-score = more pathological (OSA risk) ──────────
+// R-PAS: narrow airway = OSA risk; R-RG: narrow airway = OSA risk
+const LOWER_IS_WORSE = new Set(["R-PAS", "R-RG"]);
+
+// ─── Core landmark requirement check ──────────────────────────────────────────
+export function coreLandmarksComplete(markups) {
+  return AIRWAY_LANDMARKS_CORE.every(l => {
+    const lo = l.toLowerCase();
+    return markups.some(m => m.visible !== false && m.placed !== false && m.label?.toLowerCase() === lo && m.points?.length > 0 && m.points[0].x > -9000);
+  });
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -320,10 +405,11 @@ export function autoSnapBoundary(imageData, guidePts, windowWidth, windowCenter)
 }
 
 function getInterpretation(z) {
-  if (Math.abs(z) <= 1) return "Normal";
-  if (Math.abs(z) <= 2) return "Borderline";
-  if (z < -2) return "Narrow/Constrained";
-  return "Wide/Enlarged";
+  if (z === null || z === undefined) return "Unknown";
+  if (z < -2) return "Narrow";
+  if (z < -1) return "Borderline narrow";
+  if (z <= 1) return "Normal";
+  return "Wide/Patent";
 }
 
 // ─── Stratified airway norms ─────────────────────────────────────────────────
@@ -372,14 +458,6 @@ export const AIRWAY_NORMS_STRATIFIED = {
     { sex: "F", ageMin: 12, ageMax: 16, mean: 17.5, sd: 3.6 },
     { sex: "F", ageMin: 16, ageMax: 20, mean: 18.0, sd: 3.8 },
   ]},
-  "SPAS": { source: "Battagel 1996", groups: [
-    { sex: "M", ageMin: 8, ageMax: 12, mean: 9.5, sd: 2.0 },
-    { sex: "M", ageMin: 12, ageMax: 16, mean: 10.0, sd: 2.2 },
-    { sex: "M", ageMin: 16, ageMax: 20, mean: 10.5, sd: 2.5 },
-    { sex: "F", ageMin: 8, ageMax: 12, mean: 9.0, sd: 1.8 },
-    { sex: "F", ageMin: 12, ageMax: 16, mean: 9.8, sd: 2.0 },
-    { sex: "F", ageMin: 16, ageMax: 20, mean: 10.2, sd: 2.3 },
-  ]},
   "MAS": { source: "Battagel 1996", groups: [
     { sex: "M", ageMin: 8, ageMax: 12, mean: 9.0, sd: 2.0 },
     { sex: "M", ageMin: 12, ageMax: 16, mean: 9.5, sd: 2.2 },
@@ -406,10 +484,10 @@ export const AIRWAY_NORMS_STRATIFIED = {
   ]},
 };
 
-export function lookupAirwayNorm(label, sex, age) {
+export function lookupAirwayNorm(id, sex, age) {
   try {
     if (sex && age !== undefined && age !== null) {
-      const stratified = AIRWAY_NORMS_STRATIFIED[label];
+      const stratified = AIRWAY_NORMS_STRATIFIED[id];
       if (stratified) {
         const sexUpper = sex.toUpperCase();
         for (const g of stratified.groups) {
@@ -419,23 +497,26 @@ export function lookupAirwayNorm(label, sex, age) {
         }
       }
     }
-    const fallback = AIRWAY_NORMS[label];
+    const fallback = AIRWAY_NORMS[id];
     if (fallback) return { mean: fallback.mean, sd: fallback.sd, source: fallback.source };
     return null;
   } catch { return null; }
 }
 
 function getClinicalNote(id, value) {
+  if (id === "R-PAS" && value !== null && value < 5) return "Retropalatal narrowing <5mm — strong OSA screening indicator";
   if (id === "R-PAS" && value !== null && value < 8) return "Retropalatal narrowing — consider sleep apnea screening";
+  if (id === "R-RG" && value !== null && value < 5) return "Retroglossal narrowing <5mm — associated with OSA";
   if (id === "MP-H" && value !== null && value > 15) return "Inferiorly positioned hyoid — associated with OSA";
   if (id === "SP-Length" && value !== null && value > 35) return "Elongated soft palate — may contribute to pharyngeal collapse";
   return null;
 }
 
 function buildGlobalClinicalNote(results) {
-  const lowZ = results.filter((r) => r.zScore !== null && r.zScore < -2);
-  if (lowZ.length >= 2) return "Multiple airway measurements below normal — comprehensive airway evaluation recommended";
-  const allNormal = results.every((r) => r.zScore === null || Math.abs(r.zScore) <= 1);
+  const narrowing = results.filter((r) => r.zScore !== null && r.id !== "_global" && r.id !== "_magnification" &&
+    ((LOWER_IS_WORSE.has(r.id) && r.zScore < -2) || (HIGHER_IS_WORSE.has(r.id) && r.zScore > 2)));
+  if (narrowing.length >= 2) return "Multiple airway measurements outside normal range — comprehensive airway evaluation recommended";
+  const allNormal = results.filter(r => r.id !== "_global" && r.id !== "_magnification").every((r) => r.zScore === null || Math.abs(r.zScore) <= 1);
   if (allNormal && results.some((r) => r.zScore !== null)) return "Airway measurements within expected range";
   return null;
 }
@@ -448,7 +529,6 @@ export function computeAirwayMeasurements(markups, calibration, sex, age) {
     const calDone = calibration?.done === true;
     const ppm = calDone ? (calibration.pxPerMm || 1) : 1;
 
-    // Build O(1) point lookup map
     const ptMap = buildPtMap(markups);
     const find = (label) => findPt(markups, label, ptMap);
 
@@ -461,10 +541,11 @@ export function computeAirwayMeasurements(markups, calibration, sex, age) {
         const reqLen = def.type === "length" ? 2 : def.points.length;
 
         if (validPts.length < reqLen) {
-          const norm = lookupAirwayNorm(def.label, sex, age);
+          const norm = lookupAirwayNorm(def.id, sex, age);
           results.push({
             id: def.id,
             label: def.label,
+            tier: def.tier,
             value: null,
             unit: calDone ? "mm" : "px",
             normMean: norm ? norm.mean : def.normMean,
@@ -500,24 +581,27 @@ export function computeAirwayMeasurements(markups, calibration, sex, age) {
           if (calDone) value /= ppm;
         }
 
-        const norm = lookupAirwayNorm(def.label, sex, age);
+        const norm = lookupAirwayNorm(def.id, sex, age);
         const nMean = norm ? norm.mean : def.normMean;
         const nSD = norm ? norm.sd : def.normSD;
         const nSource = norm ? norm.source : def.normSource;
 
-        const zScore =
-          value !== null && nSD > 0
-            ? (value - nMean) / nSD
-            : null;
+        // Skip z-score when not calibrated (pixel values vs mm norms are meaningless)
+        const zScore = (value !== null && calDone && nSD > 0)
+          ? (value - nMean) / nSD
+          : null;
         const interpretation =
-          value !== null
+          value !== null && calDone
             ? getInterpretation(zScore)
-            : "Missing landmarks";
+            : value !== null
+              ? "Calibration required for z-score"
+              : "Missing landmarks";
         const clinicalNote = getClinicalNote(def.id, value);
 
         results.push({
           id: def.id,
           label: def.label,
+          tier: def.tier,
           value,
           unit,
           normMean: nMean,
@@ -532,6 +616,7 @@ export function computeAirwayMeasurements(markups, calibration, sex, age) {
         results.push({
           id: def.id,
           label: def.label,
+          tier: def.tier,
           value: null,
           unit: calDone ? "mm" : "px",
           normMean: def.normMean,
@@ -544,11 +629,29 @@ export function computeAirwayMeasurements(markups, calibration, sex, age) {
       }
     }
 
+    // 2D magnification disclaimer (S6)
+    if (calDone) {
+      results.push({
+        id: "_magnification",
+        label: "Note: Lateral ceph radiographs have ~8-10% 2D magnification. Measurements may overestimate true dimensions.",
+        tier: "core",
+        value: null,
+        unit: "",
+        normMean: null,
+        normSD: null,
+        normSource: null,
+        zScore: null,
+        interpretation: "2D magnification disclaimer",
+        points: [],
+      });
+    }
+
     const globalNote = buildGlobalClinicalNote(results);
     if (globalNote) {
       results.push({
         id: "_global",
         label: "Summary",
+        tier: "core",
         value: null,
         unit: "",
         normMean: null,
@@ -578,11 +681,13 @@ export function generateAirwayBoundaries(markups, imageData) {
     };
 
     // Anterior boundary: PNS → SP → Vallecula → Epiglottis → TT
-    const anteriorRaw = ["PNS", "SP", "Vallecula", "Epiglottis", "TT"]
-      .map(find).filter(Boolean);
-    // Posterior boundary: Ad1 → Ad2 → Ad3 → Ad4 → PASbot (sorted by Y descending)
-    const posteriorRaw = ["Ad1", "Ad2", "Ad3", "Ad4", "PASbot"]
-      .map(find).filter(Boolean)
+    // Use only landmarks that are available (some are advanced tier)
+    const anteriorLabels = ["PNS", "SP", "Vallecula", "Epiglottis", "TT"];
+    const anteriorRaw = anteriorLabels.map(find).filter(Boolean);
+    // Posterior boundary: Ad1 → Ad2 → Ad3 → Ad4 → PAS_lowest
+    // Use only landmarks that are available
+    const posteriorLabels = ["Ad1", "Ad2", "Ad3", "Ad4", "PAS_lowest"];
+    const posteriorRaw = posteriorLabels.map(find).filter(Boolean)
       .sort((a, b) => b.y - a.y);
 
     if (anteriorRaw.length < 2 && posteriorRaw.length < 2) return null;
@@ -590,7 +695,6 @@ export function generateAirwayBoundaries(markups, imageData) {
     let anteriorSmooth = anteriorRaw.length >= 2 ? sampleCatmullRom(anteriorRaw, 50) : [];
     let posteriorSmooth = posteriorRaw.length >= 2 ? sampleCatmullRom(posteriorRaw, 50) : [];
 
-    // Auto-snap to radiolucent/radiopaque boundary if image data available
     if (imageData) {
       const ww = 2000, wc = 500;
       if (anteriorSmooth.length > 0) anteriorSmooth = autoSnapBoundary(imageData, anteriorSmooth, ww, wc);
@@ -605,36 +709,41 @@ export function generateAirwayBoundaries(markups, imageData) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// REC 2: OSA risk score
+// REC 2: OSA risk score — directional z-scores
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export function computeAirwayRiskScore(measurements) {
   try {
     if (!measurements || measurements.length === 0) return null;
 
-    const keys = { "R-PAS": 1, "R-RG": 1, "MP-H": 1, "SP-Length": 1, "SP-Thickness": 1 };
-    const scores = [];
+    const riskKeys = new Set(["R-PAS", "R-RG", "MP-H", "SP-Length", "SP-Thickness"]);
+    const directionalScores = [];
     for (const m of measurements) {
-      if (keys[m.id] && m.zScore != null && isFinite(m.zScore)) {
-        scores.push(m.zScore);
+      if (riskKeys.has(m.id) && m.zScore != null && isFinite(m.zScore)) {
+        // Normalize: convert to "pathological direction" where positive = worse
+        if (HIGHER_IS_WORSE.has(m.id)) {
+          directionalScores.push(m.zScore);
+        } else if (LOWER_IS_WORSE.has(m.id)) {
+          directionalScores.push(-m.zScore);
+        }
       }
     }
-    if (scores.length === 0) return null;
+    if (directionalScores.length === 0) return null;
 
-    const meanZ = scores.reduce((a, b) => a + b, 0) / scores.length;
-    const mostNeg = Math.min(...scores);
-    const flagged = scores.filter(z => z < -1).length;
-    const critical = scores.filter(z => z < -2).length;
+    const meanPathZ = directionalScores.reduce((a, b) => a + b, 0) / directionalScores.length;
+    const maxPathZ = Math.max(...directionalScores);
+    const flagged = directionalScores.filter(z => z > 1).length;
+    const critical = directionalScores.filter(z => z > 2).length;
 
     let risk = "low";
-    if (critical >= 2 || meanZ < -1.5 || mostNeg < -2.5) risk = "high";
-    else if (critical >= 1 || flagged >= 2 || meanZ < -0.8) risk = "moderate";
+    if (critical >= 2 || meanPathZ > 1.5 || maxPathZ > 2.5) risk = "high";
+    else if (critical >= 1 || flagged >= 2 || meanPathZ > 0.8) risk = "moderate";
 
     let summary;
-    if (risk === "high") summary = "Elevated airway risk — multiple measurements significantly below normal. Comprehensive airway evaluation recommended, including sleep study referral if OSA suspected.";
-    else if (risk === "moderate") summary = "Borderline airway measurements — some dimensions below expected range. Consider clinical correlation with symptoms.";
+    if (risk === "high") summary = "Elevated airway risk — multiple measurements significantly outside normal. Comprehensive airway evaluation recommended, including sleep study referral if OSA suspected.";
+    else if (risk === "moderate") summary = "Borderline airway measurements — some dimensions outside expected range. Consider clinical correlation with symptoms.";
     else summary = "Airway measurements within expected range — no significant narrowing detected.";
 
-    return { score: meanZ, risk, summary, measuredCount: scores.length, flaggedCount: flagged, criticalCount: critical };
+    return { score: meanPathZ, risk, summary, measuredCount: directionalScores.length, flaggedCount: flagged, criticalCount: critical };
   } catch { return null; }
 }

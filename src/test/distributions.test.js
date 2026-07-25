@@ -7,7 +7,7 @@ import {
   chi2CDF,
   tTestPaired,
   oneWayAnova,
-} from "../utils.js";
+} from "../lib/utils.js";
 
 // ═════════════════════════════════════════════════════════════════
 // Golden-value reference tests for distribution functions.

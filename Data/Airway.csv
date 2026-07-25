@@ -9,9 +9,9 @@ Airway Analysis,Point,SP,Tip of the soft palate (uvula).,,,
 Airway Analysis,Point,Ad3,"Posterior pharyngeal wall at the narrowest retropalatal level (behind SP).",,,
 Airway Analysis,Point,Vallecula,Deepest point of the vallecula (junction of the tongue base and epiglottis).,,,
 Airway Analysis,Point,Epiglottis,Tip of the epiglottis.,,,
-Airway Analysis,Point,PASbot,Posterior pharyngeal wall at the level of the epiglottis tip.,,,
+Airway Analysis,Point,PAS_lowest,Posterior pharyngeal wall at the level of the epiglottis tip (lowest posterior airway point).,,,
 Airway Analysis,Point,Ad4,Posterior pharyngeal wall at the level of the vallecula.,,,
-Airway Analysis,Point,UP,Posterior border of the uvula (posterior soft palate contour).,,,
+Airway Analysis,Point,SP_mid,Soft palate midpoint (posterior border of the uvula).,,,
 Airway Analysis,Point,LP,Lower pharyngeal wall point at the level of C3-C4 intervertebral disc.,,,
 Airway Analysis,Point,Eb,Base of the epiglottis - most posterior point at the junction of the epiglottis and tongue base.,,,
 Airway Analysis,Point,TT,Tip of the tongue - most anterior point of the tongue body.,,,
@@ -22,18 +22,18 @@ Airway Analysis,Point,C3,The most anteroinferior point on the body of the third 
 Airway Analysis,Point,H,"Hyoidale - the most anterosuperior point of the hyoid bone.",,,
 Airway Analysis,Point,PH,Posterior pharyngeal wall point at the level of Nasion-PNS midpoint for nasopharyngeal depth.,,,
 Airway Analysis,Polygon Area,Nasopharynx,Nasopharyngeal airway area enclosed by PNS-Ad1-Ad2-SP.,"PNS,Ad1,Ad2,SP",250,50
-Airway Analysis,Polygon Area,Oropharynx,Oropharyngeal airway area enclosed by SP-Ad3-Vallecula-Epiglottis-UP.,"SP,Ad3,Vallecula,Epiglottis,UP",350,60
-Airway Analysis,Polygon Area,Hypopharynx,Hypopharyngeal airway area enclosed by Vallecula-Epiglottis-PASbot-Ad4.,"Vallecula,Epiglottis,PASbot,Ad4",200,40
+Airway Analysis,Polygon Area,Oropharynx,Oropharyngeal airway area enclosed by SP-Ad3-Vallecula-Epiglottis-SP_mid.,"SP,Ad3,Vallecula,Epiglottis,SP_mid",350,60
+Airway Analysis,Polygon Area,Hypopharynx,Hypopharyngeal airway area enclosed by Vallecula-Epiglottis-PAS_lowest-Ad4.,"Vallecula,Epiglottis,PAS_lowest,Ad4",200,40
 Airway Analysis,Distance,PNS-Ad1,Nasopharyngeal airway depth at the level of PNS.,"PNS,Ad1",15,3
 Airway Analysis,Distance,SP-Ad2,Retropalatal airway depth at the level of the soft palate.,"SP,Ad2",11,3
 Airway Analysis,Distance,Vallecula-Ad4,Hypopharyngeal airway depth at the level of the vallecula.,"Vallecula,Ad4",20,5
 Airway Analysis,Distance,Minimum PAS,Narrowest retropalatal airway dimension (behind SP).,"SP,Ad3",10,3
 Airway Analysis,Distance,PNS-Ad2,Nasopharyngeal airway depth at the So level (alternative nasopharyngeal measurement).,"PNS,Ad2",18,4
-Airway Analysis,Distance,UP width,Width of the nasopharynx at the level of the uvula posterior (UP).,"UP,Ad3",12,4
+Airway Analysis,Distance,SP_mid width,Width of the nasopharynx at the level of the soft palate midpoint (SP_mid).,"SP_mid,Ad3",12,4
 Airway Analysis,Distance,LP width,Width of the lower pharynx at the C3-C4 level.,"LP,Ad4",18,5
 Airway Analysis,Distance,McUP,Minimum cross-sectional width of the upper pharynx (retropalatal).,"SP,Ad3",10,3
-Airway Analysis,Distance,McLP,Minimum cross-sectional width of the lower pharynx (retroglossal).,"Eb,PASbot",11,4
-Airway Analysis,Distance,SPAS,Superior posterior airway space - PAS at the level of the soft palate tip.,"SP,PASbot",10,3
+Airway Analysis,Distance,McLP,Minimum cross-sectional width of the lower pharynx (retroglossal).,"Eb,PAS_lowest",11,4
+Airway Analysis,Distance,SPAS,Superior posterior airway space - PAS at the level of the soft palate tip.,"SP,PAS_lowest",10,3
 Airway Analysis,Distance,MAS,Middle airway space - at the mid-oropharyngeal level.,"Vallecula,Ad4",15,4
 Airway Analysis,Distance,IAS,Inferior airway space - at the hypopharyngeal level.,"Eb,Ad4",12,4
 Airway Analysis,Distance,Vertical Airway Length,Vertical distance from PNS to the base of epiglottis (Eb).,"PNS,Eb",70,10

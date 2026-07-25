@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { anonymizeProject, hasUnanonymizedPHI } from "../anonymize.js";
+import { anonymizeProject, hasUnanonymizedPHI } from "../report/anonymize.js";
 
 // ═════════════════════════════════════════════════════════════════
 // De-identification with audit trail (P2 + P3).

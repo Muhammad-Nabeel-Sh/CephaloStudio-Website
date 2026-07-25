@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mean, stdev, variance, tTestPaired, oneWayAnova, spearmanCorrelation, pearsonCorrelation, shapiroWilk, dahlbergError, confidenceInterval, linearRegression } from "../utils.js";
+import { mean, stdev, variance, tTestPaired, oneWayAnova, spearmanCorrelation, pearsonCorrelation, shapiroWilk, dahlbergError, confidenceInterval, linearRegression } from "../lib/utils.js";
 
 // Research module functions (only exported ones)
 import { mannWhitneyU, wilcoxonSignedRank } from "../research/comparative.js";

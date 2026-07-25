@@ -1,17 +1,8 @@
-import { useMemo } from "react";
-import { computeAirwayMeasurements, generateAirwayBoundaries, computeAirwayRiskScore } from "../research/airway.js";
+import { useMemo, useState } from "react";
+import { computeAirwayMeasurements, generateAirwayBoundaries, computeAirwayRiskScore, AIRWAY_LANDMARKS_CORE, AIRWAY_LANDMARKS_ADVANCED, coreLandmarksComplete } from "../research/airway.js";
 import { InfoBox, Tag, Btn } from "../ui/ui.jsx";
 import { PREDEFINED } from "../data/constants.js";
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// CONSTANTS
-// ═══════════════════════════════════════════════════════════════════════════════
-
-const REQUIRED_LANDMARKS = [
-  "PNS", "Ba", "N", "PH", "C3", "H", "Me", "Go",
-  "Eb", "TT", "SP", "Ad1", "Ad2", "Ad3", "Ad4",
-  "UP", "Vallecula", "Epiglottis", "PASbot",
-];
+import PanelGuideModal from "./PanelGuideModal.jsx";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // HELPERS
@@ -54,6 +45,7 @@ function fmtVal(v) {
 export default function AirwayPanel({ t, markups, calibration, norms, onAddPoint, onUpdateMarkups, showOverlay, onToggleOverlay, onLoadTemplate, dispatch, sex, age, canvasRef }) {
   void norms;
   void onUpdateMarkups;
+  const [guideKey, setGuideKey] = useState(null);
 
   const measurements = useMemo(
     () => computeAirwayMeasurements(markups, calibration, sex, age),
@@ -69,12 +61,15 @@ export default function AirwayPanel({ t, markups, calibration, norms, onAddPoint
 
   const calDone = calibration?.done === true;
   const unit = calDone ? "mm" : "px";
+  const coreComplete = coreLandmarksComplete(markups);
 
   return (
     <div style={{ padding: "0 12px 12px", display: "flex", flexDirection: "column", gap: 10 }}>
       {/* ─── Header ─── */}
-      <div style={{ fontSize: 13, fontWeight: 700, color: t.tx, marginTop: 8 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: t.tx, marginTop: 8, display: "flex", alignItems: "center" }}>
         Airway Analysis
+        <button onClick={() => setGuideKey("airway")}
+          style={{ background: "none", border: `1px solid ${t.tx3}55`, color: t.tx3, borderRadius: 10, width: 18, height: 18, fontSize: 10, lineHeight: "16px", textAlign: "center", cursor: "pointer", padding: 0, marginLeft: 6, verticalAlign: "middle" }} title="Guide">?</button>
       </div>
       <InfoBox t={t}>
         Computes pharyngeal airway dimensions from placed cephalometric landmarks.
@@ -87,7 +82,7 @@ export default function AirwayPanel({ t, markups, calibration, norms, onAddPoint
           (a) => a.name && a.name.toLowerCase().includes("airway")
         );
         const hasAirwayLandmarks = airwayAnalysis
-          ? ["PNS", "Ad1", "SP"].filter((l) =>
+          ? ["PNS", "SP", "N"].filter((l) =>
               markups.some(
                 (m) =>
                   m.visible !== false &&
@@ -143,7 +138,7 @@ export default function AirwayPanel({ t, markups, calibration, norms, onAddPoint
         </div>
       )}
 
-      {/* ─── Required Landmarks ─── */}
+      {/* ─── Core Landmarks ─── */}
       <div>
         <div
           style={{
@@ -155,10 +150,10 @@ export default function AirwayPanel({ t, markups, calibration, norms, onAddPoint
             marginBottom: 6,
           }}
         >
-          Required Landmarks
+          Core Landmarks (5 measurements)
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
-          {REQUIRED_LANDMARKS.map((label) => {
+          {AIRWAY_LANDMARKS_CORE.map((label) => {
             const placed = isPlaced(markups, label);
             return (
               <div
@@ -187,6 +182,66 @@ export default function AirwayPanel({ t, markups, calibration, norms, onAddPoint
                 )}
                 <span style={{ flex: 1 }}>{label}</span>
                 {!placed && (
+                  <span style={{ fontSize: 8, color: t.tx3 }}>place</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ─── Advanced Landmarks ─── */}
+      <div>
+        <div
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            color: coreComplete ? t.acc : t.tx3,
+            textTransform: "uppercase",
+            letterSpacing: 0.6,
+            marginBottom: 6,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          Advanced Landmarks (9 additional measurements)
+          {coreComplete && (
+            <span style={{ fontSize: 8, color: t.ok, fontWeight: 600 }}>CORE COMPLETE</span>
+          )}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
+          {AIRWAY_LANDMARKS_ADVANCED.map((label) => {
+            const placed = isPlaced(markups, label);
+            const disabled = !coreComplete;
+            return (
+              <div
+                key={label}
+                onClick={() => !placed && !disabled && onAddPoint && onAddPoint(label)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "4px 6px",
+                  borderRadius: 4,
+                  background: placed ? t.ok + "0a" : disabled ? t.surf3 + "33" : t.surf3 + "66",
+                  border: `1px solid ${placed ? t.ok + "30" : disabled ? t.bdr + "66" : t.bdr}`,
+                  cursor: placed ? "default" : disabled ? "not-allowed" : "pointer",
+                  fontSize: 10,
+                  color: disabled ? t.tx3 : t.tx,
+                  transition: "all 0.12s",
+                  fontFamily: "'DM Mono', monospace",
+                  opacity: disabled ? 0.5 : 1,
+                }}
+                title={disabled ? "Place all core landmarks first" : placed ? `${label} placed` : `Click to place ${label}`}
+              >
+                {placed ? (
+                  <span style={{ color: t.ok, fontSize: 12 }}>✓</span>
+                ) : (
+                  <span style={{ color: disabled ? t.tx3 : t.warn, fontSize: 12 }}>{disabled ? "🔒" : "⚠"}</span>
+                )}
+                <span style={{ flex: 1 }}>{label}</span>
+                {!placed && !disabled && (
                   <span style={{ fontSize: 8, color: t.tx3 }}>place</span>
                 )}
               </div>
@@ -334,6 +389,8 @@ export default function AirwayPanel({ t, markups, calibration, norms, onAddPoint
                 m.normMean && m.normSD
                   ? `${(m.normMean - m.normSD).toFixed(1)}–${(m.normMean + m.normSD).toFixed(1)} ${m.unit || unit}`
                   : "—";
+              const tier = m.tier || "core";
+              const tierColor = tier === "core" ? t.tx3 : t.acc;
               return (
                 <div
                   key={m.id}
@@ -348,15 +405,31 @@ export default function AirwayPanel({ t, markups, calibration, norms, onAddPoint
                     borderLeft: m.value !== null ? `3px solid ${badge.color}` : `3px solid ${t.tx3}44`,
                   }}
                 >
-                  <div
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 600,
-                      color: t.tx,
-                      fontFamily: "'DM Mono', monospace",
-                    }}
-                  >
-                    {m.label}
+                  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    <div
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 600,
+                        color: t.tx,
+                        fontFamily: "'DM Mono', monospace",
+                      }}
+                    >
+                      {m.label}
+                    </div>
+                    <span
+                      style={{
+                        fontSize: 7,
+                        color: tierColor,
+                        background: tier === "core" ? t.surf3 : t.acc + "18",
+                        padding: "1px 4px",
+                        borderRadius: 3,
+                        fontWeight: 600,
+                        textTransform: "uppercase",
+                        letterSpacing: 0.3,
+                      }}
+                    >
+                      {tier}
+                    </span>
                   </div>
                   <div
                     style={{
@@ -401,6 +474,18 @@ export default function AirwayPanel({ t, markups, calibration, norms, onAddPoint
                   >
                     {rangeStr}
                   </div>
+                  {m.normSource && (
+                    <div
+                      style={{
+                        fontSize: 7,
+                        color: t.tx3,
+                        fontStyle: "italic",
+                        gridColumn: "1 / -1",
+                      }}
+                    >
+                      Source: {m.normSource}
+                    </div>
+                  )}
                   {m.value === null && (
                     <div
                       style={{
@@ -448,6 +533,7 @@ export default function AirwayPanel({ t, markups, calibration, norms, onAddPoint
           )}
         </div>
       )}
+      {guideKey && <PanelGuideModal t={t} guideKey={guideKey} onClose={() => setGuideKey(null)} />}
     </div>
   );
 }

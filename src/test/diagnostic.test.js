@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { calibrationAnalysis } from "../research/diagnostic.js";
-import { chi2CDF } from "../utils.js";
+import { chi2CDF } from "../lib/utils.js";
 
 // ═════════════════════════════════════════════════════════════════
 // Hosmer-Lemeshow calibration regression tests.

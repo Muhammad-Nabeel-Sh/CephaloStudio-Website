@@ -296,6 +296,82 @@ function LongDiagram() {
   );
 }
 
+// Airway diagram: sagittal view concept
+function AirwayDiagram() {
+  const color = "#38bdf8";
+  const light = color + "22";
+  return (
+    <svg viewBox="0 0 640 280" style={{ width: "95%", height: "auto", display: "block" }}>
+      <text x="320" y="22" textAnchor="middle" fill={color} fontSize="13" fontWeight="700" fontFamily="sans-serif">Lateral Cephalometric Airway Analysis</text>
+      <text x="320" y="38" textAnchor="middle" fill={color + "cc"} fontSize="10" fontFamily="sans-serif">Sagittal view — 12 measurements from bony &amp; soft-tissue landmarks</text>
+
+      {/* Skull outline */}
+      <ellipse cx="300" cy="130" rx="120" ry="100" fill="none" stroke={color + "33"} strokeWidth="1.5" strokeDasharray="4,4" />
+
+      {/* Sella-Nasion line */}
+      <line x1="230" y1="60" x2="380" y2="60" stroke={color + "66"} strokeWidth="1.5" strokeDasharray="3,3" />
+      <circle cx="230" cy="60" r="4" fill={color} />
+      <circle cx="380" cy="60" r="4" fill={color} />
+      <text x="225" y="52" textAnchor="end" fill={color} fontSize="9" fontWeight="600" fontFamily="sans-serif">S</text>
+      <text x="385" y="52" fill={color} fontSize="9" fontWeight="600" fontFamily="sans-serif">N</text>
+
+      {/* PNS */}
+      <circle cx="340" cy="110" r="4" fill={color} />
+      <text x="350" y="107" fill={color} fontSize="9" fontWeight="600" fontFamily="sans-serif">PNS</text>
+
+      {/* Soft palate / SP */}
+      <line x1="340" y1="110" x2="310" y2="150" stroke={color} strokeWidth="2" />
+      <circle cx="310" cy="150" r="4" fill={color} />
+      <text x="318" y="148" fill={color} fontSize="9" fontWeight="600" fontFamily="sans-serif">SP</text>
+
+      {/* Posterior pharyngeal wall */}
+      <line x1="390" y1="70" x2="390" y2="210" stroke={color + "88"} strokeWidth="2" />
+      <circle cx="390" cy="90" r="4" fill={color} />
+      <text x="398" y="93" fill={color} fontSize="9" fontWeight="600" fontFamily="sans-serif">PH</text>
+
+      {/* Airway space labels */}
+      <rect x="330" y="105" width="55" height="20" rx="3" fill={light} stroke={color} strokeWidth="1" />
+      <text x="357" y="119" textAnchor="middle" fill={color} fontSize="8" fontWeight="600" fontFamily="sans-serif">R-PAS</text>
+
+      <rect x="330" y="155" width="55" height="20" rx="3" fill={light} stroke={color} strokeWidth="1" />
+      <text x="357" y="169" textAnchor="middle" fill={color} fontSize="8" fontWeight="600" fontFamily="sans-serif">R-RG</text>
+
+      {/* Mandibular plane */}
+      <line x1="240" y1="210" x2="380" y2="200" stroke={color + "55"} strokeWidth="1.5" strokeDasharray="3,3" />
+      <text x="240" y="225" fill={color + "cc"} fontSize="9" fontFamily="sans-serif">Mandibular Plane</text>
+
+      {/* Hyoid */}
+      <circle cx="320" cy="195" r="4" fill="#f59e0b" />
+      <text x="330" y="192" fill="#f59e0b" fontSize="9" fontWeight="600" fontFamily="sans-serif">H</text>
+      <line x1="320" y1="199" x2="320" y2="207" stroke="#f59e0b88" strokeWidth="1" strokeDasharray="2,2" />
+      <text x="355" y="206" textAnchor="middle" fill="#f59e0b" fontSize="8" fontFamily="sans-serif">MP-H</text>
+
+      {/* C3 */}
+      <rect x="400" y="195" width="40" height="25" rx="4" fill={light} stroke={color} strokeWidth="1" />
+      <text x="420" y="212" textAnchor="middle" fill={color} fontSize="9" fontWeight="600" fontFamily="sans-serif">C3</text>
+
+      {/* Legend */}
+      <rect x="460" y="55" width="155" height="130" rx="8" fill={light} stroke={color} strokeWidth="1.5" />
+      <text x="537" y="73" textAnchor="middle" fill={color} fontSize="10" fontWeight="700" fontFamily="sans-serif">Key Measurements</text>
+      <line x1="475" y1="80" x2="595" y2="80" stroke={color + "44"} strokeWidth="0.5" />
+      <text x="475" y="95" fill={color} fontSize="9" fontFamily="sans-serif">R-PAS</text>
+      <text x="595" y="95" textAnchor="end" fill={color + "cc"} fontSize="9" fontFamily="sans-serif">Retropalatal</text>
+      <text x="475" y="110" fill={color} fontSize="9" fontFamily="sans-serif">R-RG</text>
+      <text x="595" y="110" textAnchor="end" fill={color + "cc"} fontSize="9" fontFamily="sans-serif">Retroglossal</text>
+      <text x="475" y="125" fill="#f59e0b" fontSize="9" fontFamily="sans-serif">MP-H</text>
+      <text x="595" y="125" textAnchor="end" fill={color + "cc"} fontSize="9" fontFamily="sans-serif">Hyoid position</text>
+      <text x="475" y="140" fill={color} fontSize="9" fontFamily="sans-serif">MAS</text>
+      <text x="595" y="140" textAnchor="end" fill={color + "cc"} fontSize="9" fontFamily="sans-serif">Middle airway</text>
+      <text x="475" y="155" fill={color} fontSize="9" fontFamily="sans-serif">IAS</text>
+      <text x="595" y="155" textAnchor="end" fill={color + "cc"} fontSize="9" fontFamily="sans-serif">Inferior airway</text>
+      <text x="475" y="170" fill={color} fontSize="9" fontFamily="sans-serif">MP-H</text>
+      <text x="595" y="170" textAnchor="end" fill={color + "cc"} fontSize="9" fontFamily="sans-serif">Hyoid position</text>
+
+      <text x="320" y="260" textAnchor="middle" fill={color + "aa"} fontSize="9" fontFamily="sans-serif">R-PAS &lt; 5mm = severe narrowing | MP-H elevated in OSA | 14 measurements, age/sex-stratified norms</text>
+    </svg>
+  );
+}
+
 // Correlation diagram: scatter plot concept
 function CorrDiagram({ type }) {
   const color = "#a78bfa";
@@ -758,6 +834,66 @@ const GUIDES = {
       },
     ],
   },
+
+  airway: {
+    title: "Airway Analysis Study Guide",
+    sections: [
+      {
+        heading: "What it measures",
+        body: "Computes pharyngeal airway dimensions from lateral cephalometric landmarks. Evaluates retropalatal, retroglossal, and total airway spaces against age/sex-stratified normative data. Produces an OSA (Obstructive Sleep Apnea) risk score based on multi-measurement deviation analysis.",
+        icon: "🫁",
+      },
+      {
+        heading: "When to use",
+        body: "Use for: (1) Airway assessment before orthodontic treatment or orthognathic surgery. (2) OSA screening using cephalometric measurements. (3) Evaluating airway changes after mandibular advancement, maxillary expansion, or other treatments that affect the pharyngeal space. (4) Research comparing airway dimensions across patient groups.",
+        icon: "📋",
+      },
+      {
+        heading: "Data requirements",
+        body: "A lateral cephalometric radiograph with ≥16 airway landmarks placed. Core landmarks (10): PNS, N, PH, C3, H, Me, Go, SP, Eb, TT — enables 7 core measurements. Advanced landmarks (6): Ba, Ad1, Ad3, Vallecula, Epiglottis, PAS_lowest — unlocks 9 additional measurements. Calibration (pxPerMm) is required for mm-based measurements and norm comparisons. Patient sex and age enable age/sex-stratified norms.",
+        icon: "📊",
+      },
+      {
+        heading: "Required landmarks",
+        items: [
+          { label: "Core landmarks (10)", desc: "PNS (posterior nasal spine), N (nasion), PH (posterior pharyngeal wall), C3 (3rd cervical vertebra), H (hyoid), Me (menton), Go (gonion), SP (soft palate tip), Eb (epiglottis base), TT (tongue tip)" },
+          { label: "Advanced landmarks (9)", desc: "SP_mid (soft palate midpoint), Ba (basion), Ad1 (adenoid point 1), Ad2 (adenoid point 2), Ad3 (adenoid point 3), Ad4 (adenoid point 4), Vallecula, Epiglottis (tip), PAS_lowest (lowest posterior airway point)" },
+          { label: "Tiered system", desc: "Core landmarks enable 5 OSA-critical measurements. Advanced landmarks unlock 9 additional measurements for detailed regional analysis. Place core landmarks first — advanced landmarks unlock when all core are placed." },
+        ],
+        icon: "📍",
+      },
+      {
+        heading: "Step-by-step workflow",
+        icon: "📝",
+        steps: [
+          { label: "Load Airway Template", body: "Click 'Load Airway Template' in the Airway panel to place core landmarks. Alternatively, place them manually using the Landmark tool.", type: "setup" },
+          { label: "Place core landmarks", body: "Click each core landmark on the lateral cephalogram. Follow the placement guide in the Core Landmarks grid — green checkmarks indicate placed landmarks.", type: "setup" },
+          { label: "Calibrate", body: "Draw a ruler of known length (R key) and enter the real-world distance. Calibration is required for mm-based measurements and norm comparisons.", type: "configure" },
+          { label: "Review core measurements", body: "The panel computes 5 core airway measurements automatically. Each shows the value, normal range, z-score, source publication, and clinical significance. Green = normal, yellow = borderline, red = constrained.", type: "run" },
+          { label: "Place advanced landmarks (optional)", body: "Once all core landmarks are placed, advanced landmarks unlock. Place SP_mid, Ba, Ad1, Ad2, Ad3, Ad4, Vallecula, Epiglottis, PAS_lowest for detailed regional analysis.", type: "configure" },
+          { label: "Review advanced measurements", body: "9 additional measurements become available: R-RG, SP-Thickness, PNS-AD1, PNS-AD2, MAS, IAS, Oropharyngeal Depth, Hyoid-C3, Mandibular Body.", type: "run" },
+          { label: "Check OSA risk", body: "The OSA Risk Scorecard aggregates all measurements into a composite risk level (low/moderate/high). Review the flagged measurements and critical values.", type: "review" },
+          { label: "Generate boundaries (optional)", body: "Click 'Generate Smooth Airway Boundaries' to auto-trace the anterior and posterior airway walls using Catmull-Rom interpolation with boundary-snapping.", type: "review" },
+        ],
+      },
+      {
+        heading: "Output explained",
+        items: [
+          { label: "Core measurements (5)", desc: "N-PH, R-PAS, MP-H, SP-Length, Tongue-Length" },
+          { label: "Advanced measurements (9)", desc: "R-RG, SP-Thickness, PNS-AD1, PNS-AD2, MAS, IAS, Oropharyngeal Depth, Hyoid-C3, Mandibular Body" },
+          { label: "Z-scores", desc: "(Value − Norm Mean) / Norm SD. |z| ≤ 1 = normal, 1–2 = borderline, >2 = constrained (narrow)" },
+          { label: "OSA Risk Score", desc: "Composite risk level based on mean z-score across all measurements. High risk = mean |z| > 1.5 or ≥3 critical measurements. Moderate = mean |z| > 1.0 or ≥2 critical" },
+          { label: "Normative data", desc: "Age/sex-stratified norms from Solow, McNamara, Schulhof, Pracharktam, Bibby, Lowe, Dempewolf, and Standard sources. Each measurement shows its source publication." },
+        ],
+        icon: "📈",
+      },
+      {
+        heading: "Tips & limitations",
+        body: "• 2D cephalometric airway measurements are an approximation — CBCT provides 3D volumetric analysis for definitive airway assessment.\n• The retropalatal space (R-PAS) is the most clinically significant measurement for OSA screening — values <5mm suggest severe narrowing.\n• MP-H (hyoid position) is elevated in OSA patients — it reflects posterior tongue position and mandibular rotation.\n• Age/sex-stratified norms are important — pediatric airway dimensions differ significantly from adults.\n• The OSA risk score is a screening tool, not a diagnostic — polysomnography is the gold standard for OSA diagnosis.\n• Auto-generated boundaries are approximate — review and manually adjust curves if precise boundary definition is needed.",
+        icon: "💡",
+      },
+    ],
+  },
 };
 
 export default function StudyGuideModal({ t, studyType, onClose }) {
@@ -789,6 +925,7 @@ export default function StudyGuideModal({ t, studyType, onClose }) {
             {studyType === "longitudinal" && <LongDiagram />}
             {studyType === "correlation" && <CorrDiagram type={diagramTab} />}
             {studyType === "diagnostic" && <DiagDiagram />}
+            {studyType === "airway" && <AirwayDiagram />}
           </div>
         )}
         {guide.sections.map((section, i) => (

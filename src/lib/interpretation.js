@@ -344,16 +344,6 @@ export const RULES = {
       return "Posterior airway space is within normal range";
     },
   },
-  "PNS-A": {
-    category: "airway", subgroup: "nasopharyngeal",
-    label: "PNS-A Distance",
-    description: "Nasopharyngeal airway depth",
-    interpret: (v, m) => {
-      if (v < m) return "Nasopharyngeal airway is narrowed";
-      if (v > m) return "Nasopharyngeal airway is adequate";
-      return "Nasopharyngeal airway depth is within normal range";
-    },
-  },
   // ═══════════════════════════════════════════
   // SKELETAL — Cranial Base
   // ═══════════════════════════════════════════
@@ -1293,16 +1283,6 @@ export const RULES = {
       return "Hypopharyngeal airway depth is within normal range";
     },
   },
-  "PNS-Ad (airway)": {
-    category: "airway", subgroup: "nasopharyngeal",
-    label: "PNS-Ad (Nasopharyngeal)",
-    description: "Nasopharyngeal airway depth at PNS to adenoid",
-    interpret: (v, m) => {
-      if (v < m) return "Nasopharyngeal airway is narrowed (adenoid hypertrophy possible)";
-      if (v > m) return "Nasopharyngeal airway is adequate";
-      return "Nasopharyngeal airway depth is within normal range";
-    },
-  },
   "Nasopharynx": {
     category: "airway", subgroup: "nasopharyngeal",
     label: "Nasopharyngeal Airway Area",
@@ -1317,7 +1297,7 @@ export const RULES = {
   "Oropharynx": {
     category: "airway", subgroup: "oropharyngeal",
     label: "Oropharyngeal Airway Area",
-    description: "Cross-sectional area of the oropharynx (SP-Ad3-Vallecula-Epiglottis-UP)",
+    description: "Cross-sectional area of the oropharynx (SP-Ad3-Vallecula-Epiglottis-SP_mid)",
     interpret: (v, m) => {
       if (v < m - m * 0.3) return "Oropharyngeal airway area is significantly reduced — potential obstruction at soft palate or tongue base level";
       if (v < m) return "Oropharyngeal airway area is mildly reduced — possible retropalatal or retroglossal narrowing";
@@ -1328,7 +1308,7 @@ export const RULES = {
   "Hypopharynx": {
     category: "airway", subgroup: "hypopharyngeal",
     label: "Hypopharyngeal Airway Area",
-    description: "Cross-sectional area of the hypopharynx (Vallecula-Epiglottis-PASbot-Ad4)",
+    description: "Cross-sectional area of the hypopharynx (Vallecula-Epiglottis-PAS_lowest-Ad4)",
     interpret: (v, m) => {
       if (v < m - m * 0.3) return "Hypopharyngeal airway area is significantly reduced — possible retroglossal or epiglottic obstruction";
       if (v < m) return "Hypopharyngeal airway area is mildly reduced";
@@ -1346,10 +1326,10 @@ export const RULES = {
       return "Nasopharyngeal airway depth at So level is within normal range";
     },
   },
-  "UP width": {
+  "SP_mid width": {
     category: "airway", subgroup: "oropharyngeal",
     label: "Upper Pharyngeal Width (Retropalatal)",
-    description: "Width of the nasopharynx at the level of the uvula posterior",
+    description: "Width of the nasopharynx at the level of SP_mid (soft palate midpoint)",
     interpret: (v, m) => {
       if (v < m) return "Retropalatal airway width is narrowed — possible velopharyngeal obstruction";
       if (v > m) return "Retropalatal airway width is adequate";
@@ -1384,16 +1364,6 @@ export const RULES = {
       if (v < m) return "Critical narrowing of the lower pharynx — high risk of retroglossal collapse";
       if (v > m) return "Lower pharynx minimum width is adequate";
       return "Lower pharynx minimum width is within normal range";
-    },
-  },
-  "SPAS": {
-    category: "airway", subgroup: "oropharyngeal",
-    label: "Superior Posterior Airway Space",
-    description: "Posterior airway space at the level of the soft palate tip",
-    interpret: (v, m) => {
-      if (v < m) return "Superior PAS is narrowed — retropalatal airway restriction";
-      if (v > m) return "Superior PAS is adequate";
-      return "Superior PAS is within normal range";
     },
   },
   "MAS": {

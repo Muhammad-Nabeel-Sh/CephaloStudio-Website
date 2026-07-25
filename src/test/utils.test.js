@@ -38,7 +38,7 @@ import {
   buildScope,
   evalFormula,
   getMissingVars,
-} from "../utils.js";
+} from "../lib/utils.js";
 
 // ═════════════════════════════════════════════════════════════════
 // Helpers

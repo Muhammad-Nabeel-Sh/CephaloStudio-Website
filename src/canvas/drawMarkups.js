@@ -1273,8 +1273,8 @@ export function drawAirwayOverlay(ctx, markups, zoom, pan, cal, colorMode) {
   const sc = p => ({ x: p.x * zoom + pan.x, y: p.y * zoom + pan.y });
 
   const colors = colorMode === "orange"
-    ? { fill: "rgba(213, 94, 0, 0.06)", stroke: "rgba(213, 94, 0, 0.3)", widthLine: "rgba(213, 94, 0, 0.7)" }
-    : { fill: "rgba(56, 189, 248, 0.06)", stroke: "rgba(56, 189, 248, 0.25)", widthLine: "rgba(56, 189, 248, 0.7)" };
+    ? { fill: "rgba(213, 94, 0, 0.06)", stroke: "rgba(213, 94, 0, 0.3)" }
+    : { fill: "rgba(56, 189, 248, 0.06)", stroke: "rgba(56, 189, 248, 0.25)" };
 
   const findPt = (label) => {
     const m = markups.find(mk => mk.type === "point" && mk.label === label && mk.visible !== false);
@@ -1286,7 +1286,7 @@ export function drawAirwayOverlay(ctx, markups, zoom, pan, cal, colorMode) {
   const pns = findPt("PNS"), ad1 = findPt("Ad1"), ad2 = findPt("Ad2");
   const sp = findPt("SP"), ad3 = findPt("Ad3");
   const val = findPt("Vallecula"), ad4 = findPt("Ad4");
-  const epi = findPt("Epiglottis"), pasbot = findPt("PASbot");
+  const epi = findPt("Epiglottis"), pasbot = findPt("PAS_lowest");
   const go = findPt("Go"), me = findPt("Me"), h = findPt("H");
   if (!pns || !ad1 || !ad2 || !sp) return;
 
@@ -1299,25 +1299,24 @@ export function drawAirwayOverlay(ctx, markups, zoom, pan, cal, colorMode) {
   if (pasbot) posteriorPoints.push(pasbot);
   if (ad4) posteriorPoints.push(ad4);
 
-  const n = Math.min(anteriorPoints.length, posteriorPoints.length);
-  if (n < 2) return;
+  const nAnt = anteriorPoints.length;
+  const nPost = posteriorPoints.length;
+  if (nAnt < 2 || nPost < 2) return;
 
   const normKeyMap = {
     "PNS-Ad1": "PNS-AD1",
     "SP-Ad2": "PNS-AD2",
-    "McUP": "SPAS",
+    "McUP": "R-PAS",
     "MAS": "MAS",
     "McLP": "IAS",
-    "IAS": "IAS",
-    "MP-H": "MP-H",
   };
 
   ctx.save();
 
   ctx.beginPath();
   ctx.moveTo(sc(anteriorPoints[0]).x, sc(anteriorPoints[0]).y);
-  for (let i = 1; i < n; i++) ctx.lineTo(sc(anteriorPoints[i]).x, sc(anteriorPoints[i]).y);
-  for (let i = n - 1; i >= 0; i--) ctx.lineTo(sc(posteriorPoints[i]).x, sc(posteriorPoints[i]).y);
+  for (let i = 1; i < nAnt; i++) ctx.lineTo(sc(anteriorPoints[i]).x, sc(anteriorPoints[i]).y);
+  for (let i = nPost - 1; i >= 0; i--) ctx.lineTo(sc(posteriorPoints[i]).x, sc(posteriorPoints[i]).y);
   ctx.closePath();
   ctx.fillStyle = colors.fill;
   ctx.fill();
@@ -1386,7 +1385,7 @@ export function drawAirwayOverlay(ctx, markups, zoom, pan, cal, colorMode) {
       ctx.lineWidth = 2 * Math.sqrt(zoom);
       ctx.setLineDash([5 * Math.sqrt(zoom), 3 * Math.sqrt(zoom)]);
       ctx.beginPath();
-      ctx.moveTo(sc({ x: ll.ant.x, y: ll.ant.y }).x, sc({ x: ll.ant.x, y: ll.ant.y }).y);
+      ctx.moveTo(sc(ll.ant).x, sc(ll.ant).y);
       ctx.lineTo(sc({ x: projX, y: projY }).x, sc({ x: projX, y: projY }).y);
       ctx.stroke();
       ctx.setLineDash([]);
