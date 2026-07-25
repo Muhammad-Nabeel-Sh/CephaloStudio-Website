@@ -237,6 +237,7 @@ export const TOOLS = [
   { id: "parallel", icon: "⫿", label: "Parallel", key: "q" },
   { id: "polygon", icon: "⬡", label: "Polygon", key: "g" },
   { id: "curve", icon: "∿", label: "Curve", key: "c" },
+  { id: "polyline", icon: "⌇", label: "Polyline", key: "y" },
   { id: "ellipse", icon: "◯", label: "Ellipse", key: "e" },
   { id: "arc", icon: "◠", label: "Arc", key: "u" },
   { id: "circle", icon: "⊙", label: "Circle", key: "o" },
@@ -246,6 +247,7 @@ export const TOOLS = [
   { id: "ruler", icon: "⟺", label: "Ruler/Cal", key: "r" },
   { id: "tangent", icon: "⊸", label: "Tangent", key: "n" },
   { id: "concentric", icon: "◎", label: "Concentric", key: "w" },
+  { id: "mirror", icon: "⌈⌉", label: "Mirror", key: "x" },
 ];
 
 const _existingApNames = new Set([

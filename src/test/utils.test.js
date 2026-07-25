@@ -38,6 +38,8 @@ import {
   buildScope,
   evalFormula,
   getMissingVars,
+  ellipseFromAxes,
+  mirrorPoint,
 } from "../lib/utils.js";
 
 // ═════════════════════════════════════════════════════════════════
@@ -681,5 +683,93 @@ describe("evalFormula — sandbox hardening", () => {
     // A scope var named like a mathjs global must resolve to the scope value,
     // not the mathjs function.
     expect(evalFormula("e + 1", { e: 5 })).toBe(6);
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════
+// ellipseFromAxes
+// ═════════════════════════════════════════════════════════════════
+
+describe("ellipseFromAxes", () => {
+  it("returns null for fewer than 3 points", () => {
+    expect(ellipseFromAxes(null)).toBeNull();
+    expect(ellipseFromAxes([])).toBeNull();
+    expect(ellipseFromAxes([{ x: 0, y: 0 }, { x: 10, y: 0 }])).toBeNull();
+  });
+
+  it("computes center, rx, ry, and rotation from axis endpoints", () => {
+    const pts = [
+      { x: 100, y: 100 },
+      { x: 150, y: 100 },
+      { x: 100, y: 70 },
+    ];
+    const ell = ellipseFromAxes(pts);
+    expect(ell).not.toBeNull();
+    expect(ell.cx).toBe(100);
+    expect(ell.cy).toBe(100);
+    expect(ell.rx).toBeCloseTo(50, 0);
+    expect(ell.ry).toBeCloseTo(30, 0);
+    expect(ell.rotation).toBeCloseTo(0, 5);
+  });
+
+  it("handles rotated axes", () => {
+    const cx = 0, cy = 0, rx = 40, ry = 20;
+    const angle = Math.PI / 4;
+    const majorEnd = { x: cx + rx * Math.cos(angle), y: cy + rx * Math.sin(angle) };
+    const minorEnd = { x: cx + ry * Math.cos(angle + Math.PI / 2), y: cy + ry * Math.sin(angle + Math.PI / 2) };
+    const ell = ellipseFromAxes([{ x: cx, y: cy }, majorEnd, minorEnd]);
+    expect(ell).not.toBeNull();
+    expect(ell.cx).toBeCloseTo(cx, 5);
+    expect(ell.cy).toBeCloseTo(cy, 5);
+    expect(ell.rx).toBeCloseTo(rx, 0);
+    expect(ell.ry).toBeCloseTo(ry, 0);
+    expect(ell.rotation).toBeCloseTo(angle, 4);
+  });
+
+  it("returns null when an axis is too short", () => {
+    const pts = [{ x: 0, y: 0 }, { x: 0.1, y: 0 }, { x: 0, y: 30 }];
+    expect(ellipseFromAxes(pts)).toBeNull();
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════
+// mirrorPoint
+// ═════════════════════════════════════════════════════════════════
+
+describe("mirrorPoint", () => {
+  it("reflects across a horizontal axis", () => {
+    const result = mirrorPoint({ x: 5, y: 3 }, { x: 0, y: 0 }, { x: 10, y: 0 });
+    expect(result.x).toBeCloseTo(5, 5);
+    expect(result.y).toBeCloseTo(-3, 5);
+  });
+
+  it("reflects across a vertical axis", () => {
+    const result = mirrorPoint({ x: 3, y: 5 }, { x: 0, y: 0 }, { x: 0, y: 10 });
+    expect(result.x).toBeCloseTo(-3, 5);
+    expect(result.y).toBeCloseTo(5, 5);
+  });
+
+  it("reflects across a 45-degree axis", () => {
+    const result = mirrorPoint({ x: 4, y: 0 }, { x: 0, y: 0 }, { x: 1, y: 1 });
+    expect(result.x).toBeCloseTo(0, 5);
+    expect(result.y).toBeCloseTo(4, 5);
+  });
+
+  it("reflects across a non-origin axis", () => {
+    const result = mirrorPoint({ x: 6, y: 4 }, { x: 0, y: 5 }, { x: 10, y: 5 });
+    expect(result.x).toBeCloseTo(6, 5);
+    expect(result.y).toBeCloseTo(6, 5);
+  });
+
+  it("returns the point itself when axis has zero length", () => {
+    const result = mirrorPoint({ x: 3, y: 4 }, { x: 1, y: 1 }, { x: 1, y: 1 });
+    expect(result.x).toBeCloseTo(3, 5);
+    expect(result.y).toBeCloseTo(4, 5);
+  });
+
+  it("point on the axis stays in place", () => {
+    const result = mirrorPoint({ x: 5, y: 0 }, { x: 0, y: 0 }, { x: 10, y: 0 });
+    expect(result.x).toBeCloseTo(5, 5);
+    expect(result.y).toBeCloseTo(0, 5);
   });
 });

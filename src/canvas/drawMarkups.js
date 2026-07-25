@@ -1,4 +1,4 @@
-import { clamp, dist, angle3pt, angle4pt, perpDist, polyArea, polyLen, vpts, catmullRom, splineArea, splineLen, getInfiniteLinePoints, projectedDistance, fitEllipse, circleFrom3pts, autoControlPoints, distToMultiBezier, distToEllipse, distToArc } from "../lib/utils.js";
+import { clamp, dist, angle3pt, angle4pt, perpDist, polyArea, polyLen, vpts, catmullRom, splineArea, splineLen, getInfiniteLinePoints, projectedDistance, ellipseFromAxes, circleFrom3pts, autoControlPoints, distToMultiBezier, distToEllipse, distToArc } from "../lib/utils.js";
 import { SILHOUETTES } from "../data/silhouettes.js";
 import { LUT_PRESETS } from "../data/constants.js";
 import { AIRWAY_NORMS } from "../data/norms.js";
@@ -71,6 +71,7 @@ export function drawMarkup(ctx, m, zoom, pan, cal, sel, t, reproCollecting, canv
         drawPolygon(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt);
         break;
       case "curve":
+      case "polyline":
         drawCurve(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt);
         break;
       case "perp":
@@ -588,7 +589,7 @@ function drawRuler(ctx, m, sp, t, zoom, showAnnotations, annotationSize = 1){
 
 function drawEllipse(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt) {
   if (sp.length < 3) return;
-  const ell = fitEllipse(sp);
+  const ell = ellipseFromAxes(sp);
   if (!ell) return;
   const cx = ell.cx, cy = ell.cy;
   const rx = ell.rx, ry = ell.ry;
@@ -1033,15 +1034,23 @@ export function drawInProgress(ctx, draw, mp, zoom, pan, t){
     ctx.fillStyle = "#34d399";
     ctx.fill();
   }
-  else if(draw.type === "ellipse" && sp.length >= 2 && mp){
-    const pts = [...sp, mp];
-    const ell = fitEllipse(pts);
-    if(ell){
+  else if(draw.type === "ellipse" && sp.length >= 1 && mp){
+    if(sp.length === 1){
+      const r = dist(sp[0], mp);
       ctx.beginPath();
-      ctx.ellipse(ell.cx, ell.cy, ell.rx, ell.ry, 0, 0, Math.PI * 2);
+      ctx.ellipse(sp[0].x, sp[0].y, r, r, 0, 0, Math.PI * 2);
       ctx.stroke();
+      [sp[0], mp].forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fillStyle = t.acc; ctx.fill(); });
+    }else{
+      const pts = [sp[0], sp[1], mp];
+      const ell = ellipseFromAxes(pts);
+      if(ell){
+        ctx.beginPath();
+        ctx.ellipse(ell.cx, ell.cy, ell.rx, ell.ry, ell.rotation, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      pts.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fillStyle = t.acc; ctx.fill(); });
     }
-    pts.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fillStyle = t.acc; ctx.fill(); });
   }
   else if(draw.type === "arc" && sp.length >= 2 && mp){
     const pts = [...sp, mp];
@@ -1122,6 +1131,45 @@ export function drawInProgress(ctx, draw, mp, zoom, pan, t){
       }
     }
     pts.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fillStyle = t.acc; ctx.fill(); });
+  }
+  else if(draw.type === "mirror" && sp.length >= 1 && mp){
+    if(sp.length === 1){
+      ctx.beginPath();
+      ctx.moveTo(sp[0].x, sp[0].y);
+      ctx.lineTo(mp.x, mp.y);
+      ctx.strokeStyle = t.warn || "#facc15";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(sp[0].x, sp[0].y, 6, 0, Math.PI * 2);
+      ctx.stroke();
+    }else if(sp.length === 2){
+      ctx.beginPath();
+      ctx.moveTo(sp[1].x, sp[1].y);
+      ctx.lineTo(mp.x, mp.y);
+      ctx.strokeStyle = t.warn || "#facc15";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      [sp[1], mp].forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fillStyle = t.warn || "#facc15"; ctx.fill(); });
+      const adx = mp.x - sp[1].x, ady = mp.y - sp[1].y;
+      const alen2 = adx * adx + ady * ady;
+      if(alen2 > 1e-10){
+        const tt = ((sp[0].x - sp[1].x) * adx + (sp[0].y - sp[1].y) * ady) / alen2;
+        const gx = 2 * (sp[1].x + tt * adx) - sp[0].x;
+        const gy = 2 * (sp[1].y + tt * ady) - sp[0].y;
+        ctx.beginPath();
+        ctx.arc(gx, gy, 5, 0, Math.PI * 2);
+        ctx.strokeStyle = t.ok || "#22c55e";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([3, 3]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
   }
   else if(sp.length === 1 && mp){
     ctx.beginPath();
@@ -1267,7 +1315,7 @@ function getZColor(z) {
   return "#ef4444";
 }
 
-export function drawAirwayOverlay(ctx, markups, zoom, pan, cal, colorMode) {
+export function drawAirwayOverlay(ctx, markups, zoom, pan, cal, colorMode, t) {
   if (!cal?.done) return;
   const ppm = cal.pxPerMm;
   const sc = p => ({ x: p.x * zoom + pan.x, y: p.y * zoom + pan.y });
@@ -1371,7 +1419,7 @@ export function drawAirwayOverlay(ctx, markups, zoom, pan, cal, colorMode) {
     const nk = normKeyMap[ll.label] || ll.label;
     const norm = AIRWAY_NORMS[nk];
     const z = norm && norm.sd > 0 ? (w - norm.mean) / norm.sd : null;
-    const color = z !== null ? getZColor(z) : "#fff";
+    const color = z !== null ? getZColor(z) : (t?.tx2 || "#fff");
 
     if (!ll.isPerp) {
       ctx.strokeStyle = color;
@@ -1391,11 +1439,11 @@ export function drawAirwayOverlay(ctx, markups, zoom, pan, cal, colorMode) {
       ctx.setLineDash([]);
     }
 
-    ctx.fillStyle = "#ccc";
+    ctx.fillStyle = t?.tx3 || "#ccc";
     ctx.font = `${clamp(8 * Math.sqrt(zoom), 6, 11)}px "DM Mono",monospace`;
     ctx.textAlign = "center";
     ctx.fillText(`${ll.label}`, mx, my - 10 * Math.sqrt(zoom));
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = t?.tx || "#fff";
     ctx.font = `bold ${clamp(9 * Math.sqrt(zoom), 7, 12)}px "DM Mono",monospace`;
     ctx.fillText(`${w.toFixed(1)} mm`, mx, my + 14 * Math.sqrt(zoom));
     ctx.textAlign = "left";
@@ -1407,45 +1455,54 @@ export function drawAirwayOverlay(ctx, markups, zoom, pan, cal, colorMode) {
   const yMax = Math.min(sortedAnt[sortedAnt.length - 1]?.y || 0, sortedPost[sortedPost.length - 1]?.y || 0);
 
   if (yMax > yMin) {
-    let dynMinW = Infinity, dynMinX = 0, dynMinY = 0, dynFound = false;
-    const dynSteps = 50;
-    for (let i = 0; i <= dynSteps; i++) {
-      const y = yMin + (yMax - yMin) * (i / dynSteps);
-      let antX = null, postX = null;
+    const N = 100;
+    const antSamples = [], postSamples = [];
+    for (let i = 0; i <= N; i++) {
+      const y = yMin + (yMax - yMin) * (i / N);
       for (let j = 1; j < sortedAnt.length; j++) {
         if (y >= sortedAnt[j - 1].y && y <= sortedAnt[j].y) {
           const dy = sortedAnt[j].y - sortedAnt[j - 1].y;
-          const t = dy === 0 ? 0 : (y - sortedAnt[j - 1].y) / dy;
-          antX = sortedAnt[j - 1].x + t * (sortedAnt[j].x - sortedAnt[j - 1].x);
+          const f = dy === 0 ? 0 : (y - sortedAnt[j - 1].y) / dy;
+          antSamples.push({ x: sortedAnt[j - 1].x + f * (sortedAnt[j].x - sortedAnt[j - 1].x), y });
           break;
         }
       }
       for (let j = 1; j < sortedPost.length; j++) {
         if (y >= sortedPost[j - 1].y && y <= sortedPost[j].y) {
           const dy = sortedPost[j].y - sortedPost[j - 1].y;
-          const t = dy === 0 ? 0 : (y - sortedPost[j - 1].y) / dy;
-          postX = sortedPost[j - 1].x + t * (sortedPost[j].x - sortedPost[j - 1].x);
+          const f = dy === 0 ? 0 : (y - sortedPost[j - 1].y) / dy;
+          postSamples.push({ x: sortedPost[j - 1].x + f * (sortedPost[j].x - sortedPost[j - 1].x), y });
           break;
         }
       }
-      if (antX !== null && postX !== null) {
-        const w = Math.abs(postX - antX) / ppm;
-        if (w < dynMinW) { dynMinW = w; dynMinX = (antX + postX) / 2; dynMinY = y; dynFound = true; }
+    }
+
+    let dynMinW = Infinity, dynAntPt = null, dynPostPt = null;
+    for (const a of antSamples) {
+      for (const p of postSamples) {
+        const dx = p.x - a.x, dy = p.y - a.y;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d < dynMinW) { dynMinW = d; dynAntPt = a; dynPostPt = p; }
       }
     }
 
-    if (dynFound && dynMinW < Infinity) {
-      const sx = dynMinX * zoom + pan.x;
-      const sy = dynMinY * zoom + pan.y;
-      ctx.strokeStyle = "#f87171";
-      ctx.lineWidth = 3 * Math.sqrt(zoom);
+    if (dynAntPt && dynPostPt && dynMinW < Infinity) {
+      const wMm = dynMinW / ppm;
+      const sxA = dynAntPt.x * zoom + pan.x, syA = dynAntPt.y * zoom + pan.y;
+      const sxP = dynPostPt.x * zoom + pan.x, syP = dynPostPt.y * zoom + pan.y;
+      const mx = (sxA + sxP) / 2, my = (syA + syP) / 2;
+      ctx.strokeStyle = t?.err || "#f87171";
+      ctx.lineWidth = 2.5 * Math.sqrt(zoom);
+      ctx.setLineDash([5 * Math.sqrt(zoom), 3 * Math.sqrt(zoom)]);
       ctx.beginPath();
-      ctx.arc(sx, sy, 8 * Math.sqrt(zoom), 0, Math.PI * 2);
+      ctx.moveTo(sxA, syA);
+      ctx.lineTo(sxP, syP);
       ctx.stroke();
-      ctx.fillStyle = "#f87171";
+      ctx.setLineDash([]);
+      ctx.fillStyle = t?.err || "#f87171";
       ctx.font = `bold ${clamp(10 * Math.sqrt(zoom), 8, 14)}px "DM Mono",monospace`;
       ctx.textAlign = "center";
-      ctx.fillText(`⬇ Narrowest (${dynMinW.toFixed(1)} mm)`, sx, sy - 14 * Math.sqrt(zoom));
+      ctx.fillText(`↓ Narrowest (${wMm.toFixed(1)} mm)`, mx, my - 14 * Math.sqrt(zoom));
       ctx.textAlign = "left";
     }
   }
@@ -1735,7 +1792,7 @@ export function hitTest(markups, ip, zoom, reproCollecting){
     const vp = vpts(m);
     if((m.type === "line" || m.type === "parallel" || m.type === "ruler") && vp.length >= 2 && perpDist(ip, vp[0], vp[1]) < thr) return m.id;
     if((m.type === "angle3" || m.type === "angle4") && vp.some(p => dist(p, ip) < thr * 2)) return m.id;
-    if((m.type === "polygon" || m.type === "curve") && vp.length >= 2){
+    if((m.type === "polygon" || m.type === "curve" || m.type === "polyline") && vp.length >= 2){
       for(let j = 1; j < vp.length; j++){
         if(perpDist(ip, vp[j-1], vp[j]) < thr && dist(ip, vp[j-1]) < dist(vp[j-1], vp[j]) + thr) return m.id;
       }
@@ -1746,8 +1803,8 @@ export function hitTest(markups, ip, zoom, reproCollecting){
     if(m.type === "text" && vp.length && dist(vp[0], ip) < thr * 4) return m.id;
     if(m.type === "silhouette" && silhouetteHitTest(m, ip, zoom)) return m.id;
     if(m.type === "ellipse" && vp.length >= 3){
-      const ell = fitEllipse(vp);
-      if(ell){ const d = distToEllipse(ip, ell.cx, ell.cy, ell.rx, ell.ry); if(d !== null && d < thr) return m.id; }
+      const ell = ellipseFromAxes(vp);
+      if(ell){ const d = distToEllipse(ip, ell.cx, ell.cy, ell.rx, ell.ry, ell.rotation); if(d !== null && d < thr) return m.id; }
     }
     if(m.type === "arc" && vp.length >= 3){
       const d = distToArc(ip, vp[0], vp[1], vp[2]);

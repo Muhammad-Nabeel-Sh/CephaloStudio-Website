@@ -121,7 +121,7 @@ export function createRedraw(dc) {
 
     // ── Pre/post airway overlay ──
     if (showAirwayOverlay && compareSession) {
-      dc.drawAirwayOverlay(ctx2d, compareSession.markups || [], zoom, pan, drawCalibration, "orange");
+      dc.drawAirwayOverlay(ctx2d, compareSession.markups || [], zoom, pan, drawCalibration, "orange", t);
     }
 
     // ── Draw all markups ──
@@ -255,7 +255,7 @@ export function createRedraw(dc) {
     }
 
     // ── Airway overlay (base session) ──
-    if (showAirwayOverlay) dc.drawAirwayOverlay(ctx2d, drawMarkups, zoom, pan, drawCalibration);
+    if (showAirwayOverlay) dc.drawAirwayOverlay(ctx2d, drawMarkups, zoom, pan, drawCalibration, undefined, t);
 
     // ── Definition tooltip ──
     if (showDefTooltips && dc.hoveredPtRef.current?.type === "point" && activeTool === "select") {

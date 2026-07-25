@@ -61,6 +61,7 @@ export const KEYBINDINGS = [
   { id: "tool",            key: "q", toolId: "parallel" },
   { id: "tool",            key: "g", toolId: "polygon" },
   { id: "tool",            key: "c", toolId: "curve" },
+  { id: "tool",            key: "y", toolId: "polyline" },
   { id: "tool",            key: "e", toolId: "ellipse" },
   { id: "tool",            key: "u", toolId: "arc" },
   { id: "tool",            key: "o", toolId: "circle" },
@@ -69,4 +70,5 @@ export const KEYBINDINGS = [
   { id: "tool",            key: "r", toolId: "ruler" },
   { id: "tool",            key: "n", toolId: "tangent" },
   { id: "tool",            key: "w", toolId: "concentric" },
+  { id: "tool",            key: "x", toolId: "mirror" },
 ];

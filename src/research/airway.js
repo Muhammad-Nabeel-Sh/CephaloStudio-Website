@@ -267,23 +267,25 @@ export function sampleBoundaryAtY(pts, y) {
 export function findNarrowestPoint(anteriorPts, posteriorPts, yMin, yMax, steps) {
   try {
     if (!anteriorPts || !posteriorPts || steps < 1) return null;
-    let minWidth = Infinity;
-    let minY = yMin;
-    let found = false;
+    const antSamples = [], postSamples = [];
     for (let i = 0; i <= steps; i++) {
       const y = yMin + (yMax - yMin) * (i / steps);
       const ant = sampleBoundaryAtY(anteriorPts, y);
       const post = sampleBoundaryAtY(posteriorPts, y);
-      if (ant && post) {
-        const w = Math.abs(post.x - ant.x);
-        if (w < minWidth) {
-          minWidth = w;
-          minY = y;
-          found = true;
-        }
+      if (ant) antSamples.push(ant);
+      if (post) postSamples.push(post);
+    }
+    if (!antSamples.length || !postSamples.length) return null;
+    let minWidth = Infinity, bestAnt = null, bestPost = null;
+    for (const a of antSamples) {
+      for (const p of postSamples) {
+        const dx = p.x - a.x, dy = p.y - a.y;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        if (d < minWidth) { minWidth = d; bestAnt = a; bestPost = p; }
       }
     }
-    return found ? { width: minWidth, y: minY } : null;
+    if (!bestAnt || !bestPost || minWidth === Infinity) return null;
+    return { width: minWidth, y: (bestAnt.y + bestPost.y) / 2, antPt: bestAnt, postPt: bestPost };
   } catch { return null; }
 }
 

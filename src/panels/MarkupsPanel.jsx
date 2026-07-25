@@ -15,7 +15,7 @@ export function MarkupsPanel({ markups, t, theme, selectedId, onSelect, onDelete
     { id: "point", label: "Landmarks", types: ["point"], icon: "◉", color: t.acc },
     { id: "line", label: "Lines & Planes", types: ["line", "parallel", "ruler"], icon: "⟋", color: "#38bdf8" },
     { id: "angle", label: "Angles", types: ["angle3", "angle4"], icon: "∠", color: "#f472b6" },
-    { id: "curve", label: "Open Curves", types: ["curve", "bezier", "tangent"], icon: "∿", color: "#fb923c" },
+    { id: "curve", label: "Open Curves", types: ["curve", "polyline", "bezier", "tangent"], icon: "∿", color: "#fb923c" },
     { id: "polygon", label: "Polygons", types: ["polygon"], icon: "⬡", color: "#4ade80" },
     { id: "ellipse", label: "Ellipses & Circles", types: ["ellipse", "circle", "arc", "concentric"], icon: "◯", color: "#60a5fa" },
     { id: "other", label: "Measurements", types: ["perp","ratio","sum","difference","percentage","projDist"], icon: "⊥", color: "#a78bfa" },
@@ -115,7 +115,7 @@ export function MarkupsPanel({ markups, t, theme, selectedId, onSelect, onDelete
                         {isPlacing && <span style={{ color: t.warn, marginRight: 4 }}>📍</span>}
                         {unplaced && !isPlacing && <span style={{ color: t.tx3, marginRight: 4 }}>○</span>}
                         {m.label || m.type}
-                        {m.type === "curve" && m.curveStyle === "bspline" && <span style={{ fontSize: 9, color: t.tx3, marginLeft: 4 }}>[spline]</span>}
+                        {(m.type === "curve" || m.type === "polyline") && m.curveStyle === "bspline" && <span style={{ fontSize: 9, color: t.tx3, marginLeft: 4 }}>[spline]</span>}
                         {m.type === "polygon" && m.curveStyle === "bspline" && <span style={{ fontSize: 9, color: t.tx3, marginLeft: 4 }}>[spline]</span>}
                         {m.type === "text" && m.text && <span style={{ fontSize: 9, color: t.tx3, marginLeft: 4 }}>"{m.text.slice(0, 15)}{m.text.length > 15 ? "…" : ""}"</span>}
                         {m.type === "arrow" && <span style={{ fontSize: 9, color: t.tx3, marginLeft: 4 }}>→</span>}

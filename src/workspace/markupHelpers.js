@@ -44,6 +44,7 @@ export function markupDefaults(partial, markups, t) {
   if (partial.type === "point") m.label = `P${typeCount("point") + 1}`;
   if (partial.type === "line" || partial.type === "parallel") m.label = partial.label || `Line ${typeCount("line") + typeCount("parallel") + 1}`;
   if (partial.type === "curve") m.label = partial.label || `Trace ${typeCount("curve") + 1}`;
+  if (partial.type === "polyline") m.label = partial.label || `Polyline ${typeCount("polyline") + 1}`;
   if (partial.type === "angle3") m.label = partial.label || `Angle ${typeCount("angle3") + 1}`;
   if (partial.type === "angle4") m.label = partial.label || `Inc_Angle ${typeCount("angle4") + 1}`;
   if (partial.type === "ellipse") m.label = partial.label || `Ellipse ${typeCount("ellipse") + 1}`;

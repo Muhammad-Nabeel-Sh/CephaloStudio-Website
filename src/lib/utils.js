@@ -108,7 +108,7 @@ export function computeMeasurements(m, cal) {
     meas.area = (useSpline ? splineArea(vp) : polyArea(vp)) / ppm ** 2;
     meas.perimeter = (useSpline ? splineLen(vp, true) : polyLen(vp, true)) / ppm;
   }
-  if (m.type === "curve" && vp.length >= 2) {
+  if ((m.type === "curve" || m.type === "polyline") && vp.length >= 2) {
     const useSpline = m.curveStyle === "bspline" && vp.length >= 3;
     meas.length = (useSpline ? splineLen(vp, false) : polyLen(vp, false)) / ppm;
   }
@@ -149,7 +149,7 @@ export function computeMeasurements(m, cal) {
     }
   }
   if (m.type === "ellipse" && vp.length >= 3) {
-    const ell = fitEllipse(vp);
+    const ell = ellipseFromAxes(vp);
     if (ell) {
       meas.majorAxis = Math.max(ell.rx, ell.ry) * 2 / ppm;
       meas.minorAxis = Math.min(ell.rx, ell.ry) * 2 / ppm;
@@ -1007,6 +1007,27 @@ export function fitEllipse(pts) {
   return { cx: ux, cy: uy, rx: avgR, ry: avgR * 0.6, rotation: Math.atan2(y2 - y1, x2 - x1) };
 }
 
+export function ellipseFromAxes(pts) {
+  if (!pts || pts.length < 3) return null;
+  const [center, majorEnd, minorEnd] = pts;
+  const rx = dist(center, majorEnd);
+  const ry = dist(center, minorEnd);
+  if (rx < 0.5 || ry < 0.5) return null;
+  const rotation = Math.atan2(majorEnd.y - center.y, majorEnd.x - center.x);
+  return { cx: center.x, cy: center.y, rx, ry, rotation };
+}
+
+export function mirrorPoint(pt, axisP1, axisP2) {
+  const dx = axisP2.x - axisP1.x;
+  const dy = axisP2.y - axisP1.y;
+  const len2 = dx * dx + dy * dy;
+  if (len2 < 1e-10) return { x: pt.x, y: pt.y };
+  const t = ((pt.x - axisP1.x) * dx + (pt.y - axisP1.y) * dy) / len2;
+  const projX = axisP1.x + t * dx;
+  const projY = axisP1.y + t * dy;
+  return { x: 2 * projX - pt.x, y: 2 * projY - pt.y };
+}
+
 export function ellipsePerimeter(rx, ry) {
   return Math.PI * (3 * (rx + ry) - Math.sqrt((3 * rx + ry) * (rx + 3 * ry)));
 }
@@ -1281,7 +1302,7 @@ export function snapTangentToCurve(curveMarkup, dragPt) {
     return { tangentPoint: { x: c.cx + c.r * Math.cos(a), y: c.cy + c.r * Math.sin(a) }, tangentAngle: a + Math.PI / 2 };
   }
   if (curveMarkup.type === "ellipse" && vp.length >= 3) {
-    const ell = fitEllipse(vp);
+    const ell = ellipseFromAxes(vp);
     if (!ell) return null;
     const r = nearestPointOnSampledCurve(dragPt, Array.from({length: 96}, (_, i) => {
       const a = (2 * Math.PI * i) / 96;
@@ -1299,7 +1320,7 @@ export function snapTangentToCurve(curveMarkup, dragPt) {
     if (!r) return null;
     return { tangentPoint: r.point, tangentAngle: r.angle + Math.PI / 2 };
   }
-  if (curveMarkup.type === "curve" && vp.length >= 2) {
+  if ((curveMarkup.type === "curve" || curveMarkup.type === "polyline") && vp.length >= 2) {
     const samples = sampleSpline(curveMarkup.type === "curve" ? vp : vp, false, 16);
     const r = nearestPointOnSampledCurve(dragPt, samples);
     if (!r) return null;
@@ -1348,7 +1369,7 @@ export function findTangentOnCurve(markups, clickPt, threshold) {
         }
       }
     } else if (m.type === "ellipse" && vp.length >= 3) {
-      const ell = fitEllipse(vp);
+      const ell = ellipseFromAxes(vp);
       if (!ell) continue;
       const samples = 96;
       for (let i = 0; i < samples; i++) {
@@ -1371,7 +1392,7 @@ export function findTangentOnCurve(markups, clickPt, threshold) {
         bestDist = r.dist;
         best = { tangentPoint: r.point, tangentAngle: r.angle + Math.PI / 2, curveId: m.id };
       }
-    } else if (m.type === "curve" && vp.length >= 2) {
+    } else if ((m.type === "curve" || m.type === "polyline") && vp.length >= 2) {
       const samples = sampleSpline(m.type === "curve" ? vp : vp, false, 16);
       const r = nearestPointOnSampledCurve(clickPt, samples);
       if (r && r.dist < threshold && r.dist < bestDist) {
