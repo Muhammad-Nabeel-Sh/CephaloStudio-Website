@@ -133,7 +133,7 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
                   transition: "all 0.15s",
                 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 18 }} dangerouslySetInnerHTML={{ __html: st.icon }} />
+                  <span style={{ width: 24, height: 24, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }} dangerouslySetInnerHTML={{ __html: st.icon }} />
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: t.tx }}>{st.name}</span>
@@ -173,7 +173,7 @@ export default function ResearchPanel({ t, project, onUpdateProject, calibration
                 }}>
                 <div onClick={() => setSelectedId(s.id === selectedId ? null : s.id)}
                   style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 16 }} dangerouslySetInnerHTML={{ __html: meta?.icon || "📋" }} />
+                  <span style={{ width: 24, height: 24, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }} dangerouslySetInnerHTML={{ __html: meta?.icon || "📋" }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12, fontWeight: 600, color: t.tx, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{s.name}</div>
                     <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
