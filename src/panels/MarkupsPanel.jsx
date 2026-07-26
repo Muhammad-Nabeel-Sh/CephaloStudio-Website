@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { computeMeasurements, normDeviation, deviationColor, onEnter } from "../lib/utils.js";
 import { Btn } from "../ui/ui.jsx";
 import PanelGuideModal from "./PanelGuideModal.jsx";
@@ -6,10 +6,20 @@ import PanelGuideModal from "./PanelGuideModal.jsx";
 // ═══════════════════════════════════════════════════════════════════════════════
 // MARKUPS PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
-export function MarkupsPanel({ markups, t, theme, selectedId, onSelect, onDelete, onToggleVisible, onToggleLock, onToggleLabel, onToggleGroupVisible, onReplace, replacingId, calibration, placingMode, placingQueue, placingIdx, onStopPlacing, onPausePlacing, onResumePlacing, onClear, onAddPoint, norms, formatAngle, angleMode, setAngleMode }) {
+export function MarkupsPanel({ markups, t, theme, selectedId, onSelect, onDelete, onToggleVisible, onToggleLock, onToggleLabel, onToggleGroupVisible, onReplace, replacingId, calibration, placingMode, placingQueue, placingIdx, onStopPlacing, onPausePlacing, onResumePlacing, onClear, onAddPoint, norms, formatAngle, angleMode, setAngleMode, dispatch, showCpAlways, showAnchorAlways }) {
   const [collapsed, setCollapsed] = useState({});
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [guideKey, setGuideKey] = useState(null);
+  const [gearDrop, setGearDrop] = useState(false);
+  const [gearRect, setGearRect] = useState(null);
+  const gearRef = useRef(null);
+  useEffect(() => {
+    if (!gearDrop) return;
+    if (gearRef.current) setGearRect(gearRef.current.getBoundingClientRect());
+    const fn = e => { if (gearRef.current && !gearRef.current.contains(e.target)) setGearDrop(false); };
+    window.addEventListener("mousedown", fn);
+    return () => window.removeEventListener("mousedown", fn);
+  }, [gearDrop]);
   const [sign, unit] = angleMode?.split("-") || ["signed", "deg"];
   const sections = [
     { id: "point", label: "Landmarks", types: ["point"], icon: "◉", color: t.acc },
@@ -58,18 +68,30 @@ export function MarkupsPanel({ markups, t, theme, selectedId, onSelect, onDelete
         {placingMode && <Btn t={t} small onClick={onPausePlacing} style={{ whiteSpace: "nowrap", flexShrink: 0, background: t.warn + "22", color: t.warn, border: `1px solid ${t.warn}` }}>⏸</Btn>}
         {(placingMode || placingQueue.length > 0) && <Btn t={t} small danger onClick={onStopPlacing} style={{ whiteSpace: "nowrap", flexShrink: 0 }}>⏹ End</Btn>}
         <Btn t={t} small danger onClick={handleClear} style={{ whiteSpace: "nowrap", flexShrink: 0 }}>Clear</Btn>
+        <div ref={gearRef} style={{ position: "relative", flexShrink: 0 }}>
+          <Btn t={t} small active={gearDrop} onClick={() => setGearDrop(v => !v)} title="Settings" style={{ whiteSpace: "nowrap" }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-settings-icon lucide-settings"><path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/></svg>
+          </Btn>
+          {gearDrop && gearRect && <div style={{ position: "fixed", top: gearRect.bottom + 4, left: Math.max(8, gearRect.left - 150), background: t.surf2, border: `1px solid ${t.bdr}`, borderRadius: 8, padding: "8px 10px", minWidth: 180, zIndex: 9999, boxShadow: `0 4px 16px ${t.shadow}` }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: t.tx3, letterSpacing: 0.5, marginBottom: 6 }}>ANGLE</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+              <button onClick={() => setAngleMode(`${sign}-${unit === "deg" ? "rad" : "deg"}`)} style={{ padding: "2px 6px", fontSize: 10, border: `1px solid ${t.bdr}`, borderRadius: 4, background: unit === "deg" ? t.acc : "transparent", color: unit === "deg" ? (theme === "light" ? "#fff" : t.bg) : t.tx, cursor: "pointer", fontWeight: 600, fontFamily: "inherit", flexShrink: 0 }}>{unit === "deg" ? "°" : "rad"}</button>
+              <select value={sign} onChange={e => setAngleMode(`${e.target.value}-${unit}`)} style={{ background: t.surf2, border: `1px solid ${t.bdr}`, borderRadius: 4, padding: "2px 4px", color: t.tx, fontSize: 10, fontFamily: "inherit", cursor: "pointer", flexShrink: 0, flex: 1 }}>
+                <option value="signed">signed</option>
+                <option value="abs">abs</option>
+                <option value="simple">simple</option>
+                <option value="reflex">reflex</option>
+              </select>
+            </div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: t.tx3, letterSpacing: 0.5, marginBottom: 6 }}>BEZIER</div>
+            <div style={{ display: "flex", gap: 6 }}>
+              <ToggleChip t={t} active={showCpAlways} label="Ctrl pts" onClick={() => dispatch({ type: "SET", payload: { showCpAlways: !showCpAlways } })} />
+              <ToggleChip t={t} active={showAnchorAlways} label="Anchor pts" onClick={() => dispatch({ type: "SET", payload: { showAnchorAlways: !showAnchorAlways } })} />
+            </div>
+          </div>}
+        </div>
         <button onClick={() => setGuideKey("markups")}
-          style={{ background: "none", border: `1px solid ${t.tx3}55`, color: t.tx3, borderRadius: 10, width: 18, height: 18, fontSize: 10, lineHeight: "16px", textAlign: "center", cursor: "pointer", padding: 0, marginLeft: "auto", flexShrink: 0 }} title="Guide">?</button>
-      </div>
-      <div style={{ padding: "8px 10px", display: "flex", gap: 4, borderBottom: `1px solid ${t.bdr}`, flexShrink: 0, flexWrap: "nowrap", overflowX: "auto", alignItems: "center" }}>
-        <span style={{ fontSize: 10, color: t.tx2, flexShrink: 0 }}>∠</span>
-        <button onClick={() => setAngleMode(`${sign}-${unit === "deg" ? "rad" : "deg"}`)} style={{ padding: "2px 6px", fontSize: 10, border: `1px solid ${t.bdr}`, borderRadius: 4, background: unit === "deg" ? t.acc : "transparent", color: unit === "deg" ? (theme === "light" ? "#fff" : t.bg) : t.tx, cursor: "pointer", fontWeight: 600, fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0 }}>{unit === "deg" ? "°" : "rad"}</button>
-        <select value={sign} onChange={e => setAngleMode(`${e.target.value}-${unit}`)} style={{ background: t.surf2, border: `1px solid ${t.bdr}`, borderRadius: 4, padding: "2px 4px", color: t.tx, fontSize: 10, fontFamily: "inherit", cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
-          <option value="signed">signed</option>
-          <option value="abs">abs</option>
-          <option value="simple">simple</option>
-          <option value="reflex">reflex</option>
-        </select>
+          style={{ background: "none", border: `1px solid ${t.tx3}55`, color: t.tx3, borderRadius: 10, width: 18, height: 18, fontSize: 10, lineHeight: "16px", textAlign: "center", cursor: "pointer", padding: 0, flexShrink: 0 }} title="Guide">?</button>
       </div>
       {sections.map(sec => {
         const items = markups.filter(m => sec.types.includes(m.type));
@@ -135,6 +157,14 @@ export function MarkupsPanel({ markups, t, theme, selectedId, onSelect, onDelete
       {markups.length === 0 && <div style={{ padding: 24, textAlign: "center", color: t.tx3, fontSize: 12 }}>No markups yet.<br />Select a tool and click on the image.</div>}
       {guideKey && <PanelGuideModal t={t} guideKey={guideKey} onClose={() => setGuideKey(null)} />}
     </div>
+  );
+}
+
+function ToggleChip({ t, active, label, onClick }) {
+  return (
+    <button onClick={onClick} style={{ padding: "2px 8px", fontSize: 10, fontWeight: 600, borderRadius: 4, border: `1px solid ${active ? t.acc : t.bdr}`, background: active ? t.acc + "22" : "transparent", color: active ? t.acc : t.tx3, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", transition: "all 0.15s" }}>
+      {label}
+    </button>
   );
 }
 

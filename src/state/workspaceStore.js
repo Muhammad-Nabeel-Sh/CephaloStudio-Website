@@ -50,6 +50,8 @@ export const INITIAL_UI = {
   overlayAlignMode: "2pt",
   overlayVectorScale: 1,
   showTrackingLines: false,
+  showCpAlways: false,
+  showAnchorAlways: false,
 
 };
 

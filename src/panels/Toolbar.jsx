@@ -5,7 +5,7 @@ export default function Toolbar({
   activeTool, theme, t, dispatch, setActiveTool,
   sessionImage, calibration, zoom, spotlightMode, updSession,
   isMobile, showMobilePanel,
-  panRef,
+  panRef, zoomRef,
   undo, redo, undoVersion, undoStackRef, redoStackRef,
   handleDblClick, currentDraw,
   mobileToolsExpanded,
@@ -54,9 +54,9 @@ export default function Toolbar({
         <button onClick={undo} disabled={!canUndo} aria-label="Undo" style={{ width: 42, height: 42, borderRadius: 8, border: "none", background: "transparent", color: canUndo ? t.tx2 : t.bdr, cursor: canUndo ? "pointer" : "not-allowed", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} title="Undo">↶</button>
         <button onClick={redo} disabled={!canRedo} aria-label="Redo" style={{ width: 42, height: 42, borderRadius: 8, border: "none", background: "transparent", color: canRedo ? t.tx2 : t.bdr, cursor: canRedo ? "pointer" : "not-allowed", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} title="Redo">↷</button>
         <div style={{ width: 1, height: 28, background: t.bdr, flexShrink: 0 }} />
-        <button onClick={() => dispatch({ type: "SET", payload: { zoom: z => clamp(z * 1.3, 0.05, 15) } })} aria-label="Zoom In" style={{ width: 42, height: 42, borderRadius: 8, border: "none", background: "transparent", color: t.tx2, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>＋</button>
-        <button onClick={() => dispatch({ type: "SET", payload: { zoom: z => clamp(z / 1.3, 0.05, 15) } })} aria-label="Zoom Out" style={{ width: 42, height: 42, borderRadius: 8, border: "none", background: "transparent", color: t.tx2, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>－</button>
-        <button onClick={() => { dispatch({ type: "SET", payload: { zoom: 1 } }); panRef.current = { x: 40, y: 40 }; dispatch({ type: "SET", payload: { pan: { x: 40, y: 40 } } }); }} aria-label="Fit" style={{ width: 42, height: 42, borderRadius: 8, border: "none", background: "transparent", color: t.tx2, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>⊙</button>
+        <button onClick={() => { const nz=clamp(zoomRef.current*1.3,0.05,15);zoomRef.current=nz;dispatch({ type: "SET", payload: { zoom: nz } }); }} aria-label="Zoom In" style={{ width: 42, height: 42, borderRadius: 8, border: "none", background: "transparent", color: t.tx2, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>＋</button>
+        <button onClick={() => { const nz=clamp(zoomRef.current/1.3,0.05,15);zoomRef.current=nz;dispatch({ type: "SET", payload: { zoom: nz } }); }} aria-label="Zoom Out" style={{ width: 42, height: 42, borderRadius: 8, border: "none", background: "transparent", color: t.tx2, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>－</button>
+        <button onClick={() => { zoomRef.current=1;dispatch({ type: "SET", payload: { zoom: 1 } }); panRef.current = { x: 40, y: 40 }; dispatch({ type: "SET", payload: { pan: { x: 40, y: 40 } } }); }} aria-label="Fit" style={{ width: 42, height: 42, borderRadius: 8, border: "none", background: "transparent", color: t.tx2, cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>⊙</button>
         <div style={{ width: 1, height: 28, background: t.bdr, flexShrink: 0 }} />
         <button onClick={() => dispatch({ type: "SET", payload: { mobileToolsExpanded: v => !v } })} aria-label="More tools" style={{ width: 42, height: 42, borderRadius: 8, border: "none", background: mobileToolsExpanded ? t.acc : t.surf2, color: mobileToolsExpanded ? (theme === "light" ? "#fff" : t.bg) : t.tx, cursor: "pointer", fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, boxShadow: mobileToolsExpanded ? `0 0 0 2px ${t.acc}` : "none" }} title="More tools">⋯</button>
         {currentDraw && ["polygon", "curve", "polyline"].includes(activeTool) && (<> 
@@ -162,12 +162,12 @@ export default function Toolbar({
           </div>); })()}
         {/* Row 10: Zoom in | Zoom out */}
         <div style={{ display: "flex", gap: 1 }}>
-          <button onClick={() => dispatch({ type: "SET", payload: { zoom: z => clamp(z * 1.3, 0.05, 15) } })} aria-label="Zoom In" style={{ flex: 1, height: 32, borderRadius: 6, border: "none", background: "transparent", color: t.tx2, cursor: "pointer", fontSize: 18,fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} title="Zoom In">＋</button>
-          <button onClick={() => dispatch({ type: "SET", payload: { zoom: z => clamp(z / 1.3, 0.05, 15) } })} aria-label="Zoom Out" style={{ flex: 1, height: 32, borderRadius: 6, border: "none", background: "transparent", color: t.tx2, cursor: "pointer", fontSize: 18, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} title="Zoom Out">－</button>
+          <button onClick={() => { const nz=clamp(zoomRef.current*1.3,0.05,15);zoomRef.current=nz;dispatch({ type: "SET", payload: { zoom: nz } }); }} aria-label="Zoom In" style={{ flex: 1, height: 32, borderRadius: 6, border: "none", background: "transparent", color: t.tx2, cursor: "pointer", fontSize: 18,fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} title="Zoom In">＋</button>
+          <button onClick={() => { const nz=clamp(zoomRef.current/1.3,0.05,15);zoomRef.current=nz;dispatch({ type: "SET", payload: { zoom: nz } }); }} aria-label="Zoom Out" style={{ flex: 1, height: 32, borderRadius: 6, border: "none", background: "transparent", color: t.tx2, cursor: "pointer", fontSize: 18, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} title="Zoom Out">－</button>
         </div>
         {/* Row 11: Fit to Window */}
         <div style={{ display: "flex", justifyContent: "center" }}>
-          <button onClick={() => { dispatch({ type: "SET", payload: { zoom: 1 } }); panRef.current = { x: 40, y: 40 }; dispatch({ type: "SET", payload: { pan: { x: 40, y: 40 } } }); }} aria-label="Fit to Window" style={{ width: 38, height: 32, borderRadius: 6, border: "none", background: "transparent", color: t.tx2, cursor: "pointer", fontSize: 18, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} title="Fit to Window (⊙)">⊙</button>
+          <button onClick={() => { zoomRef.current=1;dispatch({ type: "SET", payload: { zoom: 1 } }); panRef.current = { x: 40, y: 40 }; dispatch({ type: "SET", payload: { pan: { x: 40, y: 40 } } }); }} aria-label="Fit to Window" style={{ width: 38, height: 32, borderRadius: 6, border: "none", background: "transparent", color: t.tx2, cursor: "pointer", fontSize: 18, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} title="Fit to Window (⊙)">⊙</button>
         </div>
         {/* Separator */}
         <div style={{ width: "100%", height: 1, background: t.bdr, margin: "4px 0" }} />

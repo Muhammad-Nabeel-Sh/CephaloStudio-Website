@@ -33,7 +33,7 @@ export default function AnonModal({ t, project, onUpdateProject }) {
       {project.meta.anonymized ? (
         <div style={{ padding: 10, background: t.ok + "11", border: `1px solid ${t.ok}33`, borderRadius: 6, fontSize: 12, color: t.ok, marginBottom: 16 }}>✓ Case is anonymized.</div>
       ) : (
-        <Btn t={t} danger onClick={anonymize} style={{ width: "100%" }}>🔏 Anonymize (clears patient IDs, keeps research labels)</Btn>
+        <Btn t={t} danger onClick={anonymize} style={{ width: "100%" }}>🔏 Anonymize <br/>(clears patient IDs, keeps research labels)</Btn>
       )}
 
       {/* Audit trail (P3): who/when/what was cleared, with salted provenance hashes. */}

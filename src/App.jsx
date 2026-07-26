@@ -349,7 +349,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   // F1: pointer state lives in refs (not reducer state) so mousemove skips React re-render
   const mousePosRef=useRef(null);const snapPosRef=useRef(null);
   const flashMarkupIdRef=useRef(null);const flashStartTimeRef=useRef(0);
-  const boxSelectRectRef=useRef(null);const panRef=useRef({x:40,y:40});
+  const boxSelectRectRef=useRef(null);const panRef=useRef({x:40,y:40});const zoomRef=useRef(1);
   // F2: device-pixel-ratio for crisp HiDPI rendering
   const dprRef=useRef(window.devicePixelRatio||1);
   // F4: offscreen canvas for static content (image+markups) — blitted on mousemove
@@ -372,7 +372,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     isMobile,showMobilePanel,mobileToolsExpanded,
     toolbarPos,toolbarDragging,rightPanelWidth,rightPanelResizing,
     spotlightMode,
-    displacementOverlay,refLandmark1,refLandmark2,overlayBlend,overlayAlignMode,overlayVectorScale,showTrackingLines,}=ui;
+    displacementOverlay,refLandmark1,refLandmark2,overlayBlend,overlayAlignMode,overlayVectorScale,showTrackingLines,showCpAlways,showAnchorAlways,}=ui;
+  useEffect(()=>{zoomRef.current=ui.zoom;},[ui.zoom]);
   const {
     compareSession, setCompareSession,
     contextMenu, setContextMenu,
@@ -650,7 +651,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const histImgRef=sessionImage[0]?imgRefs.current[sessionImage[0].id]:null;
   const histData=useMemo(()=>computeHistogram(histImgRef),[histImgRef]);
 
-  const toImage=useCallback((sx,sy)=>({x:(sx-panRef.current.x)/zoom,y:(sy-panRef.current.y)/zoom}),[zoom]);
+  const toImage=useCallback((sx,sy)=>({x:(sx-panRef.current.x)/zoomRef.current,y:(sy-panRef.current.y)/zoomRef.current}),[]);
   const getCanvasPos=useCallback(e=>{const r=canvasRef.current.getBoundingClientRect();return{x:e.clientX-r.left,y:e.clientY-r.top};},[]);
 
   // U2: zoom-to-landmark — when selecting from MarkupsPanel, pan viewport to center on the markup
@@ -664,7 +665,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     const cy=pts.reduce((s,p)=>s+p.y,0)/pts.length;
     const cw=canvasSize.current.w,ch=canvasSize.current.h;
     const dpr=dprRef.current;
-    const newPan={x:(cw/dpr)/2-cx*zoom,y:(ch/dpr)/2-cy*zoom};
+    const newPan={x:(cw/dpr)/2-cx*zoomRef.current,y:(ch/dpr)/2-cy*zoomRef.current};
     panRef.current=newPan;
     dispatch({type:"SET",payload:{pan:newPan}});
     flashMarkupIdRef.current=id;flashStartTimeRef.current=performance.now();
@@ -672,7 +673,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     flashTimerRef.current=setTimeout(()=>{flashMarkupIdRef.current=null;flashTimerRef.current=null;},1500);
     if(flashRafRef.current)cancelAnimationFrame(flashRafRef.current);
     const _fl=()=>{if(!flashMarkupIdRef.current)return;flashRafRef.current=requestAnimationFrame(_fl);scheduleRedrawRef.current();};flashRafRef.current=requestAnimationFrame(_fl);
-  },[markups,zoom,setSelectedId,dispatch]);
+  },[markups,setSelectedId,dispatch]);
 
   // F2+F8: ResizeObserver with DPR scaling and rAF coalescing
   useEffect(()=>{
@@ -696,23 +697,23 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
 
   const redraw=useCallback(()=>{
     const dc={
-      canvasRef,dprRef,mousePosRef,snapPosRef,boxSelectRectRef,panRef,
+      canvasRef,dprRef,mousePosRef,snapPosRef,boxSelectRectRef,panRef,zoomRef,
       mouseCanvasRef,flashMarkupIdRef,flashStartTimeRef,
       canvasSize,imgRefs,hoveredPtRef,
       drawMarkup,drawInProgress,drawScaleBar,drawLUTLegend,
       drawSnapIndicator,drawDisplacementVectors,drawAirwayOverlay,
-      markups,selectedId,selectedIds,zoom,sessionImage,calibration,t,
+      markups,selectedId,selectedIds,sessionImage,calibration,t,
       currentDraw,snapEnabled,showScaleBar,showDefTooltips,showLUT,
       showAnnotations,annotationSize,showDisplacement,compareSession,
       getProcessed,angleMode,lutMode,lutInvert,activeTool,
       displacementOverlay,overlayBlend,overlayAlignMode,overlayVectorScale,
       showTrackingLines,refLandmark1,refLandmark2,showCalib,pendingRuler,
-      showGrid,showAirwayOverlay,
+      showGrid,showAirwayOverlay,showCpAlways,showAnchorAlways,
       alignTwoPoints,
       silhouettes:SILHOUETTES,
     };
     createRedraw(dc)();
-  },[markups,selectedId,selectedIds,zoom,sessionImage,calibration,t,currentDraw,snapEnabled,showScaleBar,showDefTooltips,showLUT,showAnnotations,annotationSize,showDisplacement,compareSession,getProcessed,angleMode,lutMode,lutInvert,activeTool,displacementOverlay,overlayBlend,overlayAlignMode,overlayVectorScale,showTrackingLines,refLandmark1,refLandmark2,showCalib,pendingRuler,showGrid,showAirwayOverlay]);
+  },[markups,selectedId,selectedIds,sessionImage,calibration,t,currentDraw,snapEnabled,showScaleBar,showDefTooltips,showLUT,showAnnotations,annotationSize,showDisplacement,compareSession,getProcessed,angleMode,lutMode,lutInvert,activeTool,displacementOverlay,overlayBlend,overlayAlignMode,overlayVectorScale,showTrackingLines,refLandmark1,refLandmark2,showCalib,pendingRuler,showGrid,showAirwayOverlay,showCpAlways,showAnchorAlways]);
 
   useEffect(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});},[redraw]);
   const scheduleRedraw=useCallback(()=>{if(!rafRef.current)rafRef.current=requestAnimationFrame(()=>{rafRef.current=null;redraw();});},[redraw]);
@@ -754,9 +755,9 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           case"contextMenu":{e.preventDefault();const hitMarkup=selectedId||null;setContextMenu({x:window.innerWidth/2,y:window.innerHeight/2,markupId:hitMarkup,imageX:0,imageY:0});return;}
           case"placeUndo":{if(placingMode&&placingQueue.length>0){if(placingIdx>0)dispatch({type:"SET",payload:{placingIdx:placingIdx-1}});else{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}return;}const idsToDelete=selectedIds.length?selectedIds:selectedId?[selectedId]:[];const lockedIds=new Set(markups.filter(m=>m.locked).map(m=>m.id));const filtered=idsToDelete.filter(id=>!lockedIds.has(id));if(filtered.length){pushUndo();updSession({markups:refreshAutoMeas(markups.filter(m=>!filtered.includes(m.id)))});}dispatch({type:"SET",payload:{selectedIds:[],selectedId:null}});return;}
           case"deleteSelected":{const idsToDelete=selectedIds.length?selectedIds:selectedId?[selectedId]:[];const lockedIds=new Set(markups.filter(m=>m.locked).map(m=>m.id));const filtered=idsToDelete.filter(id=>!lockedIds.has(id));if(filtered.length){pushUndo();updSession({markups:refreshAutoMeas(markups.filter(m=>!filtered.includes(m.id)))});}dispatch({type:"SET",payload:{selectedIds:[],selectedId:null}});return;}
-          case"zoomIn":dispatch({type:"SET",payload:{zoom:z=>clamp(z*1.15,0.05,15)}});return;
-          case"zoomOut":dispatch({type:"SET",payload:{zoom:z=>clamp(z/1.15,0.05,15)}});return;
-          case"zoomReset":{dispatch({type:"SET",payload:{zoom:1}});panRef.current={x:40,y:40};dispatch({type:"SET",payload:{pan:{x:40,y:40}}});return;}
+          case"zoomIn":{zoomRef.current=clamp(zoomRef.current*1.15,0.05,15);dispatch({type:"SET",payload:{zoom:zoomRef.current}});return;}
+          case"zoomOut":{zoomRef.current=clamp(zoomRef.current/1.15,0.05,15);dispatch({type:"SET",payload:{zoom:zoomRef.current}});return;}
+          case"zoomReset":{zoomRef.current=1;dispatch({type:"SET",payload:{zoom:1}});panRef.current={x:40,y:40};dispatch({type:"SET",payload:{pan:{x:40,y:40}}});return;}
           case"tool":{dispatch({type:"SET",payload:{activeTool:matched.toolId}});dispatch({type:"SET",payload:{currentDraw:null}});return;}
         }
       }
@@ -770,7 +771,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     if(e.button===1){e.preventDefault();isPanning.current=true;panStart.current={mx:e.clientX,my:e.clientY,px:panRef.current.x,py:panRef.current.y};return;}
     if(e.button!==0)return;
     const sp=getCanvasPos(e);let ip=toImage(sp.x,sp.y);
-    ip=snapPoint(ip,markups,12/zoom,snapEnabled);
+    ip=snapPoint(ip,markups,12/zoomRef.current,snapEnabled);
      if(placingMode&&placingQueue.length>0&&placingIdx<placingQueue.length){
        const qid=placingQueue[placingIdx];
        const updatedMarkups=markups.map(m=>m.id===qid?{...m,points:[ip],placed:true}:m);
@@ -791,7 +792,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
      }
     if(activeTool==="pan"){isPanning.current=true;panStart.current={mx:e.clientX,my:e.clientY,px:panRef.current.x,py:panRef.current.y};return;}
     if(activeTool==="select"){
-      const hit=hitTest(markups,ip,zoom);
+      const hit=hitTest(markups,ip,zoomRef.current);
       if(!hit){
         boxSelectRectRef.current={x1:ip.x,y1:ip.y,x2:ip.x,y2:ip.y};
         dispatch({type:"SET",payload:{selectedIds:[],selectedId:null}});
@@ -805,8 +806,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       if(m?.locked){isDragging.current=false;return;}
         if(m?.type==="silhouette"){
           try {
-            const handles = getSilhouetteHandlesImage(m, zoom);
-            const thr = Math.max(10, 20 * Math.sqrt(zoom)) / zoom;
+            const handles = getSilhouetteHandlesImage(m, zoomRef.current);
+            const thr = Math.max(10, 20 * Math.sqrt(zoomRef.current)) / zoomRef.current;
             if (handles.rotCenter && isFinite(handles.rotCenter.x) && dist(ip, handles.rotCenter) < thr) {
               silhouetteAction.current = {
                 type: "rotate", markupId: hit, startIp: ip,
@@ -817,7 +818,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
               return;
             }
             if (m.paths) {
-              const ptThr = 8 / zoom;
+              const ptThr = 8 / zoomRef.current;
               const rot = m.rotation || 0;
               const sc = m.scale || 1;
               const pos = m.position || { x: 0, y: 0 };
@@ -900,7 +901,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
               }
               return;
             }
-            const cornerThr = Math.max(6, 10 * Math.sqrt(zoom)) / zoom;
+            const cornerThr = Math.max(6, 10 * Math.sqrt(zoomRef.current)) / zoomRef.current;
             for (let hi = 0; hi < handles.corners.length; hi++) {
               const c = handles.corners[hi];
               if (isFinite(c.x) && dist(ip, c) < cornerThr) {
@@ -957,7 +958,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         }
         isDragging.current=true;dragMid.current=hit;dragStartState.current=snapshotRef.current();
         let bi=0,bd=Infinity;(m.points||[]).forEach((p,i)=>{const d=dist(p,ip);if(d<bd){bd=d;bi=i;}});
-        if(bd>12/zoom)bi=-1;
+        if(bd>12/zoomRef.current)bi=-1;
         dragPtIdx.current=bi;dragStart.current=ip;
       return;
     }
@@ -975,7 +976,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     if(activeTool==="arrow"){if(!currentDraw)dispatch({type:"SET",payload:{currentDraw:{type:"arrow",points:[ip]}}});else{const p1=currentDraw.points[0],p2=ip;if(p1.x>-9000&&p2.x>-9000){addMarkup({type:"arrow",points:[p1,p2],color:"#34d399",width:2});}dispatch({type:"SET",payload:{currentDraw:null}});}return;}
     if(activeTool==="tangent"){
       if(!currentDraw){
-        const thr=25/zoom;
+        const thr=25/zoomRef.current;
         const hit=findTangentOnCurve(markups,ip,thr);
         if(hit){
           const a=hit.tangentAngle;
@@ -1006,7 +1007,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     if(activeTool==="mirror"){
       if(!currentDraw){
         let bestId=null,bd=Infinity;
-        const thr=16/zoom;
+        const thr=16/zoomRef.current;
         for(const m2 of markups){
           if(m2.type!=="point"||m2.visible===false||m2.locked)continue;
           const vp2=vpts(m2);
@@ -1040,7 +1041,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     if(["line","angle3","angle4","polygon","curve","polyline","perp"].includes(activeTool)){
       if(!currentDraw)dispatch({type:"SET",payload:{currentDraw:{type:activeTool,points:[ip],curveStyle:activeTool==="curve"?"bspline":"linear",replacingId}}});
       else{const nps=[...currentDraw.points,ip];const need={line:2,angle3:3,angle4:4,perp:3}[activeTool];if(need&&nps.length>=need){finalizeMarkup({...currentDraw,points:nps});dispatch({type:"SET",payload:{currentDraw:null}});}else dispatch({type:"SET",payload:{currentDraw:{...currentDraw,points:nps}}});}return;}
-  },[activeTool,markups,zoom,snapEnabled,currentDraw,selectedMarkup,selectedIds,placingMode,placingQueue,placingIdx,replacingId,setSelectedId,updMarkup,addMarkup,finalizeMarkup,toImage,getCanvasPos,t,analysisTemplate,autoCreateMeasurements,dispatch,norms,pushUndo,refreshAutoMeas,updSession,calibration]);
+  },[activeTool,markups,snapEnabled,currentDraw,selectedMarkup,selectedIds,placingMode,placingQueue,placingIdx,replacingId,setSelectedId,updMarkup,addMarkup,finalizeMarkup,toImage,getCanvasPos,t,analysisTemplate,autoCreateMeasurements,dispatch,norms,pushUndo,refreshAutoMeas,updSession,calibration]);
 
   const syncTangents=(curveId,dx,dy)=>{markups.forEach(tm=>{if(tm.type==="tangent"&&tm.tangentCurveId===curveId){const pts=tm.points||[];if(tm.tangentAngle!=null){const newPts=[{x:pts[0].x+dx,y:pts[0].y+dy},{x:pts[1].x+dx,y:pts[1].y+dy}];updMarkup(tm.id,{points:newPts});}else{updMarkup(tm.id,{points:pts.map(p=>({x:p.x+dx,y:p.y+dy}))});}}});};
   const syncRefDeps=(label,dx,dy)=>{if(!label)return;markups.forEach(dm=>{if(dm.type==="point"||!dm.refLabels)return;const rl=dm.refLabels;let changed=false;const pts=(dm.points||[]).map((p,i)=>{if(rl[i]===label){changed=true;return{x:p.x+dx,y:p.y+dy};}return p;});if(changed){const patch={points:pts};if(dm.type==="bezier"&&dm.cp)patch.cp=dm.cp.map(cp=>({x:cp.x+dx,y:cp.y+dy}));updMarkup(dm.id,patch);}});};
@@ -1050,8 +1051,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     mouseCanvasRef.current=sp;
     // F1: write pointer state to refs — no dispatch, no React re-render
     mousePosRef.current=sp;
-    if((snapEnabled.points||snapEnabled.lines)&&activeTool!=="select"&&activeTool!=="pan"){const ip=toImage(sp.x,sp.y);const sn=snapPoint(ip,markups,12/zoom,snapEnabled);const prev=snapPosRef.current;snapPosRef.current=(Math.abs(sn.x-ip.x)>0.1||Math.abs(sn.y-ip.y)>0.1)?sn:null;if((prev===null)!==(snapPosRef.current===null)||((prev&&snapPosRef.current)&&(prev.x!==snapPosRef.current.x||prev.y!==snapPosRef.current.y)))scheduleRedrawRef.current();}else{if(snapPosRef.current!==null){snapPosRef.current=null;scheduleRedrawRef.current();}}
-    if(activeTool==="select"&&!isDragging.current&&!silhouetteAction.current){const ip=toImage(sp.x,sp.y);let best=null,bd=Infinity;const ptThr=12/zoom;for(const m2 of markups){if(m2.locked||m2.visible===false)continue;if(m2.type==="point"){const vp=vpts(m2);if(vp.length){const d=dist(ip,vp[0]);if(d<bd&&d<ptThr){bd=d;best={type:"point",mid:m2.id};}}}if(m2.type==="silhouette"){const paths=m2.paths||SILHOUETTES[m2.silhouetteType]?.paths;if(!paths)continue;const rot=m2.rotation||0;const sc=m2.scale||1;const pos=m2.position||{x:0,y:0};const cosR=Math.cos(rot);const sinR=Math.sin(rot);paths.forEach((path,pi)=>{path.points.forEach((p,ptI)=>{const sx=p.x*sc*100;const sy=p.y*100;const rx=sx*cosR-sy*sinR;const ry=sx*sinR+sy*cosR;const d=dist(ip,{x:rx+pos.x,y:ry+pos.y});if(d<bd&&d<ptThr){bd=d;best={type:"silhouette",mid:m2.id,pathIdx:pi,ptIdx:ptI};}});});if(m2.id===selectedId){try{const h=getSilhouetteHandlesImage(m2,zoom);const rotThr=Math.max(10,22*Math.sqrt(zoom))/zoom;if(h.rotCenter&&isFinite(h.rotCenter.x)){const d=dist(ip,h.rotCenter);if(d<rotThr&&d<bd){bd=d;best={type:"rotate",mid:m2.id};}}const cornerThr=Math.max(8,12*Math.sqrt(zoom))/zoom;h.corners.forEach((c,ci)=>{if(isFinite(c.x)){const d=dist(ip,c);if(d<cornerThr&&d<bd){bd=d;best={type:"corner",mid:m2.id,cornerIdx:ci};}}});}catch{/*silent*/}}        }else if(m2.type==="curve"||m2.type==="polyline"||m2.type==="polygon"||m2.type==="bezier"||m2.type==="tangent"){if(m2.type==="bezier"&&m2.cp){m2.cp.forEach((p,i)=>{const d=dist(ip,p);if(d<bd&&d<ptThr){bd=d;best={type:"bezierCp",mid:m2.id,cpIdx:i};}});}(m2.points||[]).forEach((p,i)=>{const d=dist(ip,p);if(d<bd&&d<ptThr){bd=d;best={type:m2.type==="bezier"?"bezier":m2.type==="tangent"?"tangent":"path",mid:m2.id,ptIdx:i};}});}}const _prevHover=hoveredPtRef.current;hoveredPtRef.current=best;if(JSON.stringify(_prevHover)!==JSON.stringify(best))scheduleRedrawRef.current();}else{hoveredPtRef.current=null;}
+    if((snapEnabled.points||snapEnabled.lines)&&activeTool!=="select"&&activeTool!=="pan"){const ip=toImage(sp.x,sp.y);const sn=snapPoint(ip,markups,12/zoomRef.current,snapEnabled);const prev=snapPosRef.current;snapPosRef.current=(Math.abs(sn.x-ip.x)>0.1||Math.abs(sn.y-ip.y)>0.1)?sn:null;if((prev===null)!==(snapPosRef.current===null)||((prev&&snapPosRef.current)&&(prev.x!==snapPosRef.current.x||prev.y!==snapPosRef.current.y)))scheduleRedrawRef.current();}else{if(snapPosRef.current!==null){snapPosRef.current=null;scheduleRedrawRef.current();}}
+    if(activeTool==="select"&&!isDragging.current&&!silhouetteAction.current){const ip=toImage(sp.x,sp.y);let best=null,bd=Infinity;const ptThr=12/zoomRef.current;for(const m2 of markups){if(m2.locked||m2.visible===false)continue;if(m2.type==="point"){const vp=vpts(m2);if(vp.length){const d=dist(ip,vp[0]);if(d<bd&&d<ptThr){bd=d;best={type:"point",mid:m2.id};}}}if(m2.type==="silhouette"){const paths=m2.paths||SILHOUETTES[m2.silhouetteType]?.paths;if(!paths)continue;const rot=m2.rotation||0;const sc=m2.scale||1;const pos=m2.position||{x:0,y:0};const cosR=Math.cos(rot);const sinR=Math.sin(rot);paths.forEach((path,pi)=>{path.points.forEach((p,ptI)=>{const sx=p.x*sc*100;const sy=p.y*100;const rx=sx*cosR-sy*sinR;const ry=sx*sinR+sy*cosR;const d=dist(ip,{x:rx+pos.x,y:ry+pos.y});if(d<bd&&d<ptThr){bd=d;best={type:"silhouette",mid:m2.id,pathIdx:pi,ptIdx:ptI};}});});if(m2.id===selectedId){try{const h=getSilhouetteHandlesImage(m2,zoomRef.current);const rotThr=Math.max(10,22*Math.sqrt(zoomRef.current))/zoomRef.current;if(h.rotCenter&&isFinite(h.rotCenter.x)){const d=dist(ip,h.rotCenter);if(d<rotThr&&d<bd){bd=d;best={type:"rotate",mid:m2.id};}}const cornerThr=Math.max(8,12*Math.sqrt(zoomRef.current))/zoomRef.current;h.corners.forEach((c,ci)=>{if(isFinite(c.x)){const d=dist(ip,c);if(d<cornerThr&&d<bd){bd=d;best={type:"corner",mid:m2.id,cornerIdx:ci};}}});}catch{/*silent*/}}        }else if(m2.type==="curve"||m2.type==="polyline"||m2.type==="polygon"||m2.type==="bezier"||m2.type==="tangent"){if(m2.type==="bezier"&&m2.cp){m2.cp.forEach((p,i)=>{const d=dist(ip,p);if(d<bd&&d<ptThr){bd=d;best={type:"bezierCp",mid:m2.id,cpIdx:i};}});}(m2.points||[]).forEach((p,i)=>{const d=dist(ip,p);if(d<bd&&d<ptThr){bd=d;best={type:m2.type==="bezier"?"bezier":m2.type==="tangent"?"tangent":"path",mid:m2.id,ptIdx:i};}});}}const _prevHover=hoveredPtRef.current;hoveredPtRef.current=best;if(JSON.stringify(_prevHover)!==JSON.stringify(best))scheduleRedrawRef.current();}else{hoveredPtRef.current=null;}
     const _hp=hoveredPtRef.current;const _isPanning=isPanning.current;const _curCursor=(_hp&&(_hp.type==="bezierCp"||_hp.type==="bezier"||_hp.type==="path"||_hp.type==="point"||_hp.type==="tangent"||_hp.type==="silhouette"||_hp.type==="rotate"||_hp.type==="corner"))?"pointer":_isPanning?"grabbing":activeTool==="pan"?"grab":activeTool==="select"?"default":"crosshair";if(canvasRef.current.style.cursor!==_curCursor)canvasRef.current.style.cursor=_curCursor;
     if(boxSelectRectRef.current){const ip=toImage(sp.x,sp.y);boxSelectRectRef.current={...boxSelectRectRef.current,x2:ip.x,y2:ip.y};scheduleRedrawRef.current();return;}
     if(isPanning.current&&panStart.current){panRef.current={x:panStart.current.px+(e.clientX-panStart.current.mx),y:panStart.current.py+(e.clientY-panStart.current.my)};scheduleRedrawRef.current();return;}
@@ -1075,7 +1076,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         scheduleRedrawRef.current();
       } catch { silhouetteAction.current=null; /*silent*/ }
     }
-  },[activeTool,markups,zoom,snapEnabled,selectedId,updMarkup,updMarkups,toImage,getCanvasPos,currentDraw?.type,syncTangents,syncRefDeps]);
+  },[activeTool,markups,snapEnabled,selectedId,updMarkup,updMarkups,toImage,getCanvasPos,currentDraw?.type,syncTangents,syncRefDeps]);
 
   const handleMouseUp=()=>{
     if(boxSelectRectRef.current){
@@ -1105,18 +1106,18 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     isPanning.current=false;isDragging.current=false;silhouetteAction.current=null;multiDragIdsRef.current=null;
   };
   const handleDblClick=()=>{if((["polygon","curve","polyline","bezier"].includes(activeTool))&&currentDraw?.points.length>=2){finalizeMarkup(currentDraw);dispatch({type:"SET",payload:{currentDraw:null}});}};
-  const handleCanvasContextMenu=useCallback(e=>{e.preventDefault();const sp=getCanvasPos(e);const ip=toImage(sp.x,sp.y);const hit=hitTest(markups,ip,zoom);setContextMenu(hit?{x:e.clientX,y:e.clientY,markupId:hit,imageX:ip.x,imageY:ip.y}:{x:e.clientX,y:e.clientY,markupId:null,imageX:ip.x,imageY:ip.y});},[markups,zoom,getCanvasPos,toImage]);
+  const handleCanvasContextMenu=useCallback(e=>{e.preventDefault();const sp=getCanvasPos(e);const ip=toImage(sp.x,sp.y);const hit=hitTest(markups,ip,zoomRef.current);setContextMenu(hit?{x:e.clientX,y:e.clientY,markupId:hit,imageX:ip.x,imageY:ip.y}:{x:e.clientX,y:e.clientY,markupId:null,imageX:ip.x,imageY:ip.y});},[markups,getCanvasPos,toImage]);
   useEffect(()=>{if(!contextMenu)return;const close=()=>setContextMenu(null);const onKey=e=>{if(e.key==="Escape")close();if(e.key==="ArrowDown"||e.key==="ArrowUp"){e.preventDefault();const items=document.querySelectorAll('[data-cmenu] [role="menuitem"]');const current=e.target.closest('[role="menuitem"]');const idx=Array.from(items).indexOf(current);const next=e.key==="ArrowDown"?Math.min(idx+1,items.length-1):Math.max(idx-1,0);if(items[next])items[next].focus();}if(e.key==="Tab"){e.preventDefault();const items=document.querySelectorAll('[data-cmenu] [role="menuitem"]');const first=items[0];const last=items[items.length-1];if(e.shiftKey){if(document.activeElement===first){last.focus();}}else{if(document.activeElement===last){first.focus();}}}};const onClickOutside=e=>{if(!e.target.closest('[data-cmenu]'))close()};document.addEventListener("mousedown",onClickOutside);document.addEventListener("keydown",onKey);setTimeout(()=>{const first=document.querySelector('[data-cmenu] [role="menuitem"]');if(first)first.focus();},0);return()=>{document.removeEventListener("mousedown",onClickOutside);document.removeEventListener("keydown",onKey);};},[contextMenu]);
-  useEffect(()=>{const c=canvasRef.current;if(!c)return;const onWheel=e=>{if(Math.abs(e.deltaY)>0.1||Math.abs(e.deltaX)>0.1){e.preventDefault();e.stopPropagation();const sp=getCanvasPos(e),f=e.deltaY>0?0.9:1.1,nz=clamp(zoom*f,0.05,15);const prev=panRef.current;panRef.current={x:sp.x-(sp.x-prev.x)*(nz/zoom),y:sp.y-(sp.y-prev.y)*(nz/zoom)};dispatch({type:"SET",payload:{pan:panRef.current}});dispatch({type:"SET",payload:{zoom:nz}});}};c.addEventListener("wheel",onWheel,{passive:false});return()=>c.removeEventListener("wheel",onWheel);},[zoom,dispatch,getCanvasPos]);
+  useEffect(()=>{const c=canvasRef.current;if(!c)return;let syncPending=false;const onWheel=e=>{if(Math.abs(e.deltaY)>0.1||Math.abs(e.deltaX)>0.1){e.preventDefault();e.stopPropagation();const sp=getCanvasPos(e);const cz=zoomRef.current;const f=e.deltaY>0?0.9:1.1;const nz=clamp(cz*f,0.05,15);zoomRef.current=nz;const prev=panRef.current;panRef.current={x:sp.x-(sp.x-prev.x)*(nz/cz),y:sp.y-(sp.y-prev.y)*(nz/cz)};scheduleRedrawRef.current();if(!syncPending){syncPending=true;requestAnimationFrame(()=>{syncPending=false;dispatch({type:"SET",payload:{zoom:zoomRef.current}});});}}};c.addEventListener("wheel",onWheel,{passive:false});return()=>c.removeEventListener("wheel",onWheel);},[]);
   const touchStartRef=useRef();const touchMoveRef=useRef();const touchEndRef=useRef();const longPressTimerRef=useRef(null);
   touchStartRef.current=e=>{
-    if(e.touches.length===1){const t2=e.touches[0];const now=Date.now();if(now-lastTapRef.current<300){handleDblClick();lastTapRef.current=0;}else{lastTapRef.current=now;handleMouseDown({button:0,clientX:t2.clientX,clientY:t2.clientY});const sp=getCanvasPos({clientX:t2.clientX,clientY:t2.clientY});const ip=toImage(sp.x,sp.y);const hit=hitTest(markups,ip,zoom);longPressTimerRef.current=setTimeout(()=>{longPressTimerRef.current=null;setContextMenu({x:t2.clientX,y:t2.clientY,markupId:hit||null,imageX:ip.x,imageY:ip.y});},500);}}
+    if(e.touches.length===1){const t2=e.touches[0];const now=Date.now();if(now-lastTapRef.current<300){handleDblClick();lastTapRef.current=0;}else{lastTapRef.current=now;handleMouseDown({button:0,clientX:t2.clientX,clientY:t2.clientY});const sp=getCanvasPos({clientX:t2.clientX,clientY:t2.clientY});const ip=toImage(sp.x,sp.y);const hit=hitTest(markups,ip,zoomRef.current);longPressTimerRef.current=setTimeout(()=>{longPressTimerRef.current=null;setContextMenu({x:t2.clientX,y:t2.clientY,markupId:hit||null,imageX:ip.x,imageY:ip.y});},500);}}
     if(e.touches.length===2){lastTouchDist.current=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);if((activeTool==="curve"||activeTool==="polyline"||activeTool==="polygon")&&currentDraw?.points.length>=2){handleMouseDown({button:0,clientX:(e.touches[0].clientX+e.touches[1].clientX)/2,clientY:(e.touches[0].clientY+e.touches[1].clientY)/2,ctrlKey:true});}}
   };
   touchMoveRef.current=e=>{
     if(longPressTimerRef.current){clearTimeout(longPressTimerRef.current);longPressTimerRef.current=null;}
     if(e.touches.length===1){const t2=e.touches[0];handleMouseMove({clientX:t2.clientX,clientY:t2.clientY});}
-    if(e.touches.length===2&&lastTouchDist.current){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);const f=d/lastTouchDist.current,nz=clamp(zoom*f,0.05,15);const cx=(e.touches[0].clientX+e.touches[1].clientX)/2,cy=(e.touches[0].clientY+e.touches[1].clientY)/2;const r=canvasRef.current.getBoundingClientRect();const sp={x:cx-r.left,y:cy-r.top};const prev=panRef.current;panRef.current={x:sp.x-(sp.x-prev.x)*(nz/zoom),y:sp.y-(sp.y-prev.y)*(nz/zoom)};dispatch({type:"SET",payload:{pan:panRef.current}});dispatch({type:"SET",payload:{zoom:nz}});lastTouchDist.current=d;}
+    if(e.touches.length===2&&lastTouchDist.current){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);const cz=zoomRef.current;const f=d/lastTouchDist.current,nz=clamp(cz*f,0.05,15);zoomRef.current=nz;const cx=(e.touches[0].clientX+e.touches[1].clientX)/2,cy=(e.touches[0].clientY+e.touches[1].clientY)/2;const r=canvasRef.current.getBoundingClientRect();const sp={x:cx-r.left,y:cy-r.top};const prev=panRef.current;panRef.current={x:sp.x-(sp.x-prev.x)*(nz/cz),y:sp.y-(sp.y-prev.y)*(nz/cz)};scheduleRedrawRef.current();lastTouchDist.current=d;}
   };
   touchEndRef.current=()=>{if(longPressTimerRef.current){clearTimeout(longPressTimerRef.current);longPressTimerRef.current=null;}handleMouseUp();lastTouchDist.current=null;};
   useEffect(()=>{const c=canvasRef.current;if(!c)return;const opts={passive:false};const onStart=e=>{e.preventDefault();touchStartRef.current(e);};const onMove=e=>{e.preventDefault();touchMoveRef.current(e);};const onEnd=e=>{touchEndRef.current(e);};c.addEventListener("touchstart",onStart,opts);c.addEventListener("touchmove",onMove,opts);c.addEventListener("touchend",onEnd,opts);return()=>{c.removeEventListener("touchstart",onStart);c.removeEventListener("touchmove",onMove);c.removeEventListener("touchend",onEnd);};},[]);
@@ -1192,7 +1193,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const panelTabs = PANEL_TABS;
 
   // ── Panel prop bundles ──
-  const pMarkups={markups,t,theme,selectedId,onSelect:selectAndFocusMarkup,onDelete:delMarkup,calibration,placingMode,placingQueue,placingIdx,norms,formatAngle,angleMode,setAngleMode,replacingId,
+  const pMarkups={markups,t,theme,selectedId,onSelect:selectAndFocusMarkup,onDelete:delMarkup,calibration,placingMode,placingQueue,placingIdx,norms,formatAngle,angleMode,setAngleMode,replacingId,dispatch,showCpAlways,showAnchorAlways,
     onToggleVisible:id=>updMarkup(id,{visible:markups.find(m=>m.id===id)?.visible===false}),
     onToggleLock:id=>updMarkup(id,{locked:!markups.find(m=>m.id===id)?.locked}),
     onToggleLabel:id=>updMarkup(id,{noLabel:!markups.find(m=>m.id===id)?.noLabel}),
@@ -1248,7 +1249,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           setActiveTool={setActiveTool} sessionImage={sessionImage} calibration={calibration}
           zoom={zoom} spotlightMode={spotlightMode} updSession={updSession}
           isMobile={isMobile} showMobilePanel={showMobilePanel}
-          panRef={panRef} undo={undo} redo={redo} undoVersion={undoVersion}
+          panRef={panRef} zoomRef={zoomRef} undo={undo} redo={redo} undoVersion={undoVersion}
           undoStackRef={undoStackRef} redoStackRef={redoStackRef}
           handleDblClick={handleDblClick} currentDraw={currentDraw}
           mobileToolsExpanded={mobileToolsExpanded}
@@ -1259,7 +1260,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           setActiveTool={setActiveTool} sessionImage={sessionImage} calibration={calibration}
           zoom={zoom} spotlightMode={spotlightMode} updSession={updSession}
           isMobile={isMobile} showMobilePanel={showMobilePanel}
-          panRef={panRef} undo={undo} redo={redo} undoVersion={undoVersion}
+          panRef={panRef} zoomRef={zoomRef} undo={undo} redo={redo} undoVersion={undoVersion}
           undoStackRef={undoStackRef} redoStackRef={redoStackRef}
           handleDblClick={handleDblClick} currentDraw={currentDraw}
           mobileToolsExpanded={mobileToolsExpanded}
@@ -1393,7 +1394,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
             {copiedMarkupRef.current?item("Paste",()=>pasteMarkup({x:contextMenu.imageX||0,y:contextMenu.imageY||0})):null}
             {item("Select All",()=>{const all=markups.map(x=>x.id);dispatch({type:"SET",payload:{selectedIds:all,selectedId:all.length===1?all[0]:null}});close()})}
             {item("Calibrate ⟺",()=>{dispatch({type:"SET",payload:{showCalib:true}});close()})}
-            {item("Fit to View ⊙",()=>{dispatch({type:"SET",payload:{zoom:1}});panRef.current={x:40,y:40};dispatch({type:"SET",payload:{pan:{x:40,y:40}}});close()})}
+            {item("Fit to View ⊙",()=>{zoomRef.current=1;dispatch({type:"SET",payload:{zoom:1}});panRef.current={x:40,y:40};dispatch({type:"SET",payload:{pan:{x:40,y:40}}});close()})}
             {sep}
             {item(showGrid?"Grid: On ✓":"Grid: Off",()=>{setShowGrid(v=>!v);close()})}
           </>}

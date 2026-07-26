@@ -25,14 +25,15 @@ export function createRedraw(dc) {
     const pan = dc.panRef.current;
 
     const {
-      markups, selectedId, selectedIds, zoom, sessionImage, calibration, t,
+      markups, selectedId, selectedIds, sessionImage, calibration, t,
       currentDraw, snapEnabled, showScaleBar, showDefTooltips, showLUT,
       showAnnotations, annotationSize, showDisplacement, compareSession,
       getProcessed, angleMode, lutMode, lutInvert, activeTool,
       displacementOverlay, overlayBlend, overlayAlignMode, overlayVectorScale,
       showTrackingLines, refLandmark1, refLandmark2, showCalib, pendingRuler,
-      showGrid, showAirwayOverlay,
+      showGrid, showAirwayOverlay, showCpAlways, showAnchorAlways,
     } = dc;
+    const zoom = dc.zoomRef.current;
 
     ctx2d.clearRect(0, 0, W, H);
     ctx2d.fillStyle = t.bg;
@@ -125,7 +126,7 @@ export function createRedraw(dc) {
     }
 
     // ── Draw all markups ──
-    drawMarkups.forEach(m => dc.drawMarkup(ctx2d, m, zoom, pan, drawCalibration, selectedId, t, false, dc.canvasSize.current, angleMode, showAnnotations, annotationSize, dc.hoveredPtRef.current));
+        drawMarkups.forEach(m => dc.drawMarkup(ctx2d, m, zoom, pan, drawCalibration, selectedId, t, false, dc.canvasSize.current, angleMode, showAnnotations, annotationSize, dc.hoveredPtRef.current, { showCpAlways, showAnchorAlways }));
 
     // ── Calibration ruler highlight ──
     if (showCalib && pendingRuler) {

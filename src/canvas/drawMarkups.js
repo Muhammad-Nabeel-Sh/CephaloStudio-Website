@@ -21,6 +21,7 @@ export function drawMeasLabel(ctx, text, x, y, showAnnotations = true, annotatio
     const padding = 3 * annotationSize;
     const bgHeight = 14 * annotationSize;
     ctx.fillStyle = bgColor;
+    ctx.beginPath();
     ctx.roundRect(x - padding, y - bgHeight + 2, metrics.width + padding * 2, bgHeight + 4 , 5);
     ctx.fill();
   }
@@ -30,7 +31,7 @@ export function drawMeasLabel(ctx, text, x, y, showAnnotations = true, annotatio
   ctx.font = prevFont;
 }
 
-export function drawMarkup(ctx, m, zoom, pan, cal, sel, t, reproCollecting, canvasSize, angleMode, showAnnotations = true, annotationSize = 1, hoveredPt = null){
+export function drawMarkup(ctx, m, zoom, pan, cal, sel, t, reproCollecting, canvasSize, angleMode, showAnnotations = true, annotationSize = 1, hoveredPt = null, displayOpts = {}){
   if(m.visible === false) return;
   if(m.type === "point" && m.repro && !isReproPointVisible(m, reproCollecting)) return;
   
@@ -99,7 +100,7 @@ export function drawMarkup(ctx, m, zoom, pan, cal, sel, t, reproCollecting, canv
         drawCircle(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt);
         break;
       case "bezier":
-        drawBezier(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt, pan);
+        drawBezier(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt, pan, displayOpts);
         break;
       case "tangent":
         drawTangent(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt);
@@ -674,7 +675,7 @@ function drawCircle(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotation
   }
 }
 
-function drawBezier(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt, pan) {
+function drawBezier(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt, pan, displayOpts = {}) {
   if (sp.length < 2) return;
   const cp = (m.cp && m.cp.length === 2 * (sp.length - 1))
     ? m.cp.map(p => ({ x: p.x * zoom + pan.x, y: p.y * zoom + pan.y }))
@@ -690,6 +691,7 @@ function drawBezier(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotation
   }
   ctx.stroke();
   ctx.setLineDash([]);
+  ctx.beginPath();
   if (isSel) {
     ctx.strokeStyle = m.color + "44";
     ctx.lineWidth = 1;
@@ -702,22 +704,26 @@ function drawBezier(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotation
     }
     ctx.setLineDash([]);
   }
-  cp.forEach((p, i) => {
-    const isH = hoveredPt && hoveredPt.type === "bezierCp" && hoveredPt.mid === m.id && hoveredPt.cpIdx === i;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, (isSel || isH ? 6 : 4) * Math.sqrt(zoom), 0, 2 * Math.PI);
-    ctx.fillStyle = isH ? "#fff" : (m.color || "#c084fc") + "cc";
-    ctx.fill();
-    if (isSel) { ctx.strokeStyle = t.tx2; ctx.lineWidth = 1; ctx.stroke(); }
-  });
-  sp.forEach((p, i) => {
-    const isH = hoveredPt && hoveredPt.type === "bezier" && hoveredPt.mid === m.id && hoveredPt.ptIdx === i;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, (isSel || isH ? 6 : 4.5) * Math.sqrt(zoom), 0, 2 * Math.PI);
-    ctx.fillStyle = isH ? "#fff" : (m.color || "#c084fc");
-    ctx.fill();
-    if (isSel) { ctx.strokeStyle = t.acc; ctx.lineWidth = 1.5; ctx.stroke(); }
-  });
+  if (isSel || displayOpts.showCpAlways) {
+    cp.forEach((p, i) => {
+      const isH = hoveredPt && hoveredPt.type === "bezierCp" && hoveredPt.mid === m.id && hoveredPt.cpIdx === i;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, (isH ? 8 : 6) * Math.sqrt(zoom), 0, 2 * Math.PI);
+      ctx.fillStyle = isH ? "#fff" : (m.color || "#c084fc") + "cc";
+      ctx.fill();
+      ctx.strokeStyle = t.tx2; ctx.lineWidth = 1; ctx.stroke();
+    });
+  }
+  if (isSel || displayOpts.showAnchorAlways) {
+    sp.forEach((p, i) => {
+      const isH = hoveredPt && hoveredPt.type === "bezier" && hoveredPt.mid === m.id && hoveredPt.ptIdx === i;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, (isSel || isH ? 6 : 4.5) * Math.sqrt(zoom), 0, 2 * Math.PI);
+      ctx.fillStyle = isH ? "#fff" : (m.color || "#c084fc");
+      ctx.fill();
+      if (isSel) { ctx.strokeStyle = t.acc; ctx.lineWidth = 1.5; ctx.stroke(); }
+    });
+  }
   if (showAnnotations && !m.noLabel) {
     const mid = sp[Math.floor(sp.length / 2)];
     drawMeasLabel(ctx, m.label || "Bezier", mid.x, mid.y - 10, showAnnotations, annotationSize, m, m.color || "#c084fc");
