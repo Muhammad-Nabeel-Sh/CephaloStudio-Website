@@ -32,6 +32,7 @@ export function createRedraw(dc) {
       displacementOverlay, overlayBlend, overlayAlignMode, overlayVectorScale,
       showTrackingLines, refLandmark1, refLandmark2, showCalib, pendingRuler,
       showGrid, showAirwayOverlay, showCpAlways, showAnchorAlways,
+      snapTolerance, autoHideLabels, annotationBold,
     } = dc;
     const zoom = dc.zoomRef.current;
 
@@ -126,7 +127,7 @@ export function createRedraw(dc) {
     }
 
     // ── Draw all markups ──
-        drawMarkups.forEach(m => dc.drawMarkup(ctx2d, m, zoom, pan, drawCalibration, selectedId, t, false, dc.canvasSize.current, angleMode, showAnnotations, annotationSize, dc.hoveredPtRef.current, { showCpAlways, showAnchorAlways }));
+        drawMarkups.forEach(m => dc.drawMarkup(ctx2d, m, zoom, pan, drawCalibration, selectedId, t, false, dc.canvasSize.current, angleMode, showAnnotations, annotationSize, dc.hoveredPtRef.current, { showCpAlways, showAnchorAlways, autoHideLabels, annotationBold }));
 
     // ── Calibration ruler highlight ──
     if (showCalib && pendingRuler) {
@@ -311,7 +312,7 @@ export function createRedraw(dc) {
     // ── Snap indicator ──
     if ((snapEnabled.points || snapEnabled.lines) && snapPos) {
       const _mouseImg = { x: (mousePos.x - pan.x) / zoom, y: (mousePos.y - pan.y) / zoom };
-      dc.drawSnapIndicator(ctx2d, snapPos, zoom, pan, drawMarkups, _mouseImg, 12 / zoom, snapEnabled);
+      dc.drawSnapIndicator(ctx2d, snapPos, zoom, pan, drawMarkups, _mouseImg, snapTolerance / zoom, snapEnabled);
     }
 
     // ── Box select rectangle ──

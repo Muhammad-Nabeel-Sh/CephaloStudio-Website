@@ -53,6 +53,13 @@ export const INITIAL_UI = {
   showCpAlways: false,
   showAnchorAlways: false,
 
+  defaultLineStyle: "solid",
+  defaultMarkupColor: null,
+  defaultLineWidth: 1.5,
+  autoHideLabels: false,
+  annotationBold: false,
+  snapTolerance: 12,
+
 };
 
 // ─── Action Types ──────────────────────────────────────────────

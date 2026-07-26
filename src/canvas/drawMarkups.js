@@ -8,12 +8,14 @@ function isReproPointVisible(m, reproCollecting){
   return m.repro.studyId === reproCollecting.studyId && m.repro.opId === reproCollecting.opId && m.repro.trialIdx === reproCollecting.trialIdx;
 }
 
+let _annotationBold = false;
+
 export function drawMeasLabel(ctx, text, x, y, showAnnotations = true, annotationSize = 1, m = null, color = "#fff", bgColor = "rgba(46, 46, 46, 0.85)"){
   if(!showAnnotations || (m && m.noLabel)) return;
   
   const fontSize = 10 * annotationSize;
   const prevFont = ctx.font;
-  ctx.font = `${fontSize}px "DM Mono",monospace`;
+  ctx.font = `${_annotationBold ? "bold " : ""}${fontSize}px "DM Mono",monospace`;
   
   const prevFill = ctx.fillStyle;
   if(bgColor){
@@ -34,6 +36,8 @@ export function drawMeasLabel(ctx, text, x, y, showAnnotations = true, annotatio
 export function drawMarkup(ctx, m, zoom, pan, cal, sel, t, reproCollecting, canvasSize, angleMode, showAnnotations = true, annotationSize = 1, hoveredPt = null, displayOpts = {}){
   if(m.visible === false) return;
   if(m.type === "point" && m.repro && !isReproPointVisible(m, reproCollecting)) return;
+  const { autoHideLabels, annotationBold } = displayOpts;
+  _annotationBold = !!annotationBold;
   
   const sc = p => ({ x: p.x * zoom + pan.x, y: p.y * zoom + pan.y });
   const fmtAngle = (v) => {
@@ -49,6 +53,7 @@ export function drawMarkup(ctx, m, zoom, pan, cal, sel, t, reproCollecting, canv
   if(!sp.length && m.type !== "silhouette") return;
   
   const isSel = sel === m.id;
+  const drawLabel = showAnnotations && !(autoHideLabels && m.type !== "point");
   ctx.save();
   try {
     switch(m.type){
@@ -60,53 +65,53 @@ export function drawMarkup(ctx, m, zoom, pan, cal, sel, t, reproCollecting, canv
         break;
       case "line":
       case "parallel":
-        drawLine(ctx, m, sp, isSel, t, cal, zoom, canvasSize, showAnnotations, annotationSize);
+        drawLine(ctx, m, sp, isSel, t, cal, zoom, canvasSize, drawLabel, annotationSize);
         break;
       case "angle3":
-        drawAngle3(ctx, m, sp, isSel, t, cal, zoom, fmtAngle, showAnnotations, annotationSize);
+        drawAngle3(ctx, m, sp, isSel, t, cal, zoom, fmtAngle, drawLabel, annotationSize);
         break;
       case "angle4":
-        drawAngle4(ctx, m, sp, t, fmtAngle, zoom, showAnnotations, annotationSize);
+        drawAngle4(ctx, m, sp, t, fmtAngle, zoom, drawLabel, annotationSize);
         break;
       case "polygon":
-        drawPolygon(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt);
+        drawPolygon(ctx, m, sp, isSel, t, cal, zoom, drawLabel, annotationSize, hoveredPt);
         break;
       case "curve":
       case "polyline":
-        drawCurve(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt);
+        drawCurve(ctx, m, sp, isSel, t, cal, zoom, drawLabel, annotationSize, hoveredPt);
         break;
       case "perp":
-        drawPerp(ctx, m, sp, t, cal, zoom, pan, showAnnotations, annotationSize);
+        drawPerp(ctx, m, sp, t, cal, zoom, pan, drawLabel, annotationSize);
         break;
       case "text":
         drawText(ctx, m, sp, isSel, t, zoom, showAnnotations, annotationSize);
         break;
       case "projDist":
-        drawProjDist(ctx, m, sp, isSel, t, cal, zoom, pan, showAnnotations, annotationSize);
+        drawProjDist(ctx, m, sp, isSel, t, cal, zoom, pan, drawLabel, annotationSize);
         break;
       case "ruler":
-        drawRuler(ctx, m, sp, t, zoom, showAnnotations, annotationSize);
+        drawRuler(ctx, m, sp, t, zoom, drawLabel, annotationSize);
         break;
       case "silhouette":
         drawSilhouette(ctx, m, isSel, t, zoom, pan, showAnnotations, annotationSize, hoveredPt);
         break;
       case "ellipse":
-        drawEllipse(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt);
+        drawEllipse(ctx, m, sp, isSel, t, cal, zoom, drawLabel, annotationSize, hoveredPt);
         break;
       case "arc":
-        drawArc(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt);
+        drawArc(ctx, m, sp, isSel, t, cal, zoom, drawLabel, annotationSize, hoveredPt);
         break;
       case "circle":
-        drawCircle(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt);
+        drawCircle(ctx, m, sp, isSel, t, cal, zoom, drawLabel, annotationSize, hoveredPt);
         break;
       case "bezier":
-        drawBezier(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt, pan, displayOpts);
+        drawBezier(ctx, m, sp, isSel, t, cal, zoom, drawLabel, annotationSize, hoveredPt, pan, displayOpts);
         break;
       case "tangent":
-        drawTangent(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize, hoveredPt);
+        drawTangent(ctx, m, sp, isSel, t, cal, zoom, drawLabel, annotationSize, hoveredPt);
         break;
       case "concentric":
-        drawConcentric(ctx, m, sp, isSel, t, cal, zoom, showAnnotations, annotationSize);
+        drawConcentric(ctx, m, sp, isSel, t, cal, zoom, drawLabel, annotationSize);
         break;
     }
   } catch { /*silent*/ }
