@@ -1,8 +1,6 @@
 import { useRef, useEffect } from "react";
-import { ChartCard, FONT, FONT_STACK, PALETTE } from "./moduleChartsUtils.jsx";
+import { ChartCard, FONT, FONT_STACK, PALETTE, fmtP } from "./moduleChartsUtils.jsx";
 import PlotlyChart, { heatmapLayout, heatmapData } from "./PlotlyChart.jsx";
-
-function fmtP(p) { if (p == null || !isFinite(p)) return "—"; if (p < 0.001) return "<.001"; return p.toFixed(3).replace(/^0(?=\.)/, ""); }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // RELIABILITY CHARTS
@@ -16,7 +14,7 @@ export function ReliabilityCharts({ results, t }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <ICCForestPlot details={details} t={t} />
-      <ICCMatrixPlot details={details} t={t} />
+      <ICCBarPlot details={details} t={t} />
       <CollectiveBlandAltman details={details} t={t} />
       <ErrorMapPlot results={results} t={t} />
       <MethodErrorBarPlot details={details} t={t} />
@@ -72,42 +70,52 @@ function ICCForestPlot({ details, t }) {
   </ChartCard>;
 }
 
-function ICCMatrixPlot({ details, t }) {
-  const n = details.length;
-  if (n < 2) return null;
-  const labels = details.map(d => d.label);
-  const z = Array.from({ length: n }, (_, i) =>
-    Array.from({ length: n }, (_, j) =>
-      i === j ? 1 : (details[i].icc + (details[j]?.icc || 0)) / 2
-    )
-  );
-  const displayTxt = Array.from({ length: n }, (_, i) =>
-    Array.from({ length: n }, (_, j) => z[i][j] != null ? z[i][j].toFixed(2) : "")
-  );
-  const hoverTxt = Array.from({ length: n }, (_, i) =>
-    Array.from({ length: n }, (_, j) =>
-      i === j ? "diagonal" : `ICC avg = ${z[i][j].toFixed(3)}`
-    )
-  );
-  const data = heatmapData(z, labels, labels, displayTxt, {
-    zmin: 0, zmax: 1,
-    colorscale: [
-      [0, "#b91c1c"],
-      [0.25, "#fca5a5"],
-      [0.5, "#e5e7eb"],
-      [0.75, "#86efac"],
-      [1, "#16a34a"],
-    ],
-    customdata: hoverTxt,
-    texttemplate: "%{text}",
-    textfont: { color: "#1f2937", size: 10, family: "'DM Sans',sans-serif" },
-    hovertemplate: "%{y} vs %{x}: <b>%{customdata}</b><extra></extra>",
-  });
-  return (
-    <ChartCard title="ICC Pairwise Heatmap" t={t}>
-      <PlotlyChart data={data} layout={{...heatmapLayout(t, { height: Math.max(350, n * 28 + 80) }), xaxis: { ...heatmapLayout(t).xaxis, title: { text: "Landmark", font: { size: 12 } } }, yaxis: { ...heatmapLayout(t).yaxis, title: { text: "Landmark", font: { size: 12 } } } }} />
-    </ChartCard>
-  );
+function ICCBarPlot({ details, t }) {
+  const chartable = details.filter(d => d.icc != null);
+  if (chartable.length === 0) return null;
+  const sorted = [...chartable].sort((a, b) => b.icc - a.icc);
+  const labels = sorted.map(d => `${d.label}  [${d.icc.toFixed(3)}]`);
+  const iccVals = sorted.map(d => d.icc);
+  const ciL = sorted.map(d => d.ci95?.[0] ?? d.icc - 0.2);
+  const ciU = sorted.map(d => d.ci95?.[1] ?? d.icc + 0.2);
+  const colors = sorted.map(d => d.icc >= 0.9 ? t.ok : d.icc >= 0.75 ? t.acc : d.icc >= 0.5 ? t.warn : t.err);
+  const xMin = Math.min(0, ...ciL) - 0.05;
+  const xMax = Math.max(1, ...ciU) + 0.05;
+
+  const barTrace = {
+    type: "bar", orientation: "h",
+    y: labels, x: iccVals,
+    marker: { color: colors, opacity: 0.75 },
+    text: iccVals.map(v => v.toFixed(3)),
+    textposition: "outside",
+    textfont: { size: 9, color: t.tx2, family: FONT_STACK },
+    hovertemplate: "%{y}: %{x:.3f} [%{customdata[0]:.3f}, %{customdata[1]:.3f}]<extra></extra>",
+    customdata: iccVals.map((v, i) => [ciL[i], ciU[i]]),
+    showlegend: false,
+  };
+
+  const layout = {
+    paper_bgcolor: t.surf, plot_bgcolor: t.surf,
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
+    margin: { l: 180, r: 70, t: 15, b: 45 },
+    xaxis: { title: "ICC (ranked)", range: [xMin, xMax], gridcolor: t.surf3, zeroline: false, dtick: 0.25 },
+    yaxis: { title: { text: "Landmark", font: { size: 12 } }, autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 10 } },
+    height: Math.max(220, sorted.length * 30 + 50),
+    bargap: 0.25,
+    shapes: [{
+      type: "line", x0: 0.75, x1: 0.75, y0: -0.5, y1: labels.length - 0.5,
+      line: { color: t.tx + "70", width: 1, dash: "dash" }, layer: "below",
+    }],
+    annotations: [{
+      x: 0.75, y: 1, xref: "x", yref: "paper",
+      text: "ICC=0.75", showarrow: false, font: { size: 10, color: t.tx3 },
+      yanchor: "bottom", xanchor: "center",
+    }],
+  };
+
+  return <ChartCard title="ICC Ranked Bar — All Landmarks" t={t}>
+    <PlotlyChart data={[barTrace]} layout={layout} style={{ height: layout.height }} />
+  </ChartCard>;
 }
 
 function CollectiveBlandAltman({ details, t }) {
@@ -161,47 +169,55 @@ function CollectiveBlandAltman({ details, t }) {
 function ErrorMapPlot({ results, t }) {
   const map = results.landmarkMap;
   if (!map) return null;
-  const entries = Object.entries(map);
-  const labels = entries.map(([l]) => l);
-  const meanErr = entries.map(([, v]) => v.meanError || 0);
-  const sdErr = entries.map(([, v]) => v.sdError || 0);
-  const maxErr = entries.map(([, v]) => v.maxError);
-  const maxV = Math.max(...entries.map(([, v]) => Math.max(v.meanError || 0, v.sdError || 0, v.maxError || 0)), 1);
+  const entries = Object.entries(map).map(([l, v]) => ({
+    label: l,
+    mean: v.meanError || 0,
+    sd: v.sdError || 0,
+    max: v.maxError,
+  })).filter(e => e.sd > 0);
+  if (entries.length === 0) return null;
+  const sorted = [...entries].sort((a, b) => b.sd - a.sd);
+  const maxV = Math.max(...sorted.map(e => e.sd), 0.5);
 
   const sdTrace = {
     type: "bar", orientation: "h",
-    y: labels, x: sdErr,
-    marker: { color: t.acc, opacity: 0.6 },
-    showlegend: true, name: "SD Error",
+    y: sorted.map(e => `${e.label}  (SD=${e.sd.toFixed(2)})`),
+    x: sorted.map(e => e.sd),
+    marker: { color: t.acc, opacity: 0.7 },
+    text: sorted.map(e => e.sd.toFixed(2)),
+    textposition: "outside",
+    textfont: { size: 9, color: t.tx3, family: FONT_STACK },
+    showlegend: false,
     hovertemplate: "%{y}: SD = %{x:.2f} mm<extra></extra>",
   };
   const meanTrace = {
-    type: "bar", orientation: "h",
-    y: labels, x: meanErr,
-    marker: { color: t.warn, opacity: 0.6 },
+    type: "scatter", mode: "markers",
+    y: sorted.map(e => `${e.label}  (SD=${e.sd.toFixed(2)})`),
+    x: sorted.map(e => e.mean),
+    marker: { color: t.warn, size: 8, symbol: "diamond", line: { width: 1, color: t.bg } },
     showlegend: true, name: "Mean Error",
-    hovertemplate: "%{y}: Mean = %{x:.2f} mm<extra></extra>",
+    hovertemplate: "Mean = %{x:.2f} mm<extra></extra>",
   };
   const maxTrace = {
     type: "scatter", mode: "markers",
-    y: labels, x: maxErr,
-    marker: { color: t.err, size: 7, symbol: "circle" },
+    y: sorted.map(e => `${e.label}  (SD=${e.sd.toFixed(2)})`),
+    x: sorted.map(e => e.max),
+    marker: { color: t.err, size: 6, symbol: "circle", line: { width: 1, color: t.bg } },
     showlegend: true, name: "Max Error",
-    hovertemplate: "%{y}: Max = %{x:.2f} mm<extra></extra>",
+    hovertemplate: "Max = %{x:.2f} mm<extra></extra>",
   };
 
   const layout = {
     paper_bgcolor: t.surf, plot_bgcolor: t.surf,
     font: { color: t.tx2, family: FONT_STACK, size: 11 },
-    margin: { l: 120, r: 30, t: 15, b: 45 },
-    xaxis: { title: "Error (mm)", range: [0, maxV * 1.1], gridcolor: t.surf3, zeroline: false },
+    margin: { l: 180, r: 60, t: 15, b: 45 },
+    xaxis: { title: "Error (mm)", range: [0, maxV * 1.3], gridcolor: t.surf3, zeroline: false },
     yaxis: { title: { text: "Landmark", font: { size: 12 } }, autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 10 } },
-    height: Math.max(240, entries.length * 24 + 50),
-    barmode: "overlay",
+    height: Math.max(240, sorted.length * 30 + 60),
     legend: { orientation: "h", y: 1.02, x: 0.5, xanchor: "center", font: { size: 10 } },
   };
 
-  return <ChartCard title="Landmark Error Map — All Landmarks" t={t}>
+  return <ChartCard title="Method Error Ranking — Sort by SD" t={t}>
     <PlotlyChart data={[sdTrace, meanTrace, maxTrace]} layout={layout} style={{ height: layout.height }} />
   </ChartCard>;
 }
@@ -267,10 +283,8 @@ export function DescriptiveCharts({ results, t }) {
       <DistributionsChart combined={combined} labels={labels} t={t} />
       <RaincloudPlot combined={combined} labels={labels} t={t} />
       <CVBarChart combined={combined} labels={labels} t={t} />
-      {/* <ZScoresProfileChart results={results} t={t} /> */}
-      <BoxPlotCollective combined={combined} labels={labels} t={t} />
-      <DescriptiveBarChart combined={combined} labels={labels} t={t} />
-      <DescriptiveScatterPlot combined={combined} labels={labels} t={t} />
+      <ZScoresProfileChart results={results} t={t} />
+      <DistributionRangePlot combined={combined} labels={labels} t={t} />
     </div>
   );
 }
@@ -442,119 +456,107 @@ function CVBarChart({ combined, labels, t }) {
   </ChartCard>;
 }
 
-function DescriptiveBarChart({ combined, labels, t }) {
-  const valid = labels.filter(l => {
-    const s = combined[l]?.stats;
-    return s && isFinite(s.mean) && isFinite(s.sd);
+function ZScoresProfileChart({ results, t }) {
+  const zScores = results.zScores || {};
+  const normIds = Object.keys(zScores);
+  if (normIds.length === 0) return null;
+  const firstNorm = zScores[normIds[0]];
+  const labels = Object.keys(firstNorm).filter(k => k !== "_stratumWarning");
+  if (labels.length < 2) return null;
+
+  const zValues = labels.map(l => {
+    const z = firstNorm[l]?.zScore;
+    return z?.z != null && isFinite(z.z) ? z.z : null;
   });
-  if (valid.length === 0) return null;
-  const means = valid.map(l => combined[l].stats.mean);
-  const sds = valid.map(l => combined[l].stats.sd);
-  const nns = valid.map(l => combined[l].stats.n);
-  const hasNeg = means.some(m => m < 0);
-  const barTrace = {
+
+  const validPairs = labels.map((l, i) => ({ label: l, z: zValues[i] })).filter(d => d.z != null);
+  if (validPairs.length < 2) return null;
+  const sorted = [...validPairs].sort((a, b) => b.z - a.z);
+
+  const colors = sorted.map(d => {
+    const a = Math.abs(d.z);
+    return a < 1 ? t.ok : a < 2 ? t.warn : a < 3 ? t.err : "#7c3aed";
+  });
+  const maxAbs = Math.max(...sorted.map(d => Math.abs(d.z)), 1) * 1.25;
+
+  const trace = {
     type: "bar", orientation: "h",
-    y: [...valid].reverse(), x: [...means].reverse(),
-    marker: { color: t.acc, opacity: 0.7 },
-    text: [...valid].reverse().map((l, i) => `${means[valid.length - 1 - i].toFixed(2)} ± ${sds[valid.length - 1 - i].toFixed(2)}`),
+    y: sorted.map(d => `${d.label}  (z=${d.z >= 0 ? "+" : ""}${d.z.toFixed(2)})`),
+    x: sorted.map(d => d.z),
+    marker: { color: colors, opacity: 0.75 },
+    text: sorted.map(d => (d.z >= 0 ? "+" : "") + d.z.toFixed(2)),
     textposition: "outside",
-    textfont: { size: 10 },
-    hovertemplate: "%{y}: %{text}<br>n = %{customdata}<extra></extra>",
-    customdata: [...nns].reverse(),
+    textfont: { size: 9, color: t.tx3, family: FONT_STACK },
+    hovertemplate: "%{y}: z=%{x:.2f}<extra></extra>",
     showlegend: false,
   };
-  const errTrace = {
-    type: "scatter", mode: "markers",
-    y: [...valid].reverse(),
-    x: [...means].reverse(),
-    error_x: {
-      type: "data", symmetric: true,
-      array: [...sds].reverse(),
-      color: t.tx2, thickness: 1.5, width: 6,
-    },
-    marker: { size: 0, opacity: 0 },
-    showlegend: false,
-    hoverinfo: "skip",
-  };
-  const xMin = Math.min(0, ...means) - Math.max(...sds) * 1.2;
-  const xMax = Math.max(0, ...means) + Math.max(...sds) * 1.2;
+
   const layout = {
     paper_bgcolor: t.surf, plot_bgcolor: t.surf,
     font: { color: t.tx2, family: FONT_STACK, size: 11 },
-    margin: { l: 120, r: 80, t: 10, b: 40 },
-    xaxis: { title: "Mean ± SD", range: [xMin, xMax], gridcolor: t.surf3, zeroline: hasNeg, zerolinecolor: t.bdr },
+    margin: { l: 180, r: 70, t: 15, b: 45 },
+    xaxis: { title: "Z-score", range: [-maxAbs, maxAbs], gridcolor: t.surf3, zeroline: true, zerolinecolor: t.tx3, dtick: 1 },
     yaxis: { title: { text: "Measurement", font: { size: 12 } }, autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 10 } },
-    height: Math.max(220, valid.length * 26 + 60),
-    bargap: 0.3,
+    height: Math.max(220, sorted.length * 30 + 50),
+    bargap: 0.25,
+    shapes: [
+      { type: "line", x0: -1, x1: -1, y0: -0.5, y1: sorted.length - 0.5, line: { color: t.ok + "60", width: 1, dash: "dash" }, layer: "below" },
+      { type: "line", x0: 1, x1: 1, y0: -0.5, y1: sorted.length - 0.5, line: { color: t.ok + "60", width: 1, dash: "dash" }, layer: "below" },
+      { type: "line", x0: -2, x1: -2, y0: -0.5, y1: sorted.length - 0.5, line: { color: t.warn + "60", width: 1, dash: "dot" }, layer: "below" },
+      { type: "line", x0: 2, x1: 2, y0: -0.5, y1: sorted.length - 0.5, line: { color: t.warn + "60", width: 1, dash: "dot" }, layer: "below" },
+    ],
+    annotations: [
+      { x: 1, y: 1, xref: "x", yref: "paper", text: "z=+1", showarrow: false, font: { size: 8, color: t.ok }, xanchor: "left", yanchor: "bottom" },
+      { x: -1, y: 1, xref: "x", yref: "paper", text: "z=-1", showarrow: false, font: { size: 8, color: t.ok }, xanchor: "right", yanchor: "bottom" },
+      { x: 2, y: 1, xref: "x", yref: "paper", text: "z=+2", showarrow: false, font: { size: 8, color: t.warn }, xanchor: "left", yanchor: "bottom" },
+      { x: -2, y: 1, xref: "x", yref: "paper", text: "z=-2", showarrow: false, font: { size: 8, color: t.warn }, xanchor: "right", yanchor: "bottom" },
+    ],
   };
-  return <ChartCard title="Descriptive Bar Chart — Means with Error Bars (SD)" t={t}><PlotlyChart data={[barTrace, errTrace]} layout={layout} style={{ height: layout.height }} /></ChartCard>;
-}
 
-function DescriptiveScatterPlot({ combined, labels, t }) {
-  const valid = labels.filter(l => {
-    const vals = combined[l]?.values;
-    return vals && vals.length > 0;
-  });
-  if (valid.length === 0) return null;
-  const COLORS = [t.acc, t.err, t.warn, t.ok, "#a78bfa", "#f472b6", "#34d399", t.tx2];
-  const traces = valid.map((l, idx) => {
-    const vals = combined[l].values || [];
-    return {
-      type: "scatter", mode: "markers",
-      x: vals, y: vals.map(() => l),
-      marker: { color: COLORS[idx % COLORS.length], size: 5, opacity: 0.5, line: { width: 0.5, color: COLORS[idx % COLORS.length] } },
-      name: l,
-      hovertemplate: `<b>${l}</b>: %{x:.2f}<extra></extra>`,
-    };
-  });
-  const allV = valid.flatMap(l => combined[l].values || []);
-  const xMin = Math.min(...allV) - (Math.max(...allV) - Math.min(...allV)) * 0.1;
-  const xMax = Math.max(...allV) + (Math.max(...allV) - Math.min(...allV)) * 0.1;
-  const layout = {
-    paper_bgcolor: t.surf, plot_bgcolor: t.surf,
-    font: { color: t.tx2, family: FONT_STACK, size: 11 },
-    margin: { l: 100, r: 20, t: 10, b: 45 },
-    xaxis: { title: "Value", range: [xMin, xMax], gridcolor: t.surf3, zeroline: false },
-    yaxis: { title: { text: "Value", font: { size: 12 } }, autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 10 } },
-    height: Math.max(220, valid.length * 28 + 60),
-    showlegend: false,
-  };
-  return <ChartCard title="Scatter Plot — Clustered by Variable" t={t}><PlotlyChart data={traces} layout={layout} style={{ height: layout.height }} /></ChartCard>;
-}
+  return <ChartCard title={`Z-Score Profile — ${normIds.length > 1 ? "First Norm (" + normIds[0] + ")" : normIds[0]}`} t={t}>
+    <PlotlyChart data={[trace]} layout={layout} style={{ height: layout.height }} />
+  </ChartCard>;
+} 
 
-function BoxPlotCollective({ combined, labels, t }) {
+function DistributionRangePlot({ combined, labels, t }) {
   const valid = labels.filter(l => {
     const s = combined[l]?.stats;
-    return s && s.n >= 2;
-  });
+    return s && s.n >= 2 && isFinite(s.mean) && isFinite(s.sd);
+  }).map(l => ({ label: l, stats: combined[l].stats }));
   if (valid.length < 2) return null;
 
-  const traces = [{
-    type: "box", orientation: "h",
-    y: valid.flatMap(l => {
-      const vals = combined[l].values || [];
-      return vals.map(() => l);
-    }),
-    x: valid.flatMap(l => combined[l].values || []),
-    marker: { color: t.acc, opacity: 0.35, line: { color: t.acc, width: 1 } },
-    line: { color: t.acc, width: 1 },
-    fillcolor: t.acc + "4D",
-    whiskerwidth: 0.6,
+  const sorted = [...valid].sort((a, b) => b.stats.mean - a.stats.mean);
+  const allVals = sorted.flatMap(d => combined[d.label].values || []);
+  const globalMin = Math.min(...allVals);
+  const globalMax = Math.max(...allVals);
+  const pad = (globalMax - globalMin) * 0.15 || 1;
+
+  const pointTrace = {
+    type: "scatter", mode: "markers",
+    y: sorted.map(d => d.label),
+    x: sorted.map(d => d.stats.mean),
+    marker: { color: t.acc, size: 9, symbol: "diamond", line: { width: 1, color: t.bg } },
+    error_x: {
+      type: "data", symmetric: true,
+      array: sorted.map(d => d.stats.sd),
+      thickness: 2, width: 8, color: t.acc,
+    },
+    hovertemplate: "%{y}: %{x:.2f} ± %{customdata[0]:.2f} (n=%{customdata[1]})<extra></extra>",
+    customdata: sorted.map(d => [d.stats.sd, d.stats.n]),
     showlegend: false,
-    hovertemplate: "%{y}: Q1=%{q1:.2f}, Median=%{median:.2f}, Q3=%{q3:.2f}<br>Mean=%{mean:.2f}, SD=%{sd:.2f}<extra></extra>",
-  }];
+  };
 
   const layout = {
     paper_bgcolor: t.surf, plot_bgcolor: t.surf,
     font: { color: t.tx2, family: FONT_STACK, size: 11 },
-    margin: { l: 120, r: 20, t: 10, b: 45 },
-    xaxis: { gridcolor: t.surf3, zeroline: false, title: "Value" },
-    yaxis: { title: { text: "Group", font: { size: 12 } }, zeroline: false, showgrid: false, tickfont: { size: 10 } },
-    height: Math.max(220, valid.length * 40 + 60),
+    margin: { l: 120, r: 30, t: 15, b: 45 },
+    xaxis: { title: "Mean ± SD", range: [globalMin - pad, globalMax + pad], gridcolor: t.surf3, zeroline: false },
+    yaxis: { title: { text: "Measurement", font: { size: 12 } }, autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 10 } },
+    height: Math.max(240, sorted.length * 30 + 50),
   };
 
-  return <ChartCard title="Box Plots — All Landmarks" t={t}>
-    <PlotlyChart data={traces} layout={layout} style={{ height: layout.height }} />
+  return <ChartCard title="Mean ± SD — All Measurements" t={t}>
+    <PlotlyChart data={[pointTrace]} layout={layout} style={{ height: layout.height }} />
   </ChartCard>;
 }
 
@@ -566,173 +568,362 @@ export function ComparativeCharts({ results, t }) {
   const labels = Object.entries(results.labels || {}).filter(([, lr]) => !lr.skip);
   if (labels.length === 0) return <div style={{ fontSize: FONT.md, color: t.tx3, textAlign: "center", padding: 20 }}>No chartable data.</div>;
 
+  const nGroups = results.groups?.length || 0;
+  const isPaired = results.design === "paired";
+  const hasPostHoc = results.postHoc && Object.keys(results.postHoc).length > 0;
+  const manyLabels = labels.length >= 10;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <GroupMeansChart labels={labels} t={t} />
-      <EffectSizeForest labels={labels} t={t} />
-      <VolcanoPlot labels={labels} results={results} t={t} />
-      <PValueHeatmap labels={labels} results={results} t={t} />
-      <PValueDotChart labels={labels} results={results} t={t} />
+      <BarGraph labels={labels} results={results} t={t} />
+      {nGroups === 2 && !isPaired && <MeanDiffForest labels={labels} results={results} t={t} />}
+      {nGroups === 2 && isPaired && <PairedChangePlot labels={labels} results={results} t={t} />}
+      {hasPostHoc && <TukeyHSDPlot results={results} t={t} />}
+      <PValueWaterfall labels={labels} results={results} t={t} />
+      {manyLabels && <VolcanoPlot labels={labels} results={results} t={t} />}
     </div>
   );
 }
 
-function GroupMeansChart({ labels, t }) {
+function BarGraph({ labels, results, t }) {
+  const groupNames = results.groups?.map(g => g.label) || [];
+  if (groupNames.length < 2) return null;
   const COLORS = PALETTE;
-  const title = "Group Means — All Landmarks";
 
-  return (
-    <ChartCard title={title} t={t}>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {labels.map(([label, lr]) => {
-          const rawData = lr.rawData || {};
-          const groups = Object.entries(rawData);
-          if (groups.length === 0) return null;
-          const allVals = groups.flatMap(([, g]) => g.values || []);
-          if (allVals.length === 0) return null;
-          const yMin = Math.min(...allVals);
-          const yMax = Math.max(...allVals);
-          const yPad = (yMax - yMin) * 0.15 || 1;
-          const nGroups = groups.length;
+  const allData = labels.flatMap(([label, lr]) => {
+    const rd = lr.rawData || {};
+    return groupNames.map((gn, gi) => {
+      const gd = rd[gn];
+      if (!gd || !gd.values?.length) return null;
+      const vals = gd.values;
+      const m = gd.mean ?? vals.reduce((a, b) => a + b, 0) / vals.length;
+      const sd = gd.sd ?? (vals.length > 1 ? Math.sqrt(vals.reduce((s, v) => s + (v - m) ** 2, 0) / (vals.length - 1)) : 0);
+      return { label, group: gn, mean: m, sd, n: vals.length, groupIdx: gi, color: COLORS[gi % COLORS.length] };
+    }).filter(Boolean);
+  });
 
-          const means = [], ses = [], gNames = [], individualTraces = [];
-          groups.forEach(([gName, gData], gi) => {
-            const vals = gData.values || [];
-            const m = vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
-            const sd = vals.length > 1 ? Math.sqrt(vals.reduce((s, v) => s + (v - m) ** 2, 0) / (vals.length - 1)) : 0;
-            const se = sd / Math.sqrt(vals.length);
-            const color = COLORS[gi % COLORS.length];
-            means.push(m);
-            ses.push(se);
-            gNames.push(gName);
-            const jitter = vals.map(() => gi + (Math.random() - 0.5) * 0.3);
-            individualTraces.push({
-              type: "scatter", mode: "markers",
-              x: jitter, y: vals,
-              marker: { color, size: 5, opacity: 0.25, symbol: "circle", line: { width: 0.5, color } },
-              showlegend: false,
-              hovertemplate: `${gName}: %{y:.2f}<extra></extra>`,
-            });
-          });
+  const landmarkNames = [...new Set(allData.map(d => d.label))];
+  const barWidth = 0.7 / groupNames.length;
+  const traces = groupNames.map((gn, gi) => ({
+    type: "bar",
+    name: gn,
+    x: landmarkNames,
+    y: landmarkNames.map(l => { const d = allData.find(x => x.label === l && x.group === gn); return d ? d.mean : 0; }),
+    error_y: { type: "data", array: landmarkNames.map(l => { const d = allData.find(x => x.label === l && x.group === gn); return d ? d.sd : 0; }), visible: true, thickness: 1.5, width: 4 },
+    marker: { color: COLORS[gi % COLORS.length], opacity: 0.85 },
+    offset: (gi - (groupNames.length - 1) / 2) * barWidth,
+    width: barWidth * 0.9,
+    hovertemplate: `%{x}<br>${gn}: <b>%{y:.2f}</b> ± %{customdata[0]:.2f}<br>n=%{customdata[1]}<extra></extra>`,
+    customdata: landmarkNames.map(l => { const d = allData.find(x => x.label === l && x.group === gn); return d ? [d.sd, d.n] : [0, 0]; }),
+    showlegend: true,
+  }));
 
-          const lineTrace = {
-            type: "scatter", mode: "lines+markers",
-            x: gNames, y: means,
-            line: { color: t.acc, width: 1.5, dash: "dot", shape: "spline" },
-            marker: { size: 0 },
-            showlegend: false,
-            hoverinfo: "skip",
-          };
+  const yAll = allData.map(d => d.mean);
+  const yMin = Math.min(0, ...yAll) * 1.1;
+  const yMax = Math.max(0, ...yAll) * 1.15 || 1;
 
-          const meanTrace = {
-            type: "scatter", mode: "markers",
-            x: gNames, y: means,
-            marker: {
-              color: COLORS.slice(0, nGroups), size: 14, symbol: "diamond",
-              line: { width: 2, color: t.bg },
-            },
-            error_y: {
-              type: "data", symmetric: true,
-              array: ses, color: COLORS.slice(0, nGroups),
-              thickness: 2, width: 8,
-            },
-            text: means.map((m, i) => `${m.toFixed(1)} ± ${ses[i].toFixed(1)}`),
-            textposition: "top center",
-            textfont: { size: 10, color: t.tx2, family: FONT_STACK },
-            hovertemplate: "%{x}: <b>%{y:.2f}</b> ± %{customdata:.2f}<extra></extra>",
-            customdata: ses,
-            showlegend: false,
-          };
+  const layout = {
+    paper_bgcolor: t.surf, plot_bgcolor: t.surf,
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
+    margin: { l: 55, r: 20, t: 15, b: Math.max(60, landmarkNames.length * 2 + 40) },
+    xaxis: { tickangle: -35, tickfont: { size: 10 }, gridcolor: t.surf3, zeroline: false },
+    yaxis: { title: "Mean ± SD", range: [yMin, yMax], gridcolor: t.surf3, zeroline: true, zerolinecolor: t.bdr },
+    height: Math.max(300, 80 + landmarkNames.length * 18),
+    barmode: "group", bargap: 0.15, bargroupgap: 0.05,
+    legend: { orientation: "h", y: 1.02, x: 0.5, xanchor: "center", font: { size: 10 } },
+  };
 
-          const l = {
-            paper_bgcolor: t.surf2, plot_bgcolor: t.surf2,
-            font: { color: t.tx2, family: FONT_STACK, size: 10 },
-            margin: { l: 24, r: 16, t: 24, b: 20 },
-            xaxis: { title: "Group", showgrid: false, zeroline: false, tickfont: { size: 10, color: t.tx2 } },
-            yaxis: { title: "Mean", range: [yMin - yPad, yMax + yPad], gridcolor: t.surf3, zeroline: false, tickfont: { size: 10 } },
-            height: 150,
-            annotations: [{
-              x: 0.5, y: 1.15, xref: "paper", yref: "paper",
-              text: `<b>${label}</b>`, showarrow: false,
-              xanchor: "center", yanchor: "top",
-              font: { size: 12, color: t.tx },
-            }],
-          };
-
-          return <PlotlyChart key={label} data={[...individualTraces, lineTrace, meanTrace]} layout={l} style={{ height: 120 }} />;
-        })}
-      </div>
-    </ChartCard>
-  );
+  return <ChartCard title={`Group Means — ${landmarkNames.length} Landmarks`} t={t}>
+    <PlotlyChart data={traces} layout={layout} style={{ height: layout.height }} />
+  </ChartCard>;
 }
 
-function EffectSizeForest({ labels, t }) {
-  const esLabels = labels.filter(([, lr]) => lr.effectSize?.measure);
-  if (esLabels.length === 0) return null;
-  const esVals = esLabels.map(([, lr]) => {
-    const es = lr.effectSize;
-    return es.cohensD || es.cohensDz || es.rankBiserial || es.matchedPairsR || es.etaSq || es.partialEtaSq || es.epsilonSq || es.kendallW || 0;
-  });
-  const cis = esLabels.map(([, lr]) => lr.effectSize.ci95);
-  const ciLower = esVals.map((v, i) => cis[i]?.[0] ?? v - 0.2);
-  const ciUpper = esVals.map((v, i) => cis[i]?.[1] ?? v + 0.2);
-  const labels_n = esLabels.map(([l]) => l);
-  const xMin = Math.min(-0.2, ...ciLower) - 0.2;
-  const xMax = Math.max(0.2, ...ciUpper) + 0.2;
-  const esMeasure = esLabels[0]?.[1]?.effectSize?.measure || "Effect Size";
-  const colors = esLabels.map(([, lr]) => {
-    const interp = lr.effectSize.interpretation;
-    return interp === "Negligible" ? t.tx3 : interp === "Small" ? t.acc : interp === "Medium" ? t.warn : t.err;
-  });
+function MeanDiffForest({ labels, results, t }) {
+  const groupNames = results.groups?.map(g => g.label) || [];
+  if (groupNames.length !== 2) return null;
+  const g0 = groupNames[0], g1 = groupNames[1];
+
+  const rows = labels.map(([label, lr]) => {
+    const rd = lr.rawData || {};
+    const d0 = rd[g0], d1 = rd[g1];
+    if (!d0?.values?.length || !d1?.values?.length) return null;
+    const m0 = d0.mean ?? d0.values.reduce((a, b) => a + b, 0) / d0.values.length;
+    const m1 = d1.mean ?? d1.values.reduce((a, b) => a + b, 0) / d1.values.length;
+    const diff = m0 - m1;
+    const v0 = d0.sd ? d0.sd ** 2 : (d0.values.length > 1 ? d0.values.reduce((s, v) => s + (v - m0) ** 2, 0) / (d0.values.length - 1) : 0);
+    const v1 = d1.sd ? d1.sd ** 2 : (d1.values.length > 1 ? d1.values.reduce((s, v) => s + (v - m1) ** 2, 0) / (d1.values.length - 1) : 0);
+    const n0 = d0.values.length, n1 = d1.values.length;
+    const se = Math.sqrt(v0 / n0 + v1 / n1);
+    const df = n0 + n1 - 2;
+    const tCrit = df > 0 ? Math.max(1.96, Math.min(4, 1.96 + 2.5 / df)) : 1.96;
+    const ciLo = diff - tCrit * se, ciHi = diff + tCrit * se;
+    const pValue = lr.result?.pValue;
+    const sig = pValue != null && pValue < (results.alpha || 0.05);
+    return { label, diff, ciLo, ciHi, se, pValue, sig };
+  }).filter(Boolean);
+
+  if (rows.length === 0) return null;
+
+  const allLo = rows.map(r => r.ciLo), allHi = rows.map(r => r.ciHi);
+  const xMin = Math.min(0, ...allLo) - Math.max(1, Math.abs(Math.min(0, ...allLo)) * 0.15);
+  const xMax = Math.max(0, ...allHi) + Math.max(1, Math.abs(Math.max(0, ...allHi)) * 0.15);
+  const labels_n = rows.map(r => r.label);
+  const colors = rows.map(r => r.sig ? t.err : t.ok);
 
   const trace = {
     type: "scatter", mode: "markers",
-    x: esVals, y: labels_n,
-    marker: { color: colors, size: 11, symbol: "square", line: { width: 1, color: t.bg } },
+    x: rows.map(r => r.diff), y: labels_n,
+    marker: { color: colors, size: 11, symbol: "diamond", line: { width: 1, color: t.bg } },
     error_x: {
       type: "data", symmetric: false, thickness: 2.5, width: 0,
-      array: esVals.map((v, i) => ciUpper[i] - v),
-      arrayminus: esVals.map((v, i) => v - ciLower[i]),
+      array: rows.map(r => r.ciHi - r.diff),
+      arrayminus: rows.map(r => r.diff - r.ciLo),
       color: colors,
     },
-    hovertemplate: "%{y}: %{x:.3f} [%{customdata[0]:.3f}, %{customdata[1]:.3f}]<extra></extra>",
-    customdata: esVals.map((v, i) => [ciLower[i], ciUpper[i]]),
+    hovertemplate: "%{y}: %{x:.2f} [%{customdata[0]:.2f}, %{customdata[1]:.2f}]<br>p=%{customdata[2]}<extra></extra>",
+    customdata: rows.map(r => [r.ciLo, r.ciHi, fmtP(r.pValue)]),
     showlegend: false,
   };
 
   const layout = {
     paper_bgcolor: t.surf, plot_bgcolor: t.surf,
     font: { color: t.tx2, family: FONT_STACK, size: 11 },
-    margin: { l: 160, r: 60, t: 15, b: 45 },
-    xaxis: { title: esMeasure, range: [xMin, xMax], gridcolor: t.surf3, zeroline: true, zerolinecolor: t.tx3 },
-    yaxis: { title: { text: "Comparison", font: { size: 12 } }, autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 10 } },
-    height: Math.max(240, esLabels.length * 30 + 50),
+    margin: { l: 140, r: 30, t: 15, b: 45 },
+    xaxis: { title: `Mean Difference (${g0} − ${g1})`, range: [xMin, xMax], gridcolor: t.surf3, zeroline: true, zerolinecolor: t.tx3 },
+    yaxis: { autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 10 } },
+    height: Math.max(240, rows.length * 26 + 50),
+    shapes: [{
+      type: "line", x0: 0, x1: 0, y0: -0.5, y1: labels_n.length - 0.5,
+      line: { color: t.tx3, width: 1, dash: "dash" },
+    }],
   };
 
-  return <ChartCard title={`Effect Size Forest Plot — All Landmarks (${esMeasure})`} t={t}>
+  return <ChartCard title={`Mean Difference — ${g0} vs ${g1}`} t={t}>
     <PlotlyChart data={[trace]} layout={layout} style={{ height: layout.height }} />
   </ChartCard>;
 }
 
-function VolcanoPlot({ labels, results, t }) {
-  const pLabels = labels.filter(([, lr]) => lr.result?.pValue != null && lr.effectSize?.measure);
-  if (pLabels.length < 3) return null;
+function PairedChangePlot({ labels, results, t }) {
+  const groupNames = results.groups?.map(g => g.label) || [];
+  if (groupNames.length !== 2) return null;
+  const g0 = groupNames[0], g1 = groupNames[1];
+  const COLORS = PALETTE;
+
+  const charts = labels.map(([label, lr]) => {
+    const rd = lr.rawData || {};
+    const d0 = rd[g0]?.values || [], d1 = rd[g1]?.values || [];
+    const n = Math.min(d0.length, d1.length);
+    if (n < 2) return null;
+    const pairs = Array.from({ length: n }, (_, i) => [d0[i], d1[i]]);
+    const mean0 = d0.reduce((a, b) => a + b, 0) / n;
+    const mean1 = d1.reduce((a, b) => a + b, 0) / n;
+    const allVals = [...d0, ...d1];
+    const yMin = Math.min(...allVals);
+    const yMax = Math.max(...allVals);
+    const yPad = (yMax - yMin) * 0.12 || 1;
+
+    const individualTraces = pairs.map(pair => ({
+      type: "scatter", mode: "lines+markers",
+      x: [g0, g1], y: pair,
+      marker: { size: 4, opacity: 0.2, color: COLORS[0] },
+      line: { width: 0.5, color: COLORS[0], opacity: 0.2 },
+      showlegend: false,
+      hoverinfo: "skip",
+    }));
+
+    const meanTrace = {
+      type: "scatter", mode: "lines+markers",
+      x: [g0, g1], y: [mean0, mean1],
+      marker: { size: 12, color: COLORS[1], symbol: "diamond", line: { width: 2, color: t.bg } },
+      line: { width: 3, color: COLORS[1], dash: "solid" },
+      name: "Mean",
+      hovertemplate: `Mean: %{y:.2f}<extra></extra>`,
+    };
+
+    const layout = {
+      paper_bgcolor: t.surf, plot_bgcolor: t.surf,
+      font: { color: t.tx2, family: FONT_STACK, size: 10 },
+      margin: { l: 30, r: 10, t: 24, b: 14 },
+      xaxis: { tickfont: { size: 10 }, showgrid: false },
+      yaxis: { range: [yMin - yPad, yMax + yPad], gridcolor: t.surf3, zeroline: false },
+      height: 150,
+      annotations: [{
+        x: 0.5, y: 1.12, xref: "paper", yref: "paper",
+        text: `<b>${label}</b> (n=${n})`, showarrow: false,
+        xanchor: "center", yanchor: "top",
+        font: { size: 11, color: t.tx },
+      }],
+      showlegend: false,
+    };
+
+    return <PlotlyChart key={label} data={[...individualTraces, meanTrace]} layout={layout} style={{ height: 120 }} />;
+  }).filter(Boolean);
+
+  if (charts.length === 0) return null;
+
+  return <ChartCard title={`Paired Change — Individual Trajectories (${g0} → ${g1})`} t={t}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>{charts}</div>
+  </ChartCard>;
+}
+
+function TukeyHSDPlot({ results, t }) {
+  const entries = Object.entries(results.postHoc || {});
+  if (entries.length === 0) return null;
+
+  const chartData = entries.flatMap(([label, comparisons]) =>
+    (comparisons || []).map(c => ({
+      label,
+      pair: `${c.groupA} vs ${c.groupB}`,
+      diff: c.meanDiff, ciLo: c.ci95?.[0], ciHi: c.ci95?.[1],
+      pValue: c.pAdjusted ?? c.pValue, sig: c.significant,
+    }))
+  );
+
+  if (chartData.length === 0) return null;
+
+  const allLo = chartData.map(d => d.ciLo ?? d.diff);
+  const allHi = chartData.map(d => d.ciHi ?? d.diff);
+  const xMin = Math.min(0, ...allLo) * 1.15 || -1;
+  const xMax = Math.max(0, ...allHi) * 1.15 || 1;
+  const yLabels = chartData.map(d => `${d.label}<br>${d.pair}`);
+  const colors = chartData.map(d => d.sig ? t.err : t.ok);
+
+  const trace = {
+    type: "scatter", mode: "markers",
+    x: chartData.map(d => d.diff), y: yLabels,
+    marker: { color: colors, size: 9, symbol: "circle", line: { width: 1, color: t.bg } },
+    error_x: {
+      type: "data", symmetric: false, thickness: 2, width: 0,
+      array: chartData.map(d => (d.ciHi ?? d.diff) - d.diff),
+      arrayminus: chartData.map(d => d.diff - (d.ciLo ?? d.diff)),
+      color: colors,
+    },
+    hovertemplate: "%{y}: %{x:.2f} [%{customdata[0]:.2f}, %{customdata[1]:.2f}]<br>p=%{customdata[2]}<extra></extra>",
+    customdata: chartData.map(d => [d.ciLo ?? d.diff, d.ciHi ?? d.diff, fmtP(d.pValue)]),
+    showlegend: false,
+  };
+
+  const layout = {
+    paper_bgcolor: t.surf, plot_bgcolor: t.surf,
+    font: { color: t.tx2, family: FONT_STACK, size: 10 },
+    margin: { l: 160, r: 30, t: 15, b: 45 },
+    xaxis: { title: "Mean Difference", range: [xMin, xMax], gridcolor: t.surf3, zeroline: true, zerolinecolor: t.tx3 },
+    yaxis: { autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 9 } },
+    height: Math.max(240, yLabels.length * 28 + 50),
+    shapes: [{
+      type: "line", x0: 0, x1: 0, y0: -0.5, y1: yLabels.length - 0.5,
+      line: { color: t.tx3, width: 1, dash: "dash" },
+    }],
+  };
+
+  return <ChartCard title="Post-Hoc Pairwise Differences (Tukey HSD / Bonferroni)" t={t}>
+    <PlotlyChart data={[trace]} layout={layout} style={{ height: layout.height }} />
+  </ChartCard>;
+}
+
+function PValueWaterfall({ labels, results, t }) {
+  const pLabels = labels.filter(([, lr]) => lr.result?.pValue != null);
+  if (pLabels.length === 0) return null;
   const alpha = results.alpha || 0.05;
-  const esValues = pLabels.map(([, lr]) => {
-    const es = lr.effectSize;
-    return es.cohensD || es.cohensDz || es.rankBiserial || es.matchedPairsR || es.etaSq || es.partialEtaSq || es.epsilonSq || es.kendallW || 0;
-  });
-  const pValues = pLabels.map(([, lr]) => lr.result.pValue);
-  const logP = pValues.map(p => -Math.log10(Math.max(+p || 0, 1e-10)));
-  const xMin = Math.min(-0.5, ...esValues) - 0.3;
-  const xMax = Math.max(0.5, ...esValues) + 0.3;
+
+  const sorted = pLabels
+    .map(([label, lr]) => ({ label, pValue: lr.result.pValue, adjusted: lr.mcCorrected?.adjusted }))
+    .sort((a, b) => a.pValue - b.pValue);
+
+  const pVals = sorted.map(d => d.pValue);
+  const logP = pVals.map(p => -Math.log10(Math.max(p, 1e-12)));
+  const adjP = sorted.map(d => d.adjusted != null ? -Math.log10(Math.max(d.adjusted, 1e-12)) : null);
+
+  const yMax = Math.max(3, ...logP, ...adjP.filter(v => v != null)) * 1.2;
+  const xLabels = sorted.map((d, i) => `${i + 1}. ${d.label.length > 12 ? d.label.slice(0, 10) + "\u2026" : d.label}`);
+
+  const rawTrace = {
+    type: "scatter", mode: "markers+lines",
+    x: xLabels, y: logP,
+    marker: { color: logP.map(p => p >= -Math.log10(alpha) ? t.err : t.ok), size: 8, symbol: "circle" },
+    line: { color: t.tx3, width: 1, dash: "dot", shape: "spline" },
+    name: "Raw p-value",
+    hovertemplate: "%{x}<br>-log\u2081\u2080(p) = %{y:.2f}<br>p = %{customdata}<extra></extra>",
+    customdata: pVals.map(p => fmtP(p)),
+  };
+
+  const adjTrace = adjP.every(v => v == null) ? null : {
+    type: "scatter", mode: "markers",
+    x: xLabels, y: adjP.map(v => v ?? null),
+    marker: { color: t.acc, size: 6, symbol: "diamond-open" },
+    name: "Corrected",
+    hovertemplate: "%{x}: -log\u2081\u2080(p\u2090\u1d63\u1d65) = %{y:.2f}<extra></extra>",
+  };
+
+  const alphaLine = -Math.log10(alpha);
+  const bonfLine = pLabels.length > 0 ? -Math.log10(alpha / pLabels.length) : null;
+  const shapes = [
+    { type: "line", x0: -0.5, x1: xLabels.length - 0.5, y0: alphaLine, y1: alphaLine, line: { color: t.err, width: 1.5, dash: "dash" } },
+  ];
+  if (bonfLine != null) {
+    shapes.push({ type: "line", x0: -0.5, x1: xLabels.length - 0.5, y0: bonfLine, y1: bonfLine, line: { color: t.warn, width: 1, dash: "dot" } });
+  }
+
+  const data = [rawTrace];
+  if (adjTrace) data.push(adjTrace);
+
+  const layout = {
+    paper_bgcolor: t.surf, plot_bgcolor: t.surf,
+    font: { color: t.tx2, family: FONT_STACK, size: 10 },
+    margin: { l: 50, r: 20, t: 15, b: Math.max(60, xLabels.length * 2 + 40) },
+    xaxis: { tickangle: -45, tickfont: { size: 9 }, gridcolor: t.surf3, zeroline: false },
+    yaxis: { title: "\u2212log\u2081\u2080(p)", range: [0, yMax], gridcolor: t.surf3, zeroline: false },
+    height: Math.max(300, 80 + xLabels.length * 14),
+    shapes,
+    annotations: [
+      { x: xLabels.length * 0.02, y: alphaLine, text: `\u03b1 = ${alpha}`, showarrow: false, font: { size: 9, color: t.err }, yanchor: "bottom" },
+      ...(bonfLine != null ? [{ x: xLabels.length * 0.02, y: bonfLine, text: `Bonf. (${pLabels.length} tests)`, showarrow: false, font: { size: 9, color: t.warn }, yanchor: "bottom" }] : []),
+    ],
+    legend: { orientation: "h", y: 1.02, x: 0.5, xanchor: "center", font: { size: 10 } },
+  };
+
+  return <ChartCard title={`P-Value Waterfall (\u03b1 = ${alpha})`} t={t}>
+    <PlotlyChart data={data} layout={layout} style={{ height: layout.height }} />
+  </ChartCard>;
+}
+
+function VolcanoPlot({ labels, results, t }) {
+  const pLabels = labels.filter(([, lr]) => lr.result?.pValue != null && lr.rawData);
+  if (pLabels.length < 3) return null;
+  const groupNames = results.groups?.map(g => g.label) || [];
+  if (groupNames.length !== 2) return null;
+  const g0 = groupNames[0], g1 = groupNames[1];
+  const alpha = results.alpha || 0.05;
+
+  const volcanoRows = pLabels.map(([label, lr]) => {
+    const rd = lr.rawData || {};
+    const d0 = rd[g0], d1 = rd[g1];
+    if (!d0?.values?.length || !d1?.values?.length) return null;
+    const m0 = d0.mean ?? d0.values.reduce((a, b) => a + b, 0) / d0.values.length;
+    const m1 = d1.mean ?? d1.values.reduce((a, b) => a + b, 0) / d1.values.length;
+    const diff = m0 - m1;
+    const pooledSd = Math.sqrt(
+      ((d0.sd ?? 0) ** 2 * (d0.values.length - 1) + (d1.sd ?? 0) ** 2 * (d1.values.length - 1)) /
+      Math.max(d0.values.length + d1.values.length - 2, 1)
+    ) || 1;
+    const es = diff / pooledSd;
+    const pValue = lr.result?.pValue ?? 1;
+    return { label, diff, es, pValue, logP: -Math.log10(Math.max(pValue, 1e-12)), sig: pValue < alpha };
+  }).filter(Boolean);
+
+  if (volcanoRows.length < 3) return null;
+
+  const esVals = volcanoRows.map(r => r.es);
+  const logP = volcanoRows.map(r => r.logP);
+  const xMin = Math.min(-0.5, ...esVals) - 0.3;
+  const xMax = Math.max(0.5, ...esVals) + 0.3;
   const yMaxVal = Math.max(3, ...logP) * 1.15;
-  const sigFlags = pValues.map(p => p < alpha);
-  const plotLabels = pLabels.map(([l]) => l.length > 10 ? l.slice(0, 8) + "\u2026" : l);
+  const sigFlags = volcanoRows.map(r => r.sig);
+  const plotLabels = volcanoRows.map(r => r.label.length > 10 ? r.label.slice(0, 8) + "\u2026" : r.label);
 
   const sigTrace = {
     type: "scatter", mode: "markers+text",
-    x: esValues.filter((_, i) => sigFlags[i]),
+    x: esVals.filter((_, i) => sigFlags[i]),
     y: logP.filter((_, i) => sigFlags[i]),
     text: plotLabels.filter((_, i) => sigFlags[i]),
     textposition: "right",
@@ -743,7 +934,7 @@ function VolcanoPlot({ labels, results, t }) {
   };
   const nsTrace = {
     type: "scatter", mode: "markers",
-    x: esValues.filter((_, i) => !sigFlags[i]),
+    x: esVals.filter((_, i) => !sigFlags[i]),
     y: logP.filter((_, i) => !sigFlags[i]),
     marker: { color: t.tx3, size: 5, opacity: 0.5 },
     name: "Not significant",
@@ -755,7 +946,7 @@ function VolcanoPlot({ labels, results, t }) {
     paper_bgcolor: t.surf, plot_bgcolor: t.surf,
     font: { color: t.tx2, family: FONT_STACK, size: 11 },
     margin: { l: 55, r: 30, t: 15, b: 50 },
-    xaxis: { title: "Effect Size", range: [xMin, xMax], gridcolor: t.surf3, zeroline: true, zerolinecolor: t.tx3 },
+    xaxis: { title: "Cohen's d (effect size)", range: [xMin, xMax], gridcolor: t.surf3, zeroline: true, zerolinecolor: t.tx3 },
     yaxis: { title: "\u2212log\u2081\u2080(p)", range: [0, yMaxVal], gridcolor: t.surf3, zeroline: false },
     height: 380,
     shapes: [{
@@ -777,97 +968,6 @@ function VolcanoPlot({ labels, results, t }) {
   </ChartCard>;
 }
 
-function PValueHeatmap({ labels, results, t }) {
-  const pLabels = labels.filter(([, lr]) => lr.result?.pValue != null);
-  if (pLabels.length < 2) return null;
-  const n = pLabels.length;
-  const alpha = results.alpha || 0.05;
-  const z = Array.from({ length: n }, (_, i) =>
-    Array.from({ length: n }, (_, j) => {
-      if (i === j) return 1;
-      const p = pLabels[i][1].result.pValue;
-      return j < i ? (p + (pLabels[j]?.[1]?.result?.pValue || 0)) / 2 : p;
-    })
-  );
-  const allP = z.flat().filter(v => v != null && v !== 1);
-  const maxP = allP.length > 0 ? Math.max(alpha * 2, ...allP) : 1;
-  const mid = alpha / maxP;
-  const displayTxt = Array.from({ length: n }, (_, i) =>
-    Array.from({ length: n }, (_, j) => {
-      if (i === j || z[i][j] == null) return "";
-      const p = z[i][j];
-      return p < 0.001 ? "<.001" : p.toFixed(3).replace(/^0(?=\.)/, "");
-    })
-  );
-  const hoverTxt = Array.from({ length: n }, (_, i) =>
-    Array.from({ length: n }, (_, j) =>
-      i === j ? "diagonal" : `p = ${fmtP(z[i][j])}`
-    )
-  );
-  const data = heatmapData(z, pLabels.map(([l]) => l), pLabels.map(([l]) => l), displayTxt, {
-    zmin: 0, zmax: maxP,
-    colorscale: [
-      [0, "#b91c1c"],
-      [mid * 0.5, "#fca5a5"],
-      [mid, "#fecaca"],
-      [mid + 0.001, "#f1f5f9"],
-      [1, "#94a3b8"],
-    ],
-    customdata: hoverTxt,
-    texttemplate: "%{text}",
-    textfont: { color: "#1e293b", size: 10, family: FONT_STACK },
-    hovertemplate: "%{y} vs %{x}: <b>%{customdata}</b><extra></extra>",
-  });
-  return (
-    <ChartCard title={`P-Value Pairwise Matrix (\u03b1 = ${alpha})`} t={t}>
-      <PlotlyChart data={data} layout={{...heatmapLayout(t, { height: Math.max(350, n * 28 + 80) }), xaxis: { ...heatmapLayout(t).xaxis, title: { text: "Predictor", font: { size: 12 } } }, yaxis: { ...heatmapLayout(t).yaxis, title: { text: "Predictor", font: { size: 12 } } } }} />
-    </ChartCard>
-  );
-}
-
-function PValueDotChart({ labels, results, t }) {
-  const pLabels = labels.filter(([, lr]) => lr.result?.pValue != null);
-  if (pLabels.length === 0) return null;
-  const alpha = results.alpha || 0.05;
-  const maxP = 0.2;
-  const plotLabels = pLabels.map(([l]) => l);
-  const pVals = pLabels.map(([, lr]) => lr.result.pValue);
-  const sigFlags = pVals.map(p => p < alpha);
-  const colors = sigFlags.map(s => s ? t.err : t.ok);
-
-  const trace = {
-    type: "scatter", mode: "markers+text",
-    x: pVals, y: plotLabels,
-    marker: {
-      color: colors, size: sigFlags.map(s => s ? 10 : 7),
-      opacity: 0.8, symbol: "circle",
-    },
-    text: pVals.map(p => fmtP(p)),
-    textposition: "right",
-    textfont: { size: 10, color: t.tx2, family: FONT_STACK },
-    hovertemplate: "%{y}: p = %{x:.4f}<extra></extra>",
-    showlegend: false,
-  };
-
-  const layout = {
-    paper_bgcolor: t.surf, plot_bgcolor: t.surf,
-    font: { color: t.tx2, family: FONT_STACK, size: 11 },
-    margin: { l: 120, r: 70, t: 15, b: 45 },
-    xaxis: { title: "p-value", range: [0, maxP * 1.15], gridcolor: t.surf3, zeroline: false, dtick: maxP / 2 },
-    yaxis: { title: { text: "Comparison", font: { size: 12 } }, autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 10 } },
-    height: Math.max(200, pLabels.length * 28 + 50),
-    shapes: [{
-      type: "line", x0: alpha, x1: alpha,
-      y0: -0.5, y1: plotLabels.length - 0.5,
-      line: { color: t.err, width: 1, dash: "dash" },
-    }],
-  };
-
-  return <ChartCard title={`P-Values (\u03b1 = ${alpha})`} t={t}>
-    <PlotlyChart data={[trace]} layout={layout} style={{ height: layout.height }} />
-  </ChartCard>;
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // LONGITUDINAL CHARTS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -880,8 +980,7 @@ export function LongitudinalCharts({ results, t }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       <LongitudinalTrajectories labels={labels} t={t} />
       <MeanTrajectoryOverlay labels={labels} t={t} />
-      <ChangeScoreHeatmap labels={labels} t={t} />
-      <ChangeScoreChart labels={labels} t={t} />
+      <ChangeScoreForest labels={labels} t={t} />
     </div>
   );
 }
@@ -1021,49 +1120,47 @@ function MeanTrajectoryOverlay({ labels, t }) {
   </ChartCard>;
 }
 
-function ChangeScoreHeatmap({ labels, t }) {
-  const hasChanges = labels.filter(([, lr]) => (lr.changeScores || []).length > 0);
-  if (hasChanges.length < 2) return null;
-  const allChanges = hasChanges.flatMap(([label, lr]) =>
-    (lr.changeScores || []).map(c => ({ label, ...c })));
-  const fromTo = [...new Set(allChanges.map(c => `${c.from}\u2192${c.to}`))];
-  const nLabels = hasChanges.length;
-  const nPairs = fromTo.length;
-  const maxAbs = Math.max(...allChanges.map(c => Math.abs(c.meanChange)), 0.1);
-  const z = Array.from({ length: nLabels }, (_, li) =>
-    Array.from({ length: nPairs }, (_, fi) => {
-      const entry = hasChanges[li];
-      const c = (entry[1].changeScores || []).find(c => `${c.from}\u2192${c.to}` === fromTo[fi]);
-      return c ? c.meanChange : null;
-    })
-  );
-  const displayTxt = Array.from({ length: nLabels }, (_, li) =>
-    Array.from({ length: nPairs }, (_, fi) => z[li][fi] != null ? z[li][fi].toFixed(1) : "")
-  );
-  const hoverTxt = Array.from({ length: nLabels }, (_, li) =>
-    Array.from({ length: nPairs }, (_, fi) =>
-      z[li][fi] != null ? `change = ${z[li][fi].toFixed(2)}` : "no data"
-    )
-  );
-  const data = heatmapData(z, fromTo, hasChanges.map(([l]) => l), displayTxt, {
-    zmin: -maxAbs, zmax: maxAbs,
-    colorscale: [
-      [0, "#b91c1c"],
-      [0.25, "#fca5a5"],
-      [0.5, "#e5e7eb"],
-      [0.75, "#86efac"],
-      [1, "#16a34a"],
-    ],
-    customdata: hoverTxt,
-    texttemplate: "%{text}",
-    textfont: { color: "#1f2937", size: 10, family: "'DM Sans',sans-serif" },
-    hovertemplate: "%{y} \u2192 %{x}: <b>%{customdata}</b><extra></extra>",
-  });
-  return (
-    <ChartCard title="Change Score Heatmap" t={t}>
-      <PlotlyChart data={data} layout={{...heatmapLayout(t, { height: Math.max(350, nLabels * 28 + 80) }), xaxis: { ...heatmapLayout(t).xaxis, title: { text: "Timepoint (before)", font: { size: 12 } } }, yaxis: { ...heatmapLayout(t).yaxis, title: { text: "Timepoint (after)", font: { size: 12 } } } }} />
-    </ChartCard>
-  );
+function ChangeScoreForest({ labels, t }) {
+  const allRows = labels.flatMap(([label, lr]) =>
+    (lr.changeScores || []).map(c => ({
+      label, from: c.from, to: c.to,
+      mean: c.meanChange, se: c.seChange || c.sdChange / Math.sqrt(c.n || 1) || Math.abs(c.meanChange) * 0.25, n: c.n,
+    })));
+  if (allRows.length < 2) return null;
+  const maxAbs = Math.max(...allRows.map(r => Math.abs(r.mean)), 0.1) * 1.3;
+  const yLabels = allRows.map(r => `${r.label}  ${r.from}\u2192${r.to}`);
+  const colors = allRows.map(r => r.mean > 0 ? t.err : t.ok);
+
+  const ciLower = allRows.map(r => r.mean - 1.96 * r.se);
+  const ciUpper = allRows.map(r => r.mean + 1.96 * r.se);
+
+  const trace = {
+    type: "scatter", mode: "markers",
+    y: yLabels, x: allRows.map(r => r.mean),
+    marker: { color: colors, size: 10, symbol: "diamond", line: { width: 1, color: t.bg } },
+    error_x: {
+      type: "data", symmetric: false, thickness: 2, width: 0,
+      array: allRows.map((r, i) => ciUpper[i] - r.mean),
+      arrayminus: allRows.map((r, i) => r.mean - ciLower[i]),
+      color: colors,
+    },
+    hovertemplate: "%{y}: %{x:.2f} [%{customdata[0]:.2f}, %{customdata[1]:.2f}]<extra></extra>",
+    customdata: allRows.map((r, i) => [ciLower[i], ciUpper[i]]),
+    showlegend: false,
+  };
+
+  const layout = {
+    paper_bgcolor: t.surf, plot_bgcolor: t.surf,
+    font: { color: t.tx2, family: FONT_STACK, size: 11 },
+    margin: { l: 180, r: 50, t: 15, b: 45 },
+    xaxis: { title: "Change score", range: [-maxAbs, maxAbs], gridcolor: t.surf3, zeroline: true, zerolinecolor: t.tx3 },
+    yaxis: { title: { text: "Measurement", font: { size: 12 } }, autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 10 } },
+    height: Math.max(240, allRows.length * 28 + 50),
+  };
+
+  return <ChartCard title="Change Score Forest Plot" t={t}>
+    <PlotlyChart data={[trace]} layout={layout} style={{ height: layout.height }} />
+  </ChartCard>;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1464,40 +1561,6 @@ function DiagnosticCalibrationPlot({ results, t }) {
   </ChartCard>;
 }
 
-function ChangeScoreChart({ labels, t }) {
-  const allChanges = labels.flatMap(([label, lr]) =>
-    (lr.changeScores || []).map(c => ({ label, ...c })));
-  if (allChanges.length === 0) return null;
-  const maxAbs = Math.max(...allChanges.map(c => Math.abs(c.meanChange)), 0.1) * 1.1;
-  const yLabels = allChanges.map(c => `${c.label} ${c.from}\u2192${c.to}`);
-  const vals = allChanges.map(c => c.meanChange);
-  const colors = vals.map(v => v > 0 ? t.err : t.ok);
-
-  const trace = {
-    type: "bar", orientation: "h",
-    y: yLabels, x: vals,
-    marker: { color: colors, opacity: 0.6 },
-    text: vals.map((v, i) => `${allChanges[i].from}\u2192${allChanges[i].to}: ${v.toFixed(2)}`),
-    textposition: "outside",
-    textfont: { size: 10, color: t.tx2, family: FONT_STACK },
-    hovertemplate: "%{y}: %{x:.2f}<extra></extra>",
-    showlegend: false,
-  };
-
-  const layout = {
-    paper_bgcolor: t.surf, plot_bgcolor: t.surf,
-    font: { color: t.tx2, family: FONT_STACK, size: 11 },
-    margin: { l: 120, r: 90, t: 15, b: 45 },
-    xaxis: { title: "Change score", range: [-maxAbs, maxAbs], gridcolor: t.surf3, zeroline: true, zerolinecolor: t.tx3 },
-    yaxis: { title: { text: "Measurement", font: { size: 12 } }, autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 10 } },
-    height: Math.max(200, allChanges.length * 28 + 50),
-  };
-
-  return <ChartCard title="Change Scores — All Landmarks" t={t}>
-    <PlotlyChart data={[trace]} layout={layout} style={{ height: layout.height }} />
-  </ChartCard>;
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // SUPERIMPOSITION CHARTS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1525,7 +1588,7 @@ export function SuperimpositionCharts({ results, t }) {
       {results.rotationTracking?.length > 0 && <RotationTrackingChart rotationTracking={results.rotationTracking} t={t} />}
       {results.planeIntersections?.length > 0 && <PlaneAngleChart planeIntersections={results.planeIntersections} t={t} />}
       {results.deltaNorms?.length > 0 && <DeltaNormChart deltaNorms={results.deltaNorms} t={t} />}
-      {results.patterns?.length > 0 && <PatternRadarChart patterns={results.patterns} t={t} />}
+      {results.patterns?.length > 0 && <PatternSeverityBar patterns={results.patterns} t={t} />}
       {normogramData && (
         <ChartCard title="Superimposed Measurement Normogram" t={t}>
           <NormogramPolygon measurements={normogramData} t={t} />
@@ -1697,11 +1760,11 @@ function RotationTrackingChart({ rotationTracking, t }) {
     x: rotationTracking.map(rt => rt.label || rt.id),
     y: rotationTracking.map(rt => rt.deltaDeg),
     marker: { color: rotationTracking.map(rt => Math.abs(rt.deltaDeg) > TRAUMA_THRESHOLD ? t.err : t.ok), opacity: 0.7 },
-    text: rotationTracking.map(rt => `${rt.deltaDeg >= 0 ? "+" : ""}${(rt.deltaDeg ?? 0).toFixed(2)}\u00b0`),
+    text: rotationTracking.map(rt => `${rt.deltaDeg >= 0 ? "+" : ""}${(rt.deltaDeg ?? 0).toFixed(2)}°`),
     textposition: "outside",
     textfont: { size: 10, color: t.tx2, family: FONT_STACK },
     hovertemplate: rotationTracking.map(rt =>
-      `${rt.label || rt.id}: %{y:.2f}\u00b0<br>Direction: ${rt.direction || (rt.deltaDeg > 0 ? "opening" : "closing")}<extra></extra>`
+      `${rt.label || rt.id}: %{y:.2f}°<br>Direction: ${rt.direction || (rt.deltaDeg > 0 ? "opening" : "closing")}<extra></extra>`
     ),
     showlegend: false,
   };
@@ -1710,7 +1773,7 @@ function RotationTrackingChart({ rotationTracking, t }) {
 
   const annotations = [{
     x: 0.5, y: 1.02, xref: "paper", yref: "paper",
-    text: `Threshold \u00b1${TRAUMA_THRESHOLD}\u00b0`,
+    text: `Threshold ±${TRAUMA_THRESHOLD}°`,
     showarrow: false, font: { size: 9, color: t.tx3 },
   }];
 
@@ -1719,7 +1782,7 @@ function RotationTrackingChart({ rotationTracking, t }) {
     font: { color: t.tx2, family: FONT_STACK, size: 11 },
     margin: { l: 60, r: 30, t: 30, b: 50 },
     xaxis: { title: "Reference Plane", gridcolor: t.surf3, showgrid: false, tickfont: { size: 10 } },
-    yaxis: { title: "Angle change (\u00b0)", range: [-absMax, absMax], gridcolor: t.surf3, zeroline: true, zerolinecolor: t.tx3 },
+    yaxis: { title: "Angle change (°)", range: [-absMax, absMax], gridcolor: t.surf3, zeroline: true, zerolinecolor: t.tx3 },
     height: 300,
     annotations,
     shapes: [
@@ -1744,10 +1807,10 @@ function PlaneAngleChart({ planeIntersections, t }) {
     type: "scatter", mode: "markers+text",
     x: vals, y: yLabels,
     marker: { color: colors, size: 12, symbol: "diamond", line: { width: 1, color: t.bg } },
-    text: vals.map(v => `${v >= 0 ? "+" : ""}${(v ?? 0).toFixed(2)}\u00b0`),
+    text: vals.map(v => `${v >= 0 ? "+" : ""}${(v ?? 0).toFixed(2)}°`),
     textposition: "right",
     textfont: { size: 10, color: t.tx2, family: FONT_STACK },
-    hovertemplate: "%{y}: %{x:.2f}\u00b0<extra></extra>",
+    hovertemplate: "%{y}: %{x:.2f}°<extra></extra>",
     showlegend: false,
   };
 
@@ -1757,7 +1820,7 @@ function PlaneAngleChart({ planeIntersections, t }) {
     paper_bgcolor: t.surf, plot_bgcolor: t.surf,
     font: { color: t.tx2, family: FONT_STACK, size: 11 },
     margin: { l: 120, r: 60, t: 15, b: 45 },
-    xaxis: { title: "Angle change (\u00b0)", range: [-absMax, absMax], gridcolor: t.surf3, zeroline: true, zerolinecolor: t.tx3 },
+    xaxis: { title: "Angle change (°)", range: [-absMax, absMax], gridcolor: t.surf3, zeroline: true, zerolinecolor: t.tx3 },
     yaxis: { autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 10 } },
     height: Math.max(200, planeIntersections.length * 36 + 50),
   };
@@ -1785,10 +1848,10 @@ function DeltaNormChart({ deltaNorms, t }) {
       y: yLabels, x: actual,
       orientation: "h",
       marker: { color: colors, opacity: 0.75 },
-      text: actual.map(v => `${(v ?? 0) >= 0 ? "+" : ""}${(v ?? 0).toFixed(2)}\u00b0`),
+      text: actual.map(v => `${(v ?? 0) >= 0 ? "+" : ""}${(v ?? 0).toFixed(2)}°`),
       textposition: "outside",
       textfont: { size: 10, color: t.tx2, family: FONT_STACK },
-      hovertemplate: "%{y}: Actual %{x:.2f}\u00b0<extra></extra>",
+      hovertemplate: "%{y}: Actual %{x:.2f}°<extra></extra>",
       showlegend: true,
     },
     {
@@ -1796,10 +1859,10 @@ function DeltaNormChart({ deltaNorms, t }) {
       y: yLabels, x: expected,
       orientation: "h",
       marker: { color: t.tx3, opacity: 0.35 },
-      text: expected.map(v => `${(v ?? 0) >= 0 ? "+" : ""}${(v ?? 0).toFixed(2)}\u00b0`),
+      text: expected.map(v => `${(v ?? 0) >= 0 ? "+" : ""}${(v ?? 0).toFixed(2)}°`),
       textposition: "outside",
       textfont: { size: 9, color: t.tx3, family: FONT_STACK },
-      hovertemplate: "%{y}: Expected %{x:.2f}\u00b0<extra></extra>",
+      hovertemplate: "%{y}: Expected %{x:.2f}°<extra></extra>",
       showlegend: true,
     },
   ];
@@ -1811,7 +1874,7 @@ function DeltaNormChart({ deltaNorms, t }) {
     font: { color: t.tx2, family: FONT_STACK, size: 11 },
     barmode: "group",
     margin: { l: 100, r: 70, t: 15, b: 45 },
-    xaxis: { title: "Change (\u00b0)", range: [-absMax, absMax], gridcolor: t.surf3, zeroline: true, zerolinecolor: t.tx3 },
+    xaxis: { title: "Change (°)", range: [-absMax, absMax], gridcolor: t.surf3, zeroline: true, zerolinecolor: t.tx3 },
     yaxis: { autorange: "reversed", zeroline: false, showgrid: false, tickfont: { size: 10 } },
     height: Math.max(200, deltaNorms.length * 32 + 50),
     legend: { orientation: "h", y: 1.02, x: 0.5, xanchor: "center", font: { size: 10 } },
@@ -1822,7 +1885,7 @@ function DeltaNormChart({ deltaNorms, t }) {
   </ChartCard>;
 }
 
-function PatternRadarChart({ patterns, t }) {
+function PatternSeverityBar({ patterns, t }) {
   if (!patterns?.length) return null;
 
   const severityMap = { mild: 1, moderate: 2, severe: 3 };
