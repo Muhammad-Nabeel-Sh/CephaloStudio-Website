@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import PlotlyChart from "./PlotlyChart.jsx";
+import { computeClinicalThreshold } from "./diagnostic.js";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // TAB BAR (shared with other panels)
@@ -211,7 +212,7 @@ function ROCCurveView({ result, t, fpCost, fnCost, setFpCost, setFnCost, highlig
   const sx = fpr => pad + fpr * (W - 2 * pad);
   const sy = tpr => (H - pad) - tpr * (H - 2 * pad);
   const optYouden = opts.byYouden;
-  const optClinical = opts.clinicalThreshold(fpCost, fnCost);
+  const optClinical = computeClinicalThreshold(result.roc.thresholdMetrics, fpCost, fnCost);
   const rocPath = roc.points.map((pt, i) => `${i === 0 ? "M" : "L"}${sx(pt.fpr)},${sy(pt.tpr)}`).join(" ");
   const fillPath = rocPath + ` L${sx(1)},${sy(0)} L${sx(0)},${sy(0)} Z`;
 

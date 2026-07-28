@@ -161,11 +161,6 @@ export function optimalThresholds(thresholdMetrics) {
     return d < best.dist ? { ...pt, dist: d } : best;
   }, { dist: Infinity });
   const byAccuracy = thresholdMetrics.reduce((best, pt) => pt.accuracy > best.accuracy ? pt : best);
-  const clinicalThreshold = (fpCost = 1, fnCost = 1) =>
-    thresholdMetrics.reduce((best, pt) => {
-      const cost = fpCost * pt.fp + fnCost * pt.fn;
-      return cost < best.cost ? { ...pt, cost } : best;
-    }, { cost: Infinity });
   const enrichOptimal = (pt, nP, nN) => ({
     ...pt,
     sensitivityCI: wilsonCI(pt.tp, nP),
@@ -174,7 +169,14 @@ export function optimalThresholds(thresholdMetrics) {
     npvCI: wilsonCI(pt.tn, pt.tn + pt.fn),
     accuracy95CI: wilsonCI(pt.tp + pt.tn, pt.tp + pt.tn + pt.fp + pt.fn),
   });
-  return { byYouden, byF1, byDistance, byAccuracy, clinicalThreshold, enrichOptimal };
+  return { byYouden, byF1, byDistance, byAccuracy, clinicalThreshold: (fpCost, fnCost) => computeClinicalThreshold(thresholdMetrics, fpCost, fnCost), enrichOptimal };
+}
+
+export function computeClinicalThreshold(thresholdMetrics, fpCost = 1, fnCost = 1) {
+  return thresholdMetrics.reduce((best, pt) => {
+    const cost = fpCost * pt.fp + fnCost * pt.fn;
+    return cost < best.cost ? { ...pt, cost } : best;
+  }, { cost: Infinity });
 }
 
 // ─── Screening Indices ──────────────────────────────────────────────────────
