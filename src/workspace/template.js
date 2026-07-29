@@ -11,6 +11,19 @@ export function getMeasValue(m, calibration) {
   return vals.length > 0 ? vals[0] : 0;
 }
 
+function resolveLabel(rl, placedByLabel, placedByTemplateLabel) {
+  return placedByTemplateLabel[rl] || placedByLabel[rl] || null;
+}
+
+function buildLookups(markups) {
+  const byLabel = {}, byTemplateLabel = {};
+  for (const m of markups) {
+    if (m.label) byLabel[m.label] = m;
+    if (m.templateLabel) byTemplateLabel[m.templateLabel] = m;
+  }
+  return { byLabel, byTemplateLabel };
+}
+
 export function autoCreateMeasurements(markups, templateName, calibration) {
   const analysis = PREDEFINED.lateral.find(a => a.name === templateName)
     || PREDEFINED.ap.find(a => a.name === templateName)
@@ -21,10 +34,7 @@ export function autoCreateMeasurements(markups, templateName, calibration) {
     || PREDEFINED.photofrontal.find(a => a.name === templateName);
   if (!analysis || !analysis.measurements || analysis.measurements.length === 0) return [];
 
-  const placed = {};
-  for (const m of markups) {
-    if (m.placed && m.label) placed[m.label] = m;
-  }
+  const { byLabel: placed, byTemplateLabel: placedByTL } = buildLookups(markups);
   const existingLabels = new Set(markups.map(m => m.label));
   const result = [];
 
@@ -32,9 +42,10 @@ export function autoCreateMeasurements(markups, templateName, calibration) {
     if (meas.type === "ratio" || meas.type === "sum" || meas.type === "difference" || meas.type === "percentage") continue;
     if (!meas.pts || meas.pts.length < 2) continue;
     if (existingLabels.has(meas.l)) continue;
-    const allPlaced = meas.pts.every(rl => placed[rl]);
-    if (!allPlaced) continue;
-    const points = meas.pts.map(rl => placed[rl].points[0]);
+    const matched = meas.pts.map(rl => resolveLabel(rl, placed, placedByTL));
+    if (matched.some(m => !m)) continue;
+    const points = matched.map(m => m.points[0]);
+    const resolvedRefLabels = matched.map(m => m.label);
     const extraProps = {};
     if (meas.type === "line" && !meas.norm) { extraProps.mode = "infinite"; extraProps.style = "dashed"; }
     if (meas.type === "polygon") { extraProps.fillColor = "rgba(56,189,248,0.08)"; extraProps.curveStyle = "linear"; }
@@ -43,41 +54,40 @@ export function autoCreateMeasurements(markups, templateName, calibration) {
       label: meas.l, definition: meas.def || "",
       color: meas.color || "#888",
       visible: true, locked: true, autoCreated: true, placed: true,
-      refLabels: meas.pts, norm: meas.norm, measure: meas.l, ...extraProps,
+      refLabels: resolvedRefLabels, norm: meas.norm, measure: meas.l, ...extraProps,
     });
   }
 
   const updatedLabels = new Set([...existingLabels, ...result.map(m => m.label)]);
-  const markupMap = {};
-  for (const m of [...markups, ...result]) {
-    if (m.label) markupMap[m.label] = m;
-  }
+  const combined = [...markups, ...result];
+  const { byLabel: markupMap, byTemplateLabel: markupMapTL } = buildLookups(combined);
   for (const meas of analysis.measurements) {
     if (meas.type !== "ratio" && meas.type !== "sum" && meas.type !== "difference" && meas.type !== "percentage") continue;
     if (!meas.pts || meas.pts.length < 2) continue;
     if (updatedLabels.has(meas.l)) continue;
-    const allRefsExist = meas.pts.every(rl => markupMap[rl]);
-    if (!allRefsExist) continue;
+    const matched = meas.pts.map(rl => resolveLabel(rl, markupMap, markupMapTL));
+    if (matched.some(m => !m)) continue;
+    const resolvedRefLabels = matched.map(m => m.label);
     let computedValue = 0;
     if (meas.type === "ratio") {
-      const v0 = getMeasValue(markupMap[meas.pts[0]], calibration);
-      const v1 = getMeasValue(markupMap[meas.pts[1]], calibration);
+      const v0 = getMeasValue(matched[0], calibration);
+      const v1 = getMeasValue(matched[1], calibration);
       computedValue = v1 !== 0 ? v0 / v1 : 0;
     } else if (meas.type === "difference") {
-      computedValue = getMeasValue(markupMap[meas.pts[0]], calibration) - getMeasValue(markupMap[meas.pts[1]], calibration);
+      computedValue = getMeasValue(matched[0], calibration) - getMeasValue(matched[1], calibration);
     } else if (meas.type === "percentage") {
-      const v0 = getMeasValue(markupMap[meas.pts[0]], calibration);
-      const v1 = getMeasValue(markupMap[meas.pts[1]], calibration);
+      const v0 = getMeasValue(matched[0], calibration);
+      const v1 = getMeasValue(matched[1], calibration);
       computedValue = v1 !== 0 ? (v0 / v1) * 100 : 0;
     } else {
-      computedValue = meas.pts.reduce((s, rl) => s + getMeasValue(markupMap[rl], calibration), 0);
+      computedValue = matched.reduce((s, m) => s + getMeasValue(m, calibration), 0);
     }
     result.push({
       id: uid(), type: meas.type, points: [],
       label: meas.l, definition: meas.def || "",
       color: meas.color || "#888",
       visible: true, locked: true, autoCreated: true,
-      refLabels: meas.pts, computedValue, norm: meas.norm,
+      refLabels: resolvedRefLabels, computedValue, norm: meas.norm,
     });
   }
   return result;

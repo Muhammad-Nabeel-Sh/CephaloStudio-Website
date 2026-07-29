@@ -1,8 +1,13 @@
 import { dist, vpts, computeMeasurements } from "../lib/utils.js";
 
 export function finalizeCalibRuler(ruler, mm, markups, { pushUndo, updSession, dispatch }) {
-  const rp = ruler || markups.find(m => m.type === "ruler");
-  if (!rp) return;
+  let rp = ruler;
+  if (!rp) {
+    const rulers = markups.filter(m => m.type === "ruler");
+    if (rulers.length === 0) return;
+    if (rulers.length > 1) return; // ambiguous — CalibModal warns the user
+    rp = rulers[0];
+  }
   const vp = vpts(rp);
   if (vp.length < 2) return;
   const pixelDist = dist(vp[0], vp[1]);

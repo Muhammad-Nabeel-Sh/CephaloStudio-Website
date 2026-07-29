@@ -1,38 +1,47 @@
 import { uid } from "../lib/utils.js";
 import { getMeasValue } from "./template.js";
 
-export function refreshAutoMeasurements(markups) {
-  const placed = {};
-  const markupMap = {};
+function resolveLabel(rl, byLabel, byTemplateLabel) {
+  return byTemplateLabel[rl] || byLabel[rl] || null;
+}
+
+function buildLookups(markups) {
+  const byLabel = {}, byTemplateLabel = {};
   for (const m of markups) {
-    if (m.placed && m.label) placed[m.label] = m;
-    if (m.label) markupMap[m.label] = m;
+    if (m.label) byLabel[m.label] = m;
+    if (m.templateLabel) byTemplateLabel[m.templateLabel] = m;
   }
+  return { byLabel, byTemplateLabel };
+}
+
+export function refreshAutoMeasurements(markups) {
+  const { byLabel: placed, byTemplateLabel: placedTL } = buildLookups(markups.filter(m => m.placed));
+  const { byLabel: markupMap, byTemplateLabel: markupMapTL } = buildLookups(markups);
   return markups.map(m => {
     if (!m.refLabels || m.refLabels.length === 0) return m;
     if (m.type === "ratio" || m.type === "sum" || m.type === "difference" || m.type === "percentage") {
-      const allRefsExist = m.refLabels.every(rl => markupMap[rl]);
-      if (!allRefsExist) return m;
+      const matched = m.refLabels.map(rl => resolveLabel(rl, markupMap, markupMapTL));
+      if (matched.some(x => !x)) return m;
       let nv = 0;
       if (m.type === "ratio") {
-        const v0 = getMeasValue(markupMap[m.refLabels[0]]);
-        const v1 = getMeasValue(markupMap[m.refLabels[1]]);
+        const v0 = getMeasValue(matched[0]);
+        const v1 = getMeasValue(matched[1]);
         nv = v1 !== 0 ? v0 / v1 : 0;
       } else if (m.type === "difference") {
-        nv = getMeasValue(markupMap[m.refLabels[0]]) - getMeasValue(markupMap[m.refLabels[1]]);
+        nv = getMeasValue(matched[0]) - getMeasValue(matched[1]);
       } else if (m.type === "percentage") {
-        const v0 = getMeasValue(markupMap[m.refLabels[0]]);
-        const v1 = getMeasValue(markupMap[m.refLabels[1]]);
+        const v0 = getMeasValue(matched[0]);
+        const v1 = getMeasValue(matched[1]);
         nv = v1 !== 0 ? (v0 / v1) * 100 : 0;
       } else {
-        nv = m.refLabels.reduce((s, rl) => s + getMeasValue(markupMap[rl]), 0);
+        nv = matched.reduce((s, x) => s + getMeasValue(x), 0);
       }
       if (m.computedValue !== nv) return { ...m, computedValue: nv };
       return m;
     }
-    const allPlaced = m.refLabels.every(rl => placed[rl]);
-    if (!allPlaced) return m;
-    const np = m.refLabels.map(rl => placed[rl].points[0]);
+    const matched = m.refLabels.map(rl => resolveLabel(rl, placed, placedTL));
+    if (matched.some(x => !x)) return m;
+    const np = matched.map(x => x.points[0]);
     if (np.some((p, i) => p.x !== m.points[i]?.x || p.y !== m.points[i]?.y)) return { ...m, points: np };
     return m;
   });

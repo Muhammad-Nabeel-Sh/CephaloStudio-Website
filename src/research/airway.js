@@ -194,6 +194,30 @@ const ADVANCED_MEASUREMENTS = [
     tier: "advanced",
     description: "Mandibular body length — context for airway interpretation",
   },
+  {
+    id: "Pharyngeal-Area",
+    label: "Pharyngeal Airway Area (PNS to Epiglottis)",
+    type: "area",
+    points: ["PNS", "SP", "Vallecula", "Epiglottis", "Ad1", "Ad2", "Ad3", "Ad4", "PAS_lowest"],
+    normMean: 380,
+    normSD: 130,
+    normSource: "Riley 1983",
+    clinicalNote: "Total sagittal pharyngeal airway area (PNS→Epiglottis); reduced area associated with OSA",
+    tier: "advanced",
+    description: "Total pharyngeal airway sagittal cross-sectional area from PNS to epiglottis",
+  },
+  {
+    id: "Min-CSA",
+    label: "Minimum Estimated Cross-Sectional Area",
+    type: "area",
+    points: ["PNS", "SP", "Vallecula", "Epiglottis", "Ad1", "Ad2", "Ad3", "Ad4", "PAS_lowest"],
+    normMean: 95,
+    normSD: 35,
+    normSource: "Estimated from circular model",
+    clinicalNote: "Minimum pharyngeal CSA (circular model from narrowest AP width); <50 mm² suggests severe narrowing",
+    tier: "advanced",
+    description: "Minimum estimated cross-sectional area of the pharynx (circular approximation)",
+  },
 ];
 
 // ─── Exported measurement list (core + advanced) ──────────────────────────────
@@ -204,8 +228,7 @@ export const AIRWAY_MEASUREMENTS = [...CORE_MEASUREMENTS, ...ADVANCED_MEASUREMEN
 const HIGHER_IS_WORSE = new Set(["MP-H", "SP-Length"]);
 
 // ─── Measurements where LOWER z-score = more pathological (OSA risk) ──────────
-// R-PAS: narrow airway = OSA risk; R-RG: narrow airway = OSA risk
-const LOWER_IS_WORSE = new Set(["R-PAS", "R-RG", "SP-AW"]);
+const LOWER_IS_WORSE = new Set(["R-PAS", "R-RG", "SP-AW", "Pharyngeal-Area", "Min-CSA"]);
 
 // ─── Core landmark requirement check ──────────────────────────────────────────
 export function coreLandmarksComplete(markups) {
@@ -519,6 +542,8 @@ function getClinicalNote(id, value) {
   if (id === "R-RG" && value !== null && value < 5) return "Retroglossal narrowing <5mm — associated with OSA";
   if (id === "MP-H" && value !== null && value > 15) return "Inferiorly positioned hyoid — associated with OSA";
   if (id === "SP-Length" && value !== null && value > 35) return "Elongated soft palate — may contribute to pharyngeal collapse";
+  if (id === "Pharyngeal-Area" && value !== null && value < 200) return "Reduced pharyngeal airway area — possible constriction";
+  if (id === "Min-CSA" && value !== null && value < 50) return "Minimum cross-sectional area <50 mm² — strong OSA indicator";
   return null;
 }
 
@@ -548,7 +573,7 @@ export function computeAirwayMeasurements(markups, calibration, sex, age) {
       try {
         const pts = def.points.map((label) => find(label));
         let validPts = pts.filter((p) => p !== null);
-        const reqLen = def.type === "length" ? 2 : def.points.length;
+        const reqLen = def.type === "length" || def.type === "area" ? 2 : def.points.length;
 
         if (validPts.length < reqLen) {
           const norm = lookupAirwayNorm(def.id, sex, age);
@@ -606,6 +631,48 @@ export function computeAirwayMeasurements(markups, calibration, sex, age) {
           } else {
             value = dist(validPts[0], validPts[1]);
             if (calDone) value /= ppm;
+          }
+        } else if (def.id === "Pharyngeal-Area") {
+          // Total sagittal pharyngeal area: closed polygon of anterior + posterior boundaries
+          const antLabels = ["PNS", "SP", "Vallecula", "Epiglottis"];
+          const postLabels = ["Ad1", "Ad2", "Ad3", "Ad4", "PAS_lowest"];
+          const antRaw = antLabels.map(l => find(l)).filter(Boolean).sort((a, b) => a.y - b.y);
+          const postRaw = postLabels.map(l => find(l)).filter(Boolean).sort((a, b) => a.y - b.y);
+          if (antRaw.length >= 2 && postRaw.length >= 2) {
+            const antSmooth = sampleCatmullRom(antRaw, 30);
+            const postSmooth = sampleCatmullRom(postRaw, 30);
+            // Closed polygon: anterior top→bottom + posterior bottom→top
+            const poly = [...antSmooth, ...postSmooth.reverse()];
+            let area = 0;
+            for (let i = 0; i < poly.length; i++) {
+              const j = (i + 1) % poly.length;
+              area += poly[i].x * poly[j].y;
+              area -= poly[j].x * poly[i].y;
+            }
+            value = Math.abs(area) / 2;
+            if (calDone) value /= (ppm * ppm);
+            unit = calDone ? "mm²" : "px²";
+          }
+        } else if (def.id === "Min-CSA") {
+          // Minimum cross-sectional area: circular model from narrowest AP width
+          const antLabels = ["PNS", "SP", "Vallecula", "Epiglottis"];
+          const postLabels = ["Ad1", "Ad2", "Ad3", "Ad4", "PAS_lowest"];
+          const antRaw = antLabels.map(l => find(l)).filter(Boolean).sort((a, b) => a.y - b.y);
+          const postRaw = postLabels.map(l => find(l)).filter(Boolean).sort((a, b) => a.y - b.y);
+          if (antRaw.length >= 2 && postRaw.length >= 2) {
+            const antSmooth = sampleCatmullRom(antRaw, 50);
+            const postSmooth = sampleCatmullRom(postRaw, 50);
+            const yMin = Math.max(antSmooth[0]?.y || 0, postSmooth[postSmooth.length - 1]?.y || 0);
+            const yMax = Math.min(antSmooth[antSmooth.length - 1]?.y || 0, postSmooth[0]?.y || 0);
+            if (yMin < yMax) {
+              const narrowest = findNarrowestPoint(antSmooth, postSmooth, yMin, yMax, 100);
+              if (narrowest) {
+                let w = narrowest.width;
+                if (calDone) w /= ppm;
+                value = Math.PI * (w / 2) ** 2;
+                unit = calDone ? "mm²" : "px²";
+              }
+            }
           }
         } else if (def.type === "length" && validPts.length >= 2) {
           value = dist(validPts[0], validPts[1]);
@@ -747,7 +814,7 @@ export function computeAirwayRiskScore(measurements) {
   try {
     if (!measurements || measurements.length === 0) return null;
 
-    const riskKeys = new Set(["R-PAS", "R-RG", "MP-H", "SP-Length", "SP-AW"]);
+    const riskKeys = new Set(["R-PAS", "R-RG", "MP-H", "SP-Length", "SP-AW", "Pharyngeal-Area", "Min-CSA"]);
     const directionalScores = [];
     for (const m of measurements) {
       if (riskKeys.has(m.id) && m.zScore != null && isFinite(m.zScore)) {

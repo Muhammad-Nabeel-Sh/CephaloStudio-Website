@@ -43,6 +43,7 @@ import AnonModal from "./panels/AnonModal.jsx";
 import ResearchPanel from "./research/ResearchPanel.jsx";
 import InterpretationPanel from "./panels/InterpretationPanel.jsx";
 import NormogramPanel from "./panels/NormogramPanel.jsx";
+import ContextMenu from "./ui/ContextMenu.jsx";
 import { mkProject, updateSessionInProject } from "./model/project.js";
 import { storeImageBlob, getImageDataUrl, clearImageBlobs, deleteOrphanBlobs, idbAvailable } from "./storage/imageStore.js";
 import { importCephxPayload, validateCepht, CEPHX_FORMAT, CEPHX_VERSION, normalizeSessionImages } from "./storage/cephxFormat.js";
@@ -209,7 +210,7 @@ function CalibModal({t,calibration,onFinish,rulerLabel,rulerCount}){
       </div>
       {mode==="ruler"?<><div style={{fontSize:13,color:t.tx2,marginBottom:16,lineHeight:1.6}}>Draw a ruler on the image (⟺ key), then enter its real-world length.</div>
         {rulerLabel&&<div style={{fontSize:12,color:t.ok,marginBottom:8}}>Using ruler: <strong>{rulerLabel}</strong></div>}
-        {!rulerLabel&&rulerCount>1&&<div style={{fontSize:12,color:t.warn,marginBottom:8}}>⚠ Multiple rulers found — using the first one. Draw a ruler for a specific selection.</div>}
+        {!rulerLabel&&rulerCount>1&&<div style={{fontSize:12,color:t.warn,marginBottom:8}}>⚠ Multiple rulers found — draw a fresh ruler or delete extra rulers to avoid ambiguity.</div>}
         <PropRow label="Distance (mm)" t={t}><input type="number" value={mm} onChange={e=>setMm(e.target.value)} min="1" style={{background:t.surf2,border:`1px solid ${t.bdr}`,borderRadius:6,padding:"6px 10px",color:t.tx,fontSize:14,width:"90%",fontFamily:"'DM Mono',monospace"}}/></PropRow><div style={{fontSize:9,color:t.tx3,marginTop:8}}>2D cephalometric radiographs carry ~8–15% magnification. Ensure the ruler distance reflects the actual image scale (not CBCT).</div><Btn t={t} onClick={()=>onFinish(parseFloat(mm))} style={{width:"100%",marginTop:12}}>Set Calibration</Btn></>
       :<><div style={{fontSize:13,color:t.tx2,marginBottom:16}}>Enter px/mm directly (from DICOM metadata).</div>{calibration.done&&<div style={{fontSize:12,color:t.ok,marginBottom:10}}>Current: {calibration.pxPerMm.toFixed(4)} px/mm</div>}<PropRow label="px / mm" t={t}><input type="number" value={ppm} onChange={e=>setPpm(e.target.value)} step="0.001" min="0.001" style={{background:t.surf2,border:`1px solid ${t.bdr}`,borderRadius:6,padding:"6px 10px",color:t.tx,fontSize:14,width:"90%",fontFamily:"'DM Mono',monospace"}}/></PropRow><div style={{fontSize:9,color:t.tx3,marginTop:8}}>2D cephalograms have ~8–15% inherent magnification. CBCT-derived px/mm is more accurate for linear measurements.</div><Btn t={t} onClick={()=>onFinish(parseFloat(mm),parseFloat(ppm))} style={{width:"100%",marginTop:12}}>Apply</Btn></>}
       {guideKey&&<PanelGuideModal t={t} guideKey={guideKey} onClose={()=>setGuideKey(null)}/>}
@@ -375,6 +376,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     displacementOverlay,refLandmark1,refLandmark2,overlayBlend,overlayAlignMode,overlayVectorScale,showTrackingLines,showCpAlways,showAnchorAlways,
     defaultLineStyle,defaultMarkupColor,defaultLineWidth,autoHideLabels,annotationBold,snapTolerance,}=ui;
   useEffect(()=>{zoomRef.current=ui.zoom;},[ui.zoom]);
+  const fitToView = useCallback(() => { zoomRef.current=1; dispatch({type:"SET",payload:{zoom:1}}); panRef.current={x:40,y:40}; dispatch({type:"SET",payload:{pan:{x:40,y:40}}}); }, [dispatch]);
   const {
     compareSession, setCompareSession,
     contextMenu, setContextMenu,
@@ -468,7 +470,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const isDragging=useRef(false);const dragStart=useRef(null);const dragStartState=useRef(null);
   const dragMid=useRef(null);const dragPtIdx=useRef(null);
   const multiDragIdsRef=useRef(null);
-  const copiedMarkupRef=useRef(null);
+  const [copiedMarkup, setCopiedMarkup]=useState(null);
   const silhouetteAction=useRef(null);const hoveredPtRef=useRef(null);
   const mouseCanvasRef=useRef({x:0,y:0});
   const canvasSize=useRef({w:800,h:600});const lastTouchDist=useRef(null);const lastTapRef=useRef(0);
@@ -1113,7 +1115,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   };
   const handleDblClick=()=>{if((["polygon","curve","polyline","bezier"].includes(activeTool))&&currentDraw?.points.length>=2){finalizeMarkup(currentDraw);dispatch({type:"SET",payload:{currentDraw:null}});}};
   const handleCanvasContextMenu=useCallback(e=>{e.preventDefault();const sp=getCanvasPos(e);const ip=toImage(sp.x,sp.y);const hit=hitTest(markups,ip,zoomRef.current);setContextMenu(hit?{x:e.clientX,y:e.clientY,markupId:hit,imageX:ip.x,imageY:ip.y}:{x:e.clientX,y:e.clientY,markupId:null,imageX:ip.x,imageY:ip.y});},[markups,getCanvasPos,toImage]);
-  useEffect(()=>{if(!contextMenu)return;const close=()=>setContextMenu(null);const onKey=e=>{if(e.key==="Escape")close();if(e.key==="ArrowDown"||e.key==="ArrowUp"){e.preventDefault();const items=document.querySelectorAll('[data-cmenu] [role="menuitem"]');const current=e.target.closest('[role="menuitem"]');const idx=Array.from(items).indexOf(current);const next=e.key==="ArrowDown"?Math.min(idx+1,items.length-1):Math.max(idx-1,0);if(items[next])items[next].focus();}if(e.key==="Tab"){e.preventDefault();const items=document.querySelectorAll('[data-cmenu] [role="menuitem"]');const first=items[0];const last=items[items.length-1];if(e.shiftKey){if(document.activeElement===first){last.focus();}}else{if(document.activeElement===last){first.focus();}}}};const onClickOutside=e=>{if(!e.target.closest('[data-cmenu]'))close()};document.addEventListener("mousedown",onClickOutside);document.addEventListener("keydown",onKey);setTimeout(()=>{const first=document.querySelector('[data-cmenu] [role="menuitem"]');if(first)first.focus();},0);return()=>{document.removeEventListener("mousedown",onClickOutside);document.removeEventListener("keydown",onKey);};},[contextMenu]);
+
   useEffect(()=>{const c=canvasRef.current;if(!c)return;let syncPending=false;const onWheel=e=>{if(Math.abs(e.deltaY)>0.1||Math.abs(e.deltaX)>0.1){e.preventDefault();e.stopPropagation();const sp=getCanvasPos(e);const cz=zoomRef.current;const f=e.deltaY>0?0.9:1.1;const nz=clamp(cz*f,0.05,15);zoomRef.current=nz;const prev=panRef.current;panRef.current={x:sp.x-(sp.x-prev.x)*(nz/cz),y:sp.y-(sp.y-prev.y)*(nz/cz)};scheduleRedrawRef.current();if(!syncPending){syncPending=true;requestAnimationFrame(()=>{syncPending=false;dispatch({type:"SET",payload:{zoom:zoomRef.current}});});}}};c.addEventListener("wheel",onWheel,{passive:false});return()=>c.removeEventListener("wheel",onWheel);},[]);
   const touchStartRef=useRef();const touchMoveRef=useRef();const touchEndRef=useRef();const longPressTimerRef=useRef(null);
   touchStartRef.current=e=>{
@@ -1148,7 +1150,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       if (alreadyPlaced) return;
       const id=uid();
       pointIds[pt.l]=id;
-      newMarkups.push({id,type:"point",points:[{x:-99999,y:-99999}],label:pt.l,definition:pt.def,color:pt.color,size:6,visible:true,placed:false});
+      newMarkups.push({id,type:"point",points:[{x:-99999,y:-99999}],label:pt.l,templateLabel:pt.l,definition:pt.def,color:pt.color,size:6,visible:true,placed:false});
     });
     pushUndo();
     updSession({markups:[...markups,...newMarkups],analysisTemplate:analysis.name});
@@ -1372,60 +1374,29 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         )}
       </div>
 
-      {/* RIGHT-CLICK CONTEXT MENU */}
-      {contextMenu&&(()=>{
-        const mId=contextMenu.markupId;const m=mId?markups.find(x=>x.id===mId):null;
-        const close=()=>setContextMenu(null);
-        const sel=selectedIds.length>1?selectedIds:[];
-        const dup=()=>{if(!m)return;const pts=m.points?.map(p=>({x:p.x+15,y:p.y+15}));const dupe={...m,id:uid(),label:`${m.label||m.type} (copy)`,points:pts};if(m.type==="bezier"){const cp=m.cp?m.cp.map(p=>({x:p.x+15,y:p.y+15})):autoControlPoints(pts);dupe.cp=cp;}addMarkup(dupe);close();};
-        const copyMeas=()=>{if(!m)return;const meas=computeMeasurements(m,calibration);const txt=Object.entries(meas).filter(([k])=>!k.startsWith("_")&&k!=="x"&&k!=="y").map(([k,v])=>`${m.label||m.type} ${k}: ${k==="angle"?v.toFixed(1)+"°":v.toFixed(2)+(k==="area"?(calibration.done?" mm²":" px²"):(calibration.done?" mm":" px"))}`).join("\n");if(txt)navigator.clipboard.writeText(txt);close();};
-        const copyMarkup=()=>{if(!m)return;copiedMarkupRef.current=JSON.stringify(m);close();};
-        const pasteMarkup=(setPos)=>{const raw=copiedMarkupRef.current;if(!raw)return;try{const src=JSON.parse(raw);const imgPt=setPos||{x:contextMenu.imageX||0,y:contextMenu.imageY||0};const pts=src.points?.map(p=>({x:p.x+imgPt.x-(src.points?.[0]?.x||0),y:p.y+imgPt.y-(src.points?.[0]?.y||0)}));const dupe={...src,id:uid(),label:`${src.label||src.type} (pasted)`,points:pts};if(src.type==="bezier"&&src.cp)dupe.cp=src.cp.map(p=>({x:p.x+imgPt.x-(src.points?.[0]?.x||0),y:p.y+imgPt.y-(src.points?.[0]?.y||0)}));addMarkup(dupe);close();}catch{/*silent*/};};
-        const toFront=()=>{if(!m)return;updMarkups(ms=>{const idx=ms.findIndex(x=>x.id===mId);if(idx<0||idx===ms.length-1)return ms;const cp=[...ms];cp.splice(idx,1);cp.push(m);return cp;});close();};
-        const toBack=()=>{if(!m)return;updMarkups(ms=>{const idx=ms.findIndex(x=>x.id===mId);if(idx<0||idx===0)return ms;const cp=[...ms];cp.splice(idx,1);cp.unshift(m);return cp;});close();};
-        const groupSel=()=>{if(sel.length<2)return;const gid=uid();updMarkups(ms=>ms.map(x=>sel.includes(x.id)?{...x,groupId:gid}:x));close();};
-        const ungroupSel=()=>{const ids=m&&m.groupId?[...sel,mId]:sel;if(!ids.length)return;updMarkups(ms=>ms.map(x=>ids.includes(x.id)?{...x,groupId:void 0}:x));close();};
-        const pivotY=Math.min(contextMenu.y,window.innerHeight-320);
-        const item=(label,onClick,danger)=>(
-          <div role="menuitem" tabIndex={0} onClick={onClick} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();onClick();}}} style={{padding:"6px 14px",cursor:"pointer",display:"flex",alignItems:"center",gap:8,color:danger?t.err:t.tx,fontSize:12,transition:"background 0.1s",whiteSpace:"nowrap"}}
-            onMouseEnter={e=>e.currentTarget.style.background=t.surf2} onMouseLeave={e=>e.currentTarget.style.background="transparent"}>{label}</div>
-        );
-        const sep=<div style={{borderTop:`1px solid ${t.bdr}`,margin:"4px 0"}}/>;
-        return <div data-cmenu="1" role="menu" style={{position:"fixed",left:Math.min(contextMenu.x,window.innerWidth-200),top:pivotY,zIndex:1000,background:t.surf,border:`1px solid ${t.bdr}`,borderRadius:8,boxShadow:`0 4px 20px ${t.shadow}88`,padding:"4px 0",minWidth:170,fontSize:12,color:t.tx}}>
-          {m ? <>
-            <div style={{padding:"6px 14px",fontSize:10,color:t.tx3,textTransform:"uppercase",letterSpacing:0.5,borderBottom:`1px solid ${t.bdr}`,fontWeight:600}}>{m.label||m.type}</div>
-            {item("Focus",()=>{selectAndFocusMarkup(mId);close()})}
-            {item("Rename",()=>{const n=window.prompt("Rename markup:",m.label);if(n&&n.trim())updMarkup(mId,{label:n.trim()});close()})}
-            {item("Change Color",()=>{const ci=document.createElement('input');ci.type='color';ci.value=m.color||t.acc;ci.style.position='fixed';ci.style.opacity='0';ci.style.pointerEvents='none';document.body.appendChild(ci);ci.addEventListener('input',()=>updMarkup(mId,{color:ci.value}));ci.addEventListener('change',()=>{document.body.removeChild(ci)});close();ci.click()})}
-            {sep}
-            {item("Duplicate",dup)}
-            {item("Copy",copyMarkup)}
-            {copiedMarkupRef.current?item("Paste",pasteMarkup):null}
-            {sep}
-            {item(m.visible===false?"Show":"Hide",()=>{updMarkup(mId,{visible:m.visible===false});close()})}
-            {item(m.locked?"Unlock":"Lock",()=>{updMarkup(mId,{locked:!m.locked});close()})}
-            {sep}
-            {item(refLandmark1===m.label?"✓ Ref Landmark 1":"Ref Landmark 1",()=>{setRefLandmark1(m.label===refLandmark1?null:m.label);close()})}
-            {item(refLandmark2===m.label?"✓ Ref Landmark 2":"Ref Landmark 2",()=>{setRefLandmark2(m.label===refLandmark2?null:m.label);close()})}
-            {item("Copy Measurement",copyMeas)}
-            {sep}
-            {item("Move to Front",toFront)}
-            {item("Send to Back",toBack)}
-            {sep}
-            {m.groupId?item("Ungroup",ungroupSel):null}
-            {sel.length>1?item("Group",groupSel):null}
-            {item("Delete",()=>{delMarkup(mId);close()},true)}
-          </> : <>
-            <div style={{padding:"6px 14px",fontSize:10,color:t.tx3,textTransform:"uppercase",letterSpacing:0.5,fontWeight:600}}>Canvas</div>
-            {copiedMarkupRef.current?item("Paste",()=>pasteMarkup({x:contextMenu.imageX||0,y:contextMenu.imageY||0})):null}
-            {item("Select All",()=>{const all=markups.map(x=>x.id);dispatch({type:"SET",payload:{selectedIds:all,selectedId:all.length===1?all[0]:null}});close()})}
-            {item("Calibrate ⟺",()=>{dispatch({type:"SET",payload:{showCalib:true}});close()})}
-            {item("Fit to View ⊙",()=>{zoomRef.current=1;dispatch({type:"SET",payload:{zoom:1}});panRef.current={x:40,y:40};dispatch({type:"SET",payload:{pan:{x:40,y:40}}});close()})}
-            {sep}
-            {item(showGrid?"Grid: On ✓":"Grid: Off",()=>{setShowGrid(v=>!v);close()})}
-          </>}
-        </div>;
-      })()}
+      <ContextMenu
+        contextMenu={contextMenu}
+        theme={t}
+        markups={markups}
+        selectedIds={selectedIds}
+        copiedMarkup={copiedMarkup}
+        onCopyMarkup={setCopiedMarkup}
+        refLandmark1={refLandmark1}
+        refLandmark2={refLandmark2}
+        showGrid={showGrid}
+        calibration={calibration}
+        onClose={() => setContextMenu(null)}
+        onAddMarkup={addMarkup}
+        onUpdMarkup={updMarkup}
+        onUpdMarkups={updMarkups}
+        onSelectAndFocus={selectAndFocusMarkup}
+        onDelMarkup={delMarkup}
+        onSetRefLandmark1={setRefLandmark1}
+        onSetRefLandmark2={setRefLandmark2}
+        onSetShowGrid={setShowGrid}
+        onFitToView={fitToView}
+        dispatch={dispatch}
+      />
 
       {/* MODALS */}
       {showCalib&&<Modal t={t} title="Calibration" onClose={()=>dispatch({type:"SET",payload:{showCalib:false}})}><CalibModal t={t} calibration={calibration} onFinish={finalizeCalib} rulerLabel={pendingRuler?.label||null} rulerCount={markups.filter(m=>m.type==="ruler").length}/></Modal>}

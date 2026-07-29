@@ -72,9 +72,9 @@ describe("Airway measurement definitions", () => {
     expect(core).toHaveLength(5);
   });
 
-  it("has 9 advanced measurements", () => {
+  it("has 11 advanced measurements", () => {
     const adv = AIRWAY_MEASUREMENTS.filter(m => m.tier === "advanced");
-    expect(adv).toHaveLength(9);
+    expect(adv).toHaveLength(11);
   });
 
   it("has no SPAS or Soft-Palate-Angle measurements", () => {
@@ -104,7 +104,7 @@ describe("Airway measurement definitions", () => {
     for (const m of AIRWAY_MEASUREMENTS) {
       expect(m.id).toBeTruthy();
       expect(m.label).toBeTruthy();
-      expect(m.type).toBe("length");
+      expect(["length", "area"]).toContain(m.type);
       expect(Array.isArray(m.points)).toBe(true);
       expect(m.points.length).toBeGreaterThanOrEqual(2);
       expect(typeof m.normMean).toBe("number");

@@ -160,4 +160,6 @@ export const AIRWAY_NORMS = {
   "Oropharyngeal-Depth": { mean: 65.0, sd: 10.0, source: "McNamara 1984", note: "Total oropharyngeal depth from PNS to epiglottis base" },
   "Hyoid-C3": { mean: 20.0, sd: 4.0, source: "Estimated", note: "Vertical distance from hyoid to C3 cervical vertebra" },
   "Mandibular-Body": { mean: 70.0, sd: 5.0, source: "Estimated", note: "Length of mandibular body from Go to Me" },
+  "Pharyngeal-Area": { mean: 380, sd: 130, source: "Riley 1983", note: "Total sagittal pharyngeal airway area from PNS to epiglottis" },
+  "Min-CSA": { mean: 95, sd: 35, source: "Estimated from circular model", note: "Minimum cross-sectional area estimated from narrowest AP width (circular model)" },
 };
