@@ -21,3 +21,135 @@ body {
   to { transform: rotate(360deg); }
 }
 
+/* ═════════════════════════════════════════════════════════════════
+   Responsive utilities
+   ═════════════════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  .hide-mobile { display: none !important; }
+  .show-mobile { display: initial !important; }
+}
+@media (min-width: 768px) {
+  .hide-desktop { display: none !important; }
+  .show-desktop { display: initial !important; }
+}
+
+/* ═════════════════════════════════════════════════════════════════
+   TopBar
+   ═════════════════════════════════════════════════════════════════ */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px 5px;
+  height: 46px;
+}
+@media (max-width: 767px) {
+  .topbar { height: 42px; }
+}
+
+/* ═════════════════════════════════════════════════════════════════
+   Canvas wrapper
+   ═════════════════════════════════════════════════════════════════ */
+.canvas-wrapper {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+}
+@media (max-width: 767px) {
+  .canvas-wrapper { padding-bottom: 52px; }
+}
+
+/* ═════════════════════════════════════════════════════════════════
+   Right panel
+   ═════════════════════════════════════════════════════════════════ */
+.right-panel {
+  background: var(--t-surf, #222);
+  display: flex;
+  flex-direction: row;
+  flex-shrink: 0;
+  user-select: none;
+}
+@media (max-width: 767px) {
+  .right-panel {
+    position: fixed !important;
+    top: 42px;
+    right: 0;
+    bottom: 52px;
+    width: 85vw;
+    max-width: 300px;
+    z-index: 15;
+    box-shadow: -4px 0 20px rgba(0,0,0,0.3);
+  }
+}
+
+/* ═════════════════════════════════════════════════════════════════
+   Draw-status overlay
+   ═════════════════════════════════════════════════════════════════ */
+.draw-status {
+  position: absolute;
+  bottom: 34px;
+  left: 30px;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+@media (max-width: 767px) {
+  .draw-status { display: none; }
+}
+
+/* ═════════════════════════════════════════════════════════════════
+   Session filmstrip
+   ═════════════════════════════════════════════════════════════════ */
+.filmstrip-container {
+  display: flex;
+}
+.filmstrip-collapsed {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 5;
+}
+.filmstrip-open {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+}
+@media (max-width: 767px) {
+  .filmstrip-container { display: none; }
+}
+
+/* ═════════════════════════════════════════════════════════════════
+   MarkupProps panel
+   ═════════════════════════════════════════════════════════════════ */
+.markupprops-panel {
+  max-height: 260px;
+}
+@media (max-width: 767px) {
+  .markupprops-panel { max-height: 180px; }
+}
+
+/* ═════════════════════════════════════════════════════════════════
+   Toolbar variants
+   ═════════════════════════════════════════════════════════════════ */
+.toolbar-desktop { display: flex; }
+.toolbar-mobile { display: none; }
+@media (max-width: 767px) {
+  .toolbar-desktop { display: none; }
+  .toolbar-mobile { display: contents; }
+}
+
+/* ═════════════════════════════════════════════════════════════════
+   Right panel sidebar
+   ═════════════════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  .rightpanel-sidebar { display: none; }
+}
+.rightpanel-sidebar-open {
+  display: flex;
+}
+@media (min-width: 768px) {
+  .rightpanel-sidebar-open { display: flex; }
+}

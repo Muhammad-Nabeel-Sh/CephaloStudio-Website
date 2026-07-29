@@ -32,7 +32,6 @@ export const INITIAL_UI = {
   placingQueue: [],
   placingIdx: 0,
   loadingImages: false,
-  isMobile: window.innerWidth < 768,
   showMobilePanel: false,
   toolbarPos: { x: 70, y: 100 },
   toolbarDragging: false,

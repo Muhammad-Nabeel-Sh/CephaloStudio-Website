@@ -4,11 +4,9 @@
 
 import { PANEL_ICONS } from "./panelIcons.jsx";
 
-export function RightPanelSidebar({ t, rightPanel, setRightPanel, panelTabs, toggleBtnRef, toggleCollapsed, isMobile, showMobilePanel }) {
-  if (isMobile && !showMobilePanel) return null;
-
+export function RightPanelSidebar({ t, rightPanel, setRightPanel, panelTabs, toggleBtnRef, toggleCollapsed }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 8, flexShrink: 0, background: t.surf2 }}>
+    <div className="rightpanel-sidebar" style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 8, flexShrink: 0, background: t.surf2 }}>
       {panelTabs.map(([id, label]) => (
         <button key={id} onClick={() => setRightPanel(id)} aria-label={label} title={label}
           onMouseEnter={e => { if (rightPanel !== id) { e.currentTarget.style.background = t.accMuted; e.currentTarget.style.color = t.acc; } }}

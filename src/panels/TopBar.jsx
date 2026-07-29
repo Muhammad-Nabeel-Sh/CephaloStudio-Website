@@ -4,7 +4,7 @@ import { hasUnanonymizedPHI } from "../report/anonymize.js";
 import { Btn, Tag } from "../ui/ui.jsx";
 
 export default function TopBar({
-  t, theme, project, isMobile, onHome,
+  t, theme, project, onHome,
   compareSession, showAnnotations, annotationSize,
   showDisplacement, onSave,
   openImgRef, importRef, dispatch, calibration,
@@ -27,13 +27,13 @@ export default function TopBar({
   const anySnap = snapEnabled.points || snapEnabled.lines;
   const toggleSnap = (key) => dispatch({ type: "SET", payload: { snapEnabled: { ...snapEnabled, [key]: !snapEnabled[key] } } });
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "5px 10px 5px", height: isMobile ? 42 : 46, background: t.surf, flexShrink: 0, overflowX: "auto", position: "relative", zIndex: 10 }}>
+    <div className="topbar" style={{ background: t.surf, flexShrink: 0, overflowX: "auto", position: "relative", zIndex: 10 }}>
       <button onClick={onHome} title="Back to Home" style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, padding: "4px 8px", borderRadius: 6, flexShrink: 0, color: t.tx }}>
         <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M240-200h120v-240h240v240h120v-360L480-740 240-560v360Zm-80 80v-480l320-240 320 240v480H520v-240h-80v240H160Zm320-350Z" /></svg>
       </button>
       <button onClick={onHome} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 5, padding: "4px 8px", borderRadius: 6, flexShrink: 0 }}>
         <span><img src="/favicon.svg" alt="Website Icon" width="48" height="48" /> </span>
-        {!isMobile && <span style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, color: t.tx, fontSize: 17, display: "inline-flex", alignItems: "center", gap: 6 }}>Cephalometry Studio<span style={{ fontSize: 8, fontWeight: 700, color: t.acc, background: t.accMuted, borderRadius: 5, padding: "1px 5px", letterSpacing: 0.8 }}>BETA</span></span>}
+        <span className="hide-mobile" style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, color: t.tx, fontSize: 17, display: "inline-flex", alignItems: "center", gap: 6 }}>Cephalometry Studio<span style={{ fontSize: 8, fontWeight: 700, color: t.acc, background: t.accMuted, borderRadius: 5, padding: "1px 5px", letterSpacing: 0.8 }}>BETA</span></span>
       </button>
       <div style={{ width: 1, height: 20, background: t.bdr, flexShrink: 0 }} />
       <Tag color={t.acc}>{project.projection?.toUpperCase()}</Tag>
@@ -41,7 +41,7 @@ export default function TopBar({
       {calibration.done && <Tag color={t.ok}>⟺{"\u00A0"}{calibration.pxPerMm.toFixed(2)}px/mm</Tag>}
       {placingMode && <Tag color={t.warn}>📍 {placingIdx + 1}/{placingQueue.length}</Tag>}
       <div style={{ flex: 1 }} />
-      {!isMobile && <>
+      <div className="hide-mobile" style={{display:"contents"}}>
         <div ref={snapRef} style={{ position: "relative" }}>
           <Btn ghost t={t} small active={anySnap} title="Snap settings" onClick={() => setSnapDrop(v => !v)}>
             <svg fill={t.tx} width="20" height="20" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M21.7,12.818a1.022,1.022,0,0,1,0,1.445L20.154,15.81l-3.589-3.589,1.547-1.548a1.022,1.022,0,0,1,1.444,0ZM9.737,2.3,8.19,3.846l3.59,3.589,1.546-1.547a1.021,1.021,0,0,0,0-1.444L11.181,2.3A1.021,1.021,0,0,0,9.737,2.3ZM4.478,19.522a8.458,8.458,0,0,0,11.963,0l2.269-2.268-3.589-3.589-2.269,2.268a3.384,3.384,0,0,1-4.785-4.785l2.269-2.269L6.747,5.29,4.478,7.559A8.458,8.458,0,0,0,4.478,19.522Z" /></svg>
@@ -70,7 +70,7 @@ export default function TopBar({
         {showAnnotations && <input type="range" min="0.5" max="2" step="0.1" value={annotationSize} onChange={e => dispatch({ type: "SET", payload: { annotationSize: +e.target.value } })} style={{ width: 60, marginLeft: 4, accentColor: t.acc }} title={`Annotation size: ${annotationSize.toFixed(1)}`} />}
         {compareSession && <Btn ghost t={t} small active={showDisplacement} title="Toggle displacement vectors" onClick={() => dispatch({ type: "SET", payload: { showDisplacement: !showDisplacement } })}>⇝ Vec</Btn>}
         <div style={{ width: 1, height: 20, background: t.bdr }} />
-      </>}
+      </div>
       <Btn ghost t={t} small title="Open image" onClick={() => openImgRef.current?.click()}>
         <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}>
           <path d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560H200v560Zm40-80h480L570-480 450-320l-90-120-120 160Zm-40 80v-560 560Z" />
@@ -90,22 +90,22 @@ export default function TopBar({
           <path d="M840-680v480q0 33-23.5 56.5T760-120H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h480l160 160Zm-80 34L646-760H200v560h560v-446ZM565-275q35-35 35-85t-35-85q-35-35-85-35t-85 35q-35 35-35 85t35 85q35 35 85 35t85-35ZM240-560h360v-160H240v160Zm-40-86v446-560 114Z" />
         </svg>
       </Btn>
-      {<Btn ghost t={t} small title="Export" onClick={() => dispatch({ type: "SET", payload: { showExport: true } })}>
+      <Btn ghost t={t} small title="Export" onClick={() => dispatch({ type: "SET", payload: { showExport: true } })}>
         <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M160-80v-80h640v80H160Zm320-160L200-600h160v-280h240v280h160L480-240Zm0-130 116-150h-76v-280h-80v280h-76l116 150Zm0-150Z" /></svg>
-      </Btn>}
-      {<Btn ghost t={t} small title="Normogram" onClick={() => dispatch({ type: "SET", payload: { showNormogram: true } })}>
+      </Btn>
+      <Btn ghost t={t} small title="Normogram" onClick={() => dispatch({ type: "SET", payload: { showNormogram: true } })}>
         <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M200-120q-33 0-56.5-23.5T120-200v-640h80v640h640v80H200Zm40-120v-360h160v360H240Zm200 0v-560h160v560H440Zm200 0v-200h160v200H640Z" /></svg>
-      </Btn>}
-      {!isMobile && <Btn ghost t={t} small title="Anonymize" onClick={() => dispatch({ type: "SET", payload: { showAnon: true } })}>
+      </Btn>
+      <span className="hide-mobile" style={{display:"contents"}}><Btn ghost t={t} small title="Anonymize" onClick={() => dispatch({ type: "SET", payload: { showAnon: true } })}>
         <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="m644-428-58-58q9-47-27-88t-93-32l-58-58q17-8 34.5-12t37.5-4q75 0 127.5 52.5T660-500q0 20-4 37.5T644-428Zm128 126-58-56q38-29 67.5-63.5T832-500q-50-101-143.5-160.5T480-720q-29 0-57 4t-55 12l-62-62q41-17 84-25.5t90-8.5q151 0 269 83.5T920-500q-23 59-60.5 109.5T772-302Zm20 246L624-222q-35 11-70.5 16.5T480-200q-151 0-269-83.5T40-500q21-53 53-98.5t73-81.5L56-792l56-56 736 736-56 56ZM222-624q-29 26-53 57t-41 67q50 101 143.5 160.5T480-280q20 0 39-2.5t39-5.5l-36-38q-11 3-21 4.5t-21 1.5q-75 0-127.5-52.5T300-500q0-11 1.5-21t4.5-21l-84-82Zm319 93Zm-151 75Z" /></svg>
-      </Btn>}
+      </Btn></span>
       <div style={{ width: 1, height: 20, background: t.bdr, flexShrink: 0 }} />
       {Object.values(THEMES).map(th => (
         <button key={th.id} onClick={() => setTheme(th.id)} title={th.name} aria-label={th.name} aria-pressed={theme === th.id} style={{ width: 22, height: 22, borderRadius: 6, border: theme === th.id ? `2px solid ${t.acc}` : `1px solid ${t.bdr}`, background: th.bg, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div style={{ width: 10, height: 10, borderRadius: 3, background: th.acc }} />
         </button>
       ))}
-      {isMobile && <Btn ghost t={t} small active={showMobilePanel} title="Toggle panel" onClick={() => setShowMobilePanel(v => !v)}>≡</Btn>}
+      <span className="hide-desktop" style={{display:"contents"}}><Btn ghost t={t} small active={showMobilePanel} title="Toggle panel" onClick={() => setShowMobilePanel(v => !v)}>≡</Btn></span>
     </div>
   );
 }

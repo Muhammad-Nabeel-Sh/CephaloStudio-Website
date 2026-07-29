@@ -1,15 +1,17 @@
 import { clamp } from "../lib/utils.js";
 import ToolBtn from "../ui/ToolBtn.jsx";
+import { useMediaQuery } from "../hooks/useMediaQuery.js";
 
 export default function Toolbar({
   activeTool, theme, t, dispatch, setActiveTool,
   sessionImage, calibration, zoom, spotlightMode, updSession,
-  isMobile, showMobilePanel,
+  showMobilePanel,
   panRef, zoomRef,
   undo, redo, undoVersion, undoStackRef, redoStackRef,
   handleDblClick, currentDraw,
   mobileToolsExpanded,
 }) {
+  const isMobile = useMediaQuery("(max-width: 767px)");
   if (isMobile && !showMobilePanel) {
     const selTool = (id) => {
       dispatch({ type: "SET", payload: { activeTool: id } });
