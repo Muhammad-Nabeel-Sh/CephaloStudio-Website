@@ -84,7 +84,7 @@ const CORE_MEASUREMENTS = [
 
 // ─── Advanced measurements (computed when advanced landmarks are placed) ──────
 // R-RG moved here: requires PAS_lowest (advanced landmark)
-// SP-Thickness moved here: requires SP_mid (advanced landmark)
+// SP-AW moved here: requires SP_mid (advanced landmark)
 const ADVANCED_MEASUREMENTS = [
   {
     id: "R-RG",
@@ -99,16 +99,16 @@ const ADVANCED_MEASUREMENTS = [
     description: "Retroglossal airway width — tongue base level",
   },
   {
-    id: "SP-Thickness",
-    label: "Soft Palate Thickness",
+    id: "SP-AW",
+    label: "SP-AW (Mid-Palate Airway Width)",
     type: "length",
     points: ["SP_mid", "Ad3"],
     normMean: 8.5,
     normSD: 1.8,
     normSource: "Lowe 1985",
-    clinicalNote: "Maximum thickness of soft palate approximated by SP_mid-Ad3 distance",
+    clinicalNote: "Airway width at mid-soft-palate level from SP_mid to posterior pharyngeal wall (Ad3); <5mm associated with OSA",
     tier: "advanced",
-    description: "Soft palate thickness — thickening associated with OSA",
+    description: "Airway space at mid-soft-palate level — narrowing associated with OSA",
   },
   {
     id: "PNS-AD1",
@@ -201,11 +201,11 @@ export const AIRWAY_MEASUREMENTS = [...CORE_MEASUREMENTS, ...ADVANCED_MEASUREMEN
 
 // ─── Measurements where HIGHER z-score = more pathological (OSA risk) ────────
 // MP-H: elevated hyoid = OSA risk; SP-Length: elongated soft palate = OSA risk
-const HIGHER_IS_WORSE = new Set(["MP-H", "SP-Length", "SP-Thickness"]);
+const HIGHER_IS_WORSE = new Set(["MP-H", "SP-Length"]);
 
 // ─── Measurements where LOWER z-score = more pathological (OSA risk) ──────────
 // R-PAS: narrow airway = OSA risk; R-RG: narrow airway = OSA risk
-const LOWER_IS_WORSE = new Set(["R-PAS", "R-RG"]);
+const LOWER_IS_WORSE = new Set(["R-PAS", "R-RG", "SP-AW"]);
 
 // ─── Core landmark requirement check ──────────────────────────────────────────
 export function coreLandmarksComplete(markups) {
@@ -484,6 +484,14 @@ export const AIRWAY_NORMS_STRATIFIED = {
     { sex: "F", ageMin: 12, ageMax: 16, mean: 11.5, sd: 3.0 },
     { sex: "F", ageMin: 16, ageMax: 20, mean: 12.0, sd: 3.3 },
   ]},
+  "Tongue-Length": {
+    source: "Samman et al. 2003 (Hong Kong Chinese) — East Asian strata",
+    note: "Caucasian adult default 76.9±5.6 (Lowe 1985) may overestimate by 5–15 mm for East Asian patients",
+    groups: [
+      { sex: "M", ageMin: 18, ageMax: 40, mean: 72.0, sd: 4.1 },
+      { sex: "F", ageMin: 18, ageMax: 40, mean: 64.8, sd: 4.0 },
+    ],
+  },
 };
 
 export function lookupAirwayNorm(id, sex, age) {
@@ -539,7 +547,7 @@ export function computeAirwayMeasurements(markups, calibration, sex, age) {
     for (const def of AIRWAY_MEASUREMENTS) {
       try {
         const pts = def.points.map((label) => find(label));
-        const validPts = pts.filter((p) => p !== null);
+        let validPts = pts.filter((p) => p !== null);
         const reqLen = def.type === "length" ? 2 : def.points.length;
 
         if (validPts.length < reqLen) {
@@ -576,6 +584,27 @@ export function computeAirwayMeasurements(markups, calibration, sex, age) {
             );
             const den = dist(go, me);
             value = den < 1e-9 ? 0 : num / den;
+            if (calDone) value /= ppm;
+          }
+        } else if (def.id === "R-PAS") {
+          // McNamara R-PAS: narrowest AP dimension at retropalatal level,
+          // not simply SP→Ad3 distance. Scan from PNS to SP level.
+          const antPts = ["PNS", "SP"].map(find).filter(Boolean).sort((a, b) => a.y - b.y);
+          const postPts = ["Ad1", "Ad2", "Ad3"].map(find).filter(Boolean).sort((a, b) => a.y - b.y);
+          if (antPts.length >= 2 && postPts.length >= 2) {
+            const yMin = antPts[0].y;
+            const yMax = antPts[antPts.length - 1].y;
+            const narrowest = findNarrowestPoint(antPts, postPts, yMin, yMax, 50);
+            if (narrowest) {
+              value = narrowest.width;
+              if (calDone) value /= ppm;
+              validPts = [narrowest.antPt, narrowest.postPt];
+            } else {
+              value = dist(validPts[0], validPts[1]);
+              if (calDone) value /= ppm;
+            }
+          } else {
+            value = dist(validPts[0], validPts[1]);
             if (calDone) value /= ppm;
           }
         } else if (def.type === "length" && validPts.length >= 2) {
@@ -718,7 +747,7 @@ export function computeAirwayRiskScore(measurements) {
   try {
     if (!measurements || measurements.length === 0) return null;
 
-    const riskKeys = new Set(["R-PAS", "R-RG", "MP-H", "SP-Length", "SP-Thickness"]);
+    const riskKeys = new Set(["R-PAS", "R-RG", "MP-H", "SP-Length", "SP-AW"]);
     const directionalScores = [];
     for (const m of measurements) {
       if (riskKeys.has(m.id) && m.zScore != null && isFinite(m.zScore)) {

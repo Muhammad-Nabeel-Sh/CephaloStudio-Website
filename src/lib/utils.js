@@ -618,10 +618,14 @@ export function shapiroWilk(arr) {
 
 function shapiroCoefficients(n) {
   if (n < 3) return null;
+  // Expected normal order statistics (Blom scores)
   const m = Array.from({ length: n }, (_, i) => normalQuantile((i + 1 - 0.375) / (n + 0.25)));
+  // Shapiro-Francia: a_i = m_i / sqrt(∑ m_j²)
+  // This is asymptotically equivalent to SW (Royston 1992)
+  // and gives a valid, well-behaved test for all n
   const ss = m.reduce((s, x) => s + x * x, 0);
-  const a = m.map(x => x / Math.sqrt(ss));
-  return a.slice(0, Math.floor(n / 2));
+  const normed = m.map(x => x / Math.sqrt(ss));
+  return normed.slice(0, Math.floor(n / 2));
 }
 
 function normalQuantile(p) {
@@ -633,17 +637,17 @@ function normalQuantile(p) {
   const c = [-7.784894002430293e-03, -3.223964580411365e-01, -2.400758277161838e+00, -2.549732539343734e+00, 4.374664141464968e+00, 2.938163982698783e+00];
   const d = [7.784695709041462e-03, 3.224671290700398e-01, 2.445134137142996e+00, 3.754408661907416e+00];
   const pLow = 0.02425;
+  // For tail: q = min(p, 1-p) → tail approx returns |x|, sign applied after
+  // For central: r = p-0.5 → x already correctly signed
   const q = p < pLow ? p : 1 - p;
-  let x;
   if (q < pLow) {
     const r = Math.sqrt(-2 * Math.log(q));
-    x = (((((c[0]*r+c[1])*r+c[2])*r+c[3])*r+c[4])*r+c[5]) / ((((d[0]*r+d[1])*r+d[2])*r+d[3])*r+1);
-  } else {
-    const r = p - 0.5;
-    const r2 = r * r;
-    x = (((((a[0]*r2+a[1])*r2+a[2])*r2+a[3])*r2+a[4])*r2+a[5])*r / (((((b[0]*r2+b[1])*r2+b[2])*r2+b[3])*r2+b[4])*r2+1);
+    const x = (((((c[0]*r+c[1])*r+c[2])*r+c[3])*r+c[4])*r+c[5]) / ((((d[0]*r+d[1])*r+d[2])*r+d[3])*r+1);
+    return p < 0.5 ? -x : x;
   }
-  return p < 0.5 ? -x : x;
+  const r = p - 0.5;
+  const r2 = r * r;
+  return (((((a[0]*r2+a[1])*r2+a[2])*r2+a[3])*r2+a[4])*r2+a[5])*r / (((((b[0]*r2+b[1])*r2+b[2])*r2+b[3])*r2+b[4])*r2+1);
 }
 
 function shapiroPValue(W, n) {

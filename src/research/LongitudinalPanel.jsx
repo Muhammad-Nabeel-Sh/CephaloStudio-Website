@@ -132,10 +132,19 @@ export function LongitudinalConfig({ study, sessions, onUpdateStudy, t, project 
                 background: config.modelType === m ? t.acc + "22" : "transparent",
                 color: config.modelType === m ? t.acc : t.tx2,
               }}>
-              {m === "rm_anova" ? "RM-ANOVA" : "Mixed Model"}
+              {m === "rm_anova" ? "RM-ANOVA" : "Mixed Model*"}
             </button>
           ))}
         </div>
+        {config.modelType === "mixed_model" && (
+          <div style={{ marginTop: 6, padding: "6px 8px", borderRadius: 4, background: t.warn + "18", border: `1px solid ${t.warn}44`, fontSize: 10, color: t.tx2, lineHeight: 1.5 }}>
+            <b style={{ color: t.warn }}>Pseudo-OLS approximation.</b> Not a true REML/ML mixed model.
+            Fixed effects fitted via pooled OLS; cluster-robust SEs partially correct for within-subject
+            correlation. Random-intercept variance estimated post-hoc (method-of-moments) and may go{" "}
+            <b>negative</b> &mdash; clamped to 0 in display. LogLik/AIC/BIC use OLS likelihood.
+            Use a proper mixed-model library for definitive inference.
+          </div>
+        )}
       </div>
 
       {/* Sphericity correction */}
@@ -577,6 +586,14 @@ function MixedModelView({ results, t }) {
 
   return (
     <div>
+      {/* Prominent limitation banner */}
+      <div style={{ marginBottom: 12, padding: "8px 10px", borderRadius: 4, background: t.warn + "18", border: `1px solid ${t.warn}44`, fontSize: 10, color: t.tx2, lineHeight: 1.5 }}>
+        <b style={{ color: t.warn }}>Pseudo-OLS approximation &mdash; not a true REML/ML mixed model.</b>
+        Fixed effects fitted via pooled OLS ignoring within-subject correlation; cluster-robust SEs
+        partially correct for anti-conservative bias. Random-intercept variance is a method-of-moments
+        estimate that can go <b>negative</b> (clamped to 0). LogLik/AIC/BIC are OLS-based (not REML).
+        Use a proper mixed-model library for definitive inference.
+      </div>
       {labels.map(([label, lr]) => {
         const m = lr.lmm;
         if (!m) return null;

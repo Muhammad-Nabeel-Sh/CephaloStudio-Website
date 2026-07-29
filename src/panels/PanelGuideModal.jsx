@@ -843,7 +843,7 @@ const GUIDES = {
         heading: "14 airway measurements",
         items: [
           "Core (5): N-PH, R-PAS, MP-H, SP-Length, Tongue-Length",
-          "Advanced (9): R-RG, SP-Thickness, PNS-AD1, PNS-AD2, MAS, IAS, Oropharyngeal Depth, Hyoid-C3, Mandibular Body",
+          "Advanced (9): R-RG, SP-AW, PNS-AD1, PNS-AD2, MAS, IAS, Oropharyngeal Depth, Hyoid-C3, Mandibular Body",
           "Each measurement shows its source publication and age/sex-stratified norm ranges",
           "Core measurements cover OSA screening; advanced measurements provide detailed regional analysis",
         ],

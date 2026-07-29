@@ -4,7 +4,7 @@
 // multi-timepoint longitudinal analysis, and group-level research.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { vpts, angle3pt, computeMeasurements } from "../lib/utils.js";
+import { vpts, angle3pt, computeMeasurements, tDistributeCDF } from "../lib/utils.js";
 
 // ─── Structural reference planes ─────────────────────────────────────────────
 
@@ -14,7 +14,7 @@ export const REFERENCE_PLANES = [
   { id: "palatal",  label: "Palatal Plane",                   pt1: "ANS",      pt2: "PNS" },
   { id: "mandible", label: "Mandibular Plane",                pt1: "Go",       pt2: "Me" },
   { id: "FH",       label: "Frankfort Horizontal",            pt1: "Porion",   pt2: "Orbitale" },
-  { id: "OP",       label: "Occlusal Plane",                  pt1: "U1 tip",   pt2: "Me" },
+  { id: "OP",       label: "Occlusal Plane",                  pt1: "APOcc",    pt2: "PPOcc" },
 ];
 
 // ─── Growth/Rotation reference planes (2-point pairs for rotation tracking) ──
@@ -22,7 +22,7 @@ export const REFERENCE_PLANES = [
 export const ROTATION_TRACKING = [
   { id: "mandAngle",  label: "Mandibular Plane Angle",   pt1: "Go",     pt2: "Me",    ref1: "Sella",  ref2: "Nasion" },
   { id: "palatalAngle", label: "Palatal Plane Angle",    pt1: "ANS",    pt2: "PNS",   ref1: "Sella",  ref2: "Nasion" },
-  { id: "occlusalAngle", label: "Occlusal Plane Angle",  pt1: "U1 tip", pt2: "Me",    ref1: "Sella",  ref2: "Nasion" },
+  { id: "occlusalAngle", label: "Occlusal Plane Angle",  pt1: "APOcc",  pt2: "PPOcc", ref1: "Sella",  ref2: "Nasion" },
   { id: "Yaxis",      label: "Y-Axis (SGn)",             pt1: "Sella",  pt2: "Gn",    ref1: null,     ref2: null },
 ];
 
@@ -284,10 +284,12 @@ function matchLandmarks(srcMarkups, dstMarkups) {
 export function computeDisplacements(matched, transform, pxPerMm) {
   const mm = pxPerMm > 0;
   return matched.map(({ label, src, dst }) => {
-    // KEY FIX: transform compare-session point (src) to align with base (dst)
+    // Align compare-session point (src = T2) into base (dst = T1) space
     const aligned = applyTransform({ x: src.x, y: src.y }, transform);
-    const dx = dst.x - aligned.x;
-    const dy = dst.y - aligned.y;
+    // Displacement = T2 − T1 (positive = movement in +x/+y direction over time)
+    // Consistent with linear-change sign convention (computeLinearChanges uses T2 − T1)
+    const dx = aligned.x - dst.x;
+    const dy = aligned.y - dst.y;
     const lenPx = Math.sqrt(dx * dx + dy * dy);
     const lenMm = mm ? lenPx / pxPerMm : lenPx;
     const angle = Math.atan2(-dy, dx) * (180 / Math.PI);
@@ -413,19 +415,32 @@ export function computePlaneIntersections(baseMarkups, compareMarkups, transform
 export function lookupDeltaNorm(label, sex, ageStart, ageEnd) {
   const entry = DELTA_NORMS.find(n => n.label === label);
   if (!entry) return null;
-  const yearSpan = Math.max(0.5, (ageEnd || ageStart + 2) - ageStart);
+  const aStart = ageStart ?? 12;
+  const aEnd = ageEnd ?? aStart + 2;
+  if (aEnd <= aStart) return null;
   const sexKey = sex === "Male" || sex === "M" || sex === "male" ? "M" : "F";
-  const group = entry.groups.find(g => g.sex === sexKey && ageStart >= g.ageMin && ageStart < g.ageMax);
-  if (!group) return null;
-  const scaledDelta = group.meanDelta * yearSpan;
-  const scaledSD = group.sd * Math.sqrt(yearSpan);
+  const groups = entry.groups.filter(g => g.sex === sexKey);
+  let totalDelta = 0;
+  let totalVar = 0;
+  let lastNote = "";
+  for (const g of groups) {
+    const overlapStart = Math.max(aStart, g.ageMin);
+    const overlapEnd = Math.min(aEnd, g.ageMax);
+    if (overlapEnd <= overlapStart) continue;
+    const spanYears = Math.max(0.5, g.ageMax - g.ageMin);
+    const frac = (overlapEnd - overlapStart) / spanYears;
+    totalDelta += g.meanDelta * frac;
+    totalVar += g.sd * g.sd * frac;
+    lastNote = g.note;
+  }
+  if (totalVar <= 0) return null;
   return {
     label: entry.label,
     source: entry.source,
-    expectedDelta: scaledDelta,
-    expectedSD: scaledSD,
-    yearSpan,
-    note: group.note,
+    expectedDelta: totalDelta,
+    expectedSD: Math.sqrt(totalVar),
+    yearSpan: aEnd - aStart,
+    note: lastNote,
   };
 }
 
@@ -461,12 +476,47 @@ export function evaluateDeltaNorms(linearChanges, angularChanges, sex, ageStart,
 // 3. CLINICAL PATTERN DETECTION
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// Label synonyms for case-insensitive+fuzzy matching.
+// Each entry maps a canonical label to its known variants.
+// Used by detectPatterns to find measurements regardless of label naming
+// convention in the user's project.
+const _LABEL_SYNONYMS = {
+  "ANB": ["A-N-B", "ANB angle", "ANB°", "ANB (degrees)"],
+  "SNA": ["S-N-A", "SNA angle", "SNA°", "SNA (degrees)"],
+  "SNB": ["S-N-B", "SNB angle", "SNB°", "SNB (degrees)"],
+  "U1-NA": ["U1NA", "U1/NA", "U1-NA (angle)", "U1-NA angle"],
+  "U1-NA-mm": ["U1-NA mm", "U1NA mm", "U1-NA distance", "U1-NA (mm)"],
+  "L1-NB": ["L1NB", "L1/NB", "L1-NB (angle)", "L1-NB angle"],
+  "L1-NB-mm": ["L1-NB mm", "L1NB mm", "L1-NB distance", "L1-NB (mm)"],
+  "Interincisal": ["interincisal", "interincisal angle", "U1-L1", "U1/L1", "IIA"],
+  "U1-L1": ["U1/L1", "U1-L1 angle", "Interincisal", "interincisal", "interincisal angle"],
+  "E-line (nose tip)": ["E line (nose tip)", "ELine (nose tip)"],
+  "E-line": ["E line", "ELine", "E-plane", "esthetic line"],
+};
+const _SYNONYM_TABLE = (() => {
+  const t = {};
+  for (const [canonical, aliases] of Object.entries(_LABEL_SYNONYMS)) {
+    for (const v of [canonical, ...aliases]) {
+      t[v.toLowerCase()] = canonical;
+    }
+  }
+  return t;
+})();
+function _matchLabel(candidate, query) {
+  const cLower = candidate.toLowerCase();
+  const qLower = query.toLowerCase();
+  if (cLower === qLower) return true;
+  const cCanon = _SYNONYM_TABLE[cLower] || cLower;
+  const qCanon = _SYNONYM_TABLE[qLower] || qLower;
+  return cCanon === qCanon;
+}
+
 export function detectPatterns(displacements, angularChanges, rotationTracking, planeIntersections, linearChanges, centroidSize) {
   const patterns = [];
 
-  const findAng = (label) => angularChanges.find(c => c.label === label);
+  const findAng = (label) => angularChanges.find(c => _matchLabel(c.label, label));
   const findRot = (id) => rotationTracking.find(r => r.id === id);
-  const findLin = (label) => (linearChanges || []).find(c => c.label === label);
+  const findLin = (label) => (linearChanges || []).find(c => _matchLabel(c.label, label));
 
   // 1. Growth pattern classification
   const mandPlaneRot = findRot("mandAngle");
@@ -510,7 +560,19 @@ export function detectPatterns(displacements, angularChanges, rotationTracking, 
     }
   }
 
-  // 3. Maxillary rotation
+  // 3. Missing-data warning for skeletal class
+  if (!anbChange) {
+    patterns.push({
+      id: "missingSkeletalClass",
+      category: "Skeletal",
+      label: "Skeletal Class Data Missing",
+      summary: "No ANB change found in linear or angular changes — skeletal class pattern not reported",
+      detail: "Pattern detection looks for labels matching 'ANB' (including 'A-N-B', 'ANB angle', etc.). If your project uses a different label, consider renaming.",
+      severity: "mild",
+    });
+  }
+
+  // 4. Maxillary rotation
   const palatalRot = findRot("palatalAngle");
   if (palatalRot) {
     const delta = palatalRot.deltaDeg;
@@ -526,7 +588,7 @@ export function detectPatterns(displacements, angularChanges, rotationTracking, 
     }
   }
 
-  // 4. Mandibular autorotation
+  // 5. Mandibular autorotation
   if (mandPlaneRot) {
     const delta = mandPlaneRot.deltaDeg;
     if (Math.abs(delta) > 2) {
@@ -541,7 +603,7 @@ export function detectPatterns(displacements, angularChanges, rotationTracking, 
     }
   }
 
-  // 5. Incisor compensation
+  // 6. Incisor compensation
   const u1Change = findAng("U1-NA") || findLin("U1-NA-mm");
   const l1Change = findAng("L1-NB") || findLin("L1-NB-mm");
   const interincisal = findAng("Interincisal") || findAng("U1-L1");
@@ -562,7 +624,7 @@ export function detectPatterns(displacements, angularChanges, rotationTracking, 
     }
   }
 
-  // 6. Dental symmetry check
+  // 7. Dental symmetry check
   if (interincisal) {
     const delta = interincisal.delta ?? (interincisal.value2 - interincisal.value1);
     if (Math.abs(delta) > 5) {
@@ -577,7 +639,7 @@ export function detectPatterns(displacements, angularChanges, rotationTracking, 
     }
   }
 
-  // 7. Soft tissue assessment
+  // 8. Soft tissue assessment
   const eLine = findLin("E-line (nose tip)") || findLin("E-line");
   if (eLine) {
     const delta = eLine.delta;
@@ -593,7 +655,7 @@ export function detectPatterns(displacements, angularChanges, rotationTracking, 
     }
   }
 
-  // 8. Overall size change
+  // 9. Overall size change
   if (centroidSize && Math.abs(centroidSize.pctChange) > 5) {
     patterns.push({
       id: "sizeChange",
@@ -888,10 +950,12 @@ export function computeGroupSuperimposition(caseResults) {
       meanDx: dxValues.reduce((a, b) => a + b, 0) / dxValues.length,
       meanDy: dyValues.reduce((a, b) => a + b, 0) / dyValues.length,
       seMagnitude: sd(magnitudes) / Math.sqrt(magnitudes.length),
-      ci95: [
-        magnitudes.reduce((a, b) => a + b, 0) / magnitudes.length - 1.96 * sd(magnitudes) / Math.sqrt(magnitudes.length),
-        magnitudes.reduce((a, b) => a + b, 0) / magnitudes.length + 1.96 * sd(magnitudes) / Math.sqrt(magnitudes.length),
-      ],
+      ci95: (n => {
+        const tc = tCritical(0.975, n - 1);
+        const mean = magnitudes.reduce((a, b) => a + b, 0) / n;
+        const se = sd(magnitudes) / Math.sqrt(n);
+        return [mean - tc * se, mean + tc * se];
+      })(values.length),
     };
   }
 
@@ -902,6 +966,21 @@ export function computeGroupSuperimposition(caseResults) {
   });
 
   return { groupStats, heatmapData, labelList, nCases: caseResults.length };
+}
+
+// ─── t-critical helper (invert tDistributeCDF) ───────────────────────────────
+function tCritical(p, df) {
+  if (df <= 0) return 1.96;
+  if (df > 1000) return p >= 0.995 ? 2.576 : p >= 0.975 ? 1.96 : p >= 0.95 ? 1.645 : 0;
+  const target = p;
+  let lo = 0.0, hi = 8.0, mid;
+  for (let it = 0; it < 60; it++) {
+    mid = (lo + hi) / 2;
+    const cdf = tDistributeCDF(mid, df);
+    if (cdf < target) lo = mid; else hi = mid;
+    if (Math.abs(cdf - target) < 1e-10) break;
+  }
+  return (lo + hi) / 2;
 }
 
 // ─── Study-level runner (called by engine.js) ────────────────────────────────

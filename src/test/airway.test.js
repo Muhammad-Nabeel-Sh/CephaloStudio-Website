@@ -94,8 +94,8 @@ describe("Airway measurement definitions", () => {
     expect(rrg.tier).toBe("advanced");
   });
 
-  it("SP-Thickness is an advanced measurement", () => {
-    const sp = AIRWAY_MEASUREMENTS.find(m => m.id === "SP-Thickness");
+  it("SP-AW is an advanced measurement", () => {
+    const sp = AIRWAY_MEASUREMENTS.find(m => m.id === "SP-AW");
     expect(sp).toBeDefined();
     expect(sp.tier).toBe("advanced");
   });
@@ -241,7 +241,7 @@ describe("computeAirwayMeasurements", () => {
     expect(ids).toContain("SP-Length");
     expect(ids).toContain("Tongue-Length");
     expect(ids).not.toContain("R-RG");
-    expect(ids).not.toContain("SP-Thickness");
+    expect(ids).not.toContain("SP-AW");
     expect(ids).not.toContain("PNS-AD1");
     expect(ids).not.toContain("PNS-AD2");
     expect(ids).not.toContain("MAS");

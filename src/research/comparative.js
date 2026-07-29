@@ -400,7 +400,7 @@ function studentizedRangeCDF(q, k, df) {
   const steps = Math.max(200, Math.round(40 * Math.min(1, df / 10)));
   const dHalf = df / 2;
   let p = 0;
-  const maxX = df < 5 ? 12 + q / 2 : 6 + q / 2;
+  const maxX = Math.max(6 + q / 2, q + 10);
   for (let i = 0; i <= steps; i++) {
     const x = (maxX * i) / steps;
     const z = q * x / Math.SQRT2;

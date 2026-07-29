@@ -3,16 +3,15 @@ import { chi2CDF } from "../lib/utils.js";
 import { normalCdf as normalCDF, dot, matVecMul, matMul, matInverse, transposeMatrix, addIntercept } from "./statsCore.js";
 // ─── Math helpers ────────────────────────────────────────────────────────────
 function zCritical(alpha) {
-  const lookup = [];
-  for (let i = 0; i <= 30; i++) lookup.push({ z: i / 10, c: normalCDF(i / 10) });
   const p = 1 - alpha / 2;
-  for (let i = 1; i < lookup.length; i++) {
-    if (lookup[i].c >= p) {
-      const frac = (p - lookup[i - 1].c) / (lookup[i].c - lookup[i - 1].c);
-      return lookup[i - 1].z + frac * 0.1;
-    }
+  let lo = 0.0, hi = 5.0, mid;
+  for (let it = 0; it < 60; it++) {
+    mid = (lo + hi) / 2;
+    const c = normalCDF(mid);
+    if (c < p) lo = mid; else hi = mid;
+    if (Math.abs(c - p) < 1e-12) break;
   }
-  return 3.09;
+  return (lo + hi) / 2;
 }
 
 function bonferroniAdjust(pValues) {
@@ -204,6 +203,17 @@ export function screeningIndices(tp, fp, tn, fn) {
 // ─── Calibration Analysis ────────────────────────────────────────────────────
 export function calibrationAnalysis(predictedProbs, observedLabels, nGroups = 10) {
   const n = predictedProbs.length;
+  const warnings = [];
+  // Bail out when n is too small to form meaningful groups
+  if (n < nGroups) {
+    warnings.push(`Hosmer-Lemeshow: sample size (n=${n}) is smaller than requested groups (g=${nGroups}). Each cell would have < 2 observations rendering the test degenerate. Defaulting to floor(n/3) groups.`);
+    nGroups = Math.max(2, Math.floor(n / 3));
+  }
+  // Also warn if the resulting group size is still tiny
+  const rawSize = Math.floor(n / nGroups);
+  if (rawSize < 3) {
+    warnings.push(`Hosmer-Lemeshow: resulting group size ≈ ${rawSize} (n=${n}, g=${nGroups}). Small bins inflate the χ² approximation error; consider a larger sample.`);
+  }
   const pairs = predictedProbs.map((p, i) => ({ prob: p, obs: observedLabels[i] }))
     .sort((a, b) => a.prob - b.prob);
   const groups = [];
@@ -235,7 +245,6 @@ export function calibrationAnalysis(predictedProbs, observedLabels, nGroups = 10
   const brierRef = prevalence * (1 - prevalence);
   const brierSkill = brierRef > 0 ? 1 - brier / brierRef : 0;
   const lowExpected = groups.some(g => g.expected < 5 || (g.n - g.expected) < 5);
-  const warnings = [];
   if (lowExpected) warnings.push(`Hosmer-Lemeshow: some groups have expected count < 5 (n=${n}, g=${groups.length}). The χ² approximation may be unreliable; consider reducing the number of groups or using a larger sample.`);
   return { groups, hlStat, hlDF, hlP, wellCalibrated: hlP > 0.05, ici, brier, brierSkill, n, warnings };
 }
@@ -249,16 +258,31 @@ export function buildCompositeIndex(predictors, labels) {
   let beta = Array(k).fill(0);
   for (let iter = 0; iter < 200; iter++) {
     const p = X.map(xi => sigmoid(dot(xi, beta)));
-    const W = p.map(pi => pi * (1 - pi));
     const resid = labels.map((yi, i) => yi - p[i]);
     const score = transposeMatrix(X).map(col => dot(col, resid));
+    const gradNorm = Math.sqrt(score.reduce((s, g) => s + g * g, 0));
+    if (gradNorm > 1e6) return null; // separation detected
+    const W = p.map(pi => pi * (1 - pi));
     const Xt = transposeMatrix(X);
     const XtW = Xt.map(row => row.map((v, i) => v * W[i]));
     const Hess = matMul(XtW, X).map(row => row.map(v => -v));
-    const delta = matVecMul(matInverse(Hess), score);
-    beta = beta.map((b, i) => b - delta[i]);
-    if (delta.every(d => Math.abs(d) < 1e-8)) break;
+    const Hinv = matInverse(Hess);
+    if (!Hinv) return null; // singular Hessian
+    const delta = matVecMul(Hinv, score);
+    // Step-halving: backtrack if deviance increases
+    const devOld = labels.reduce((s, yi, i) => s - (yi * Math.log(Math.max(p[i], 1e-15)) + (1 - yi) * Math.log(Math.max(1 - p[i], 1e-15))), 0);
+    let step = 1;
+    while (step > 1e-6) {
+      const trialBeta = beta.map((b, i) => b - step * delta[i]);
+      const trialP = X.map(xi => sigmoid(dot(xi, trialBeta)));
+      const devNew = labels.reduce((s, yi, i) => s - (yi * Math.log(Math.max(trialP[i], 1e-15)) + (1 - yi) * Math.log(Math.max(1 - trialP[i], 1e-15))), 0);
+      if (devNew <= devOld + 1e-8) break;
+      step *= 0.5;
+    }
+    beta = beta.map((b, i) => b - step * delta[i]);
+    if (Math.sqrt(delta.reduce((s, d) => s + d * d, 0)) * step < 1e-8) break;
   }
+  if (beta.some(b => !isFinite(b))) return null; // explosive divergence
   const pFinal = X.map(xi => sigmoid(dot(xi, beta)));
   const WFinal = pFinal.map(pi => pi * (1 - pi));
   const XtF = transposeMatrix(X);

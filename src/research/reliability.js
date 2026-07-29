@@ -152,9 +152,6 @@ function runBlandAltman(samples) {
 
   const meanDiff = diffs.reduce((a, b) => a + b, 0) / n;
   const sdDiff = Math.sqrt(diffs.reduce((s, d) => s + (d - meanDiff) ** 2, 0) / (n - 1));
-  // Use the t-distribution for the LoA CI (was z=1.96, which underestimates the CI for
-  // small n). The SE of the LoA limits is sqrt(3·sd²/n).
-  const seLoA = Math.sqrt(3 * sdDiff * sdDiff / n);
   const df = n - 1;
   let tCrit = 1.96;
   if (df > 0) {
@@ -167,6 +164,16 @@ function runBlandAltman(samples) {
     }
     tCrit = (lo + hi) / 2;
   }
+  // Exact small-n LoA: use t_{n-1} instead of z=1.96, and √(1+1/n) for the
+  // prediction-interval correction (Carkeet 2015). Converges to d̄±1.96·sd for large n.
+  const loaFactor = tCrit * Math.sqrt(1 + 1 / n);
+  const loaUpper = meanDiff + loaFactor * sdDiff;
+  const loaLower = meanDiff - loaFactor * sdDiff;
+  // Exact SE for the LoA boundary: Var(L) = sd²/n + k²·sd²/(2(n-1))
+  // instead of the large-sample approximation sd·√(3/n).
+  const seLoA = sdDiff * Math.sqrt(1 / n + tCrit ** 2 / (2 * (n - 1)));
+  const loaUpperCi = [loaUpper - tCrit * seLoA, loaUpper + tCrit * seLoA];
+  const loaLowerCi = [loaLower - tCrit * seLoA, loaLower + tCrit * seLoA];
 
   const reg = simpleRegression(means, diffs);
 
@@ -180,10 +187,8 @@ function runBlandAltman(samples) {
 
   return {
     meanDiff, sdDiff, n,
-    loaUpper: meanDiff + 1.96 * sdDiff,
-    loaLower: meanDiff - 1.96 * sdDiff,
-    loaUpperCi: [meanDiff + 1.96 * sdDiff - tCrit * seLoA, meanDiff + 1.96 * sdDiff + tCrit * seLoA],
-    loaLowerCi: [meanDiff - 1.96 * sdDiff - tCrit * seLoA, meanDiff - 1.96 * sdDiff + tCrit * seLoA],
+    loaUpper, loaLower,
+    loaUpperCi, loaLowerCi,
     meanDiffCi: [meanDiff - tCrit * biasSE, meanDiff + tCrit * biasSE],
     proportionalBias: { detected: reg.pValue < 0.05, slope: reg.slope, r: reg.r, pValue: reg.pValue, t: reg.t },
     points: means.map((m, i) => ({ mean: m, diff: diffs[i], outlier: Math.abs(diffs[i] - meanDiff) > 2 * sdDiff })),
@@ -194,6 +199,9 @@ function runBlandAltman(samples) {
 
 // ─── Dahlberg / SEM / MDC ─────────────────────────────────────────────────
 // Use ALL pairs from 3+ occasions (was capped at 2 readings per case).
+// NOTE: dahlberg ≠ SEM for 3+ occasions. dahlberg = √(Σd²/(2n)) which is the
+// RMS pairwise error / √2. The true SEM = σ_total × √(1 − ICC). Both are
+// returned; sem is overwritten with the ICC-based value in the calling scope.
 function runDahlbergSEM(samples) {
   const byCase = {};
   for (const s of samples) {
@@ -216,11 +224,15 @@ function runDahlbergSEM(samples) {
 
   const dahlberg = Math.sqrt(sumSqDiff / (2 * count));
   const grandMean = allVals.reduce((a, b) => a + b, 0) / allVals.length;
+  const totalSD = Math.sqrt(allVals.reduce((s, v) => s + (v - grandMean) ** 2, 0) / Math.max(allVals.length - 1, 1));
+
+  // cv and mdc computed from naive dahlberg here; calling code replaces them
+  // with ICC-based values when iccResult is available.
   const cv = grandMean !== 0 ? (dahlberg / grandMean) * 100 : 0;
-  const sem = dahlberg;
+  const sem = dahlberg;  // placeholder — overwritten by calling scope when ICC known
   const mdc = 1.96 * Math.sqrt(2) * sem;
 
-  return { dahlberg, sem, cv, mdc, n: count, nCases: Object.keys(byCase).length };
+  return { dahlberg, sem, cv, mdc, totalSD, grandMean, n: count, nCases: Object.keys(byCase).length };
 }
 
 // ─── Landmark coordinate error mapping ────────────────────────────────────
@@ -389,6 +401,17 @@ export function runReliabilityAll(sessions, config, calibration) {
     const baResult = runBlandAltman(samples);
     const dsResult = runDahlbergSEM(samples);
 
+    // Correct SEM/MDC/CV using variance-components (σ_total × √(1−ICC)) instead
+    // of the naive dahlberg-equality which is only valid for 2 occasions.
+    let semCorrected = dsResult?.sem ?? null;
+    let mdcCorrected = dsResult?.mdc ?? null;
+    let cvCorrected = dsResult?.cv ?? null;
+    if (iccResult?.icc != null && dsResult?.totalSD != null) {
+      semCorrected = dsResult.totalSD * Math.sqrt(Math.max(0, 1 - iccResult.icc));
+      mdcCorrected = 1.96 * Math.sqrt(2) * semCorrected;
+      cvCorrected = dsResult.grandMean !== 0 ? (semCorrected / dsResult.grandMean) * 100 : 0;
+    }
+
     details.push({
       label,
       n: samples.length,
@@ -402,6 +425,9 @@ export function runReliabilityAll(sessions, config, calibration) {
       nRaters: k,
       ...baResult,
       ...dsResult,
+      sem: semCorrected,
+      mdc: mdcCorrected,
+      cv: cvCorrected,
     });
   }
 

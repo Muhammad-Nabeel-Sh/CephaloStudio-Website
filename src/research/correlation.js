@@ -306,7 +306,8 @@ export function runRegression(sessions, config, calibration) {
 
   const vif = [];
   for (let j = 0; j < XClean.length; j++) {
-    const otherX = Xt.filter((_, k) => k !== j);
+    const otherCols = XClean.filter((_, k) => k !== j);
+    const otherX = transposeMatrix(otherCols);
     const thisY = Xt.map(row => row[j]);
     if (otherX.length === 0 || otherX[0].length < 2) { vif.push(1); continue; }
     const otherXm = addIntercept(otherX);
