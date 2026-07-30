@@ -142,6 +142,7 @@ src/
 ├── state/                      Global state management (Zustand)
 │   ├── toolStore.js            Tool/canvas state (activeTool, zoom, pan, selectedIds, etc.)
 │   ├── uiStore.js              UI chrome state (modals, panels, overlays, refLandmarks, etc.)
+│   ├── sessionStore.js         Active session data (markups, calibration, norms) + undo/redo
 │   └── workspaceStore.js       Compat layer (re-exports stores + useStoreDispatch + useWorkspaceStore)
 │
 ├── storage/                    Data persistence
@@ -156,7 +157,6 @@ src/
 │   └── ErrorBoundary.jsx       React error boundary
 │
 ├── workspace/                  Workspace state logic
-│   ├── undo.js                 Undo/redo stack management
 │   ├── markupHelpers.js        refreshAutoMeasurements, markupDefaults
 │   ├── calibration.js          Ruler/manual calibration, CSV export
 │   ├── template.js             autoCreateMeasurements, getMeasValue
@@ -189,9 +189,13 @@ src/
 - `useCallback` for event handlers passed as props
 - `useMemo` for expensive computations
 - `useEffect` for side effects (canvas resize, image loading)
-- **Zustand** stores for global state: `toolStore.js` (tool/canvas state), `uiStore.js` (UI chrome state)
+- **Zustand** stores for global state:
+  - `toolStore.js` — tool/canvas state (activeTool, zoom, pan, selection, placing, etc.)
+  - `uiStore.js` — UI chrome state (panels, modals, overlays, display options, etc.)
+  - `sessionStore.js` — active session data (markups, calibration, norms, formulas, processing, sessionImage) + undo/redo
 - `useStoreDispatch()` is a stable dispatch (uses `getState()`, never subscribes) — pass `{ type: "SET", payload: { ... } }`
-- Components subscribe to individual store slices with selectors: `useToolStore(s => s.activeTool)`
+- Components subscribe to individual store slices with selectors: `useToolStore(s => s.activeTool)`, `useSessionStore(s => s.markups)`
+- Session data syncs bidirectionally: when active session changes → `loadFromSession()` populates the store; when store mutates → `_onChange` callback syncs back to the project
 
 ### Naming Conventions
 - Components: PascalCase (`HomePage`, `Workspace`, `MarkupsPanel`)

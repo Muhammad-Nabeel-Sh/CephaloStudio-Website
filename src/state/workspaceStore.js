@@ -4,6 +4,7 @@ import { useUIStore } from "./uiStore.js";
 
 export { useToolStore } from "./toolStore.js";
 export { useUIStore } from "./uiStore.js";
+export { useSessionStore } from "./sessionStore.js";
 
 export const INITIAL_UI = {};
 export const Actions = { SET: "SET" };

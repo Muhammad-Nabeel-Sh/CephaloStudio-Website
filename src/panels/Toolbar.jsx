@@ -1,14 +1,14 @@
 import { clamp } from "../lib/utils.js";
 import ToolBtn from "../ui/ToolBtn.jsx";
 import { useMediaQuery } from "../hooks/useMediaQuery.js";
-import { useStoreDispatch } from "../state/workspaceStore.js";
+import { useStoreDispatch, useSessionStore } from "../state/workspaceStore.js";
 import { useToolStore, useUIStore } from "../state/workspaceStore.js";
 
 export default function Toolbar({
   theme, t,
   sessionImage, calibration, updSession,
   panRef, zoomRef,
-  undo, redo, undoVersion, undoStackRef, redoStackRef,
+  undo, redo,
   handleDblClick,
 }) {
   const dispatch = useStoreDispatch();
@@ -19,16 +19,16 @@ export default function Toolbar({
   const showMobilePanel = useUIStore(s => s.showMobilePanel);
   const mobileToolsExpanded = useUIStore(s => s.mobileToolsExpanded);
   const isMobile = useMediaQuery("(max-width: 767px)");
+  const undoStackSize = useSessionStore(s => s.undoStack.length);
+  const redoStackSize = useSessionStore(s => s.redoStack.length);
+  const canUndo = undoStackSize > 0;
+  const canRedo = redoStackSize > 0;
   if (isMobile && !showMobilePanel) {
     const selTool = (id) => {
       dispatch({ type: "SET", payload: { activeTool: id } });
       dispatch({ type: "SET", payload: { currentDraw: null } });
       dispatch({ type: "SET", payload: { mobileToolsExpanded: false } });
     };
-    // eslint-disable-next-line react-hooks/refs
-    const canUndo = undoVersion >= 0 && undoStackRef.current.length > 0;
-    // eslint-disable-next-line react-hooks/refs
-    const canRedo = undoVersion >= 0 && redoStackRef.current.length > 0;
     const primaryTools = [
       { id: "select", icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-mouse-pointer2-icon lucide-mouse-pointer-2"><path d="M4.037 4.688a.495.495 0 0 1 .651-.651l16 6.5a.5.5 0 0 1-.063.947l-6.124 1.58a2 2 0 0 0-1.438 1.435l-1.579 6.126a.5.5 0 0 1-.947.063z"/></svg>, label: "Select" }, 
       { id: "pan", icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 34 34" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pointer-icon lucide-pointer"><path d="M22 14a8 8 0 0 1-8 8"/><path d="M18 11v-1a2 2 0 0 0-2-2a2 2 0 0 0-2 2"/><path d="M14 10V9a2 2 0 0 0-2-2a2 2 0 0 0-2 2v1"/><path d="M10 9.5V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v10"/><path d="M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>, label: "Pan" }, 
@@ -160,15 +160,10 @@ export default function Toolbar({
         {/* Separator */}
         <div style={{ width: "100%", height: 1, background: t.bdr, margin: "4px 0" }} />
         {/* Row 9: Undo | Redo */}
-        {(() => {
-          // eslint-disable-next-line react-hooks/refs
-          const canUndo = undoVersion >= 0 && undoStackRef.current.length > 0;
-          // eslint-disable-next-line react-hooks/refs
-          const canRedo = undoVersion >= 0 && redoStackRef.current.length > 0; return (
-          <div style={{ display: "flex", gap: 1 }}>
-            <button onClick={undo} disabled={!canUndo} aria-label="Undo (Ctrl+Z)" style={{ flex: 1, height: 32, borderRadius: 6, border: "none", background: "transparent", color: canUndo ? t.tx2 : t.bdr, cursor: canUndo ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} title="Undo (Ctrl+Z)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-undo-icon lucide-undo"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg></button>
-            <button onClick={redo} disabled={!canRedo} aria-label="Redo (Ctrl+Y)" style={{ flex: 1, height: 32, borderRadius: 6, border: "none", background: "transparent", color: canRedo ? t.tx2 : t.bdr, cursor: canRedo ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} title="Redo (Ctrl+Y)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-redo-icon lucide-redo"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg></button>
-          </div>); })()}
+        <div style={{ display: "flex", gap: 1 }}>
+          <button onClick={undo} disabled={!canUndo} aria-label="Undo (Ctrl+Z)" style={{ flex: 1, height: 32, borderRadius: 6, border: "none", background: "transparent", color: canUndo ? t.tx2 : t.bdr, cursor: canUndo ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} title="Undo (Ctrl+Z)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-undo-icon lucide-undo"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg></button>
+          <button onClick={redo} disabled={!canRedo} aria-label="Redo (Ctrl+Y)" style={{ flex: 1, height: 32, borderRadius: 6, border: "none", background: "transparent", color: canRedo ? t.tx2 : t.bdr, cursor: canRedo ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} title="Redo (Ctrl+Y)"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-redo-icon lucide-redo"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg></button>
+        </div>
         {/* Row 10: Zoom in | Zoom out */}
         <div style={{ display: "flex", gap: 1 }}>
           <button onClick={() => { const nz=clamp(zoomRef.current*1.3,0.05,15);zoomRef.current=nz;dispatch({ type: "SET", payload: { zoom: nz } }); }} aria-label="Zoom In" style={{ flex: 1, height: 32, borderRadius: 6, border: "none", background: "transparent", color: t.tx2, cursor: "pointer", fontSize: 18,fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} title="Zoom In">＋</button>

@@ -67,6 +67,7 @@ body {
   display: flex;
   flex-direction: row;
   flex-shrink: 0;
+  -webkit-user-select: none;
   user-select: none;
 }
 @media (max-width: 767px) {
