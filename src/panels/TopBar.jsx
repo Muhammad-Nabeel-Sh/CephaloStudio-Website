@@ -2,18 +2,29 @@ import { useState, useRef, useEffect } from "react";
 import { THEMES } from "../data/constants.js";
 import { hasUnanonymizedPHI } from "../report/anonymize.js";
 import { Btn, Tag } from "../ui/ui.jsx";
+import { useStoreDispatch } from "../state/workspaceStore.js";
+import { useToolStore, useUIStore } from "../state/workspaceStore.js";
 
 export default function TopBar({
   t, theme, project, onHome,
-  compareSession, showAnnotations, annotationSize,
-  showDisplacement, onSave,
-  openImgRef, importRef, dispatch, calibration,
-  snapEnabled, showScaleBar, showDefTooltips,
-  placingMode, placingQueue, placingIdx,
-  showMobilePanel, setShowMobilePanel,
+  onSave,
+  openImgRef, importRef, calibration,
   imgRefs,
   setTheme,
 }) {
+  const dispatch = useStoreDispatch();
+  const snapEnabled = useToolStore(s => s.snapEnabled);
+  const placingMode = useToolStore(s => s.placingMode);
+  const placingQueue = useToolStore(s => s.placingQueue);
+  const placingIdx = useToolStore(s => s.placingIdx);
+  const showScaleBar = useUIStore(s => s.showScaleBar);
+  const showDefTooltips = useUIStore(s => s.showDefTooltips);
+  const showAnnotations = useUIStore(s => s.showAnnotations);
+  const annotationSize = useUIStore(s => s.annotationSize);
+  const showDisplacement = useUIStore(s => s.showDisplacement);
+  const compareSession = useUIStore(s => s.compareSession);
+  const showMobilePanel = useUIStore(s => s.showMobilePanel);
+
   const [snapDrop, setSnapDrop] = useState(false);
   const [snapRect, setSnapRect] = useState(null);
   const snapRef = useRef(null);
@@ -105,7 +116,7 @@ export default function TopBar({
           <div style={{ width: 10, height: 10, borderRadius: 3, background: th.acc }} />
         </button>
       ))}
-      <span className="hide-desktop" style={{display:"contents"}}><Btn ghost t={t} small active={showMobilePanel} title="Toggle panel" onClick={() => setShowMobilePanel(v => !v)}>≡</Btn></span>
+      <span className="hide-desktop" style={{display:"contents"}}><Btn ghost t={t} small active={showMobilePanel} title="Toggle panel" onClick={() => dispatch({ type: "SET", payload: { showMobilePanel: v => !v } })}>≡</Btn></span>
     </div>
   );
 }

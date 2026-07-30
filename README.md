@@ -48,44 +48,67 @@ Requires ES2020 support, Canvas 2D, and IndexedDB. Not supported in Internet Exp
 ├── Data/                       # CSV reference data
 ├── src/
 │   ├── main.jsx
-│   ├── App.jsx                 # Root component (~2355 lines)
-│   ├── constants.js            # Themes, tools, predefined analyses, LUT presets
-│   ├── utils.js                # Math, geometry, statistics (1360 lines, 60+ exports)
-│   ├── markups.jsx             # Markup rendering, hit-testing, template parsing (~1690 lines)
-│   ├── panels.jsx              # Side panels (1430 lines)
-│   ├── ui.jsx                  # UI primitives (Btn, Tag, InfoBox, etc.)
-│   ├── ToolBtn.jsx             # Toolbar button component
-│   ├── imageUtils.jsx          # Image processing (brightness, contrast, LUT)
-│   ├── hooks.jsx               # Custom hooks (useKatex, etc.)
-│   ├── silhouettes.js          # 23 SVG anatomical silhouettes (auto-generated)
-│   ├── norms.js                # Canonical cephalometric reference norms
-│   ├── logger.js               # PHI-safe error logging
-│   ├── interpretation.js       # Clinical interpretation generator
-│   ├── reportGenerator.js      # PDF report generation
-│   ├── csvParser.js            # CSV parsing utilities
-│   ├── anonymize.js            # PHI anonymization
-│   ├── examplesData.js         # Built-in example cases
-│   ├── ErrorBoundary.jsx       # React error boundary
-│   ├── model/
-│   │   ├── session.js          # Session data model
-│   │   ├── project.js          # Project model with session CRUD
-│   │   └── csv.js              # CSV model helpers
-│   ├── state/
-│   │   └── workspaceStore.js   # Canvas state reducer
+│   ├── App.jsx                 # Root component (~1844 lines)
+│   ├── main.jsx                # Entry point
+│   ├── index.css               # Global styles
+│   ├── canvas/                 # Canvas rendering + image processing
+│   │   ├── redraw.js           Draw pipeline (createRedraw factory)
+│   │   ├── drawMarkups.js      drawMarkup, drawMeasLabel, hitTest, drawAirwayOverlay
+│   │   ├── imageUtils.jsx      LUT processing, getProcessed
+│   │   └── imageProcessor.worker.js Web worker for image processing
+│   ├── data/                   # Constants, norms, presets
+│   │   ├── constants.js        Themes, tools, predefined analyses
+│   │   ├── norms.js            Normative data definitions
+│   │   ├── normLibrary.js      Library norm browsing
+│   │   ├── communityNorms.js   GitHub-fetched community norms
+│   │   ├── silhouettes.js      23 SVG anatomical silhouettes
+│   │   └── examplesData.js     Example project data
+│   ├── hooks/                  # Custom React hooks
+│   │   ├── useKatex.js         KaTeX rendering
+│   │   └── useMediaQuery.js    Responsive breakpoint hook
+│   ├── lib/                    # Core utilities
+│   │   ├── utils.js            Math, geometry, formatting, export
+│   │   ├── interpretation.js   Clinical interpretation engine
+│   │   └── logger.js           PHI-safe logging
+│   ├── model/                  # Data models
+│   │   ├── session.js          Session data model
+│   │   ├── project.js          Project model with session CRUD
+│   │   └── csv.js              CSV model helpers
+│   ├── state/                  # Global state (Zustand)
+│   │   ├── toolStore.js        Tool/canvas state (activeTool, zoom, pan, selection)
+│   │   ├── uiStore.js          UI chrome state (modals, panels, overlays)
+│   │   └── workspaceStore.js   Compat layer re-exporting both stores
 │   ├── storage/
-│   │   ├── imageStore.js       # IndexedDB wrapper for image blobs
-│   │   ├── cephxFormat.js      # Import/export validation, migration
-│   │   └── secureStorage.js    # Encrypted storage utilities
+│   │   ├── imageStore.js       IndexedDB wrapper for image blobs
+│   │   ├── cephxFormat.js      Import/export validation, migration
+│   │   └── secureStorage.js    Encrypted storage utilities
 │   ├── panels/
-│   │   ├── Modal.jsx           # Accessible modal with focus trap
-│   │   ├── HomePage.jsx        # Project list, create/import portal
-│   │   ├── SessionsPanel.jsx   # Session cards, subjects tab
-│   │   ├── SessionMetadataModal.jsx  # Spreadsheet-style metadata editor
-│   │   ├── BatchImportModal.jsx
+│   │   ├── Modal.jsx           Accessible modal with focus trap
+│   │   ├── HomePage.jsx        Project list, create/import portal
+│   │   ├── StartupWizard.jsx   First-run guided setup
+│   │   ├── Toolbar.jsx         Desktop + mobile toolbar
+│   │   ├── TopBar.jsx          Top bar (home, logo, save)
+│   │   ├── RightPanelSidebar.jsx  Vertical tab sidebar
 │   │   ├── SessionFilmstrip.jsx
+│   │   ├── SessionsPanel.jsx   Session cards, subjects tab
+│   │   ├── SessionMetadataModal.jsx  Spreadsheet-style metadata editor
+│   │   ├── BatchImportModal.jsx
+│   │   ├── MarkupsPanel.jsx    Markup list + properties
+│   │   ├── MeasurementsPanel.jsx Measurement table + norms
+│   │   ├── FormulasPanel.jsx   Formula editor
+│   │   ├── ImagePanel.jsx      Image processing controls
+│   │   ├── LayersPanel.jsx     Layer management
+│   │   ├── TemplatesPanel.jsx  Template browser
+│   │   ├── SilhouettesPanel.jsx Silhouette overlays
+│   │   ├── PanelContent.jsx    11-panel router
+│   │   ├── panelIcons.jsx      Panel icon/tab definitions
+│   │   ├── PanelGuideModal.jsx Contextual help guides
 │   │   ├── NormogramPanel.jsx
 │   │   ├── InterpretationPanel.jsx
-│   │   └── StartupWizard.jsx
+│   │   ├── NormsReferenceModal.jsx Norm database browser
+│   │   ├── ExamplesPanel.jsx   Example projects browser
+│   │   ├── MarkupProps.jsx     Markup property editor
+│   │   └── AirwayPanel.jsx     Airway analysis panel
 │   ├── research/
 │   │   ├── studyModel.js       # Study configuration model
 │   │   ├── engine.js           # Research engine orchestrator
@@ -97,10 +120,11 @@ Requires ES2020 support, Canvas 2D, and IndexedDB. Not supported in Internet Exp
 │   │   ├── descriptive.js      # Descriptive stats, reference intervals, z-scores
 │   │   ├── comparative.js      # t-tests, ANOVA, MANOVA, post-hoc, test routing
 │   │   ├── longitudinal.js     # RM-ANOVA, LMM, sphericity, change scores
-│   │   ├── correlation.js      # Correlation analysis
+│   │   ├── statsCore.js        # Core statistical functions
+│   │   ├── correlation.js      # Correlation & regression
 │   │   ├── diagnostic.js       # Diagnostic performance metrics
+│   │   ├── airway.js           # Airway measurements + norms
 │   │   ├── superimposition.js  # Procrustes/structural alignment, displacement, patterns, delta norms
-│   │   ├── norms.js            # Canonical cephalometric reference norms
 │   │   ├── ReliabilityPanel.jsx
 │   │   ├── DescriptivePanel.jsx
 │   │   ├── ComparativePanel.jsx
@@ -108,6 +132,7 @@ Requires ES2020 support, Canvas 2D, and IndexedDB. Not supported in Internet Exp
 │   │   ├── CorrelationPanel.jsx
 │   │   ├── DiagnosticPanel.jsx
 │   │   ├── SuperimpositionPanel.jsx
+│   │   ├── AirwayStudyPanel.jsx
 │   │   ├── ResearchPanel.jsx
 │   │   ├── StudyGuideModal.jsx
 │   │   ├── ResultsDialog.jsx   # Floating modal with Tables/Charts tabs
@@ -117,24 +142,25 @@ Requires ES2020 support, Canvas 2D, and IndexedDB. Not supported in Internet Exp
 │   │   └── resultsExport.js
 │   └── test/
 │       ├── setup.js
-│       ├── utils.test.js       # 97 tests
-│       ├── statGoldenValues.test.js  # 18 tests
-│       ├── researchGolden.test.js   # 31 tests
-│       ├── comparative.test.js # 18 tests
-│       ├── descriptive.test.js # 12 tests
-│       ├── distributions.test.js # 27 tests
-│       ├── cephxFormat.test.js # 40 tests
-│       ├── imageStore.test.js  # 14 tests
-│       ├── anonymize.test.js   # 10 tests
-│       ├── validation.test.js  # 9 tests
-│       ├── diagnostic.test.js  # 5 tests
-│       ├── engine.test.js      # 5 tests
-│       ├── secureStorage.test.js # 5 tests
-│       ├── reliability.test.js # 3 tests
-│       ├── longitudinal.test.js # 3 tests
-│       └── MarkupsPanel.test.jsx # 3 tests
+│       ├── utils.test.js           # 97 tests
+│       ├── researchGolden.test.js  # 31 tests
+│       ├── distributions.test.js   # 27 tests
+│       ├── cephxFormat.test.js     # 40 tests
+│       ├── comparative.test.js     # 18 tests
+│       ├── statGoldenValues.test.js # 18 tests
+│       ├── imageStore.test.js      # 14 tests
+│       ├── descriptive.test.js     # 12 tests
+│       ├── anonymize.test.js       # 10 tests
+│       ├── validation.test.js      # 9 tests
+│       ├── diagnostic.test.js      # 5 tests
+│       ├── engine.test.js          # 5 tests
+│       ├── secureStorage.test.js   # 5 tests
+│       ├── reliability.test.js     # 3 tests
+│       ├── longitudinal.test.js    # 3 tests
+│       ├── MarkupsPanel.test.jsx   # 3 tests
+│       └── NormsReferenceModal.test.jsx # 3 tests
 ```
-**Total: 300 tests across 16 test files**
+**Total: 377 tests across 17 test files**
 
 ### Scripts
 
@@ -159,31 +185,34 @@ App
 ├── HomePage              # Project list, create/import portal
 ├── StartupWizard         # First-use guided setup
 └── Workspace             # Main editor
-    ├── Toolbar           # Top bar (tools, save, export, theme)
-    ├── ToolSidebar       # Floating tool palette
+    ├── TopBar            # Top bar (home, logo, save)
+    ├── Toolbar           # Desktop + mobile toolbar palette
     ├── Canvas            # Image + markup rendering
+    ├── ContextMenu       # Right-click context menu
     ├── SessionFilmstrip  # Session thumbnail bar (bottom, desktop only)
     ├── RightPanel        # Tabbed side panel
-    │   ├── MarkupsPanel
-    │   ├── FormulasPanel (via panels.jsx)
+    │   ├── MarkupsPanel, MarkupProps
+    │   ├── MeasurementsPanel
+    │   ├── FormulasPanel
     │   ├── ImagePanel
     │   ├── LayersPanel
     │   ├── SessionsPanel
-    │   ├── ResearchPanel # Tabbed: Reliability / Descriptive / Comparative / Longitudinal / Correlation / Diagnostic / Superimposition
-    │   ├── InterpretPanel
     │   ├── TemplatesPanel
-    │   └── SilhouettesPanel
-    ├── CalibModal, TextModal, AnonModal, AlignModal, TransformModal
-    ├── BatchImportModal
-    ├── SessionMetadataModal
+    │   ├── SilhouettesPanel
+    │   ├── ResearchPanel # 8 sub-tabs: Reliability / Descriptive / Comparative / Longitudinal / Correlation / Diagnostic / Superimposition / Airway
+    │   ├── InterpretationPanel
+    │   ├── NormogramPanel
+    │   └── AirwayPanel
+    ├── Modals: Calib, Text, Anon, BatchImport, SessionMetadata, NormsReference, Examples, PanelGuide, StudyGuide
     ├── ResultsDialog     # Floating modal with Tables/Charts tabs
     └── NormogramPanel    # SVG normogram visualization
 ```
 
 ### State Management
 
+- **Global Zustand stores**: `toolStore` (tool/canvas state) and `uiStore` (UI chrome state) — components subscribe to individual slices via selectors, avoiding re-renders from unrelated state changes
 - **Root state**: `projects` array + `activeId` (React useState)
-- **Workspace**: zoom, pan, tool, markups, calibration, processing, LUT, selected markup, drawing state
+- **Workspace (useReducer)**: markups, calibration, processing, LUT, image loading — remaining reducer in App.jsx pending migration to Zustand
 - **Undo/Redo**: In-memory stacks of markup snapshots
 - **Auto-save**: Debounced localStorage (500ms), key `"cephalo-autosave"`, cleared on `.cephx` export
 - **Project updates**: `updateProject(id, patch)` cascades with `modified` timestamp
@@ -442,26 +471,27 @@ Floating bottom-center horizontal thumbnail bar showing all sessions. Supports q
 
 ## 14. Testing & CI
 
-### Test Suite (300 tests, 16 files)
+### Test Suite (377 tests, 17 files)
 
 | Test File | Tests | Coverage |
 |-----------|-------|----------|
 | `utils.test.js` | 97 | All geometry, statistics, formulas, ICC, Bland-Altman utilities |
-| `statGoldenValues.test.js` | 18 | Reference-value regression guards for fCDF, tDistributeCDF, chi2CDF, betaIncomplete |
+| `cephxFormat.test.js` | 40 | Import/export format validation |
 | `researchGolden.test.js` | 31 | Golden-value tests for t-test, ANOVA, Mann-Whitney, Wilcoxon, Spearman, BH, Shapiro-Wilk, Cohen's d, ICC, Dahlberg, regression |
+| `distributions.test.js` | 27 | Statistical distributions |
+| `statGoldenValues.test.js` | 18 | Reference-value regression guards for fCDF, tDistributeCDF, chi2CDF, betaIncomplete |
 | `comparative.test.js` | 18 | Test selection routing, Mann-Whitney, Wilcoxon, Box's M, multi-group structure |
+| `imageStore.test.js` | 14 | IDB image storage |
 | `descriptive.test.js` | 12 | `runDescriptiveAll`, norm stratum selection, predefined norms |
 | `anonymize.test.js` | 10 | PHI anonymization |
 | `validation.test.js` | 9 | Cepht validation |
-| `distributions.test.js` | 27 | Statistical distributions |
-| `imageStore.test.js` | 14 | IDB image storage |
-| `MarkupsPanel.test.jsx` | 3 | Component smoke tests |
-| `reliability.test.js` | 3 | ICC computation, Landmark error map |
-| `longitudinal.test.js` | 3 | RM-ANOVA, error handling |
 | `diagnostic.test.js` | 5 | Diagnostic tests |
 | `engine.test.js` | 5 | Research engine |
 | `secureStorage.test.js` | 5 | Secure storage |
-| `cephxFormat.test.js` | 40 | Import/export format validation |
+| `reliability.test.js` | 3 | ICC computation, Landmark error map |
+| `longitudinal.test.js` | 3 | RM-ANOVA, error handling |
+| `MarkupsPanel.test.jsx` | 3 | Component smoke tests |
+| `NormsReferenceModal.test.jsx` | 3 | Component smoke tests |
 
 ### CI Pipeline (`.github/workflows/test.yml`)
 

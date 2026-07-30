@@ -41,7 +41,7 @@ npm run lint -- --fix
 ### Directory Structure
 ```
 src/
-├── App.jsx                     Root component (~1700 lines)
+├── App.jsx                     Root component (~1850 lines)
 ├── main.jsx                    Entry point
 ├── index.css                   Global styles
 │
@@ -61,7 +61,7 @@ src/
 │
 ├── hooks/                      Custom React hooks
 │   ├── useKatex.js             KaTeX rendering (useKatex, KatexSpan, LatexFloatingPanel)
-│   └── useWorkspaceUIState.js  Bundled useState calls for workspace UI
+│   └── useMediaQuery.js        Responsive breakpoint hook
 │
 ├── lib/                        Core utilities
 │   ├── utils.js                Geometry, math, formatting, export (dist, angle3pt, buildPDF, etc.)
@@ -139,8 +139,10 @@ src/
 │   ├── moduleCharts.jsx        All chart components
 │   └── moduleChartsUtils.jsx   Chart utility functions
 │
-├── state/                      Global state management
-│   └── workspaceStore.js       useWorkspaceStore (Zustand)
+├── state/                      Global state management (Zustand)
+│   ├── toolStore.js            Tool/canvas state (activeTool, zoom, pan, selectedIds, etc.)
+│   ├── uiStore.js              UI chrome state (modals, panels, overlays, refLandmarks, etc.)
+│   └── workspaceStore.js       Compat layer (re-exports stores + useStoreDispatch + useWorkspaceStore)
 │
 ├── storage/                    Data persistence
 │   ├── cephxFormat.js          Import/export validation
@@ -150,6 +152,7 @@ src/
 ├── ui/                         Shared UI components
 │   ├── Modal.jsx               Reusable modal
 │   ├── ToolBtn.jsx             Toolbar button
+│   ├── ContextMenu.jsx         Right-click context menu
 │   └── ErrorBoundary.jsx       React error boundary
 │
 ├── workspace/                  Workspace state logic
@@ -186,6 +189,9 @@ src/
 - `useCallback` for event handlers passed as props
 - `useMemo` for expensive computations
 - `useEffect` for side effects (canvas resize, image loading)
+- **Zustand** stores for global state: `toolStore.js` (tool/canvas state), `uiStore.js` (UI chrome state)
+- `useStoreDispatch()` is a stable dispatch (uses `getState()`, never subscribes) — pass `{ type: "SET", payload: { ... } }`
+- Components subscribe to individual store slices with selectors: `useToolStore(s => s.activeTool)`
 
 ### Naming Conventions
 - Components: PascalCase (`HomePage`, `Workspace`, `MarkupsPanel`)
@@ -329,7 +335,7 @@ Located in `eslint.config.js`:
 3. Scope building in `lib/utils.js` (`buildScope()` function)
 
 ### Adding a context menu action
-1. Add handler function inside the context menu IIFE in `App.jsx`
+1. Add handler function inside the context menu component in `src/ui/ContextMenu.jsx`
 2. Add `item(label, onClick, danger?)` call in the appropriate section
 3. Wire through any required state/refs
 
@@ -399,11 +405,15 @@ Recommended settings for `.vscode/settings.json`:
 - **Code review (S1–S15 statistical correctness)**: Fixed Cohen's dz (was undefined); BH adjustment direction (was reversed); ICC uses exact fCDF (was Paulson approx); ICC unbalanced-data handling; seeded PRNG for cross-validation; logistic regression singular-matrix bail-out; consolidated tCritical; HL small-n warning; LMM conservative df; Bland-Altman VIF; MANOVA fractional df; studentized range CDF quadrature improvement
 - **Golden-value tests**: 31 new tests in `src/test/researchGolden.test.js` covering basic stats, t-test, ANOVA, Mann-Whitney, Wilcoxon, Spearman, BH adjustment, Shapiro-Wilk, Cohen's d, ICC, Dahlberg, linear regression against R/published references
 - **Superimposition statistical/clinical audit**: Fixed angular/linear deltas (were T1−T2 instead of T2−T1); centroid size pctChange inverted; growth pattern classification labels swapped (clockwise↔counterclockwise, hyper↔hypo); mandibular autorotation "opening"↔"closing" inverted; centroid size pattern never fired (was looking up `displacements._centroidSize` which was never set); `runLongitudinalSuperimposition` passed obsolete `referencePlane` key instead of `planePoint1/planePoint2`; `structuralAlign` included unwanted scale (changed to rotation-only); panel T1/T2 column header labels swapped for angular and linear tables
+- **Zustand stores (toolStore/uiStore)**: Replaced monolithic `useWorkspaceStore` with two Zustand stores — `toolStore` (tool/canvas state: activeTool, zoom, pan, selection, placing mode, loading, spotlight) and `uiStore` (UI chrome: modals, panels, overlays, display options, refLandmarks, context menu, filmstrip, comparison state). `useStoreDispatch()` is stable (uses `getState()`, never subscribes) — no re-renders from dispatching. `workspaceStore.js` is now a compat layer re-exporting both stores.
+- **TopBar + Toolbar migration**: Both panels read state from `useToolStore`/`useUIStore` with individual selectors, and use local `useStoreDispatch()`. Store-state props eliminated from App.jsx (45 individual selector subscriptions replace the single monolithic destructure). `useWorkspaceUIState.js` hook removed (state merged into `uiStore`).
+- **ContextMenu migration**: Reads `contextMenu`, `copiedMarkup`, `selectedIds`, `refLandmark1/2`, `showGrid` from stores directly. App.jsx props reduced from 20 → 6. `copiedMarkup` moved from `useState` into `uiStore`.
+- **Dependency added**: `zustand` npm package.
 
 ### Ongoing
-- (none)
+- **Remaining workspace-reducer migration** — `markups`, `calibration`, projects, sessions, undo/redo are still in App.jsx `useReducer`; should be migrated to Zustand stores for consistency
 
 ### Build Status
 - `npm run build` — OK (chunk size warning is pre-existing, mathjs is large; plotly loaded as dynamic import)
 - `npm run lint` — 0 errors, 6 pre-existing warnings in App.jsx only (`react-hooks/exhaustive-deps`)
-- `npm test` — 300 tests pass (16 test files, 0 failures)
+- `npm test` — 377 tests pass (17 test files, 0 failures)

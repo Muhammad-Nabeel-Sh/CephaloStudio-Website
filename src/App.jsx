@@ -21,7 +21,6 @@ import { MarkupProps } from "./panels/MarkupProps.jsx";
 import { ExamplesPanel } from "./panels/ExamplesPanel.jsx";
 import { loadNormLibrary, saveNormLibrary } from "./data/normLibrary.js";
 import { createRedraw } from "./canvas/redraw.js";
-import { useWorkspaceUIState } from "./hooks/useWorkspaceUIState.js";
 import { useMediaQuery } from "./hooks/useMediaQuery.js";
 import { autoCreateMeasurements } from "./workspace/template.js";
 import { pushUndoSnapshot, undoAction, redoAction } from "./workspace/undo.js";
@@ -52,7 +51,8 @@ import { encryptJSON, decryptJSON, clearSecureStorage, secureStorageAvailable } 
 import { anonymizeProject, hasUnanonymizedPHI } from "./report/anonymize.js";
 import { logError, logWarn } from "./lib/logger.js";
 
-import { INITIAL_UI, Actions, useWorkspaceStore } from "./state/workspaceStore.js";
+import { useStoreDispatch } from "./state/workspaceStore.js";
+import { useToolStore, useUIStore } from "./state/workspaceStore.js";
 
 function profileProject(project) {
   const rows = [];
@@ -362,34 +362,141 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   // file input refs
   const openImgRef=useRef(null);const stackImgRef=useRef(null);const importRef=useRef(null);
 
-  const{ui,dispatch,setSelectedId,setActiveTool,setRightPanel,
-    setPlacingQueue,setShowMobilePanel,
-    setShowLUT,setShowScaleBar,setShowHistogram,setShowDisplacement,setDisplacementOverlay,setRefLandmark1,setRefLandmark2,setOverlayBlend,setOverlayAlignMode,setOverlayVectorScale,setShowTrackingLines}=useWorkspaceStore();
-  const{zoom,selectedId,selectedIds,replacingId,currentDraw,
-    activeTool,snapEnabled,showScaleBar,showDefTooltips,
-    showLUT,showHistogram,showAnnotations,annotationSize,showDisplacement,rightPanel,showCalib,pendingRuler,
-    showExport,showAnon,showNormogram,
-    pendingTextPos,showFormulaEditor,editFormulaId,
-    placingMode,placingQueue,placingIdx,loadingImages,
-    showMobilePanel,mobileToolsExpanded,
-    toolbarPos,toolbarDragging,rightPanelWidth,rightPanelResizing,
-    spotlightMode,
-    displacementOverlay,refLandmark1,refLandmark2,overlayBlend,overlayAlignMode,overlayVectorScale,showTrackingLines,showCpAlways,showAnchorAlways,
-    defaultLineStyle,defaultMarkupColor,defaultLineWidth,autoHideLabels,annotationBold,snapTolerance,}=ui;
-  useEffect(()=>{zoomRef.current=ui.zoom;},[ui.zoom]);
+  const dispatch = useStoreDispatch();
+  const zoom = useToolStore(s => s.zoom);
+  const selectedId = useToolStore(s => s.selectedId);
+  const selectedIds = useToolStore(s => s.selectedIds);
+  const replacingId = useToolStore(s => s.replacingId);
+  const currentDraw = useToolStore(s => s.currentDraw);
+  const activeTool = useToolStore(s => s.activeTool);
+  const snapEnabled = useToolStore(s => s.snapEnabled);
+  const placingMode = useToolStore(s => s.placingMode);
+  const placingQueue = useToolStore(s => s.placingQueue);
+  const placingIdx = useToolStore(s => s.placingIdx);
+  const loadingImages = useToolStore(s => s.loadingImages);
+  const spotlightMode = useToolStore(s => s.spotlightMode);
+
+  const showScaleBar = useUIStore(s => s.showScaleBar);
+  const showDefTooltips = useUIStore(s => s.showDefTooltips);
+  const showLUT = useUIStore(s => s.showLUT);
+  const showHistogram = useUIStore(s => s.showHistogram);
+  const showAnnotations = useUIStore(s => s.showAnnotations);
+  const annotationSize = useUIStore(s => s.annotationSize);
+  const showDisplacement = useUIStore(s => s.showDisplacement);
+  const rightPanel = useUIStore(s => s.rightPanel);
+  const showCalib = useUIStore(s => s.showCalib);
+  const pendingRuler = useUIStore(s => s.pendingRuler);
+  const showExport = useUIStore(s => s.showExport);
+  const showAnon = useUIStore(s => s.showAnon);
+  const showNormogram = useUIStore(s => s.showNormogram);
+  const pendingTextPos = useUIStore(s => s.pendingTextPos);
+  const showFormulaEditor = useUIStore(s => s.showFormulaEditor);
+  const editFormulaId = useUIStore(s => s.editFormulaId);
+  const showMobilePanel = useUIStore(s => s.showMobilePanel);
+  const mobileToolsExpanded = useUIStore(s => s.mobileToolsExpanded);
+  const toolbarPos = useUIStore(s => s.toolbarPos);
+  const toolbarDragging = useUIStore(s => s.toolbarDragging);
+  const rightPanelWidth = useUIStore(s => s.rightPanelWidth);
+  const rightPanelResizing = useUIStore(s => s.rightPanelResizing);
+  const displacementOverlay = useUIStore(s => s.displacementOverlay);
+  const refLandmark1 = useUIStore(s => s.refLandmark1);
+  const refLandmark2 = useUIStore(s => s.refLandmark2);
+  const overlayBlend = useUIStore(s => s.overlayBlend);
+  const overlayAlignMode = useUIStore(s => s.overlayAlignMode);
+  const overlayVectorScale = useUIStore(s => s.overlayVectorScale);
+  const showTrackingLines = useUIStore(s => s.showTrackingLines);
+  const showCpAlways = useUIStore(s => s.showCpAlways);
+  const showAnchorAlways = useUIStore(s => s.showAnchorAlways);
+  const defaultLineStyle = useUIStore(s => s.defaultLineStyle);
+  const defaultMarkupColor = useUIStore(s => s.defaultMarkupColor);
+  const defaultLineWidth = useUIStore(s => s.defaultLineWidth);
+  const autoHideLabels = useUIStore(s => s.autoHideLabels);
+  const annotationBold = useUIStore(s => s.annotationBold);
+  const snapTolerance = useUIStore(s => s.snapTolerance);
+  const compareSession = useUIStore(s => s.compareSession);
+  const showGrid = useUIStore(s => s.showGrid);
+  const showAirwayOverlay = useUIStore(s => s.showAirwayOverlay);
+  const showReportOptions = useUIStore(s => s.showReportOptions);
+  const filmstripOpen = useUIStore(s => s.filmstripOpen);
+  const guideKey = useUIStore(s => s.guideKey);
+  const reportSections = useUIStore(s => s.reportSections);
+  const pinnedFormulas = useUIStore(s => s.pinnedFormulas);
+
+  useEffect(()=>{zoomRef.current=zoom;},[zoom]);
   const fitToView = useCallback(() => { zoomRef.current=1; dispatch({type:"SET",payload:{zoom:1}}); panRef.current={x:40,y:40}; dispatch({type:"SET",payload:{pan:{x:40,y:40}}}); }, [dispatch]);
   const isMobile = useMediaQuery("(max-width: 767px)");
-  const {
-    compareSession, setCompareSession,
-    contextMenu, setContextMenu,
-    showGrid, setShowGrid,
-    showAirwayOverlay, setShowAirwayOverlay,
-    showReportOptions, setShowReportOptions,
-    filmstripOpen, setFilmstripOpen,
-    guideKey, setGuideKey,
-    defaultSections, reportSections, setReportSections,
-    pinnedFormulas, setPinnedFormulas,
-  } = useWorkspaceUIState();
+
+  // ─── Stable setter helpers (passed as props to children) ───
+  const setSelectedId = useCallback((v) => {
+    useToolStore.setState({ selectedId: typeof v === "function" ? v(useToolStore.getState().selectedId) : v });
+  }, []);
+  const setActiveTool = useCallback((v) => {
+    useToolStore.setState({ activeTool: v, currentDraw: null });
+  }, []);
+  const setRightPanel = useCallback((v) => useUIStore.setState({ rightPanel: v }), []);
+  const setPlacingQueue = useCallback((v) => {
+    useUIStore.setState({ placingQueue: typeof v === "function" ? v(useUIStore.getState().placingQueue) : v });
+  }, []);
+  const setShowMobilePanel = useCallback((v) => {
+    useUIStore.setState({ showMobilePanel: typeof v === "function" ? v(useUIStore.getState().showMobilePanel) : v });
+  }, []);
+  const setShowLUT = useCallback((v) => {
+    useUIStore.setState({ showLUT: typeof v === "function" ? v(useUIStore.getState().showLUT) : v });
+  }, []);
+  const setShowScaleBar = useCallback((v) => {
+    useUIStore.setState({ showScaleBar: typeof v === "function" ? v(useUIStore.getState().showScaleBar) : v });
+  }, []);
+  const setShowHistogram = useCallback((v) => {
+    useUIStore.setState({ showHistogram: typeof v === "function" ? v(useUIStore.getState().showHistogram) : v });
+  }, []);
+  const setShowDisplacement = useCallback((v) => {
+    useUIStore.setState({ showDisplacement: typeof v === "function" ? v(useUIStore.getState().showDisplacement) : v });
+  }, []);
+  const setDisplacementOverlay = useCallback((v) => {
+    useUIStore.setState({ displacementOverlay: typeof v === "function" ? v(useUIStore.getState().displacementOverlay) : v });
+  }, []);
+  const setRefLandmark1 = useCallback((v) => {
+    useUIStore.setState({ refLandmark1: typeof v === "function" ? v(useUIStore.getState().refLandmark1) : v });
+  }, []);
+  const setRefLandmark2 = useCallback((v) => {
+    useUIStore.setState({ refLandmark2: typeof v === "function" ? v(useUIStore.getState().refLandmark2) : v });
+  }, []);
+  const setOverlayBlend = useCallback((v) => {
+    useUIStore.setState({ overlayBlend: typeof v === "function" ? v(useUIStore.getState().overlayBlend) : v });
+  }, []);
+  const setOverlayAlignMode = useCallback((v) => {
+    useUIStore.setState({ overlayAlignMode: typeof v === "function" ? v(useUIStore.getState().overlayAlignMode) : v });
+  }, []);
+  const setOverlayVectorScale = useCallback((v) => {
+    useUIStore.setState({ overlayVectorScale: typeof v === "function" ? v(useUIStore.getState().overlayVectorScale) : v });
+  }, []);
+  const setShowTrackingLines = useCallback((v) => {
+    useUIStore.setState({ showTrackingLines: typeof v === "function" ? v(useUIStore.getState().showTrackingLines) : v });
+  }, []);
+  const setCompareSession = useCallback((v) => useUIStore.setState({ compareSession: typeof v === "function" ? v(useUIStore.getState().compareSession) : v }), []);
+  const setContextMenu = useCallback((v) => useUIStore.setState({ contextMenu: typeof v === "function" ? v(useUIStore.getState().contextMenu) : v }), []);
+  const setShowGrid = useCallback((v) => {
+    useUIStore.setState({ showGrid: typeof v === "function" ? v(useUIStore.getState().showGrid) : v });
+  }, []);
+  const setShowAirwayOverlay = useCallback((v) => {
+    useUIStore.setState({ showAirwayOverlay: typeof v === "function" ? v(useUIStore.getState().showAirwayOverlay) : v });
+  }, []);
+  const setShowReportOptions = useCallback((v) => {
+    useUIStore.setState({ showReportOptions: typeof v === "function" ? v(useUIStore.getState().showReportOptions) : v });
+  }, []);
+  const setFilmstripOpen = useCallback((v) => {
+    useUIStore.setState({ filmstripOpen: typeof v === "function" ? v(useUIStore.getState().filmstripOpen) : v });
+  }, []);
+  const setGuideKey = useCallback((v) => useUIStore.setState({ guideKey: v }), []);
+  const setReportSections = useCallback((v) => {
+    useUIStore.setState({ reportSections: typeof v === "function" ? v(useUIStore.getState().reportSections) : v });
+  }, []);
+  const setPinnedFormulas = useCallback((v) => {
+    useUIStore.setState({ pinnedFormulas: typeof v === "function" ? v(useUIStore.getState().pinnedFormulas) : v });
+  }, []);
+
+  const defaultSections = { cover: true, images: true, measurements: true, normograms: true, research: true, formulas: true, interpretation: true };
+
   const rightPanelWidthRef=useRef(rightPanelWidth);rightPanelWidthRef.current=rightPanelWidth;
   const toolbarPosRef=useRef(toolbarPos);toolbarPosRef.current=toolbarPos;
   // Panel collapse state — useRef + DOM manipulation to avoid canvas re-renders
@@ -470,7 +577,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const isDragging=useRef(false);const dragStart=useRef(null);const dragStartState=useRef(null);
   const dragMid=useRef(null);const dragPtIdx=useRef(null);
   const multiDragIdsRef=useRef(null);
-  const [copiedMarkup, setCopiedMarkup]=useState(null);
+
   const silhouetteAction=useRef(null);const hoveredPtRef=useRef(null);
   const mouseCanvasRef=useRef({x:0,y:0});
   const canvasSize=useRef({w:800,h:600});const lastTouchDist=useRef(null);const lastTapRef=useRef(0);
@@ -1363,27 +1470,15 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       </div>
 
       <ContextMenu
-        contextMenu={contextMenu}
         theme={t}
         markups={markups}
-        selectedIds={selectedIds}
-        copiedMarkup={copiedMarkup}
-        onCopyMarkup={setCopiedMarkup}
-        refLandmark1={refLandmark1}
-        refLandmark2={refLandmark2}
-        showGrid={showGrid}
         calibration={calibration}
-        onClose={() => setContextMenu(null)}
         onAddMarkup={addMarkup}
         onUpdMarkup={updMarkup}
         onUpdMarkups={updMarkups}
         onSelectAndFocus={selectAndFocusMarkup}
         onDelMarkup={delMarkup}
-        onSetRefLandmark1={setRefLandmark1}
-        onSetRefLandmark2={setRefLandmark2}
-        onSetShowGrid={setShowGrid}
         onFitToView={fitToView}
-        dispatch={dispatch}
       />
 
       {/* MODALS */}

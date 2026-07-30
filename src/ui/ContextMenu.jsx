@@ -1,32 +1,30 @@
 import { useEffect } from "react";
 import { uid, computeMeasurements, autoControlPoints } from "../lib/utils.js";
+import { useStoreDispatch, useToolStore, useUIStore } from "../state/workspaceStore.js";
 
 export default function ContextMenu({
-  contextMenu,
   theme: t,
   markups,
-  selectedIds,
-  copiedMarkup,
-  onCopyMarkup,
-  refLandmark1,
-  refLandmark2,
-  showGrid,
   calibration,
-  onClose,
   onAddMarkup,
   onUpdMarkup,
   onUpdMarkups,
   onSelectAndFocus,
   onDelMarkup,
-  onSetRefLandmark1,
-  onSetRefLandmark2,
-  onSetShowGrid,
   onFitToView,
-  dispatch,
 }) {
+  const dispatch = useStoreDispatch();
+  const contextMenu = useUIStore(s => s.contextMenu);
+  const selectedIds = useToolStore(s => s.selectedIds);
+  const copiedMarkup = useUIStore(s => s.copiedMarkup);
+  const refLandmark1 = useUIStore(s => s.refLandmark1);
+  const refLandmark2 = useUIStore(s => s.refLandmark2);
+  const showGrid = useUIStore(s => s.showGrid);
+
+  const close = () => useUIStore.setState({ contextMenu: null });
+
   useEffect(() => {
     if (!contextMenu) return;
-    const close = () => onClose();
     const onKey = (e) => {
       if (e.key === "Escape") close();
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
@@ -57,13 +55,12 @@ export default function ContextMenu({
       document.removeEventListener("mousedown", onClickOutside);
       document.removeEventListener("keydown", onKey);
     };
-  }, [contextMenu, onClose]);
+  }, [contextMenu]);
 
   if (!contextMenu) return null;
 
   const mId = contextMenu.markupId;
   const m = mId ? markups.find(x => x.id === mId) : null;
-  const close = () => onClose();
   const sel = selectedIds.length > 1 ? selectedIds : [];
 
   const dup = () => {
@@ -91,12 +88,12 @@ export default function ContextMenu({
 
   const copyMarkup = () => {
     if (!m) return;
-    onCopyMarkup(JSON.stringify(m));
+    useUIStore.setState({ copiedMarkup: JSON.stringify(m) });
     close();
   };
 
   const pasteMarkup = (setPos) => {
-    const raw = copiedMarkup;
+    const raw = useUIStore.getState().copiedMarkup;
     if (!raw) return;
     try {
       const src = JSON.parse(raw);
@@ -164,6 +161,10 @@ export default function ContextMenu({
 
   const sep = <div style={{ borderTop: `1px solid ${t.bdr}`, margin: "4px 0" }} />;
 
+  const setRef1 = (v) => useUIStore.setState({ refLandmark1: typeof v === "function" ? v(useUIStore.getState().refLandmark1) : v });
+  const setRef2 = (v) => useUIStore.setState({ refLandmark2: typeof v === "function" ? v(useUIStore.getState().refLandmark2) : v });
+  const setGrid = (v) => useUIStore.setState({ showGrid: typeof v === "function" ? v(useUIStore.getState().showGrid) : v });
+
   return (
     <div data-cmenu="1" role="menu"
       style={{
@@ -201,8 +202,8 @@ export default function ContextMenu({
         {item(m.visible === false ? "Show" : "Hide", () => { onUpdMarkup(mId, { visible: m.visible === false }); close(); })}
         {item(m.locked ? "Unlock" : "Lock", () => { onUpdMarkup(mId, { locked: !m.locked }); close(); })}
         {sep}
-        {item(refLandmark1 === m.label ? "✓ Ref Landmark 1" : "Ref Landmark 1", () => { onSetRefLandmark1(m.label === refLandmark1 ? null : m.label); close(); })}
-        {item(refLandmark2 === m.label ? "✓ Ref Landmark 2" : "Ref Landmark 2", () => { onSetRefLandmark2(m.label === refLandmark2 ? null : m.label); close(); })}
+        {item(refLandmark1 === m.label ? "✓ Ref Landmark 1" : "Ref Landmark 1", () => { setRef1(m.label === refLandmark1 ? null : m.label); close(); })}
+        {item(refLandmark2 === m.label ? "✓ Ref Landmark 2" : "Ref Landmark 2", () => { setRef2(m.label === refLandmark2 ? null : m.label); close(); })}
         {item("Copy Measurement", copyMeas)}
         {sep}
         {item("Move to Front", toFront)}
@@ -222,7 +223,7 @@ export default function ContextMenu({
         {item("Calibrate ⟺", () => { dispatch({ type: "SET", payload: { showCalib: true } }); close(); })}
         {item("Fit to View ⊙", () => { onFitToView?.(); close(); })}
         {sep}
-        {item(showGrid ? "Grid: On ✓" : "Grid: Off", () => { onSetShowGrid(v => !v); close(); })}
+        {item(showGrid ? "Grid: On ✓" : "Grid: Off", () => { setGrid(v => !v); close(); })}
       </>}
     </div>
   );

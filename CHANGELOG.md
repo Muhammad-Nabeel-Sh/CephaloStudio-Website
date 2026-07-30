@@ -1,5 +1,45 @@
 # Changelog
 
+## [1.4.0] - 2026-07-30
+
+### Added — Zustand State Management
+
+- **toolStore** (`src/state/toolStore.js`): New Zustand store for tool/canvas state — `activeTool`, `zoom`, `pan`, `selectedId`, `selectedIds`, `activeSessionId`, `currentDraw`, `snapEnabled`, `placingMode`, `placingQueue`, `placingIdx`, `loadingImages`, `spotlightMode`
+- **uiStore** (`src/state/uiStore.js`): New Zustand store for UI chrome state — modals, panels, overlays, display options, refLandmarks, context menu, filmstrip, comparison state, copiedMarkup. Merged state previously in `useWorkspaceUIState.js` hook.
+- **`useStoreDispatch()`**: Stable dispatch hook using `getState()` (never subscribes) — no re-renders from dispatching
+- **`workspaceStore.js`**: Rewritten as compat layer re-exporting both Zustand stores
+
+### Changed — TopBar & Toolbar
+
+- Both panels now read state from `useToolStore`/`useUIStore` with individual selectors and local `useStoreDispatch()`
+- Store-state props eliminated from App.jsx (45 individual selector subscriptions replace the single monolithic destructure)
+- `useWorkspaceUIState.js` hook removed (state merged into uiStore)
+
+### Changed — ContextMenu
+
+- Migrated to read `contextMenu`, `copiedMarkup`, `selectedIds`, `refLandmark1/2`, `showGrid` from stores directly
+- App.jsx ContextMenu props reduced from 20 to 6
+- `copiedMarkup` moved from `useState` into `uiStore`
+- Now uses `useStoreDispatch()` and `useUIStore.setState()` for setters
+
+### Changed — Dependencies
+
+- Added `zustand` npm package
+
+### Changed — Project Structure
+
+- `src/state/` expanded: `toolStore.js`, `uiStore.js`, `workspaceStore.js`
+- `src/hooks/useWorkspaceUIState.js` deleted
+- `src/state/workspaceStore.js` rewritten (compat layer)
+
+### Testing
+
+- All 377 tests pass (17 test files, 0 failures)
+- 0 lint errors (6 pre-existing exhaustive-deps warnings)
+- Production build succeeds
+
+---
+
 ## [1.3.0] - 2026-07-20
 
 ### Added — Superimposition / Growth Research Module (F3)
