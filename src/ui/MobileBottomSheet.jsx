@@ -133,7 +133,7 @@ export default function MobileBottomSheet({ t, isOpen, onClose, children }) {
           }}/>
         </div>
         <div style={{ flex: 1, overflow: "auto", scrollbarWidth: "thin" }}>
-          {children}
+          <div style={{ maxWidth: 960, width: "100%", margin: "0 auto" }}>{children}</div>
         </div>
       </div>
     </div>

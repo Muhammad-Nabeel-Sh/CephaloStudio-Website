@@ -379,8 +379,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const mousePosRef=useRef(null);const snapPosRef=useRef(null);
   const flashMarkupIdRef=useRef(null);const flashStartTimeRef=useRef(0);
   const boxSelectRectRef=useRef(null);const panRef=useRef({x:40,y:40});const zoomRef=useRef(1);
-  // F2: device-pixel-ratio for crisp HiDPI rendering
-  const dprRef=useRef(window.devicePixelRatio||1);
+  // F2: device-pixel-ratio for crisp HiDPI rendering (capped at 2 to bound per-frame fill cost)
+  const dprRef=useRef(Math.max(1,Math.min(window.devicePixelRatio||1,2)));
   // F4: offscreen canvas for static content (image+markups) — blitted on mousemove
   const staticDirtyRef=useRef(true);
   // F8: rAF handle for ResizeObserver coalescing
@@ -392,7 +392,6 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const openImgRef=useRef(null);const stackImgRef=useRef(null);const importRef=useRef(null);
 
   const dispatch = useStoreDispatch();
-  const zoom = useToolStore(s => s.zoom);
   const selectedId = useToolStore(s => s.selectedId);
   const selectedIds = useToolStore(s => s.selectedIds);
   const replacingId = useToolStore(s => s.replacingId);
@@ -458,9 +457,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const formulas=useSessionStore(s=>s.formulas);
   const processing=useSessionStore(s=>s.processing);
   const sessionImage=useSessionStore(s=>s.sessionImage);
-  useEffect(()=>{zoomRef.current=zoom;},[zoom]);
   const fitToView = useCallback(() => { zoomRef.current=1; dispatch({type:"SET",payload:{zoom:1}}); panRef.current={x:40,y:40}; dispatch({type:"SET",payload:{pan:{x:40,y:40}}}); }, [dispatch]);
-  const isMobile = useMediaQuery("(max-width: 767px)");
+  const isMobile = useMediaQuery("(max-width: 1024px)"); // compact layout: phones + tablets (portrait/landscape)
 
   // ─── Stable setter helpers (passed as props to children) ───
   const setSelectedId = useCallback((v) => {
@@ -612,7 +610,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
 
   const silhouetteAction=useRef(null);const hoveredPtRef=useRef(null);
   const mouseCanvasRef=useRef({x:0,y:0});
-  const canvasSize=useRef({w:800,h:600});const lastTouchDist=useRef(null);const lastTapRef=useRef(0);
+  const canvasSize=useRef({w:800,h:600});const lastTapRef=useRef(0);
 
   // Auto-start placing mode when project has unplaced markups (from wizard)
   const placingInitRef=useRef(true);
@@ -640,7 +638,14 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
 
   const updSessionRef=useRef();
   updSessionRef.current=patch=>onUpdateProject(updateSessionInProject(project,activeSession.id,patch));
-  const updSession=useCallback(patch=>updSessionRef.current(patch),[]);
+  const updSession=useCallback(patch=>{
+    updSessionRef.current(patch);
+    // Mirror project-side session writes back into the Zustand store so the canvas
+    // (which renders from the store) reflects them immediately — e.g. keyboard delete,
+    // template loads, lock/unlock/hide/clear all call updSession({markups}) directly.
+    // Ref-equality guard in merge() breaks the store→project↔project→store loop.
+    useSessionStore.getState().merge(patch);
+  },[]);
   // ─── Two-way sync: session ↔ Zustand sessionStore ──────────────
   const lastSessionIdRef=useRef(null);
   useEffect(()=>{
@@ -708,6 +713,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       else newMarkup.color=defaultMarkupColor;
     }
     if(draw.replacingId){
+      pushUndo();
       updMarkup(draw.replacingId,{points:draw.points,placed:true,curveStyle:draw.curveStyle});
       dispatch({type:"SET",payload:{replacingId:null}});
     }else{
@@ -866,6 +872,38 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     return ()=>window.removeEventListener("cephalostudio:image-processed",onProcessed);
   },[]);
 
+  // F9: central redraw watcher — restores the pre-Zustand "state change → redraw" trigger.
+  // The Zustand refactor made `redraw` a stable useCallback([]) reading getState(), which
+  // silently removed the auto-redraw that the old `useEffect([redraw])` provided. Subscribing
+  // (without React re-renders) and scheduling a redraw whenever any canvas-affecting state
+  // reference changes restores live feedback for selection, drawing previews, deletions and
+  // display toggles.
+  const lastRedrawStateRef=useRef(null);
+  useEffect(()=>{
+    const pick=()=>{
+      const ss=useSessionStore.getState(),ts=useToolStore.getState(),us=useUIStore.getState();
+      return { m:ss.markups,c:ss.calibration,i:ss.sessionImage,
+        z:ts.zoom,p:ts.pan,
+        cd:ts.currentDraw,sid:ts.selectedId,sids:ts.selectedIds,at:ts.activeTool,se:ts.snapEnabled,
+        lm:ts.lutMode,li:ts.lutInvert,
+        sg:us.showGrid,sb:us.showScaleBar,dt:us.showDefTooltips,an:us.showAnnotations,
+        lut:us.showLUT,as:us.annotationSize,disp:us.showDisplacement,cmp:us.compareSession,
+        aw:us.showAirwayOverlay,cpa:us.showCpAlways,ana:us.showAnchorAlways,tol:us.snapTolerance,
+        al:us.autoHideLabels,ab:us.annotationBold };
+    };
+    lastRedrawStateRef.current=pick();
+    const check=()=>{
+      const k=pick(),p=lastRedrawStateRef.current;
+      let dirty=false;
+      for(const kk in k){ if(k[kk]!==p[kk]){ dirty=true; break; } }
+      if(dirty){ lastRedrawStateRef.current=k; scheduleRedrawRef.current(); }
+    };
+    const u1=useSessionStore.subscribe(check);
+    const u2=useToolStore.subscribe(check);
+    const u3=useUIStore.subscribe(check);
+    return ()=>{u1();u2();u3();};
+  },[]);
+
   // U3: Keep redrawing while calibration modal is open (pulsing highlight animation)
   useEffect(()=>{if(!showCalib||!pendingRuler)return;let raf;const loop=()=>{scheduleRedrawRef.current();raf=requestAnimationFrame(loop);};raf=requestAnimationFrame(loop);return()=>cancelAnimationFrame(raf);},[showCalib,pendingRuler]);
 
@@ -877,8 +915,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   // ══════════════════════════════════════
   // IMAGE LOADING
   const loadImage=useCallback((file,addToStack=false)=>{
-    loadImageFile(file, addToStack, { sessionImages: activeSession?.images || [], dispatch, updSession, imgRefs, canvasSize, panRef });
-  },[activeSession?.images, dispatch, updSession, imgRefs, canvasSize, panRef]);
+    loadImageFile(file, addToStack, { sessionImages: activeSession?.images || [], dispatch, updSession, imgRefs, canvasSize, panRef, zoomRef });
+  },[activeSession?.images, dispatch, updSession, imgRefs, canvasSize, panRef, zoomRef]);
 
   const handleDrop=useCallback(e=>{handleImageDrop(e, loadImage);},[loadImage]);
 
@@ -1017,6 +1055,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
                 newPoints.splice(bestPtIdx + 1, 0, { x: dnx, y: dny });
                 return { ...path, points: newPoints };
               });
+              pushUndo();
               updMarkup(hit, { paths: newPaths });
               return;
             }
@@ -1043,6 +1082,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
                   if (pi !== bestPathIdx) return path;
                   return { ...path, points: path.points.filter((_, i) => i !== bestPtIdx) };
                 });
+                pushUndo();
                 updMarkup(hit, { paths: newPaths });
               }
               return;
@@ -1087,6 +1127,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
             for(;j<nc.length;j++)nc[j]=oc[j-2];
             patch.cp=nc;
           }else if(m.type==="bezier")patch.cp=autoControlPoints(newPoints);
+          pushUndo();
           updMarkup(hit,patch);
           return;
         }
@@ -1094,7 +1135,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           const vp=vpts(m);
           let bestIdx=-1,bestDist=Infinity;
           for(let i=0;i<vp.length;i++){const d=dist(ip,vp[i]);if(d<bestDist){bestDist=d;bestIdx=i;}}
-          if(bestIdx>=0&&vp.length>2){const newPoints=m.points.filter((_,i)=>i!==bestIdx);const patch={points:newPoints};if(m.type==="bezier"&&Array.isArray(m.cp)&&m.cp.length===2*(m.points.length-1)){const oc=m.cp;if(bestIdx===0)patch.cp=oc.slice(2);else if(bestIdx===vp.length-1)patch.cp=oc.slice(0,oc.length-2);else{const nc=new Array(oc.length-2);let j=0;for(;j<2*bestIdx-1;j++)nc[j]=oc[j];nc[j]=oc[2*bestIdx+1];j++;for(;j<nc.length;j++)nc[j]=oc[j+2];patch.cp=nc;}}else if(m.type==="bezier")patch.cp=autoControlPoints(newPoints);updMarkup(hit,patch);}
+          if(bestIdx>=0&&vp.length>2){const newPoints=m.points.filter((_,i)=>i!==bestIdx);const patch={points:newPoints};if(m.type==="bezier"&&Array.isArray(m.cp)&&m.cp.length===2*(m.points.length-1)){const oc=m.cp;if(bestIdx===0)patch.cp=oc.slice(2);else if(bestIdx===vp.length-1)patch.cp=oc.slice(0,oc.length-2);else{const nc=new Array(oc.length-2);let j=0;for(;j<2*bestIdx-1;j++)nc[j]=oc[j];nc[j]=oc[2*bestIdx+1];j++;for(;j<nc.length;j++)nc[j]=oc[j+2];patch.cp=nc;}}else if(m.type==="bezier")patch.cp=autoControlPoints(newPoints);pushUndo();updMarkup(hit,patch);}
           return;
         }
         if(m.type==="bezier"&&hoveredPtRef.current?.type==="bezierCp"){
@@ -1110,7 +1151,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     }
     if(activeTool==="text"){dispatch({type:"SET",payload:{pendingTextPos:ip}});return;}
     if(activeTool==="point"){
-      if(replacingId){updMarkup(replacingId,{points:[ip],placed:true});dispatch({type:"SET",payload:{replacingId:null}});return;}
+      if(replacingId){pushUndo();updMarkup(replacingId,{points:[ip],placed:true});dispatch({type:"SET",payload:{replacingId:null}});return;}
       const nNon=markups.filter(m=>m.type==="point"&&!m.repro).length;
       addMarkup({type:"point",points:[ip],label:`P${nNon+1}`,color:t.acc,size:6,definition:""});
       return;
@@ -1198,11 +1239,11 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     // F1: write pointer state to refs — no dispatch, no React re-render
     mousePosRef.current=sp;
     if((snapEnabled.points||snapEnabled.lines)&&activeTool!=="select"&&activeTool!=="pan"){const ip=toImage(sp.x,sp.y);const sn=snapPoint(ip,markups,snapTolerance/zoomRef.current,snapEnabled);const prev=snapPosRef.current;snapPosRef.current=(Math.abs(sn.x-ip.x)>0.1||Math.abs(sn.y-ip.y)>0.1)?sn:null;if((prev===null)!==(snapPosRef.current===null)||((prev&&snapPosRef.current)&&(prev.x!==snapPosRef.current.x||prev.y!==snapPosRef.current.y)))scheduleRedrawRef.current();}else{if(snapPosRef.current!==null){snapPosRef.current=null;scheduleRedrawRef.current();}}
-    if(activeTool==="select"&&!isDragging.current&&!silhouetteAction.current){const ip=toImage(sp.x,sp.y);let best=null,bd=Infinity;const ptThr=12/zoomRef.current;for(const m2 of markups){if(m2.locked||m2.visible===false)continue;if(m2.type==="point"){const vp=vpts(m2);if(vp.length){const d=dist(ip,vp[0]);if(d<bd&&d<ptThr){bd=d;best={type:"point",mid:m2.id};}}}if(m2.type==="silhouette"){const paths=m2.paths||SILHOUETTES[m2.silhouetteType]?.paths;if(!paths)continue;const rot=m2.rotation||0;const sc=m2.scale||1;const pos=m2.position||{x:0,y:0};const cosR=Math.cos(rot);const sinR=Math.sin(rot);paths.forEach((path,pi)=>{path.points.forEach((p,ptI)=>{const sx=p.x*sc*100;const sy=p.y*100;const rx=sx*cosR-sy*sinR;const ry=sx*sinR+sy*cosR;const d=dist(ip,{x:rx+pos.x,y:ry+pos.y});if(d<bd&&d<ptThr){bd=d;best={type:"silhouette",mid:m2.id,pathIdx:pi,ptIdx:ptI};}});});if(m2.id===selectedId){try{const h=getSilhouetteHandlesImage(m2,zoomRef.current);const rotThr=Math.max(10,22*Math.sqrt(zoomRef.current))/zoomRef.current;if(h.rotCenter&&isFinite(h.rotCenter.x)){const d=dist(ip,h.rotCenter);if(d<rotThr&&d<bd){bd=d;best={type:"rotate",mid:m2.id};}}const cornerThr=Math.max(8,12*Math.sqrt(zoomRef.current))/zoomRef.current;h.corners.forEach((c,ci)=>{if(isFinite(c.x)){const d=dist(ip,c);if(d<cornerThr&&d<bd){bd=d;best={type:"corner",mid:m2.id,cornerIdx:ci};}}});}catch{/*silent*/}}        }else if(m2.type==="curve"||m2.type==="polyline"||m2.type==="polygon"||m2.type==="bezier"||m2.type==="tangent"){if(m2.type==="bezier"&&m2.cp){m2.cp.forEach((p,i)=>{const d=dist(ip,p);if(d<bd&&d<ptThr){bd=d;best={type:"bezierCp",mid:m2.id,cpIdx:i};}});}(m2.points||[]).forEach((p,i)=>{const d=dist(ip,p);if(d<bd&&d<ptThr){bd=d;best={type:m2.type==="bezier"?"bezier":m2.type==="tangent"?"tangent":"path",mid:m2.id,ptIdx:i};}});}}const _prevHover=hoveredPtRef.current;hoveredPtRef.current=best;if(JSON.stringify(_prevHover)!==JSON.stringify(best))scheduleRedrawRef.current();}else{hoveredPtRef.current=null;}
+    if(activeTool==="select"&&!isDragging.current&&!isPanning.current&&!silhouetteAction.current&&!boxSelectRectRef.current){const ip=toImage(sp.x,sp.y);let best=null,bd=Infinity;const ptThr=12/zoomRef.current;for(const m2 of markups){if(m2.locked||m2.visible===false)continue;if(m2.type==="point"){const vp=vpts(m2);if(vp.length){const d=dist(ip,vp[0]);if(d<bd&&d<ptThr){bd=d;best={type:"point",mid:m2.id};}}}if(m2.type==="silhouette"){const paths=m2.paths||SILHOUETTES[m2.silhouetteType]?.paths;if(!paths)continue;const rot=m2.rotation||0;const sc=m2.scale||1;const pos=m2.position||{x:0,y:0};const cosR=Math.cos(rot);const sinR=Math.sin(rot);paths.forEach((path,pi)=>{path.points.forEach((p,ptI)=>{const sx=p.x*sc*100;const sy=p.y*100;const rx=sx*cosR-sy*sinR;const ry=sx*sinR+sy*cosR;const d=dist(ip,{x:rx+pos.x,y:ry+pos.y});if(d<bd&&d<ptThr){bd=d;best={type:"silhouette",mid:m2.id,pathIdx:pi,ptIdx:ptI};}});});if(m2.id===selectedId){try{const h=getSilhouetteHandlesImage(m2,zoomRef.current);const rotThr=Math.max(10,22*Math.sqrt(zoomRef.current))/zoomRef.current;if(h.rotCenter&&isFinite(h.rotCenter.x)){const d=dist(ip,h.rotCenter);if(d<rotThr&&d<bd){bd=d;best={type:"rotate",mid:m2.id};}}const cornerThr=Math.max(8,12*Math.sqrt(zoomRef.current))/zoomRef.current;h.corners.forEach((c,ci)=>{if(isFinite(c.x)){const d=dist(ip,c);if(d<cornerThr&&d<bd){bd=d;best={type:"corner",mid:m2.id,cornerIdx:ci};}}});}catch{/*silent*/}}        }else if(m2.type==="curve"||m2.type==="polyline"||m2.type==="polygon"||m2.type==="bezier"||m2.type==="tangent"){if(m2.type==="bezier"&&m2.cp){m2.cp.forEach((p,i)=>{const d=dist(ip,p);if(d<bd&&d<ptThr){bd=d;best={type:"bezierCp",mid:m2.id,cpIdx:i};}});}(m2.points||[]).forEach((p,i)=>{const d=dist(ip,p);if(d<bd&&d<ptThr){bd=d;best={type:m2.type==="bezier"?"bezier":m2.type==="tangent"?"tangent":"path",mid:m2.id,ptIdx:i};}});}}const _prevHover=hoveredPtRef.current;hoveredPtRef.current=best;if(JSON.stringify(_prevHover)!==JSON.stringify(best))scheduleRedrawRef.current();}else{hoveredPtRef.current=null;}
     const _hp=hoveredPtRef.current;const _isPanning=isPanning.current;const _curCursor=(_hp&&(_hp.type==="bezierCp"||_hp.type==="bezier"||_hp.type==="path"||_hp.type==="point"||_hp.type==="tangent"||_hp.type==="silhouette"||_hp.type==="rotate"||_hp.type==="corner"))?"pointer":_isPanning?"grabbing":activeTool==="pan"?"grab":activeTool==="select"?"default":"crosshair";if(canvasRef.current.style.cursor!==_curCursor)canvasRef.current.style.cursor=_curCursor;
     if(boxSelectRectRef.current){const ip=toImage(sp.x,sp.y);boxSelectRectRef.current={...boxSelectRectRef.current,x2:ip.x,y2:ip.y};scheduleRedrawRef.current();return;}
     if(isPanning.current&&panStart.current){panRef.current={x:panStart.current.px+(e.clientX-panStart.current.mx),y:panStart.current.py+(e.clientY-panStart.current.my)};scheduleRedrawRef.current();return;}
-    if(isDragging.current&&multiDragIdsRef.current){const ip=toImage(sp.x,sp.y);const dx=ip.x-dragStart.current.x,dy=ip.y-dragStart.current.y;const ids=multiDragIdsRef.current;ids.forEach(cid=>{const cm=markups.find(x=>x.id===cid);if(cm?.label)syncRefDeps(cm.label,dx,dy);});updMarkups(ms=>ms.map(m=>{if(!ids.includes(m.id))return m;if(m.type==="silhouette")return{...m,position:{x:(m.position?.x||0)+dx,y:(m.position?.y||0)+dy}};return{...m,points:(m.points||[]).map(p=>p.x>-9000?{x:p.x+dx,y:p.y+dy}:p)};}));ids.forEach(cid=>{const cm=markups.find(x=>x.id===cid);if(!cm)return;if(["circle","arc","ellipse","bezier","curve","polyline","polygon"].includes(cm.type))syncTangents(cid,dx,dy);});dragStart.current=ip;scheduleRedrawRef.current();return;}
+    if(isDragging.current&&multiDragIdsRef.current){const ip=toImage(sp.x,sp.y);const dx=ip.x-dragStart.current.x,dy=ip.y-dragStart.current.y;const ids=multiDragIdsRef.current;ids.forEach(cid=>{const cm=markups.find(x=>x.id===cid);if(cm?.label)syncRefDeps(cm.label,dx,dy);});useSessionStore.getState().updMarkups(ms=>ms.map(m=>{if(!ids.includes(m.id))return m;if(m.type==="silhouette")return{...m,position:{x:(m.position?.x||0)+dx,y:(m.position?.y||0)+dy}};return{...m,points:(m.points||[]).map(p=>p.x>-9000?{x:p.x+dx,y:p.y+dy}:p)};}));ids.forEach(cid=>{const cm=markups.find(x=>x.id===cid);if(!cm)return;if(["circle","arc","ellipse","bezier","curve","polyline","polygon"].includes(cm.type))syncTangents(cid,dx,dy);});dragStart.current=ip;scheduleRedrawRef.current();return;}
     if(isDragging.current&&dragMid.current){const ip=toImage(sp.x,sp.y);const dx=ip.x-dragStart.current.x,dy=ip.y-dragStart.current.y;const m=markups.find(x=>x.id===dragMid.current);if(!m)return;if(m.type==="silhouette"){if(typeof dragPtIdx.current==="object"&&dragPtIdx.current!==null){const sc=m.scale||1;const rot=m.rotation||0;const cosR=Math.cos(rot);const sinR=Math.sin(rot);const baseSize=100;const dnx=(cosR*dx+sinR*dy)/(sc*baseSize);const dny=(-sinR*dx+cosR*dy)/(sc*baseSize);const{pathIdx,ptIdx}=dragPtIdx.current;updMarkup(dragMid.current,{paths:(m.paths||[]).map((path,pi)=>({...path,points:path.points.map((p,ptI)=>pi===pathIdx&&ptI===ptIdx?{x:p.x+dnx,y:p.y+dny}:p)}))});}else{updMarkup(dragMid.current,{position:{x:(m.position?.x||0)+dx,y:(m.position?.y||0)+dy}});}}else if(m.type==="tangent"&&dragPtIdx.current===0&&m.tangentCurveId){const curve=markups.find(c=>c.id===m.tangentCurveId);if(curve){const raw={x:(m.points[0]||{}).x+dx,y:(m.points[0]||{}).y+dy};const snapped=snapTangentToCurve(curve,raw);if(snapped){const ep=m.points[1]||raw;const a=snapped.tangentAngle;const dex=ep.x-snapped.tangentPoint.x,dey=ep.y-snapped.tangentPoint.y;const proj=dex*Math.cos(a)+dey*Math.sin(a);const newEp={x:snapped.tangentPoint.x+proj*Math.cos(a),y:snapped.tangentPoint.y+proj*Math.sin(a)};updMarkup(dragMid.current,{points:[snapped.tangentPoint,newEp],tangentAngle:snapped.tangentAngle});}}else{updMarkup(dragMid.current,{points:(m.points||[]).map((p,i)=>i===0?{x:p.x+dx,y:p.y+dy}:p)});}}else if(m.type==="bezier"&&typeof dragPtIdx.current==="object"&&dragPtIdx.current?.type==="cp"){const cp=[...(m.cp||[])];const ci=dragPtIdx.current.idx;if(ci<cp.length)cp[ci]={x:cp[ci].x+dx,y:cp[ci].y+dy};updMarkup(dragMid.current,{cp});}else if(m.type==="bezier"&&typeof dragPtIdx.current==="number"&&dragPtIdx.current>=0){const ni=dragPtIdx.current;const pts=(m.points||[]).map((p,i)=>i===ni?{x:p.x+dx,y:p.y+dy}:p);const cp=Array.isArray(m.cp)?[...(m.cp)]:[];if(cp.length===2*(pts.length-1)){if(ni>0&&cp[2*ni-1])cp[2*ni-1]={x:cp[2*ni-1].x+dx,y:cp[2*ni-1].y+dy};if(ni<pts.length-1&&cp[2*ni])cp[2*ni]={x:cp[2*ni].x+dx,y:cp[2*ni].y+dy};}updMarkup(dragMid.current,{points:pts,cp});}else{syncRefDeps(m.label,dx,dy);updMarkup(dragMid.current,{points:(m.points||[]).map((p,i)=>i===dragPtIdx.current?{x:p.x+dx,y:p.y+dy}:p)});syncTangents(m.id,dx,dy);}dragStart.current=ip;scheduleRedrawRef.current();}
     if(silhouetteAction.current){
       try {
@@ -1222,7 +1263,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         scheduleRedrawRef.current();
       } catch { silhouetteAction.current=null; /*silent*/ }
     }
-  },[activeTool,markups,snapEnabled,selectedId,updMarkup,updMarkups,toImage,getCanvasPos,syncTangents,syncRefDeps,snapTolerance]);
+  },[activeTool,markups,snapEnabled,selectedId,updMarkup,toImage,getCanvasPos,syncTangents,syncRefDeps,snapTolerance]);
 
   const handleMouseUp=()=>{
     if(boxSelectRectRef.current){
@@ -1253,17 +1294,91 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
 
   useEffect(()=>{const c=canvasRef.current;if(!c)return;let syncPending=false;const onWheel=e=>{if(Math.abs(e.deltaY)>0.1||Math.abs(e.deltaX)>0.1){e.preventDefault();e.stopPropagation();const sp=getCanvasPos(e);const cz=zoomRef.current;const f=e.deltaY>0?0.9:1.1;const nz=clamp(cz*f,0.05,15);zoomRef.current=nz;const prev=panRef.current;panRef.current={x:sp.x-(sp.x-prev.x)*(nz/cz),y:sp.y-(sp.y-prev.y)*(nz/cz)};scheduleRedrawRef.current();if(!syncPending){syncPending=true;requestAnimationFrame(()=>{syncPending=false;dispatch({type:"SET",payload:{zoom:zoomRef.current}});});}}};c.addEventListener("wheel",onWheel,{passive:false});return()=>c.removeEventListener("wheel",onWheel);},[dispatch,getCanvasPos]);
   const touchStartRef=useRef();const touchMoveRef=useRef();const touchEndRef=useRef();const longPressTimerRef=useRef(null);
+  const gestureRef=useRef("none");const pinchRef=useRef(null);const panCandidateRef=useRef(null);const syncZoomRef=useRef(false);
+  const syncZoom=()=>{if(!syncZoomRef.current){syncZoomRef.current=true;requestAnimationFrame(()=>{syncZoomRef.current=false;dispatch({type:"SET",payload:{zoom:zoomRef.current}});});}};
   touchStartRef.current=e=>{
-    if(e.touches.length===1){const t2=e.touches[0];const now=Date.now();if(now-lastTapRef.current<300){handleDblClick();lastTapRef.current=0;}else{lastTapRef.current=now;handleMouseDown({button:0,clientX:t2.clientX,clientY:t2.clientY});const sp=getCanvasPos({clientX:t2.clientX,clientY:t2.clientY});const ip=toImage(sp.x,sp.y);const hit=hitTest(markups,ip,zoomRef.current);longPressTimerRef.current=setTimeout(()=>{longPressTimerRef.current=null;setContextMenu({x:t2.clientX,y:t2.clientY,markupId:hit||null,imageX:ip.x,imageY:ip.y});},500);}}
-    if(e.touches.length===2){lastTouchDist.current=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);if((activeTool==="curve"||activeTool==="polyline"||activeTool==="polygon")&&currentDraw?.points.length>=2){handleMouseDown({button:0,clientX:(e.touches[0].clientX+e.touches[1].clientX)/2,clientY:(e.touches[0].clientY+e.touches[1].clientY)/2,ctrlKey:true});}}
+    const touches=e.touches;
+    if(touches.length===1){
+      if(gestureRef.current==="pinch")return;
+      const t2=touches[0];const now=Date.now();
+      if(now-lastTapRef.current<300){
+        lastTapRef.current=0;gestureRef.current="none";
+        const canFinish=(["polygon","curve","polyline","bezier"].includes(activeTool))&&currentDraw?.points.length>=2;
+        if(canFinish){handleDblClick();}
+        else{
+          const sp=getCanvasPos({clientX:t2.clientX,clientY:t2.clientY});
+          const cz=zoomRef.current,nz=clamp(cz*1.5,0.05,15);
+          zoomRef.current=nz;const prev=panRef.current;
+          panRef.current={x:sp.x-(sp.x-prev.x)*(nz/cz),y:sp.y-(sp.y-prev.y)*(nz/cz)};
+          scheduleRedrawRef.current();syncZoom();
+        }
+        return;
+      }
+      lastTapRef.current=now;gestureRef.current="single";panCandidateRef.current=null;
+      const sp=getCanvasPos({clientX:t2.clientX,clientY:t2.clientY});
+      const ip=toImage(sp.x,sp.y);
+      const hit=hitTest(markups,ip,zoomRef.current);
+      if(activeTool==="select"&&!hit){panCandidateRef.current={x:t2.clientX,y:t2.clientY};}
+      else{handleMouseDown({button:0,clientX:t2.clientX,clientY:t2.clientY});}
+      longPressTimerRef.current=setTimeout(()=>{longPressTimerRef.current=null;if(navigator.vibrate)navigator.vibrate(20);setContextMenu({x:t2.clientX,y:t2.clientY,markupId:hit||null,imageX:ip.x,imageY:ip.y});},500);
+    }
+    if(touches.length===2){
+      if(gestureRef.current==="single"){
+        if(panCandidateRef.current)panCandidateRef.current=null;
+        isDragging.current=false;isPanning.current=false;silhouetteAction.current=null;multiDragIdsRef.current=null;
+      }
+      gestureRef.current="pinch";
+      if(longPressTimerRef.current){clearTimeout(longPressTimerRef.current);longPressTimerRef.current=null;}
+      const a=touches[0],b=touches[1];
+      const cx=(a.clientX+b.clientX)/2,cy=(a.clientY+b.clientY)/2;
+      const r=canvasRef.current.getBoundingClientRect();
+      const ip=toImage({x:cx-r.left,y:cy-r.top});
+      pinchRef.current={d:Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY),nz:zoomRef.current,ip};
+      if((activeTool==="curve"||activeTool==="polyline"||activeTool==="polygon")&&currentDraw?.points.length>=2){handleMouseDown({button:0,clientX:cx,clientY:cy,ctrlKey:true});}
+    }
   };
   touchMoveRef.current=e=>{
     if(longPressTimerRef.current){clearTimeout(longPressTimerRef.current);longPressTimerRef.current=null;}
-    if(e.touches.length===1){const t2=e.touches[0];handleMouseMove({clientX:t2.clientX,clientY:t2.clientY});}
-    if(e.touches.length===2&&lastTouchDist.current){const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);const cz=zoomRef.current;const f=d/lastTouchDist.current,nz=clamp(cz*f,0.05,15);zoomRef.current=nz;const cx=(e.touches[0].clientX+e.touches[1].clientX)/2,cy=(e.touches[0].clientY+e.touches[1].clientY)/2;const r=canvasRef.current.getBoundingClientRect();const sp={x:cx-r.left,y:cy-r.top};const prev=panRef.current;panRef.current={x:sp.x-(sp.x-prev.x)*(nz/cz),y:sp.y-(sp.y-prev.y)*(nz/cz)};scheduleRedrawRef.current();lastTouchDist.current=d;}
+    if(gestureRef.current==="pinch"&&e.touches.length>=2&&pinchRef.current){
+      const a=e.touches[0],b=e.touches[1];
+      const d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
+      const nz=clamp(pinchRef.current.nz*(d/pinchRef.current.d),0.05,15);
+      zoomRef.current=nz;
+      const cx=(a.clientX+b.clientX)/2,cy=(a.clientY+b.clientY)/2;
+      const r=canvasRef.current.getBoundingClientRect();
+      const sp={x:cx-r.left,y:cy-r.top};
+      panRef.current={x:sp.x-pinchRef.current.ip.x*nz,y:sp.y-pinchRef.current.ip.y*nz};
+      scheduleRedrawRef.current();syncZoom();
+      return;
+    }
+    if(e.touches.length===1){
+      const t2=e.touches[0];
+      if(panCandidateRef.current){
+        const dx=t2.clientX-panCandidateRef.current.x,dy=t2.clientY-panCandidateRef.current.y;
+        if(Math.hypot(dx,dy)>8){
+          isPanning.current=true;
+          panStart.current={px:panRef.current.x,py:panRef.current.y,mx:t2.clientX,my:t2.clientY};
+          panCandidateRef.current=null;
+        }
+      }
+      handleMouseMove({clientX:t2.clientX,clientY:t2.clientY});
+    }
   };
-  touchEndRef.current=()=>{if(longPressTimerRef.current){clearTimeout(longPressTimerRef.current);longPressTimerRef.current=null;}handleMouseUp();lastTouchDist.current=null;};
-  useEffect(()=>{const c=canvasRef.current;if(!c)return;const opts={passive:false};const onStart=e=>{e.preventDefault();touchStartRef.current(e);};const onMove=e=>{e.preventDefault();touchMoveRef.current(e);};const onEnd=e=>{touchEndRef.current(e);};c.addEventListener("touchstart",onStart,opts);c.addEventListener("touchmove",onMove,opts);c.addEventListener("touchend",onEnd,opts);return()=>{c.removeEventListener("touchstart",onStart);c.removeEventListener("touchmove",onMove);c.removeEventListener("touchend",onEnd);};},[]);
+  touchEndRef.current=e=>{
+    if(longPressTimerRef.current){clearTimeout(longPressTimerRef.current);longPressTimerRef.current=null;}
+    if(gestureRef.current==="pinch"){
+      if(e.touches.length===0){gestureRef.current="none";pinchRef.current=null;handleMouseUp();}
+      return;
+    }
+    if(panCandidateRef.current){
+      const ct=e.changedTouches[0];
+      panCandidateRef.current=null;
+      handleMouseDown({button:0,clientX:ct.clientX,clientY:ct.clientY});
+    }
+    gestureRef.current="none";
+    handleMouseUp();
+  };
+  useEffect(()=>{const c=canvasRef.current;if(!c)return;const opts={passive:false};const onStart=e=>{e.preventDefault();touchStartRef.current(e);};const onMove=e=>{e.preventDefault();touchMoveRef.current(e);};const onEnd=e=>{touchEndRef.current(e);};const onCancel=e=>{touchEndRef.current(e);};c.addEventListener("touchstart",onStart,opts);c.addEventListener("touchmove",onMove,opts);c.addEventListener("touchend",onEnd,opts);c.addEventListener("touchcancel",onCancel,opts);return()=>{c.removeEventListener("touchstart",onStart);c.removeEventListener("touchmove",onMove);c.removeEventListener("touchend",onEnd);c.removeEventListener("touchcancel",onCancel);};},[]);
 
   // ══════════════════════════════════════
   // CALIBRATION + TEMPLATE + EXPORT
@@ -1357,9 +1472,9 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     annotationBold,setAnnotationBold,snapTolerance,setSnapTolerance,
     onLockAll:()=>{pushUndo();updSession({markups:markups.map(m=>({...m,locked:true}))});},
     onUnlockAll:()=>{pushUndo();updSession({markups:markups.map(m=>({...m,locked:false}))});},
-    onToggleVisible:id=>updMarkup(id,{visible:markups.find(m=>m.id===id)?.visible===false}),
-    onToggleLock:id=>updMarkup(id,{locked:!markups.find(m=>m.id===id)?.locked}),
-    onToggleLabel:id=>updMarkup(id,{noLabel:!markups.find(m=>m.id===id)?.noLabel}),
+    onToggleVisible:id=>{pushUndo();updMarkup(id,{visible:markups.find(m=>m.id===id)?.visible===false});},
+    onToggleLock:id=>{pushUndo();updMarkup(id,{locked:!markups.find(m=>m.id===id)?.locked});},
+    onToggleLabel:id=>{pushUndo();updMarkup(id,{noLabel:!markups.find(m=>m.id===id)?.noLabel});},
     onToggleGroupVisible:types=>{
       const group=markups.filter(m=>types.includes(m.type));
       if(!group.length)return;
@@ -1410,7 +1525,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         <div style={{display:"flex",flex:1,overflow:"hidden"}}>
           <Toolbar activeTool={activeTool} theme={theme} t={t} dispatch={dispatch}
             setActiveTool={setActiveTool} sessionImage={sessionImage} calibration={calibration}
-            zoom={zoom} spotlightMode={spotlightMode} updSession={updSession}
+            spotlightMode={spotlightMode} updSession={updSession}
             panRef={panRef} zoomRef={zoomRef} undo={undo} redo={redo}
             handleDblClick={handleDblClick} currentDraw={currentDraw}
             mobileToolsExpanded={mobileToolsExpanded}
@@ -1486,7 +1601,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
                 canvasSize={canvasSize} toImage={toImage} addMarkup={addMarkup} pushUndo={pushUndo}
               />
             {selectedMarkup&&<div className="markupprops-panel" style={{borderTop:`1px solid ${t.bdr}`,padding:12,flexShrink:0,overflowY:"auto",scrollbarWidth:"none"}}>
-                <MarkupProps m={selectedMarkup} t={t} theme={theme} onUpdate={p=>updMarkup(selectedMarkup.id,p)} onDelete={()=>delMarkup(selectedMarkup.id)} calibration={calibration} onParallel={()=>dispatch({type:"SET",payload:{activeTool:"parallel"}})} formatAngle={formatAngle} norms={norms} onUpdateNorms={ns=>updSession({norms:ns})}/>
+                <MarkupProps m={selectedMarkup} t={t} theme={theme} onUpdate={p=>{pushUndo();updMarkup(selectedMarkup.id,p);}} onDelete={()=>delMarkup(selectedMarkup.id)} calibration={calibration} onParallel={()=>dispatch({type:"SET",payload:{activeTool:"parallel"}})} formatAngle={formatAngle} norms={norms} onUpdateNorms={ns=>updSession({norms:ns})}/>
               </div>}
             </div>
             <div onMouseDown={()=>dispatch({type:"SET",payload:{rightPanelResizing:true}})} style={{width:4,cursor:"col-resize",background: rightPanelResizing ? t.acc : "transparent",transition:"background 0.15s",flexShrink:0}}/>
@@ -1510,7 +1625,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
             canvasSize={canvasSize} toImage={toImage} addMarkup={addMarkup} pushUndo={pushUndo}
           />
           {selectedMarkup&&<div style={{borderTop:`1px solid ${t.bdr}`,padding:12,flexShrink:0}}>
-            <MarkupProps m={selectedMarkup} t={t} theme={theme} onUpdate={p=>updMarkup(selectedMarkup.id,p)} onDelete={()=>delMarkup(selectedMarkup.id)} calibration={calibration} onParallel={()=>dispatch({type:"SET",payload:{activeTool:"parallel"}})} formatAngle={formatAngle} norms={norms} onUpdateNorms={ns=>updSession({norms:ns})}/>
+            <MarkupProps m={selectedMarkup} t={t} theme={theme} onUpdate={p=>{pushUndo();updMarkup(selectedMarkup.id,p);}} onDelete={()=>delMarkup(selectedMarkup.id)} calibration={calibration} onParallel={()=>dispatch({type:"SET",payload:{activeTool:"parallel"}})} formatAngle={formatAngle} norms={norms} onUpdateNorms={ns=>updSession({norms:ns})}/>
           </div>}
         </>}
       </MobileBottomSheet>}

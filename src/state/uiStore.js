@@ -1,5 +1,11 @@
 import { create } from "zustand";
 
+let initialFavorites = ["select", "pan", "point", "line", "angle3", "ruler", "arrow"];
+try {
+  const saved = localStorage.getItem("cephalo_favTools");
+  if (saved) initialFavorites = JSON.parse(saved);
+} catch { /* localStorage unavailable */ }
+
 export const useUIStore = create(() => ({
   showScaleBar: false,
   showDefTooltips: true,
@@ -59,4 +65,5 @@ export const useUIStore = create(() => ({
   },
   pinnedFormulas: new Set(),
   copiedMarkup: null,
+  favoriteTools: initialFavorites,
 }));

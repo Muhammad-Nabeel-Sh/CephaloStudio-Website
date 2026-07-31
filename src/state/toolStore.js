@@ -9,7 +9,7 @@ export const useToolStore = create(() => ({
   replacingId: null,
   currentDraw: null,
   activeTool: "select",
-  snapEnabled: { points: true, lines: true },
+  snapEnabled: { points: true, lines: false },
   placingMode: false,
   placingQueue: [],
   placingIdx: 0,

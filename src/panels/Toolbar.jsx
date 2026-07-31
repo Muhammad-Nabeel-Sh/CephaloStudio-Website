@@ -18,7 +18,8 @@ export default function Toolbar({
   const spotlightMode = useToolStore(s => s.spotlightMode);
   const mobileToolsExpanded = useUIStore(s => s.mobileToolsExpanded);
   const mobileTab = useUIStore(s => s.mobileTab);
-  const isMobile = useMediaQuery("(max-width: 767px)");
+  const favoriteTools = useUIStore(s => s.favoriteTools);
+  const isMobile = useMediaQuery("(max-width: 1024px)"); // compact toolbar: phones + tablets
   const undoStackSize = useSessionStore(s => s.undoStack.length);
   const redoStackSize = useSessionStore(s => s.redoStack.length);
   const canUndo = undoStackSize > 0;
@@ -29,35 +30,52 @@ export default function Toolbar({
       dispatch({ type: "SET", payload: { currentDraw: null } });
       dispatch({ type: "SET", payload: { mobileToolsExpanded: false } });
     };
-    const primaryTools = [
-      { id: "select", icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-mouse-pointer2-icon lucide-mouse-pointer-2"><path d="M4.037 4.688a.495.495 0 0 1 .651-.651l16 6.5a.5.5 0 0 1-.063.947l-6.124 1.58a2 2 0 0 0-1.438 1.435l-1.579 6.126a.5.5 0 0 1-.947.063z"/></svg>, label: "Select" }, 
-      { id: "pan", icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 34 34" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pointer-icon lucide-pointer"><path d="M22 14a8 8 0 0 1-8 8"/><path d="M18 11v-1a2 2 0 0 0-2-2a2 2 0 0 0-2 2"/><path d="M14 10V9a2 2 0 0 0-2-2a2 2 0 0 0-2 2v1"/><path d="M10 9.5V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v10"/><path d="M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>, label: "Pan" }, 
-      { id: "point", icon: "◉", label: "Landmark" },
-      { id: "line", icon: <svg xmlns="http://www.w3.org/2000/svg" width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="icon icon-tabler icons-tabler-outline icon-tabler-line"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M4 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M16 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M7.5 16.5l9 -9" /></svg>, label: "Line" }, 
-      { id: "angle3", icon: <svg xmlns="http://www.w3.org/2000/svg" width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="icon icon-tabler icons-tabler-outline icon-tabler-angle"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M21 19h-18l9 -15" /><path d="M20.615 15.171h.015" /><path d="M19.515 11.771h.015" /><path d="M17.715 8.671h.015" /><path d="M15.415 5.971h.015" /></svg>, label: "Angle 3" }, 
-      { id: "ruler", icon: <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M160-240q-33 0-56.5-23.5T80-320v-320q0-33 23.5-56.5T160-720h640q33 0 56.5 23.5T880-640v320q0 33-23.5 56.5T800-240H160Zm0-80h640v-320H680v160h-80v-160h-80v160h-80v-160h-80v160h-80v-160H160v320Zm120-160h80-80Zm160 0h80-80Zm160 0h80-80Zm-120 0Z" /></svg>, label: "Ruler" }, 
-      { id: "arrow", icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-move-up-right-icon lucide-move-up-right"><path d="M13 5H19V11"/><path d="M19 5L5 19"/></svg>, label: "Arrow" }
+    const toggleFav = (id) => {
+      const cur = useUIStore.getState().favoriteTools;
+      const next = cur.includes(id) ? cur.filter(t => t !== id) : [...cur, id];
+      useUIStore.setState({ favoriteTools: next });
+      try { localStorage.setItem("cephalo_favTools", JSON.stringify(next)); } catch { /* localStorage unavailable */ }
+    };
+    const ALL_TOOLS = {
+      select: { id:"select", icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-mouse-pointer2-icon lucide-mouse-pointer-2"><path d="M4.037 4.688a.495.495 0 0 1 .651-.651l16 6.5a.5.5 0 0 1-.063.947l-6.124 1.58a2 2 0 0 0-1.438 1.435l-1.579 6.126a.5.5 0 0 1-.947.063z"/></svg>, label:"Select" },
+      pan: { id:"pan", icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 34 34" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-pointer-icon lucide-pointer"><path d="M22 14a8 8 0 0 1-8 8"/><path d="M18 11v-1a2 2 0 0 0-2-2a2 2 0 0 0-2 2"/><path d="M14 10V9a2 2 0 0 0-2-2a2 2 0 0 0-2 2v1"/><path d="M10 9.5V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v10"/><path d="M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>, label:"Pan" },
+      point: { id:"point", icon:"\u25C9", label:"Landmark" },
+      line: { id:"line", icon: <svg xmlns="http://www.w3.org/2000/svg" width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="icon icon-tabler icons-tabler-outline icon-tabler-line"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M4 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M16 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" /><path d="M7.5 16.5l9 -9" /></svg>, label:"Line" },
+      angle3: { id:"angle3", icon: <svg xmlns="http://www.w3.org/2000/svg" width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="icon icon-tabler icons-tabler-outline icon-tabler-angle"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M21 19h-18l9 -15" /><path d="M20.615 15.171h.015" /><path d="M19.515 11.771h.015" /><path d="M17.715 8.671h.015" /><path d="M15.415 5.971h.015" /></svg>, label:"Angle 3" },
+      ruler: { id:"ruler", icon: <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M160-240q-33 0-56.5-23.5T80-320v-320q0-33 23.5-56.5T160-720h640q33 0 56.5 23.5T880-640v320q0 33-23.5 56.5T800-240H160Zm0-80h640v-320H680v160h-80v-160h-80v160h-80v-160h-80v160h-80v-160H160v320Zm120-160h80-80Zm160 0h80-80Zm160 0h80-80Zm-120 0Z" /></svg>, label:"Ruler" },
+      arrow: { id:"arrow", icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-move-up-right-icon lucide-move-up-right"><path d="M13 5H19V11"/><path d="M19 5L5 19"/></svg>, label:"Arrow" },
+      midpoint: { id:"midpoint", icon: <svg xmlns="http://www.w3.org/2000/svg" width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="icon icon-tabler icons-tabler-outline icon-tabler-circuit-bulb"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M2 12h5" /><path d="M17 12h5" /><path d="M7 12a5 5 0 1 0 10 0a5 5 0 1 0 -10 0" /><path d="M8.5 8.5l7 7" /><path d="M15.5 8.5l-7 7" /></svg>, label:"Midpoint" },
+      angle4: { id:"angle4", icon: <svg xmlns="http://www.w3.org/2000/svg" width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="icon icon-tabler icons-tabler-outline icon-tabler-arrows-cross"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M16 4h4v4" /><path d="M15 9l5 -5" /><path d="M4 20l5 -5" /><path d="M16 20h4v-4" /><path d="M4 4l16 16" /></svg>, label:"Angle 4" },
+      parallel: { id:"parallel", icon: <svg xmlns="http://www.w3.org/2000/svg" width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="icon icon-tabler icons-tabler-outline icon-tabler-arrows-right"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M21 17l-18 0" /><path d="M18 4l3 3l-3 3" /><path d="M18 20l3 -3l-3 -3" /><path d="M21 7l-18 0" /></svg>, label:"Parallel" },
+      perppoint: { id:"perppoint", icon: <svg xmlns="http://www.w3.org/2000/svg" width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="icon icon-tabler icons-tabler-outline icon-tabler-letter-l"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M7 4v16h10" /></svg>, label:"Perp Pt" },
+      perp: { id:"perp", icon: <svg xmlns="http://www.w3.org/2000/svg" width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="icon icon-tabler icons-tabler-outline icon-tabler-external-link-off"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M7 7h-1a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-1" /><path d="M10 14l2 -2m2.007 -2.007l6 -6" /><path d="M15 4h5v5" /><path d="M3 3l18 18" /></svg>, label:"Perp Dist" },
+      text: { id:"text", icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-type-outline-icon lucide-type-outline"><path d="M14 16.5a.5.5 0 0 0 .5.5h.5a2 2 0 0 1 0 4H9a2 2 0 0 1 0-4h.5a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5V8a2 2 0 0 1-4 0V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v3a2 2 0 0 1-4 0v-.5a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5Z"/></svg>, label:"Text" },
+      curve: { id:"curve", icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-spline-icon lucide-spline"><circle cx="19" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><path d="M5 17A12 12 0 0 1 17 5"/></svg>, label:"Curve" },
+      polyline: { id:"polyline", icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4,18 8,8 14,14 20,4"/></svg>, label:"Polyline" },
+      polygon: { id:"polygon", icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-hexagon-icon lucide-hexagon"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>, label:"Polygon" },
+      bezier: { id:"bezier", icon: <svg xmlns="http://www.w3.org/2000/svg" width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="icon icon-tabler icons-tabler-outline icon-tabler-vector-bezier-2"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 4a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -2" /><path d="M17 18a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -2" /><path d="M7 5l7 0" /><path d="M10 19l7 0" /><path d="M8 19a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M14 5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M7 5.5a5 6.5 0 0 1 5 6.5a5 6.5 0 0 0 5 6.5" /></svg>, label:"Bezier" },
+      tangent: { id:"tangent", icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-tangent-icon lucide-tangent"><circle cx="17" cy="4" r="2"/><path d="M15.59 5.41 5.41 15.59"/><circle cx="4" cy="17" r="2"/><path d="M12 22s-4-9-1.5-11.5S22 12 22 12"/></svg>, label:"Tangent" },
+      concentric: { id:"concentric", icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-rainbow-icon lucide-rainbow"><path d="M22 17a10 10 0 0 0-20 0"/><path d="M6 17a6 6 0 0 1 12 0"/><path d="M10 17a2 2 0 0 1 4 0"/></svg>, label:"Concentric" },
+      mirror: { id:"mirror", icon:"\u2308\u2309", label:"Mirror" },
+      circle: { id:"circle", icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-radius-icon lucide-radius"><path d="M20.34 17.52a10 10 0 1 0-2.82 2.82"/><circle cx="19" cy="19" r="2"/><path d="m13.41 13.41 4.18 4.18"/><circle cx="12" cy="12" r="2"/></svg>, label:"Circle" },
+      ellipse: { id:"ellipse", icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-ellipse-icon lucide-ellipse"><ellipse cx="12" cy="12" rx="10" ry="6"/></svg>, label:"Ellipse" },
+      arc: { id:"arc", icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-drafting-compass-icon lucide-drafting-compass"><path d="m12.99 6.74 1.93 3.44"/><path d="M19.136 12a10 10 0 0 1-14.271 0"/><path d="m21 21-2.16-3.84"/><path d="m3 21 8.02-14.26"/><circle cx="12" cy="5" r="2"/></svg>, label:"Arc" },
+    };
+    const CATEGORIES = [
+      { name: "Select & Navigate", tools: ["select","pan"] },
+      { name: "Points", tools: ["point","midpoint"] },
+      { name: "Lines", tools: ["line","parallel","perp","perppoint"] },
+      { name: "Angles", tools: ["angle3","angle4"] },
+      { name: "Shapes", tools: ["polygon","circle","ellipse","arc","bezier","curve","polyline"] },
+      { name: "Annotations", tools: ["text","arrow","ruler"] },
+      { name: "Other", tools: ["mirror","tangent","concentric"] },
     ];
-    const secondaryTools = [
-      [{ id: "midpoint", icon: <svg xmlns="http://www.w3.org/2000/svg" width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="icon icon-tabler icons-tabler-outline icon-tabler-circuit-bulb"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M2 12h5" /><path d="M17 12h5" /><path d="M7 12a5 5 0 1 0 10 0a5 5 0 1 0 -10 0" /><path d="M8.5 8.5l7 7" /><path d="M15.5 8.5l-7 7" /></svg>, label: "Midpoint" }, 
-        { id: "angle4", icon: <svg xmlns="http://www.w3.org/2000/svg" width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="icon icon-tabler icons-tabler-outline icon-tabler-arrows-cross"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M16 4h4v4" /><path d="M15 9l5 -5" /><path d="M4 20l5 -5" /><path d="M16 20h4v-4" /><path d="M4 4l16 16" /></svg>, label: "Angle 4" }],
-      [{ id: "parallel", icon: <svg xmlns="http://www.w3.org/2000/svg" width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="icon icon-tabler icons-tabler-outline icon-tabler-arrows-right"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M21 17l-18 0" /><path d="M18 4l3 3l-3 3" /><path d="M18 20l3 -3l-3 -3" /><path d="M21 7l-18 0" /></svg>, label: "Parallel" }, 
-        { id: "perppoint", icon: <svg xmlns="http://www.w3.org/2000/svg" width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="icon icon-tabler icons-tabler-outline icon-tabler-letter-l"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M7 4v16h10" /></svg>, label: "Perp Pt" }],
-      [{ id: "perp", icon: <svg xmlns="http://www.w3.org/2000/svg" width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="icon icon-tabler icons-tabler-outline icon-tabler-external-link-off"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M7 7h-1a2 2 0 0 0 -2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2 -2v-1" /><path d="M10 14l2 -2m2.007 -2.007l6 -6" /><path d="M15 4h5v5" /><path d="M3 3l18 18" /></svg>, label: "Perp Dist" }, 
-        { id: "text", icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-type-outline-icon lucide-type-outline"><path d="M14 16.5a.5.5 0 0 0 .5.5h.5a2 2 0 0 1 0 4H9a2 2 0 0 1 0-4h.5a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5V8a2 2 0 0 1-4 0V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v3a2 2 0 0 1-4 0v-.5a.5.5 0 0 0-.5-.5h-3a.5.5 0 0 0-.5.5Z"/></svg>, label: "Text" }],
-      [{ id: "curve", icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-spline-icon lucide-spline"><circle cx="19" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><path d="M5 17A12 12 0 0 1 17 5"/></svg>, label: "Curve" },
-        { id: "polyline", icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4,18 8,8 14,14 20,4"/></svg>, label: "Polyline" }],
-      [{ id: "polygon", icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-hexagon-icon lucide-hexagon"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>, label: "Polygon" },
-        { id: "bezier", icon: <svg xmlns="http://www.w3.org/2000/svg" width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="icon icon-tabler icons-tabler-outline icon-tabler-vector-bezier-2"><path stroke="none" d="M0 0h24v24H0z" fill="none" /><path d="M3 4a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -2" /><path d="M17 18a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v2a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -2" /><path d="M7 5l7 0" /><path d="M10 19l7 0" /><path d="M8 19a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M14 5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M7 5.5a5 6.5 0 0 1 5 6.5a5 6.5 0 0 0 5 6.5" /></svg>, label: "Bezier" }],
-      [{ id: "tangent", icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-tangent-icon lucide-tangent"><circle cx="17" cy="4" r="2"/><path d="M15.59 5.41 5.41 15.59"/><circle cx="4" cy="17" r="2"/><path d="M12 22s-4-9-1.5-11.5S22 12 22 12"/></svg>, label: "Tangent" }, 
-        { id: "concentric", icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-rainbow-icon lucide-rainbow"><path d="M22 17a10 10 0 0 0-20 0"/><path d="M6 17a6 6 0 0 1 12 0"/><path d="M10 17a2 2 0 0 1 4 0"/></svg>, label: "Concentric" }],
-      [{ id: "mirror", icon: "⌈⌉", label: "Mirror" }],
-    ];
+    const favSet = new Set(favoriteTools);
     return (<>
-      {/* Collapsed bar — floating horizontal strip above tab bar */}
+      {/* Collapsed bar — favorites + controls */}
       <div style={{ position: "absolute", bottom: 56, left: 8, right: 8, height: 40, display: "flex", alignItems: "center", borderRadius: 10, zIndex: 15, background: t.surf + "ee", backdropFilter: "blur(6px)", boxShadow: `0 2px 12px ${t.shadow}44`, border: `1px solid ${t.bdr}33`, padding: "0 4px", gap: 1, overflowX: "auto", overflowY: "hidden", scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}>
-        {primaryTools.map(tool => (
-          <ToolBtn key={tool.id} tool={tool} active={activeTool === tool.id} onClick={() => selTool(tool.id)} theme={theme} t={t} style={{ flexShrink: 0 }} />
+        {favoriteTools.map(id => ALL_TOOLS[id] && (
+          <ToolBtn key={id} tool={ALL_TOOLS[id]} active={activeTool === id} onClick={() => selTool(id)} theme={theme} t={t} style={{ flexShrink: 0 }} />
         ))}
         <div style={{ width: 1, height: 28, background: t.bdr, flexShrink: 0 }} />
         <button onClick={undo} disabled={!canUndo} aria-label="Undo" style={{ width: 42, height: 42, borderRadius: 8, border: "none", background: "transparent", color: canUndo ? t.tx2 : t.bdr, cursor: canUndo ? "pointer" : "not-allowed", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} title="Undo">↶</button>
@@ -73,19 +91,29 @@ export default function Toolbar({
           <button onClick={handleDblClick} aria-label="Finish shape" style={{ width: 42, height: 42, borderRadius: 8, border: "none", background: t.ok, color: "#fff", cursor: "pointer", fontSize: 16, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} title="Finish">✓</button>
         </>)}
       </div>
-      {/* Expanded bottom sheet — full tool grid */}
+      {/* Expanded bottom sheet — categorized with favorites */}
       {mobileToolsExpanded && (<>
         <div onClick={() => dispatch({ type: "SET", payload: { mobileToolsExpanded: false } })} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 19 }} />
-        <div style={{ position: "fixed", bottom: 100, left: 8, right: 8, maxHeight: "55vh", background: t.surf, border: `1px solid ${t.bdr}33`, borderRadius: 12, zIndex: 20, overflowY: "auto", padding: "12px 8px 16px", boxShadow: `0 -4px 20px ${t.shadow}44` }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, padding: "0 8px" }}>
+        <div style={{ position: "fixed", bottom: 100, left: 8, right: 8, maxHeight: "55vh", background: t.surf, border: `1px solid ${t.bdr}33`, borderRadius: 12, zIndex: 20, overflowY: "auto", padding: "12px 8px 8px", boxShadow: `0 -4px 20px ${t.shadow}44` }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, padding: "0 8px" }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: t.tx2, fontFamily: "'DM Sans',sans-serif" }}>All Tools</span>
             <span style={{ fontSize: 9, color: t.tx3, fontFamily: "'DM Mono',monospace" }}>{(zoom * 100).toFixed(0)}%{calibration.done ? ` · ⟺${calibration.pxPerMm.toFixed(1)}` : ""}</span>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 4 }}>
-            {secondaryTools.map((row) => row.map(tool => (
-              <ToolBtn key={tool.id} tool={tool} active={activeTool === tool.id} onClick={() => selTool(tool.id)} theme={theme} t={t} style={{ flex: 1, height: 46 }} />
-            )))}
-          </div>
+          {CATEGORIES.map(cat => (
+            <div key={cat.name} style={{ marginBottom: 4 }}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: t.tx3, textTransform: "uppercase", letterSpacing: "0.5px", padding: "2px 8px", marginBottom: 1 }}>{cat.name}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 2 }}>
+                {cat.tools.map(id => ALL_TOOLS[id] && (
+                  <div key={id} style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                    <ToolBtn tool={ALL_TOOLS[id]} active={activeTool === id} onClick={() => selTool(id)} theme={theme} t={t} style={{ flex: 1, height: 46 }} />
+                    <button onClick={(e) => { e.stopPropagation(); toggleFav(id); }}
+                      style={{ position: "absolute", top: 1, right: 1, width: 18, height: 18, borderRadius: 4, border: "none", background: favSet.has(id) ? t.acc + "33" : "transparent", color: favSet.has(id) ? t.acc : t.tx3, cursor: "pointer", fontSize: 10, display: "flex", alignItems: "center", justifyContent: "center", padding: 0 }}
+                      title={favSet.has(id) ? "Remove from favorites" : "Add to favorites"}>{favSet.has(id) ? "\u2605" : "\u2606"}</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       </>)}
     </>);

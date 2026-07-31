@@ -1,7 +1,7 @@
 import { uid } from "../lib/utils.js";
 import { logError } from "../lib/logger.js";
 
-export function loadImageFile(file, addToStack, { sessionImages, dispatch, updSession, imgRefs, canvasSize, panRef }) {
+export function loadImageFile(file, addToStack, { sessionImages, dispatch, updSession, imgRefs, canvasSize, panRef, zoomRef }) {
   if (!file || !file.type.startsWith("image/")) return;
   if (file.size > 100 * 1024 * 1024) {
     alert(`"${file.name}" is too large (${(file.size / 1024 / 1024).toFixed(1)} MB). Maximum image size is 100 MB.`);
@@ -26,6 +26,7 @@ export function loadImageFile(file, addToStack, { sessionImages, dispatch, updSe
       if (!addToStack) {
         const cw = canvasSize.current.w - 80, ch = canvasSize.current.h - 80;
         const sc = Math.min(cw / (img.naturalWidth || 600), ch / (img.naturalHeight || 500), 1);
+        if (zoomRef) zoomRef.current = sc;
         dispatch({ type: "SET", payload: { zoom: sc } });
         panRef.current = { x: 40, y: 40 };
         dispatch({ type: "SET", payload: { pan: { x: 40, y: 40 } } });

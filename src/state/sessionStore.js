@@ -79,6 +79,7 @@ export const useSessionStore = create((set, get) => ({
       redoStack: [...state.redoStack, current],
       undoVersion: state.undoVersion + 1,
     });
+    _onChange?.();
   },
 
   redo() {
@@ -97,6 +98,7 @@ export const useSessionStore = create((set, get) => ({
       undoStack: [...state.undoStack, current],
       undoVersion: state.undoVersion + 1,
     });
+    _onChange?.();
   },
 
   updMarkups(fn) {
@@ -110,11 +112,25 @@ export const useSessionStore = create((set, get) => ({
   },
 
   delMarkup(id) {
+    get().pushUndo();
     get().updMarkups(ms => ms.filter(m => m.id !== id));
   },
 
   addMarkup(m) {
+    get().pushUndo();
     set(state => ({ markups: [...state.markups, m] }));
     _onChange?.();
+  },
+
+  // Mirror a project-side session patch back into the store (project→store direction).
+  // Ref-equality guard prevents a loop with _onChange (store→project). Never fires _onChange —
+  // the caller has already written the project.
+  merge(patch) {
+    const s = get();
+    const next = {};
+    for (const k of ["markups", "calibration", "norms", "formulas", "processing", "angleMode"]) {
+      if (patch[k] !== undefined && patch[k] !== s[k]) next[k] = patch[k];
+    }
+    if (Object.keys(next).length) set(next);
   },
 }));
