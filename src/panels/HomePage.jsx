@@ -2,43 +2,46 @@ import { useState, useRef } from "react";
 import { THEMES } from "../data/constants.js";
 import { Btn, Tag } from "../ui/ui.jsx";
 import { onEnter } from "../lib/utils.js";
+import { useMediaQuery } from "../hooks/useMediaQuery.js";
 import StartupWizard from "./StartupWizard.jsx";
 
 function NewCaseForm({t,onSubmit,onCancel}){
+  const isMobile=useMediaQuery("(max-width: 640px)");
   const[d,setD]=useState({name:"Case 001",patientId:"",patientName:"",dob:"",age:"",gender:"",ethnicity:"",clinician:"",facility:"",referral:"",notes:""});
   const upd=(k,v)=>setD(prev=>({...prev,[k]:v}));
+  const base={background:t.surf3,border:`1px solid ${t.bdr}`,borderRadius:6,padding:isMobile?"11px 12px":"4px 8px",color:t.tx,fontSize:isMobile?16:12,width:"100%",fontFamily:"inherit",boxSizing:"border-box",outline:"none"};
   return(
-    <div style={{width:560,maxWidth:"95vw"}}>
-      <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:18,color:t.tx,marginBottom:4}}>New Case</div>
-      <div style={{fontSize:13,color:t.tx2,marginBottom:20}}>Enter patient and case details before starting the setup wizard.</div>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:16}}>
+    <div style={{width:"100%",maxWidth:560}}>
+      <div style={{fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:isMobile?20:18,color:t.tx,marginBottom:4}}>New Case</div>
+      <div style={{fontSize:isMobile?14:13,color:t.tx2,marginBottom:isMobile?18:20}}>Enter patient and case details before starting the setup wizard.</div>
+      <div style={{display:"grid",gridTemplateColumns:isMobile?"1fr":"1fr 1fr",gap:isMobile?14:12,marginBottom:16}}>
         {[["name","Case Name *",""],["patientId","Patient ID",""],["patientName","Patient Name",""],["dob","Date of Birth","date"],["age","Age","number"],["gender","","select-gender"],["ethnicity","Ethnicity",""],["clinician","Clinician",""],["facility","Facility",""],["referral","Referral",""],].map(([k,label,type])=>(
           <div key={k}>
-            <div style={{fontSize:11,color:t.tx2,marginBottom:3}}>{label||k.charAt(0).toUpperCase()+k.slice(1)}</div>
+            <div style={{fontSize:isMobile?13:11,color:t.tx2,marginBottom:4,fontWeight:600}}>{label||k.charAt(0).toUpperCase()+k.slice(1)}</div>
             {type==="select-gender"?(
-              <select value={d[k]} onChange={e=>upd(k,e.target.value)} style={{background:t.surf3,border:`1px solid ${t.bdr}`,borderRadius:4,padding:"4px 8px",color:t.tx,fontSize:12,width:"100%",fontFamily:"inherit"}}>
+              <select value={d[k]} onChange={e=>upd(k,e.target.value)} style={base}>
                 <option value="">Select gender…</option>
                 {["Male","Female"].map(g=><option key={g} value={g}>{g}</option>)}
               </select>
             ):(
-              <input type={type||"text"} value={d[k]} onChange={e=>upd(k,e.target.value)}
-                style={{background:t.surf3,border:`1px solid ${t.bdr}`,borderRadius:4,padding:"4px 8px",color:t.tx,fontSize:12,width:"100%",fontFamily:"inherit",boxSizing:"border-box"}}/>
+              <input type={type||"text"} value={d[k]} onChange={e=>upd(k,e.target.value)} style={base}/>
             )}
           </div>
         ))}
       </div>
       <div style={{marginBottom:16}}>
-        <div style={{fontSize:11,color:t.tx2,marginBottom:3}}>Notes</div>
-        <textarea value={d.notes} onChange={e=>upd("notes",e.target.value)} rows={2}
-          style={{background:t.surf3,border:`1px solid ${t.bdr}`,borderRadius:4,padding:"4px 8px",color:t.tx,fontSize:12,width:"100%",fontFamily:"inherit",resize:"vertical",boxSizing:"border-box"}}/>
+        <div style={{fontSize:isMobile?13:11,color:t.tx2,marginBottom:4,fontWeight:600}}>Notes</div>
+        <textarea value={d.notes} onChange={e=>upd("notes",e.target.value)} rows={isMobile?3:2}
+          style={{...base,resize:"vertical"}}/>
       </div>
-      <div style={{display:"flex",gap:8}}><Btn t={t} onClick={()=>onSubmit(d.name||"New Case",d)} disabled={!d.name} style={{flex:1}}>Start Setup →</Btn><Btn t={t} onClick={onCancel} style={{flex:1}}>Cancel</Btn></div>
+      <div style={{display:"flex",gap:8}}><Btn t={t} onClick={()=>onSubmit(d.name||"New Case",d)} disabled={!d.name} style={{flex:1,padding:isMobile?"13px 0":"8px 16px",fontSize:isMobile?16:15}}>Start Setup →</Btn><Btn t={t} onClick={onCancel} style={{flex:1,padding:isMobile?"13px 0":"8px 16px",fontSize:isMobile?16:15}}>Cancel</Btn></div>
     </div>
   );
 }
 
 export default function HomePage({t,theme,setTheme,projects,onOpen,onCreate,onImport,storageEncrypted,onClearLocalData}){
   const[hov,setHov]=useState(null);
+  const isMobile=useMediaQuery("(max-width: 640px)");
   // flow: null | {proj, phase:"form"} | {proj, phase:"wizard", caseData:{name,meta}}
   const[flow,setFlow]=useState(null);
   const fileRef=useRef(null);
@@ -144,8 +147,8 @@ export default function HomePage({t,theme,setTheme,projects,onOpen,onCreate,onIm
       </div>}
 
       {/* OVERLAY: New Case Form → Startup Wizard */}
-      {flow&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:50,display:"flex",alignItems:"center",justifyContent:"center",padding:24}} onClick={e=>e.target===e.currentTarget&&setFlow(null)}>
-        {flow.phase==="form"&&<div style={{background:t.surf,border:`1px solid ${t.bdr}`,borderRadius:14,padding:28}}>
+      {flow&&<div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.6)",zIndex:50,display:"flex",alignItems:isMobile?"flex-start":"center",justifyContent:"center",padding:isMobile?"14px 12px":"24px",overflowY:"auto",WebkitOverflowScrolling:"touch"}} onClick={e=>e.target===e.currentTarget&&setFlow(null)}>
+        {flow.phase==="form"&&<div style={{background:t.surf,border:`1px solid ${t.bdr}`,borderRadius:14,padding:isMobile?18:28,width:"100%",maxWidth:620,flexShrink:0,boxSizing:"border-box"}}>
           <NewCaseForm t={t} onSubmit={(name,meta)=>setFlow({...flow,phase:"wizard",caseData:{name,meta}})} onCancel={()=>setFlow(null)}/>
         </div>}
         {flow.phase==="wizard"&&<StartupWizard t={t} projection={flow.proj}

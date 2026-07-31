@@ -119,6 +119,8 @@ export default function Toolbar({
     </>);
   }
 
+  if (isMobile) return null;
+
   return (
     <div style={{ width: 100, background: t.surf, display: "flex", flexDirection: "column", alignItems: "center", padding: "8px 4px", gap: 1, flexShrink: 0, overflowY: "auto", scrollbarWidth: "thin" }}>
       <div style={{ display: "flex", flexDirection: "column", gap: 4, width: "100%" }}>
