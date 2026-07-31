@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, useLayoutEffect } fr
 import { THEMES, PREDEFINED, LUT_PRESETS } from "./data/constants.js";
 import { KEYBINDINGS } from "./data/keybindings.js";
 import { SILHOUETTES } from "./data/silhouettes.js";
-import { uid, clamp, dist, vpts, computeMeasurements, snapPoint, alignTwoPoints, buildScope, evalFormula, getMissingVars, autoControlPoints, findTangentOnCurve, snapTangentToCurve, mirrorPoint } from "./lib/utils.js";
+import { uid, clamp, dist, vpts, computeMeasurements, snapPoint, snapPointResult, alignTwoPoints, buildScope, evalFormula, getMissingVars, autoControlPoints, findTangentOnCurve, snapTangentToCurve, mirrorPoint } from "./lib/utils.js";
 import { generateInterpretation } from "./lib/interpretation.js";
 import { generateReport } from "./report/reportGenerator.js";
 import { processImageToCanvas, computeHistogram, FloatingHistogram } from "./canvas/imageUtils.jsx";
@@ -658,7 +658,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   useEffect(()=>{
     setSessionChangeHandler(()=>{
       const s=useSessionStore.getState();
-      updSession({markups:s.markups,calibration:s.calibration,norms:s.norms,formulas:s.formulas,processing:s.processing});
+      updSession({markups:s.markups,calibration:s.calibration,norms:s.norms,formulas:s.formulas,processing:s.processing,angleMode:s.angleMode,lutMode:s.lutMode,lutInvert:s.lutInvert});
     });
     return ()=>setSessionChangeHandler(null);
   },[updSession]);
@@ -770,8 +770,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   // CANVAS DRAW PIPELINE
   const getProcessed=useCallback(imgEntry=>{
     const p=useSessionStore.getState().processing;
-    const lm=useToolStore.getState().lutMode;
-    const li=useToolStore.getState().lutInvert;
+    const lm=useSessionStore.getState().lutMode;
+    const li=useSessionStore.getState().lutInvert;
     const key=`${imgEntry.id}-${JSON.stringify(p)}-${lm}-${li}`;
     if(!procCache.current.has(key)){for(const k of procCache.current.keys())if(k.startsWith(imgEntry.id+"-")&&k!==key)procCache.current.delete(k);procCache.current.set(key,processImageToCanvas(imgRefs.current[imgEntry.id],p,lm,li));}
     staticDirtyRef.current=true;
@@ -842,7 +842,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       markups:ss.markups,calibration:ss.calibration,sessionImage:ss.sessionImage,
       selectedId:ts.selectedId,selectedIds:ts.selectedIds,
       currentDraw:ts.currentDraw,snapEnabled:ts.snapEnabled,
-      angleMode:ts.angleMode,lutMode:ts.lutMode,lutInvert:ts.lutInvert,
+      angleMode:ss.angleMode,lutMode:ss.lutMode,lutInvert:ss.lutInvert,
       activeTool:ts.activeTool,
       t:themeRef.current,showScaleBar:us.showScaleBar,showDefTooltips:us.showDefTooltips,
       showLUT:us.showLUT,showAnnotations:us.showAnnotations,
@@ -885,7 +885,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       return { m:ss.markups,c:ss.calibration,i:ss.sessionImage,
         z:ts.zoom,p:ts.pan,
         cd:ts.currentDraw,sid:ts.selectedId,sids:ts.selectedIds,at:ts.activeTool,se:ts.snapEnabled,
-        lm:ts.lutMode,li:ts.lutInvert,
+        pr:ss.processing,lm:ss.lutMode,li:ss.lutInvert,am:ss.angleMode,
         sg:us.showGrid,sb:us.showScaleBar,dt:us.showDefTooltips,an:us.showAnnotations,
         lut:us.showLUT,as:us.annotationSize,disp:us.showDisplacement,cmp:us.compareSession,
         aw:us.showAirwayOverlay,cpa:us.showCpAlways,ana:us.showAnchorAlways,tol:us.snapTolerance,
@@ -1238,7 +1238,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     mouseCanvasRef.current=sp;
     // F1: write pointer state to refs — no dispatch, no React re-render
     mousePosRef.current=sp;
-    if((snapEnabled.points||snapEnabled.lines)&&activeTool!=="select"&&activeTool!=="pan"){const ip=toImage(sp.x,sp.y);const sn=snapPoint(ip,markups,snapTolerance/zoomRef.current,snapEnabled);const prev=snapPosRef.current;snapPosRef.current=(Math.abs(sn.x-ip.x)>0.1||Math.abs(sn.y-ip.y)>0.1)?sn:null;if((prev===null)!==(snapPosRef.current===null)||((prev&&snapPosRef.current)&&(prev.x!==snapPosRef.current.x||prev.y!==snapPosRef.current.y)))scheduleRedrawRef.current();}else{if(snapPosRef.current!==null){snapPosRef.current=null;scheduleRedrawRef.current();}}
+    if((snapEnabled.points||snapEnabled.lines)&&activeTool!=="select"&&activeTool!=="pan"){const ip=toImage(sp.x,sp.y);const sr=snapPointResult(ip,markups,snapTolerance/zoomRef.current,snapEnabled);const sn=sr.point;const prev=snapPosRef.current;snapPosRef.current=(Math.abs(sn.x-ip.x)>0.1||Math.abs(sn.y-ip.y)>0.1)?{x:sn.x,y:sn.y,kind:sr.kind}:null;if((prev===null)!==(snapPosRef.current===null)||((prev&&snapPosRef.current)&&(prev.x!==snapPosRef.current.x||prev.y!==snapPosRef.current.y)))scheduleRedrawRef.current();}else{if(snapPosRef.current!==null){snapPosRef.current=null;scheduleRedrawRef.current();}}
     if(activeTool==="select"&&!isDragging.current&&!isPanning.current&&!silhouetteAction.current&&!boxSelectRectRef.current){const ip=toImage(sp.x,sp.y);let best=null,bd=Infinity;const ptThr=12/zoomRef.current;for(const m2 of markups){if(m2.locked||m2.visible===false)continue;if(m2.type==="point"){const vp=vpts(m2);if(vp.length){const d=dist(ip,vp[0]);if(d<bd&&d<ptThr){bd=d;best={type:"point",mid:m2.id};}}}if(m2.type==="silhouette"){const paths=m2.paths||SILHOUETTES[m2.silhouetteType]?.paths;if(!paths)continue;const rot=m2.rotation||0;const sc=m2.scale||1;const pos=m2.position||{x:0,y:0};const cosR=Math.cos(rot);const sinR=Math.sin(rot);paths.forEach((path,pi)=>{path.points.forEach((p,ptI)=>{const sx=p.x*sc*100;const sy=p.y*100;const rx=sx*cosR-sy*sinR;const ry=sx*sinR+sy*cosR;const d=dist(ip,{x:rx+pos.x,y:ry+pos.y});if(d<bd&&d<ptThr){bd=d;best={type:"silhouette",mid:m2.id,pathIdx:pi,ptIdx:ptI};}});});if(m2.id===selectedId){try{const h=getSilhouetteHandlesImage(m2,zoomRef.current);const rotThr=Math.max(10,22*Math.sqrt(zoomRef.current))/zoomRef.current;if(h.rotCenter&&isFinite(h.rotCenter.x)){const d=dist(ip,h.rotCenter);if(d<rotThr&&d<bd){bd=d;best={type:"rotate",mid:m2.id};}}const cornerThr=Math.max(8,12*Math.sqrt(zoomRef.current))/zoomRef.current;h.corners.forEach((c,ci)=>{if(isFinite(c.x)){const d=dist(ip,c);if(d<cornerThr&&d<bd){bd=d;best={type:"corner",mid:m2.id,cornerIdx:ci};}}});}catch{/*silent*/}}        }else if(m2.type==="curve"||m2.type==="polyline"||m2.type==="polygon"||m2.type==="bezier"||m2.type==="tangent"){if(m2.type==="bezier"&&m2.cp){m2.cp.forEach((p,i)=>{const d=dist(ip,p);if(d<bd&&d<ptThr){bd=d;best={type:"bezierCp",mid:m2.id,cpIdx:i};}});}(m2.points||[]).forEach((p,i)=>{const d=dist(ip,p);if(d<bd&&d<ptThr){bd=d;best={type:m2.type==="bezier"?"bezier":m2.type==="tangent"?"tangent":"path",mid:m2.id,ptIdx:i};}});}}const _prevHover=hoveredPtRef.current;hoveredPtRef.current=best;if(JSON.stringify(_prevHover)!==JSON.stringify(best))scheduleRedrawRef.current();}else{hoveredPtRef.current=null;}
     const _hp=hoveredPtRef.current;const _isPanning=isPanning.current;const _curCursor=(_hp&&(_hp.type==="bezierCp"||_hp.type==="bezier"||_hp.type==="path"||_hp.type==="point"||_hp.type==="tangent"||_hp.type==="silhouette"||_hp.type==="rotate"||_hp.type==="corner"))?"pointer":_isPanning?"grabbing":activeTool==="pan"?"grab":activeTool==="select"?"default":"crosshair";if(canvasRef.current.style.cursor!==_curCursor)canvasRef.current.style.cursor=_curCursor;
     if(boxSelectRectRef.current){const ip=toImage(sp.x,sp.y);boxSelectRectRef.current={...boxSelectRectRef.current,x2:ip.x,y2:ip.y};scheduleRedrawRef.current();return;}

@@ -237,6 +237,15 @@ export const perpPoint = (p, a, b) => {
   return { x: a.x + t * dx, y: a.y + t * dy };
 };
 
+// Projection of p onto line (a,b); returns null when the foot lies outside the segment (a,b).
+export const perpPointSeg = (p, a, b) => {
+  const dx = b.x - a.x, dy = b.y - a.y, len2 = dx * dx + dy * dy;
+  if (len2 < 1e-12) return null;
+  const t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2;
+  if (t < 0 || t > 1) return null;
+  return { x: a.x + t * dx, y: a.y + t * dy };
+};
+
 export function sampleCurvePoints(pts, n) {
   if (!pts || pts.length < 2) return pts || [];
   const lens = [0];
@@ -258,9 +267,9 @@ export function sampleCurvePoints(pts, n) {
   return samples;
 }
 
-export const snapPoint = (ip, markups, r, enabled) => {
-  if (!enabled || (!enabled.points && !enabled.lines)) return ip;
-  let best = ip, bestD = r;
+const snapPointCore = (ip, markups, r, enabled) => {
+  if (!enabled || (!enabled.points && !enabled.lines)) return { point: ip, kind: null };
+  let best = ip, bestD = r, bestKind = null;
 
   for (const m of markups) {
     if (m.visible === false) continue;
@@ -269,18 +278,25 @@ export const snapPoint = (ip, markups, r, enabled) => {
     if (enabled.points) {
       for (const p of vp) {
         const d = dist(p, ip);
-        if (d < bestD) { bestD = d; best = p; }
+        if (d < bestD) { bestD = d; best = p; bestKind = "point"; }
       }
     }
 
     if (enabled.lines && (m.type === "line" || m.type === "parallel") && vp.length >= 2) {
-      const pr = perpPoint(ip, vp[0], vp[1]);
-      const d = dist(pr, ip);
-      if (d < bestD) { bestD = d; best = pr; }
+      const pr = m.mode === "infinite" ? perpPoint(ip, vp[0], vp[1]) : perpPointSeg(ip, vp[0], vp[1]);
+      if (pr) {
+        const d = dist(pr, ip);
+        if (d < bestD) { bestD = d; best = pr; bestKind = "line"; }
+      }
     }
   }
-  return best === ip ? ip : { ...best };
+  return { point: best === ip ? ip : { ...best }, kind: bestKind };
 };
+
+export const snapPoint = (ip, markups, r, enabled) => snapPointCore(ip, markups, r, enabled).point;
+
+// Same as snapPoint but also reports the snap kind ("point" | "line" | null).
+export const snapPointResult = (ip, markups, r, enabled) => snapPointCore(ip, markups, r, enabled);
 
 export const alignOnePoint = (src, dst) => ({ tx: dst.x - src.x, ty: dst.y - src.y, rot: 0, scale: 1 });
 

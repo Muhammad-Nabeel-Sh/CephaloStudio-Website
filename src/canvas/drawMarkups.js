@@ -1,4 +1,4 @@
-import { clamp, dist, angle3pt, angle4pt, perpDist, polyArea, polyLen, vpts, catmullRom, sampleCatmullRom, splineArea, splineLen, getInfiniteLinePoints, projectedDistance, ellipseFromAxes, circleFrom3pts, autoControlPoints, distToMultiBezier, distToEllipse, distToArc, perpPoint, distToSeg } from "../lib/utils.js";
+import { clamp, dist, angle3pt, angle4pt, perpDist, polyArea, polyLen, vpts, catmullRom, sampleCatmullRom, splineArea, splineLen, getInfiniteLinePoints, projectedDistance, ellipseFromAxes, circleFrom3pts, autoControlPoints, distToMultiBezier, distToEllipse, distToArc, perpPoint, perpPointSeg, distToSeg } from "../lib/utils.js";
 import { SILHOUETTES } from "../data/silhouettes.js";
 import { LUT_PRESETS } from "../data/constants.js";
 import { AIRWAY_NORMS } from "../data/norms.js";
@@ -1283,15 +1283,16 @@ export function drawLUTLegend(ctx, lutMode, lutInvert, cw, ch, t){
 export function drawSnapIndicator(ctx, sn, zoom, pan, markups, mouseImg, snapRadius, snapEnabled){
   const sx = sn.x * zoom + pan.x;
   const sy = sn.y * zoom + pan.y;
-  
+  const col = sn.kind === "line" ? "#38bdf8" : "#ffd700";
+
   ctx.save();
-  ctx.strokeStyle = "#ffd700";
+  ctx.strokeStyle = col;
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.arc(sx, sy, 12, 0, Math.PI * 2);
   ctx.stroke();
-  
-  ctx.strokeStyle = "#ffd700" + "66";
+
+  ctx.strokeStyle = col + "66";
   ctx.beginPath();
   ctx.moveTo(sx - 18, sy);
   ctx.lineTo(sx + 18, sy);
@@ -1300,7 +1301,7 @@ export function drawSnapIndicator(ctx, sn, zoom, pan, markups, mouseImg, snapRad
   ctx.stroke();
 
   if(markups && mouseImg && snapRadius){
-    ctx.strokeStyle = "#ffd700" + "33";
+    ctx.strokeStyle = col + "33";
     ctx.lineWidth = 1.5;
     for(const m of markups){
       if(m.visible === false) continue;
@@ -1319,7 +1320,8 @@ export function drawSnapIndicator(ctx, sn, zoom, pan, markups, mouseImg, snapRad
       }
 
       if(snapEnabled?.lines && (m.type === "line" || m.type === "parallel") && vp.length >= 2){
-        const pr = perpPoint(mouseImg, vp[0], vp[1]);
+        const pr = m.mode === "infinite" ? perpPoint(mouseImg, vp[0], vp[1]) : perpPointSeg(mouseImg, vp[0], vp[1]);
+        if(!pr) continue;
         const d = dist(pr, mouseImg);
         if(d < snapRadius){
           const psx = pr.x * zoom + pan.x, psy = pr.y * zoom + pan.y;
@@ -1328,10 +1330,10 @@ export function drawSnapIndicator(ctx, sn, zoom, pan, markups, mouseImg, snapRad
           ctx.stroke();
           const x1 = vp[0].x * zoom + pan.x, y1 = vp[0].y * zoom + pan.y;
           const x2 = vp[1].x * zoom + pan.x, y2 = vp[1].y * zoom + pan.y;
-          ctx.strokeStyle = "#ffd700" + "55";
+          ctx.strokeStyle = col + "55";
           ctx.lineWidth = 3;
           ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-          ctx.strokeStyle = "#ffd700" + "33";
+          ctx.strokeStyle = col + "33";
           ctx.lineWidth = 1.5;
         }
       }

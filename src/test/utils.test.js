@@ -11,6 +11,7 @@ import {
   vpts,
   computeMeasurements,
   snapPoint,
+  snapPointResult,
   perpPoint,
   projectedDistance,
   calculateICC,
@@ -243,6 +244,30 @@ describe("snapPoint", () => {
     const lineMarkups = [{ type: "line", points: [{ x: 0, y: 0 }, { x: 10, y: 0 }], visible: true }];
     const result = snapPoint({ x: 5, y: 3 }, lineMarkups, 2, snapPts);
     expect(result).toEqual({ x: 5, y: 3 });
+  });
+
+  it("does not snap past a segment endpoint (segment mode)", () => {
+    const markups = [{ type: "line", points: [{ x: 0, y: 0 }, { x: 10, y: 0 }], visible: true }];
+    const result = snapPoint({ x: 20, y: 8 }, markups, 10, snap);
+    expect(result).toEqual({ x: 20, y: 8 });
+  });
+
+  it("snaps to the infinite extension of an infinite line", () => {
+    const markups = [{ type: "line", mode: "infinite", points: [{ x: 0, y: 0 }, { x: 10, y: 0 }], visible: true }];
+    const result = snapPoint({ x: 20, y: 8 }, markups, 10, snap);
+    expect(result.x).toBeCloseTo(20, 5);
+    expect(result.y).toBeCloseTo(0, 5);
+  });
+
+  it("reports the snap kind (point vs line)", () => {
+    const markups = [
+      { type: "point", label: "N", points: [{ x: 100, y: 200 }], visible: true },
+      { type: "line", points: [{ x: 0, y: 0 }, { x: 10, y: 0 }], visible: true },
+    ];
+    expect(snapPointResult({ x: 101, y: 201 }, markups, 10, snap).kind).toBe("point");
+    expect(snapPointResult({ x: 5, y: 3 }, markups, 10, snap).kind).toBe("line");
+    expect(snapPointResult({ x: 101, y: 201 }, markups, 10, snapPts).kind).toBe("point");
+    expect(snapPointResult({ x: 5, y: 3 }, markups, 10, snapLn).kind).toBe("line");
   });
 });
 

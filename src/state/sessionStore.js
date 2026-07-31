@@ -16,6 +16,8 @@ export const useSessionStore = create((set, get) => ({
   processing: EMPTY_PROC,
   sessionImage: [],
   angleMode: "signed-deg",
+  lutMode: "gray",
+  lutInvert: false,
 
   undoStack: [],
   redoStack: [],
@@ -30,6 +32,8 @@ export const useSessionStore = create((set, get) => ({
       processing: session?.processing || EMPTY_PROC,
       sessionImage: session?.images || [],
       angleMode: session?.angleMode || "signed-deg",
+      lutMode: session?.lutMode || "gray",
+      lutInvert: session?.lutInvert || false,
       undoStack: [],
       redoStack: [],
       undoVersion: get().undoVersion + 1,
@@ -128,9 +132,10 @@ export const useSessionStore = create((set, get) => ({
   merge(patch) {
     const s = get();
     const next = {};
-    for (const k of ["markups", "calibration", "norms", "formulas", "processing", "angleMode"]) {
+    for (const k of ["markups", "calibration", "norms", "formulas", "processing", "angleMode", "lutMode", "lutInvert"]) {
       if (patch[k] !== undefined && patch[k] !== s[k]) next[k] = patch[k];
     }
+    if (patch.images !== undefined && patch.images !== s.sessionImage) next.sessionImage = patch.images;
     if (Object.keys(next).length) set(next);
   },
 }));
