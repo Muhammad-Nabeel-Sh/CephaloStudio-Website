@@ -1,4 +1,4 @@
-import { useReducer, useRef, useEffect, useCallback } from "react";
+import { useReducer, useRef, useEffect, useCallback, useState } from "react";
 
 const SNAP_OPEN = 35;
 const ANIM = "transform 0.35s cubic-bezier(0.32, 0.72, 0, 1)";
@@ -19,6 +19,7 @@ function reducer(st, action) {
 
 export default function MobileBottomSheet({ t, isOpen, onClose, children }) {
   const [st, dispatch] = useReducer(reducer, init);
+  const [kbH, setKbH] = useState(0);
   const sheetRef = useRef(null);
   const rootRef = useRef(null);
   const startYRef = useRef(0);
@@ -49,6 +50,27 @@ export default function MobileBottomSheet({ t, isOpen, onClose, children }) {
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev; };
+  }, [st.render]);
+
+  // Track the on-screen keyboard via the visual viewport so the sheet rises
+  // above it instead of staying pinned under it while typing.
+  useEffect(() => {
+    if (!st.render) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => {
+      const inset = Math.max(0, window.innerHeight - vv.height);
+      setKbH(Math.min(inset, window.innerHeight * 0.6));
+    };
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    window.addEventListener("resize", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
   }, [st.render]);
 
   const syncState = useCallback(() => {
@@ -133,8 +155,9 @@ export default function MobileBottomSheet({ t, isOpen, onClose, children }) {
         pointerEvents: "auto",
       }}/>
       <div ref={sheetRef} className="mobile-sheet" style={{
-        position: "absolute", left: 0, right: 0, bottom: 0,
+        position: "absolute", left: 0, right: 0, bottom: kbH || 0,
         background: t.surf,
+        height: kbH ? `calc(95dvh - ${kbH}px)` : undefined,
         borderRadius: "16px 16px 0 0",
         transform: `translateY(${st.openPct}%)`,
         transition: ANIM,

@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from "react";
 import { THEMES } from "../data/constants.js";
-import { hasUnanonymizedPHI } from "../report/anonymize.js";
 import { Btn, Tag } from "../ui/ui.jsx";
 import { useStoreDispatch } from "../state/workspaceStore.js";
 import { useToolStore, useUIStore } from "../state/workspaceStore.js";
@@ -9,7 +8,6 @@ export default function TopBar({
   t, theme, project, onHome,
   onSave,
   openImgRef, importRef, calibration,
-  imgRefs,
   setTheme,
 }) {
   const dispatch = useStoreDispatch();
@@ -91,11 +89,7 @@ export default function TopBar({
           <path d="M440-320v-326L336-542l-56-58 200-200 200 200-56 58-104-104v326h-80ZM240-160q-33 0-56.5-23.5T160-240v-120h80v120h480v-120h80v120q0 33-23.5 56.5T720-160H240Z" />
         </svg>
       </Btn>
-      <Btn ghost t={t} small title="Save project" onClick={() => {
-        if (hasUnanonymizedPHI(project) && !window.confirm("This project still contains patient identifiers (name, DOB, age, etc.). Exporting will include them. Continue? Use the Export dialog for an anonymized export.")) return;
-        const patched = { ...project, sessions: project.sessions?.map(s => ({ ...s, images: s.images?.map(img => ({ ...img, dataUrl: imgRefs.current[img.id]?.src || img.dataUrl })) })) };
-        onSave?.(patched);
-      }}>
+      <span className="hide-mobile" style={{display:"contents"}}><Btn ghost t={t} small title="Save project" onClick={onSave}>
         <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}>
           <path d="M840-680v480q0 33-23.5 56.5T760-120H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h480l160 160Zm-80 34L646-760H200v560h560v-446ZM565-275q35-35 35-85t-35-85q-35-35-85-35t-85 35q-35 35-35 85t35 85q35 35 85 35t85-35ZM240-560h360v-160H240v160Zm-40-86v446-560 114Z" />
         </svg>
@@ -105,16 +99,18 @@ export default function TopBar({
       </Btn>
       <Btn ghost t={t} small title="Normogram" onClick={() => dispatch({ type: "SET", payload: { showNormogram: true } })}>
         <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M200-120q-33 0-56.5-23.5T120-200v-640h80v640h640v80H200Zm40-120v-360h160v360H240Zm200 0v-560h160v560H440Zm200 0v-200h160v200H640Z" /></svg>
-      </Btn>
+      </Btn></span>
       <span className="hide-mobile" style={{display:"contents"}}><Btn ghost t={t} small title="Anonymize" onClick={() => dispatch({ type: "SET", payload: { showAnon: true } })}>
         <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="m644-428-58-58q9-47-27-88t-93-32l-58-58q17-8 34.5-12t37.5-4q75 0 127.5 52.5T660-500q0 20-4 37.5T644-428Zm128 126-58-56q38-29 67.5-63.5T832-500q-50-101-143.5-160.5T480-720q-29 0-57 4t-55 12l-62-62q41-17 84-25.5t90-8.5q151 0 269 83.5T920-500q-23 59-60.5 109.5T772-302Zm20 246L624-222q-35 11-70.5 16.5T480-200q-151 0-269-83.5T40-500q21-53 53-98.5t73-81.5L56-792l56-56 736 736-56 56ZM222-624q-29 26-53 57t-41 67q50 101 143.5 160.5T480-280q20 0 39-2.5t39-5.5l-36-38q-11 3-21 4.5t-21 1.5q-75 0-127.5-52.5T300-500q0-11 1.5-21t4.5-21l-84-82Zm319 93Zm-151 75Z" /></svg>
       </Btn></span>
-      <div style={{ width: 1, height: 20, background: t.bdr, flexShrink: 0 }} />
-      {Object.values(THEMES).map(th => (
-        <button key={th.id} onClick={() => setTheme(th.id)} title={th.name} aria-label={th.name} aria-pressed={theme === th.id} style={{ width: 22, height: 22, borderRadius: 6, border: theme === th.id ? `2px solid ${t.acc}` : `1px solid ${t.bdr}`, background: th.bg, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ width: 10, height: 10, borderRadius: 3, background: th.acc }} />
-        </button>
-      ))}
+      <span className="hide-mobile" style={{display:"contents"}}>
+        <div style={{ width: 1, height: 20, background: t.bdr, flexShrink: 0 }} />
+        {Object.values(THEMES).map(th => (
+          <button key={th.id} onClick={() => setTheme(th.id)} title={th.name} aria-label={th.name} aria-pressed={theme === th.id} style={{ width: 22, height: 22, borderRadius: 6, border: theme === th.id ? `2px solid ${t.acc}` : `1px solid ${t.bdr}`, background: th.bg, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ width: 10, height: 10, borderRadius: 3, background: th.acc }} />
+          </button>
+        ))}
+      </span>
     </div>
   );
 }

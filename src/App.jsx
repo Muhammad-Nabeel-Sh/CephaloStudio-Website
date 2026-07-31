@@ -342,10 +342,51 @@ function FormulaEditor({t,formula,scope,onSave,onClose}){
     </div>
   );
 }
-function MobileMorePanel({t, panels, panelIcons, onSelect}){
+function MobileMorePanel({t, panels, panelIcons, onSelect, theme, setTheme, onSaveProject, dispatch}){
+  const actionBtn = {
+    display:"flex",flexDirection:"column",alignItems:"center",gap:6,
+    padding:"16px 8px",background:t.surf2,borderRadius:10,cursor:"pointer",
+    color:t.tx,border:"none",transition:"background 0.15s",
+  };
   return(
     <div style={{padding:"12px 16px 16px"}}>
       <div style={{fontSize:13,fontWeight:700,color:t.tx2,marginBottom:12}}>More Tools</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:12}}>
+        <button onClick={onSaveProject} style={actionBtn}
+          onMouseEnter={e=>e.currentTarget.style.background=t.surf3}
+          onMouseLeave={e=>e.currentTarget.style.background=t.surf2}>
+          <span style={{height:24,display:"flex",alignItems:"center",color:t.acc}}>
+            <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M840-680v480q0 33-23.5 56.5T760-120H200q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h480l160 160Zm-80 34L646-760H200v560h560v-446ZM565-275q35-35 35-85t-35-85q-35-35-85-35t-85 35q-35 35-35 85t35 85q35 35 85 35t85-35ZM240-560h360v-160H240v160Zm-40-86v446-560 114Z" /></svg>
+          </span>
+          <span style={{fontSize:11,fontWeight:600,color:t.tx}}>Save</span>
+        </button>
+        <button onClick={()=>dispatch({type:"SET",payload:{showExport:true}})} style={actionBtn}
+          onMouseEnter={e=>e.currentTarget.style.background=t.surf3}
+          onMouseLeave={e=>e.currentTarget.style.background=t.surf2}>
+          <span style={{height:24,display:"flex",alignItems:"center",color:t.acc}}>
+            <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M160-80v-80h640v80H160Zm320-160L200-600h160v-280h240v280h160L480-240Zm0-130 116-150h-76v-280h-80v280h-76l116 150Zm0-150Z" /></svg>
+          </span>
+          <span style={{fontSize:11,fontWeight:600,color:t.tx}}>Export</span>
+        </button>
+        <button onClick={()=>dispatch({type:"SET",payload:{showNormogram:true}})} style={actionBtn}
+          onMouseEnter={e=>e.currentTarget.style.background=t.surf3}
+          onMouseLeave={e=>e.currentTarget.style.background=t.surf2}>
+          <span style={{height:24,display:"flex",alignItems:"center",color:t.acc}}>
+            <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M200-120q-33 0-56.5-23.5T120-200v-640h80v640h640v80H200Zm40-120v-360h160v360H240Zm200 0v-560h160v560H440Zm200 0v-200h160v200H640Z" /></svg>
+          </span>
+          <span style={{fontSize:11,fontWeight:600,color:t.tx}}>Normogram</span>
+        </button>
+      </div>
+      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14,padding:"0 2px"}}>
+        <span style={{fontSize:10,fontWeight:700,color:t.tx3,letterSpacing:"0.8px"}}>THEME</span>
+        {Object.values(THEMES).map(th=>(
+          <button key={th.id} onClick={()=>setTheme(th.id)} title={th.name} aria-label={th.name} aria-pressed={theme===th.id}
+            style={{width:26,height:26,borderRadius:6,border:theme===th.id?`2px solid ${t.acc}`:`1px solid ${t.bdr}`,background:th.bg,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
+            <div style={{width:12,height:12,borderRadius:3,background:th.acc}}/>
+          </button>
+        ))}
+      </div>
+      <div style={{fontSize:11,fontWeight:700,color:t.tx3,textTransform:"uppercase",letterSpacing:"0.5px",marginBottom:8}}>Panels</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
         {panels.map(([key,label])=>(
           <button key={key} onClick={()=>onSelect(key)}
@@ -459,6 +500,32 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const sessionImage=useSessionStore(s=>s.sessionImage);
   const fitToView = useCallback(() => { zoomRef.current=1; dispatch({type:"SET",payload:{zoom:1}}); panRef.current={x:40,y:40}; dispatch({type:"SET",payload:{pan:{x:40,y:40}}}); }, [dispatch]);
   const isMobile = useMediaQuery("(max-width: 1024px)"); // compact layout: phones + tablets (portrait/landscape)
+
+  // ─── Mobile sheet: share save logic + browser-back integration ───
+  const handleSaveProject = useCallback(() => {
+    if (hasUnanonymizedPHI(project) && !window.confirm("This project still contains patient identifiers (name, DOB, age, etc.). Exporting will include them. Continue? Use the Export dialog for an anonymized export.")) return;
+    const patched = { ...project, sessions: project.sessions?.map(s => ({ ...s, images: s.images?.map(img => ({ ...img, dataUrl: imgRefs.current[img.id]?.src || img.dataUrl })) })) };
+    onSave?.(patched);
+  }, [project, onSave]);
+  const sheetBackRef = useRef(false);
+  const sheetOpen = isMobile && mobileTab !== "canvas";
+  useEffect(() => {
+    if (!sheetOpen) return;
+    window.history.pushState({ cephxSheet: true }, "");
+    const onPop = () => {
+      if (sheetBackRef.current) { sheetBackRef.current = false; return; }
+      useUIStore.setState({ mobileTab: "canvas" });
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [sheetOpen]);
+  const closeSheet = useCallback(() => {
+    useUIStore.setState({ mobileTab: "canvas" });
+    if (window.history.state?.cephxSheet) {
+      sheetBackRef.current = true;
+      window.history.back();
+    }
+  }, []);
 
   // ─── Stable setter helpers (passed as props to children) ───
   const setSelectedId = useCallback((v) => {
@@ -1512,11 +1579,11 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       {/* TOP BAR */}
       <TopBar t={t} theme={theme} project={project} onHome={onHome}
         compareSession={compareSession} showAnnotations={showAnnotations} annotationSize={annotationSize}
-        showDisplacement={showDisplacement} onSave={onSave}
+        showDisplacement={showDisplacement} onSave={handleSaveProject}
         openImgRef={openImgRef} importRef={importRef} dispatch={dispatch} calibration={calibration}
         snapEnabled={snapEnabled} showScaleBar={showScaleBar} showDefTooltips={showDefTooltips}
         placingMode={placingMode} placingQueue={placingQueue} placingIdx={placingIdx}
-        imgRefs={imgRefs} setTheme={setTheme}
+        setTheme={setTheme}
       />
 
       {/* BODY */}
@@ -1609,8 +1676,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       </div>
 
       {/* MOBILE: swipeable bottom sheet (overlays canvas) */}
-      {isMobile&&<MobileBottomSheet t={t} isOpen={mobileTab!=="canvas"} onClose={()=>useUIStore.setState({mobileTab:"canvas"})}>
-        {mobileTab==="more"?<MobileMorePanel t={t} panels={panelTabs.filter(([k])=>!["markups","measurements"].includes(k))} panelIcons={panelIcons} onSelect={key=>{useUIStore.setState({mobileTab:key,rightPanel:key});}} />:<>
+      {isMobile&&<MobileBottomSheet t={t} isOpen={mobileTab!=="canvas"} onClose={closeSheet}>
+        {mobileTab==="more"?<MobileMorePanel t={t} panels={panelTabs.filter(([k])=>!["markups","measurements"].includes(k))} panelIcons={panelIcons} onSelect={key=>{useUIStore.setState({mobileTab:key,rightPanel:key});}} theme={theme} setTheme={setTheme} onSaveProject={handleSaveProject} dispatch={dispatch} />:<>
           <PanelContent rightPanel={rightPanel} panelIcons={panelIcons} panelTabs={panelTabs} t={t}
             pMarkups={pMarkups} pSessions={pSessions}
             allMeas={allMeas} formulaMeas={formulaMeas} calibration={calibration} norms={norms} formatAngle={formatAngle}
