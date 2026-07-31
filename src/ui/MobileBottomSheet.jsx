@@ -12,6 +12,7 @@ function reducer(st, action) {
     case "HIDE": return { render: true, openPct: 100 };
     case "CLOSE": return { render: false, openPct: 100 };
     case "FULL": return { render: true, openPct: 5 };
+    case "SET": return { ...st, openPct: action.pct };
     default: return st;
   }
 }
@@ -22,6 +23,8 @@ export default function MobileBottomSheet({ t, isOpen, onClose, children }) {
   const rootRef = useRef(null);
   const startYRef = useRef(0);
   const startPctRef = useRef(100);
+  const pctRef = useRef(100);
+  const rafRef = useRef(null);
   const hideTimer = useRef(null);
 
   useEffect(() => {
@@ -39,26 +42,41 @@ export default function MobileBottomSheet({ t, isOpen, onClose, children }) {
     return () => { if (hideTimer.current) clearTimeout(hideTimer.current); };
   }, [isOpen]);
 
+  useEffect(() => { pctRef.current = st.openPct; }, [st.openPct]);
+
+  const syncState = useCallback(() => {
+    if (rafRef.current) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      dispatch({ type: "SET", pct: pctRef.current });
+    });
+  }, []);
+
   const setTranslate = useCallback((pct) => {
     const el = sheetRef.current;
     if (el) {
+      const clamped = Math.max(0, Math.min(100, pct));
+      pctRef.current = clamped;
       el.style.transition = "none";
-      el.style.transform = `translateY(${Math.max(0, Math.min(100, pct))}%)`;
+      el.style.transform = `translateY(${clamped}%)`;
+      syncState();
     }
-  }, []);
+  }, [syncState]);
 
   const animateTo = useCallback((pct) => {
     const el = sheetRef.current;
     if (el) {
+      pctRef.current = pct;
       el.style.transition = ANIM;
       el.style.transform = `translateY(${pct}%)`;
+      syncState();
     }
-  }, []);
+  }, [syncState]);
 
   const onHandleTouchStart = useCallback((e) => {
     startYRef.current = e.touches[0].clientY;
-    startPctRef.current = st.openPct;
-  }, [st.openPct]);
+    startPctRef.current = pctRef.current;
+  }, []);
 
   const onHandleTouchMove = useCallback((e) => {
     const dy = e.touches[0].clientY - startYRef.current;
@@ -69,8 +87,7 @@ export default function MobileBottomSheet({ t, isOpen, onClose, children }) {
   const onHandleTouchEnd = useCallback(() => {
     const el = sheetRef.current;
     if (!el) return;
-    const match = el.style.transform.match(/translateY\(([\d.]+)%\)/);
-    const current = match ? parseFloat(match[1]) : st.openPct;
+    const current = pctRef.current;
     if (current > 50) {
       animateTo(100);
       if (hideTimer.current) clearTimeout(hideTimer.current);
@@ -85,7 +102,7 @@ export default function MobileBottomSheet({ t, isOpen, onClose, children }) {
       dispatch({ type: "SHOW" });
       animateTo(SNAP_OPEN);
     }
-  }, [st.openPct, onClose, animateTo]);
+  }, [onClose, animateTo]);
 
   const onBackdropClick = useCallback(() => {
     animateTo(100);
@@ -114,25 +131,26 @@ export default function MobileBottomSheet({ t, isOpen, onClose, children }) {
         borderRadius: "16px 16px 0 0",
         transform: `translateY(${st.openPct}%)`,
         transition: ANIM,
+        willChange: "transform",
         pointerEvents: "auto",
         display: "flex", flexDirection: "column",
         overflow: "hidden",
         boxShadow: `0 -4px 24px ${t.shadow}66`,
-      }}
-        onTouchStart={onHandleTouchStart}
-        onTouchMove={onHandleTouchMove}
-        onTouchEnd={onHandleTouchEnd}
-      >
+      }}>
         <div style={{
           display: "flex", justifyContent: "center", padding: "8px 0 2px",
           cursor: "grab", touchAction: "none", flexShrink: 0,
-        }}>
+        }}
+          onTouchStart={onHandleTouchStart}
+          onTouchMove={onHandleTouchMove}
+          onTouchEnd={onHandleTouchEnd}
+        >
           <div style={{
             width: 36, height: 4, borderRadius: 2,
             background: t.tx3 + "55",
           }}/>
         </div>
-        <div style={{ flex: 1, overflow: "auto", scrollbarWidth: "thin" }}>
+        <div style={{ flex: 1, overflow: "auto", scrollbarWidth: "thin", WebkitOverflowScrolling: "touch" }}>
           <div style={{ maxWidth: 960, width: "100%", margin: "0 auto" }}>{children}</div>
         </div>
       </div>

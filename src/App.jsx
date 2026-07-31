@@ -1332,7 +1332,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       const a=touches[0],b=touches[1];
       const cx=(a.clientX+b.clientX)/2,cy=(a.clientY+b.clientY)/2;
       const r=canvasRef.current.getBoundingClientRect();
-      const ip=toImage({x:cx-r.left,y:cy-r.top});
+      const ip=toImage(cx-r.left,cy-r.top);
       pinchRef.current={d:Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY),nz:zoomRef.current,ip};
       if((activeTool==="curve"||activeTool==="polyline"||activeTool==="polygon")&&currentDraw?.points.length>=2){handleMouseDown({button:0,clientX:cx,clientY:cy,ctrlKey:true});}
     }

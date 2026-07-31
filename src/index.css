@@ -45,7 +45,9 @@ body {
 }
 @media (max-width: 767px) {
   .topbar { height: 42px; }
+  .topbar-logo img { width: 26px; height: 26px; }
 }
+.topbar-logo img { width: 40px; height: 40px; display: block; }
 
 /* ═════════════════════════════════════════════════════════════════
    Canvas wrapper

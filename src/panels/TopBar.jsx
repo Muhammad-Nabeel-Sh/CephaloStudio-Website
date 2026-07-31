@@ -23,7 +23,6 @@ export default function TopBar({
   const annotationSize = useUIStore(s => s.annotationSize);
   const showDisplacement = useUIStore(s => s.showDisplacement);
   const compareSession = useUIStore(s => s.compareSession);
-  const mobileTab = useUIStore(s => s.mobileTab);
 
   const [snapDrop, setSnapDrop] = useState(false);
   const [snapRect, setSnapRect] = useState(null);
@@ -38,12 +37,12 @@ export default function TopBar({
   const anySnap = snapEnabled.points || snapEnabled.lines;
   const toggleSnap = (key) => dispatch({ type: "SET", payload: { snapEnabled: { ...snapEnabled, [key]: !snapEnabled[key] } } });
   return (
-    <div className="topbar" style={{ background: t.surf, flexShrink: 0, overflowX: "auto", position: "relative", zIndex: 10 }}>
+    <div className="topbar" style={{ background: t.surf, flexShrink: 0, overflowX: "auto", overflowY: "hidden", position: "relative", zIndex: 10 }}>
       <button onClick={onHome} title="Back to Home" style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 4, padding: "4px 8px", borderRadius: 6, flexShrink: 0, color: t.tx }}>
         <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M240-200h120v-240h240v240h120v-360L480-740 240-560v360Zm-80 80v-480l320-240 320 240v480H520v-240h-80v240H160Zm320-350Z" /></svg>
       </button>
       <button onClick={onHome} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 5, padding: "4px 8px", borderRadius: 6, flexShrink: 0 }}>
-        <span><img src="/favicon.svg" alt="Website Icon" width="48" height="48" /> </span>
+        <span className="topbar-logo"><img src="/favicon.svg" alt="Website Icon" width="40" height="40" /></span>
         <span className="hide-mobile" style={{ fontFamily: "'Syne',sans-serif", fontWeight: 800, color: t.tx, fontSize: 17, display: "inline-flex", alignItems: "center", gap: 6 }}>Cephalometry Studio<span style={{ fontSize: 8, fontWeight: 700, color: t.acc, background: t.accMuted, borderRadius: 5, padding: "1px 5px", letterSpacing: 0.8 }}>BETA</span></span>
       </button>
       <div style={{ width: 1, height: 20, background: t.bdr, flexShrink: 0 }} />
@@ -116,7 +115,6 @@ export default function TopBar({
           <div style={{ width: 10, height: 10, borderRadius: 3, background: th.acc }} />
         </button>
       ))}
-      <span className="hide-desktop" style={{display:"contents"}}><Btn ghost t={t} small active={mobileTab!=="canvas"} title="Toggle panel" onClick={() => { const s=useUIStore.getState();useUIStore.setState({mobileTab:s.mobileTab==="canvas"?s.rightPanel:"canvas"});}}>≡</Btn></span>
     </div>
   );
 }
