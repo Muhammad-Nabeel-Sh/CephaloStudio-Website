@@ -17,6 +17,7 @@ export const useUIStore = create(() => ({
   showFormulaEditor: false,
   editFormulaId: null,
   showMobilePanel: false,
+  mobileTab: "canvas",
   mobileToolsExpanded: false,
   toolbarPos: { x: 70, y: 100 },
   toolbarDragging: false,

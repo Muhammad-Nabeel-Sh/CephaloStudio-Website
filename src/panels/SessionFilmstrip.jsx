@@ -3,7 +3,7 @@ import { mkSession } from "../model/session.js";
 import { addSession, removeSession } from "../model/project.js";
 import { onEnter } from "../lib/utils.js";
 
-export default function SessionFilmstrip({ project, t, onUpdateProject }) {
+export default function SessionFilmstrip({ project, t, onUpdateProject, compact }) {
   const sessions = project?.sessions || [];
   const activeId = project?.activeSessionId;
   const [hoveredId, setHoveredId] = useState(null);
@@ -27,17 +27,20 @@ export default function SessionFilmstrip({ project, t, onUpdateProject }) {
     <div style={{
       display: "flex", alignItems: "stretch", gap: 0, flexShrink: 0,
       background: t.surf, borderBottom: `1px solid ${t.bdr}`,
-      overflow: "hidden", height: 62,
+      overflow: "hidden", height: compact ? 44 : 62,
     }}>
       <div style={{
-        display: "flex", alignItems: "center", gap: 4, padding: "6px 10px",
+        display: "flex", alignItems: "center", gap: compact ? 2 : 4,
+        padding: compact ? "2px 6px" : "6px 10px",
         overflowX: "auto", overflowY: "hidden", flex: 1,
-        maxWidth: 5 * (52 + 4) + 30 + 20,
+        maxWidth: compact ? "none" : 5 * (52 + 4) + 30 + 20,
         scrollbarWidth: "thin",
         scrollbarColor: `${t.bdr} transparent`,
       }}>
         {sessions.map((s) => {
           const isActive = s.id === activeId;
+          const thumbSize = compact ? { w: 28, h: 22 } : { w: 40, h: 30 };
+          const cw = compact ? 46 : 52;
           return (
             <div
               key={s.id}
@@ -53,37 +56,37 @@ export default function SessionFilmstrip({ project, t, onUpdateProject }) {
               onBlur={() => setHoveredId(null)}
               style={{
                 display: "flex", flexDirection: "column", alignItems: "center",
-                justifyContent: "center", gap: 2, flexShrink: 0,
-                width: 52, height: 50, borderRadius: 6, cursor: "pointer",
+                justifyContent: "center", gap: compact ? 1 : 2, flexShrink: 0,
+                width: cw, height: compact ? 38 : 50, borderRadius: 6, cursor: "pointer",
                 background: isActive ? t.accMuted : "transparent",
                 border: `2px solid ${isActive ? t.acc : "transparent"}`,
                 transition: "all 0.15s", position: "relative",
-                padding: "2px 0",
+                padding: compact ? "1px 0" : "2px 0",
               }}
             >
               <div style={{
-                width: 40, height: 30, borderRadius: 3, overflow: "hidden",
+                width: thumbSize.w, height: thumbSize.h, borderRadius: 3, overflow: "hidden",
                 background: t.surf3, display: "flex", alignItems: "center",
                 justifyContent: "center", flexShrink: 0,
               }}>
                 <SessionThumb dataUrl={s.images?.[0]?.dataUrl} />
               </div>
-              <div style={{
+              {!compact && <div style={{
                 fontSize: 8, color: isActive ? t.acc : t.tx2, textAlign: "center",
                 maxWidth: 50, overflow: "hidden", textOverflow: "ellipsis",
                 whiteSpace: "nowrap", fontWeight: isActive ? 700 : 400, lineHeight: 1.2,
               }}>
                 {s.label || s.name || "Session"}
-              </div>
+              </div>}
               {hoveredId === s.id && sessions.length > 1 && (
                 <button
                   onClick={(e) => { e.stopPropagation(); handleRemove(s.id); }}
                   title="Delete session"
                   style={{
                     position: "absolute", top: -3, right: -3,
-                    width: 14, height: 14, borderRadius: "50%",
+                    width: compact ? 12 : 14, height: compact ? 12 : 14, borderRadius: "50%",
                     border: "none", background: t.err, color: "#fff",
-                    fontSize: 8, lineHeight: "14px", textAlign: "center",
+                    fontSize: compact ? 7 : 8, lineHeight: "12px", textAlign: "center",
                     cursor: "pointer", padding: 0, display: "flex",
                     alignItems: "center", justifyContent: "center",
                   }}
@@ -98,10 +101,10 @@ export default function SessionFilmstrip({ project, t, onUpdateProject }) {
           aria-label="Add session"
           style={{
             display: "flex", alignItems: "center", justifyContent: "center",
-            width: 30, height: 30, borderRadius: 6, flexShrink: 0,
+            width: compact ? 24 : 30, height: compact ? 24 : 30, borderRadius: 6, flexShrink: 0,
             border: `1px dashed ${t.bdr}`, background: "transparent",
-            color: t.tx3, cursor: "pointer", fontSize: 16, lineHeight: 1,
-            transition: "all 0.15s", marginLeft: 2,
+            color: t.tx3, cursor: "pointer", fontSize: compact ? 13 : 16, lineHeight: 1,
+            transition: "all 0.15s", marginLeft: compact ? 1 : 2,
           }}
           onMouseEnter={(e) => { e.currentTarget.style.borderColor = t.acc; e.currentTarget.style.color = t.acc; }}
           onMouseLeave={(e) => { e.currentTarget.style.borderColor = t.bdr; e.currentTarget.style.color = t.tx3; }}

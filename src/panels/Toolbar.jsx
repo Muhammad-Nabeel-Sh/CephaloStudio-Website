@@ -16,14 +16,14 @@ export default function Toolbar({
   const zoom = useToolStore(s => s.zoom);
   const currentDraw = useToolStore(s => s.currentDraw);
   const spotlightMode = useToolStore(s => s.spotlightMode);
-  const showMobilePanel = useUIStore(s => s.showMobilePanel);
   const mobileToolsExpanded = useUIStore(s => s.mobileToolsExpanded);
+  const mobileTab = useUIStore(s => s.mobileTab);
   const isMobile = useMediaQuery("(max-width: 767px)");
   const undoStackSize = useSessionStore(s => s.undoStack.length);
   const redoStackSize = useSessionStore(s => s.redoStack.length);
   const canUndo = undoStackSize > 0;
   const canRedo = redoStackSize > 0;
-  if (isMobile && !showMobilePanel) {
+  if (isMobile && mobileTab === "canvas") {
     const selTool = (id) => {
       dispatch({ type: "SET", payload: { activeTool: id } });
       dispatch({ type: "SET", payload: { currentDraw: null } });
@@ -54,8 +54,8 @@ export default function Toolbar({
       [{ id: "mirror", icon: "⌈⌉", label: "Mirror" }],
     ];
     return (<>
-      {/* Collapsed bar — horizontal scroll row */}
-      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 52, display: "flex", alignItems: "center", borderTop: `1px solid ${t.bdr}`, zIndex: 20, background: t.surf, padding: "0 4px", gap: 2, overflowX: "auto", overflowY: "hidden", scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}>
+      {/* Collapsed bar — floating horizontal strip above tab bar */}
+      <div style={{ position: "absolute", bottom: 56, left: 8, right: 8, height: 40, display: "flex", alignItems: "center", borderRadius: 10, zIndex: 15, background: t.surf + "ee", backdropFilter: "blur(6px)", boxShadow: `0 2px 12px ${t.shadow}44`, border: `1px solid ${t.bdr}33`, padding: "0 4px", gap: 1, overflowX: "auto", overflowY: "hidden", scrollbarWidth: "none", WebkitOverflowScrolling: "touch" }}>
         {primaryTools.map(tool => (
           <ToolBtn key={tool.id} tool={tool} active={activeTool === tool.id} onClick={() => selTool(tool.id)} theme={theme} t={t} style={{ flexShrink: 0 }} />
         ))}
@@ -76,7 +76,7 @@ export default function Toolbar({
       {/* Expanded bottom sheet — full tool grid */}
       {mobileToolsExpanded && (<>
         <div onClick={() => dispatch({ type: "SET", payload: { mobileToolsExpanded: false } })} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.3)", zIndex: 19 }} />
-        <div style={{ position: "fixed", bottom: 52, left: 0, right: 0, maxHeight: "55vh", background: t.surf, borderTop: `1px solid ${t.bdr}`, borderRadius: "12px 12px 0 0", zIndex: 20, overflowY: "auto", padding: "12px 8px 16px", boxShadow: `0 -4px 20px ${t.shadow}` }}>
+        <div style={{ position: "fixed", bottom: 100, left: 8, right: 8, maxHeight: "55vh", background: t.surf, border: `1px solid ${t.bdr}33`, borderRadius: 12, zIndex: 20, overflowY: "auto", padding: "12px 8px 16px", boxShadow: `0 -4px 20px ${t.shadow}44` }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, padding: "0 8px" }}>
             <span style={{ fontSize: 13, fontWeight: 600, color: t.tx2, fontFamily: "'DM Sans',sans-serif" }}>All Tools</span>
             <span style={{ fontSize: 9, color: t.tx3, fontFamily: "'DM Mono',monospace" }}>{(zoom * 100).toFixed(0)}%{calibration.done ? ` · ⟺${calibration.pxPerMm.toFixed(1)}` : ""}</span>

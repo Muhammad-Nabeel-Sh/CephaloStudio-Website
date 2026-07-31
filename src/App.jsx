@@ -42,6 +42,8 @@ import AnonModal from "./panels/AnonModal.jsx";
 import ResearchPanel from "./research/ResearchPanel.jsx";
 import InterpretationPanel from "./panels/InterpretationPanel.jsx";
 import NormogramPanel from "./panels/NormogramPanel.jsx";
+import MobileTabBar from "./ui/MobileTabBar.jsx";
+import MobileBottomSheet from "./ui/MobileBottomSheet.jsx";
 import ContextMenu from "./ui/ContextMenu.jsx";
 import { mkProject, updateSessionInProject } from "./model/project.js";
 import { storeImageBlob, getImageDataUrl, clearImageBlobs, deleteOrphanBlobs, idbAvailable } from "./storage/imageStore.js";
@@ -340,6 +342,31 @@ function FormulaEditor({t,formula,scope,onSave,onClose}){
     </div>
   );
 }
+function MobileMorePanel({t, panels, panelIcons, onSelect}){
+  return(
+    <div style={{padding:"12px 16px 16px"}}>
+      <div style={{fontSize:13,fontWeight:700,color:t.tx2,marginBottom:12}}>More Tools</div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8}}>
+        {panels.map(([key,label])=>(
+          <button key={key} onClick={()=>onSelect(key)}
+            style={{
+              display:"flex",flexDirection:"column",alignItems:"center",gap:6,
+              padding:"16px 8px",background:t.surf2,
+              borderRadius:10,cursor:"pointer",color:t.tx,border:"none",
+              transition:"background 0.15s",
+            }}
+            onMouseEnter={e=>e.currentTarget.style.background=t.surf3}
+            onMouseLeave={e=>e.currentTarget.style.background=t.surf2}
+          >
+            <span style={{height:24,display:"flex",alignItems:"center",color:t.acc}}>{panelIcons[key]}</span>
+            <span style={{fontSize:11,fontWeight:600,color:t.tx}}>{label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // WORKSPACE
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -395,6 +422,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const showFormulaEditor = useUIStore(s => s.showFormulaEditor);
   const editFormulaId = useUIStore(s => s.editFormulaId);
   const showMobilePanel = useUIStore(s => s.showMobilePanel);
+  const mobileTab = useUIStore(s => s.mobileTab);
   const mobileToolsExpanded = useUIStore(s => s.mobileToolsExpanded);
   const toolbarPos = useUIStore(s => s.toolbarPos);
   const toolbarDragging = useUIStore(s => s.toolbarDragging);
@@ -444,9 +472,6 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const setRightPanel = useCallback((v) => useUIStore.setState({ rightPanel: v }), []);
   const setPlacingQueue = useCallback((v) => {
     useUIStore.setState({ placingQueue: typeof v === "function" ? v(useUIStore.getState().placingQueue) : v });
-  }, []);
-  const setShowMobilePanel = useCallback((v) => {
-    useUIStore.setState({ showMobilePanel: typeof v === "function" ? v(useUIStore.getState().showMobilePanel) : v });
   }, []);
   const setShowLUT = useCallback((v) => {
     useUIStore.setState({ showLUT: typeof v === "function" ? v(useUIStore.getState().showLUT) : v });
@@ -843,6 +868,11 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
 
   // U3: Keep redrawing while calibration modal is open (pulsing highlight animation)
   useEffect(()=>{if(!showCalib||!pendingRuler)return;let raf;const loop=()=>{scheduleRedrawRef.current();raf=requestAnimationFrame(loop);};raf=requestAnimationFrame(loop);return()=>cancelAnimationFrame(raf);},[showCalib,pendingRuler]);
+
+  // U4: When switching back to canvas on mobile, trigger a redraw (display:none→flex transition)
+  useEffect(()=>{
+    if(isMobile&&mobileTab==="canvas"){requestAnimationFrame(()=>scheduleRedrawRef.current());}
+  },[isMobile,mobileTab]);
 
   // ══════════════════════════════════════
   // IMAGE LOADING
@@ -1371,78 +1401,76 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         openImgRef={openImgRef} importRef={importRef} dispatch={dispatch} calibration={calibration}
         snapEnabled={snapEnabled} showScaleBar={showScaleBar} showDefTooltips={showDefTooltips}
         placingMode={placingMode} placingQueue={placingQueue} placingIdx={placingIdx}
-        showMobilePanel={showMobilePanel} setShowMobilePanel={setShowMobilePanel}
         imgRefs={imgRefs} setTheme={setTheme}
       />
 
       {/* BODY */}
       <div style={{flex:1,display:"flex",overflow:"hidden",position:"relative"}}>
-        {/* TOOLBAR */}
-        <Toolbar activeTool={activeTool} theme={theme} t={t} dispatch={dispatch}
-          setActiveTool={setActiveTool} sessionImage={sessionImage} calibration={calibration}
-          zoom={zoom} spotlightMode={spotlightMode} updSession={updSession}
-          showMobilePanel={showMobilePanel}
-          panRef={panRef} zoomRef={zoomRef} undo={undo} redo={redo}
-          handleDblClick={handleDblClick} currentDraw={currentDraw}
-          mobileToolsExpanded={mobileToolsExpanded}
-        />
-
-        {/* CANVAS */}
-        <div ref={containerRef} className="canvas-wrapper" style={{background:t.bg}} onDrop={handleDrop} onDragOver={e=>e.preventDefault()}>
-          <canvas ref={canvasRef} style={{display:"block",cursor:cursorStyle,touchAction:"none",background:"transparent"}}
-            onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
-            onAuxClick={e=>e.preventDefault()} onDoubleClick={handleDblClick} onContextMenu={handleCanvasContextMenu}/>
-          {loadingImages&&<div role="status" aria-live="polite" style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:t.bg+"cc",zIndex:10}}>
-            <div style={{textAlign:"center"}}><div style={{width:28,height:28,border:`3px solid ${t.bdr}`,borderTopColor:t.acc,borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto 10px"}}/><div style={{fontSize:13,color:t.tx2}}>Loading images…</div></div>
-          </div>}
-          {/* A5: Placing-mode card — floating React panel (was canvas-drawn) */}
-          {placingMode&&placingQueue.length>0&&placingIdx<placingQueue.length&&(markups.find(x=>x.id===placingQueue[placingIdx]))&&(()=>{
-            const m=markups.find(x=>x.id===placingQueue[placingIdx]);
-            const defText=m.definition||"No definition available";
-            return(
-              <div role="status" aria-label={`Place ${m.label}: ${defText}`} style={{position:"absolute",bottom:20,left:"50%",transform:"translateX(-50%)",width:"min(520px,calc(100% - 32px))",background:t.surf,borderRadius:10,boxShadow:`0 4px 16px rgba(0,0,0,0.5)`,overflow:"hidden",zIndex:8}}>
-                <div style={{height:4,background:t.acc,borderRadius:"10px 10px 0 0"}}/>
-                <div style={{padding:"12px 16px 10px"}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
-                    <span style={{fontWeight:"bold",fontSize:15,color:t.tx,fontFamily:"'DM Sans',sans-serif"}}>{m.label}</span>
-                    <span style={{fontSize:11,color:t.tx3,fontFamily:"'DM Sans',sans-serif"}}>{placingIdx+1}/{placingQueue.length}</span>
-                  </div>
-                  <div style={{fontSize:13,color:t.tx2,fontFamily:"'DM Sans',sans-serif",marginBottom:8,lineHeight:1.4}}>{defText}</div>
-                  <div style={{display:"flex",gap:16,fontSize:10,color:t.tx3,fontFamily:"'DM Mono',monospace"}}>
-                    <span>Click to place</span><span>Esc skip</span><span>Backspace back</span>
+        {/* Toolbar + Canvas — always visible; bottom sheet overlays on mobile */}
+        <div style={{display:"flex",flex:1,overflow:"hidden"}}>
+          <Toolbar activeTool={activeTool} theme={theme} t={t} dispatch={dispatch}
+            setActiveTool={setActiveTool} sessionImage={sessionImage} calibration={calibration}
+            zoom={zoom} spotlightMode={spotlightMode} updSession={updSession}
+            panRef={panRef} zoomRef={zoomRef} undo={undo} redo={redo}
+            handleDblClick={handleDblClick} currentDraw={currentDraw}
+            mobileToolsExpanded={mobileToolsExpanded}
+          />
+          <div style={{display:"flex",flexDirection:"column",flex:1,overflow:"hidden"}}>
+          {isMobile&&<SessionFilmstrip compact project={project} t={t} onUpdateProject={onUpdateProject}/>}
+          <div ref={containerRef} className="canvas-wrapper" style={{flex:1,background:t.bg,position:"relative"}} onDrop={handleDrop} onDragOver={e=>e.preventDefault()}>
+            <canvas ref={canvasRef} style={{display:"block",cursor:cursorStyle,touchAction:"none",background:"transparent"}}
+              onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}
+              onAuxClick={e=>e.preventDefault()} onDoubleClick={handleDblClick} onContextMenu={handleCanvasContextMenu}/>
+            {loadingImages&&<div role="status" aria-live="polite" style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",background:t.bg+"cc",zIndex:10}}>
+              <div style={{textAlign:"center"}}><div style={{width:28,height:28,border:`3px solid ${t.bdr}`,borderTopColor:t.acc,borderRadius:"50%",animation:"spin 0.8s linear infinite",margin:"0 auto 10px"}}/><div style={{fontSize:13,color:t.tx2}}>Loading images…</div></div>
+            </div>}
+            {placingMode&&placingQueue.length>0&&placingIdx<placingQueue.length&&(markups.find(x=>x.id===placingQueue[placingIdx]))&&(()=>{
+              const m=markups.find(x=>x.id===placingQueue[placingIdx]);
+              const defText=m.definition||"No definition available";
+              return(
+                <div role="status" aria-label={`Place ${m.label}: ${defText}`} style={{position:"absolute",bottom:20,left:"50%",transform:"translateX(-50%)",width:"min(520px,calc(100% - 32px))",background:t.surf,borderRadius:10,boxShadow:`0 4px 16px rgba(0,0,0,0.5)`,overflow:"hidden",zIndex:8}}>
+                  <div style={{height:4,background:t.acc,borderRadius:"10px 10px 0 0"}}/>
+                  <div style={{padding:"12px 16px 10px"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                      <span style={{fontWeight:"bold",fontSize:15,color:t.tx,fontFamily:"'DM Sans',sans-serif"}}>{m.label}</span>
+                      <span style={{fontSize:11,color:t.tx3,fontFamily:"'DM Sans',sans-serif"}}>{placingIdx+1}/{placingQueue.length}</span>
+                    </div>
+                    <div style={{fontSize:13,color:t.tx2,fontFamily:"'DM Sans',sans-serif",marginBottom:8,lineHeight:1.4}}>{defText}</div>
+                    <div style={{display:"flex",gap:16,fontSize:10,color:t.tx3,fontFamily:"'DM Mono',monospace"}}>
+                      <span>Click to place</span><span>Esc skip</span><span>Backspace back</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })()}
-          <div className="draw-status">
-            {currentDraw&&<div style={{background:t.acc+"22",border:`1px solid ${t.acc}`,borderRadius:6,padding:"3px 10px",fontSize:11,color:t.acc,fontFamily:"'DM Mono',monospace"}}>
-              {["polygon","curve","polyline","bezier"].includes(activeTool)?`${currentDraw.points.length} pts · ${isMobile?"double-tap to finish":"dbl-click to finish"}`:activeTool==="tangent"?`${currentDraw.points.length===1?(currentDraw.tangentAngle!=null?"tangent snapped · click for endpoint":"click 2nd point"):""}`:activeTool==="mirror"?(currentDraw.points.length===1?"select axis pt 1":currentDraw.points.length===2?"select axis pt 2 → mirror":""):(()=>{const n={line:2,angle3:3,angle4:4,perp:3,ruler:2,ellipse:3,arc:3,circle:2,tangent:2,concentric:3}[activeTool];return n?`${currentDraw.points.length}/${n}`:`${currentDraw.points.length} pts`;})()}
-            </div>}
+              );
+            })()}
+            <div className="draw-status">
+              {currentDraw&&<div style={{background:t.acc+"22",border:`1px solid ${t.acc}`,borderRadius:6,padding:"3px 10px",fontSize:11,color:t.acc,fontFamily:"'DM Mono',monospace"}}>
+                {["polygon","curve","polyline","bezier"].includes(activeTool)?`${currentDraw.points.length} pts · ${isMobile?"double-tap to finish":"dbl-click to finish"}`:activeTool==="tangent"?`${currentDraw.points.length===1?(currentDraw.tangentAngle!=null?"tangent snapped · click for endpoint":"click 2nd point"):""}`:activeTool==="mirror"?(currentDraw.points.length===1?"select axis pt 1":currentDraw.points.length===2?"select axis pt 2 → mirror":""):(()=>{const n={line:2,angle3:3,angle4:4,perp:3,ruler:2,ellipse:3,arc:3,circle:2,tangent:2,concentric:3}[activeTool];return n?`${currentDraw.points.length}/${n}`:`${currentDraw.points.length} pts`;})()}
+              </div>}
+            </div>
+            <div className="filmstrip-container">
+              {filmstripOpen ? (
+                <div className="filmstrip-open" style={{borderRadius:8,background:t.surf+"ee",border:`1px solid ${t.bdr}`,boxShadow:`0 2px 12px ${t.shadow}44`,backdropFilter:"blur(6px)",display:"flex",alignItems:"stretch",overflow:"hidden"}}>
+                  <SessionFilmstrip project={project} t={t} onUpdateProject={onUpdateProject}/>
+                  <button onClick={()=>setFilmstripOpen(false)} title="Collapse filmstrip"
+                    style={{background:"none",border:"none",borderLeft:`1px solid ${t.bdr}`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:"0 6px",color:t.tx3,fontSize:10,flexShrink:0,transition:"color 0.15s"}}
+                    onMouseEnter={e=>e.currentTarget.style.color=t.tx} onMouseLeave={e=>e.currentTarget.style.color=t.tx3}>◀</button>
+                </div>
+              ) : (
+                <button onClick={()=>setFilmstripOpen(true)} title="Show filmstrip"
+                  className="filmstrip-collapsed" style={{background:t.surf+"ee",border:`1px solid ${t.bdr}`,borderRadius:6,boxShadow:`0 2px 12px ${t.shadow}44`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:"8px 4px",color:t.tx3,fontSize:10,backdropFilter:"blur(6px)",transition:"color 0.15s"}}
+                  onMouseEnter={e=>e.currentTarget.style.color=t.tx} onMouseLeave={e=>e.currentTarget.style.color=t.tx3}>▶</button>
+              )}
+            </div>
           </div>
-          {/* Floating session filmstrip at bottom — collapsible to the left (desktop only) */}
-          <div className="filmstrip-container">
-            {filmstripOpen ? (
-              <div className="filmstrip-open" style={{borderRadius:8,background:t.surf+"ee",border:`1px solid ${t.bdr}`,boxShadow:`0 2px 12px ${t.shadow}44`,backdropFilter:"blur(6px)",display:"flex",alignItems:"stretch",overflow:"hidden"}}>
-                <SessionFilmstrip project={project} t={t} onUpdateProject={onUpdateProject}/>
-                <button onClick={()=>setFilmstripOpen(false)} title="Collapse filmstrip"
-                  style={{background:"none",border:"none",borderLeft:`1px solid ${t.bdr}`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:"0 6px",color:t.tx3,fontSize:10,flexShrink:0,transition:"color 0.15s"}}
-                  onMouseEnter={e=>e.currentTarget.style.color=t.tx} onMouseLeave={e=>e.currentTarget.style.color=t.tx3}>◀</button>
-              </div>
-            ) : (
-              <button onClick={()=>setFilmstripOpen(true)} title="Show filmstrip"
-                className="filmstrip-collapsed" style={{background:t.surf+"ee",border:`1px solid ${t.bdr}`,borderRadius:6,boxShadow:`0 2px 12px ${t.shadow}44`,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",padding:"8px 4px",color:t.tx3,fontSize:10,backdropFilter:"blur(6px)",transition:"color 0.15s"}}
-                onMouseEnter={e=>e.currentTarget.style.color=t.tx} onMouseLeave={e=>e.currentTarget.style.color=t.tx3}>▶</button>
-            )}
           </div>
         </div>
 
-        {/* RIGHT PANEL — VSCode-style vertical tabs on left */}
-        <div ref={panelRef} className={`right-panel${showMobilePanel?" right-panel-open":""}`} style={{width:rightPanelWidth,background:t.surf,userSelect:rightPanelResizing?"none":"auto",cursor:rightPanelResizing?"col-resize":"auto",transition:"width 0.25s ease"}}>
+        {/* RIGHT PANEL — desktop only */}
+        {!isMobile&&<div ref={panelRef} className={`right-panel${showMobilePanel?" right-panel-open":""}`} style={{width:rightPanelWidth,background:t.surf,userSelect:rightPanelResizing?"none":"auto",cursor:rightPanelResizing?"col-resize":"auto",transition:"width 0.25s ease"}}>
             <RightPanelSidebar t={t} rightPanel={rightPanel} setRightPanel={setRightPanel}
               panelTabs={panelTabs} toggleBtnRef={toggleBtnRef} toggleCollapsed={toggleCollapsed}
               showMobilePanel={showMobilePanel} />
-              {/* Panel content — scrollbar hidden but scrollable */}
             <div ref={contentRef} style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden",minWidth:0,maxWidth:800,opacity:1,transition:"max-width 0.25s ease, opacity 0.2s ease"}}>
               <PanelContent rightPanel={rightPanel} panelIcons={panelIcons} panelTabs={panelTabs} t={t}
                 pMarkups={pMarkups} pSessions={pSessions}
@@ -1461,10 +1489,33 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
                 <MarkupProps m={selectedMarkup} t={t} theme={theme} onUpdate={p=>updMarkup(selectedMarkup.id,p)} onDelete={()=>delMarkup(selectedMarkup.id)} calibration={calibration} onParallel={()=>dispatch({type:"SET",payload:{activeTool:"parallel"}})} formatAngle={formatAngle} norms={norms} onUpdateNorms={ns=>updSession({norms:ns})}/>
               </div>}
             </div>
-            {/* Resize handle */}
             <div onMouseDown={()=>dispatch({type:"SET",payload:{rightPanelResizing:true}})} style={{width:4,cursor:"col-resize",background: rightPanelResizing ? t.acc : "transparent",transition:"background 0.15s",flexShrink:0}}/>
-          </div>
+          </div>}
       </div>
+
+      {/* MOBILE: swipeable bottom sheet (overlays canvas) */}
+      {isMobile&&<MobileBottomSheet t={t} isOpen={mobileTab!=="canvas"} onClose={()=>useUIStore.setState({mobileTab:"canvas"})}>
+        {mobileTab==="more"?<MobileMorePanel t={t} panels={panelTabs.filter(([k])=>!["markups","measurements"].includes(k))} panelIcons={panelIcons} onSelect={key=>{useUIStore.setState({mobileTab:key,rightPanel:key});}} />:<>
+          <PanelContent rightPanel={rightPanel} panelIcons={panelIcons} panelTabs={panelTabs} t={t}
+            pMarkups={pMarkups} pSessions={pSessions}
+            allMeas={allMeas} formulaMeas={formulaMeas} calibration={calibration} norms={norms} formatAngle={formatAngle}
+            exportCSV={exportCSV} userPresets={userPresets} handleSavePreset={handleSavePreset} handleDeletePreset={handleDeletePreset}
+            updSession={updSession} dispatch={dispatch}
+            formulas={formulas} measScope={measScope} pinnedFormulas={pinnedFormulas} setPinnedFormulas={setPinnedFormulas}
+            processing={processing} lutMode={lutMode} lutInvert={lutInvert} showLUT={showLUT} setShowLUT={setShowLUT} showScaleBar={showScaleBar} setShowScaleBar={setShowScaleBar} showHistogram={showHistogram} setShowHistogram={setShowHistogram}
+            sessionImage={sessionImage} stackImgRef={stackImgRef}
+            project={project} onUpdateProject={onUpdateProject}
+            markups={markups} loadAirwayTier={loadAirwayTier} showAirwayOverlay={showAirwayOverlay} setShowAirwayOverlay={setShowAirwayOverlay}
+            loadTemplate={loadTemplate} patientSex={patientSex} patientAge={patientAge} canvasRef={canvasRef}
+            canvasSize={canvasSize} toImage={toImage} addMarkup={addMarkup} pushUndo={pushUndo}
+          />
+          {selectedMarkup&&<div style={{borderTop:`1px solid ${t.bdr}`,padding:12,flexShrink:0}}>
+            <MarkupProps m={selectedMarkup} t={t} theme={theme} onUpdate={p=>updMarkup(selectedMarkup.id,p)} onDelete={()=>delMarkup(selectedMarkup.id)} calibration={calibration} onParallel={()=>dispatch({type:"SET",payload:{activeTool:"parallel"}})} formatAngle={formatAngle} norms={norms} onUpdateNorms={ns=>updSession({norms:ns})}/>
+          </div>}
+        </>}
+      </MobileBottomSheet>}
+
+      {isMobile&&<MobileTabBar t={t}/>}
 
       <ContextMenu
         theme={t}

@@ -23,7 +23,7 @@ export default function TopBar({
   const annotationSize = useUIStore(s => s.annotationSize);
   const showDisplacement = useUIStore(s => s.showDisplacement);
   const compareSession = useUIStore(s => s.compareSession);
-  const showMobilePanel = useUIStore(s => s.showMobilePanel);
+  const mobileTab = useUIStore(s => s.mobileTab);
 
   const [snapDrop, setSnapDrop] = useState(false);
   const [snapRect, setSnapRect] = useState(null);
@@ -116,7 +116,7 @@ export default function TopBar({
           <div style={{ width: 10, height: 10, borderRadius: 3, background: th.acc }} />
         </button>
       ))}
-      <span className="hide-desktop" style={{display:"contents"}}><Btn ghost t={t} small active={showMobilePanel} title="Toggle panel" onClick={() => dispatch({ type: "SET", payload: { showMobilePanel: v => !v } })}>≡</Btn></span>
+      <span className="hide-desktop" style={{display:"contents"}}><Btn ghost t={t} small active={mobileTab!=="canvas"} title="Toggle panel" onClick={() => { const s=useUIStore.getState();useUIStore.setState({mobileTab:s.mobileTab==="canvas"?s.rightPanel:"canvas"});}}>≡</Btn></span>
     </div>
   );
 }
