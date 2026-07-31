@@ -343,15 +343,39 @@ function FormulaEditor({t,formula,scope,onSave,onClose}){
   );
 }
 function MobileMorePanel({t, panels, panelIcons, onSelect, theme, setTheme, onSaveProject, dispatch}){
+  const [isFs, setIsFs] = useState(false);
+  useEffect(() => {
+    const onChange = () => setIsFs(!!(document.fullscreenElement || document.webkitFullscreenElement));
+    document.addEventListener("fullscreenchange", onChange);
+    document.addEventListener("webkitfullscreenchange", onChange);
+    onChange();
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      document.removeEventListener("webkitfullscreenchange", onChange);
+    };
+  }, []);
+  const toggleFullscreen = () => {
+    try {
+      if (document.fullscreenElement || document.webkitFullscreenElement) {
+        const exit = document.exitFullscreen || document.webkitExitFullscreen;
+        exit?.call(document);
+      } else {
+        const el = document.documentElement;
+        const req = el.requestFullscreen || el.webkitRequestFullscreen;
+        const p = req?.call(el);
+        if (p && typeof p.catch === "function") p.catch(() => {});
+      }
+    } catch { /* fullscreen unavailable */ }
+  };
   const actionBtn = {
     display:"flex",flexDirection:"column",alignItems:"center",gap:6,
     padding:"16px 8px",background:t.surf2,borderRadius:10,cursor:"pointer",
-    color:t.tx,border:"none",transition:"background 0.15s",
+    color:t.tx,border:"1px solid transparent",transition:"background 0.15s",
   };
   return(
     <div style={{padding:"12px 16px 16px"}}>
       <div style={{fontSize:13,fontWeight:700,color:t.tx2,marginBottom:12}}>More Tools</div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:8,marginBottom:12}}>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(84px,1fr))",gap:8,marginBottom:12}}>
         <button onClick={onSaveProject} style={actionBtn}
           onMouseEnter={e=>e.currentTarget.style.background=t.surf3}
           onMouseLeave={e=>e.currentTarget.style.background=t.surf2}>
@@ -375,6 +399,17 @@ function MobileMorePanel({t, panels, panelIcons, onSelect, theme, setTheme, onSa
             <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 -960 960 960" width="20" fill={t.tx}><path d="M200-120q-33 0-56.5-23.5T120-200v-640h80v640h640v80H200Zm40-120v-360h160v360H240Zm200 0v-560h160v560H440Zm200 0v-200h160v200H640Z" /></svg>
           </span>
           <span style={{fontSize:11,fontWeight:600,color:t.tx}}>Normogram</span>
+        </button>
+        <button onClick={toggleFullscreen}
+          style={{...actionBtn, background:isFs?t.acc+"22":t.surf2, border:`1px solid ${isFs?t.acc:t.bdr}`}}
+          onMouseEnter={e=>e.currentTarget.style.background=t.surf3}
+          onMouseLeave={e=>{e.currentTarget.style.background=isFs?t.acc+"22":t.surf2;}}>
+          <span style={{height:24,display:"flex",alignItems:"center",color:t.acc}}>
+            {isFs
+              ? <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 0 24 24" width="20" fill={t.tx}><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z" /></svg>
+              : <svg xmlns="http://www.w3.org/2000/svg" height="20" viewBox="0 0 24 24" width="20" fill={t.tx}><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z" /></svg>}
+          </span>
+          <span style={{fontSize:11,fontWeight:600,color:t.tx}}>{isFs?"Restore":"Fullscreen"}</span>
         </button>
       </div>
       <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:14,padding:"0 2px"}}>

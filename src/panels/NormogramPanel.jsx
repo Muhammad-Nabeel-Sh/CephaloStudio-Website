@@ -55,7 +55,7 @@ function PolygonChart({ rows, t, formatValue, getSeverityColor, totalH, svgRef }
   const clamp = (v) => Math.max(-SD_RANGE, Math.min(SD_RANGE, v));
 
   return (
-    <svg ref={svgRef} viewBox={`0 0 700 ${totalH}`} style={{ maxWidth: "100%", width: 1000, height: totalH, display: "block", overflow: "visible", fontFamily: "'DM Sans','DM Mono',sans-serif", userSelect: "none" }}>
+    <svg ref={svgRef} viewBox={`0 0 700 ${totalH}`} style={{ maxWidth: "100%", minWidth: 560, width: 1000, height: totalH, display: "block", overflow: "visible", fontFamily: "'DM Sans','DM Mono',sans-serif", userSelect: "none" }}>
       <rect x="0" y="0" width="700" height={totalH} fill={t.bg} />
       <rect x={LABEL_W} y={TOP} width={700 - LABEL_W - CHART_R} height={rows.length * ROW_H} fill={t.surf} rx="4" />
 
@@ -140,7 +140,7 @@ function WiggleChart({ rows, t, formatValue, getSeverityColor, totalH, svgRef })
   const barWidth = (sd) => Math.abs(sd * pxPerSd);
 
   return (
-    <svg ref={svgRef} viewBox={`0 0 700 ${totalH}`} style={{ maxWidth: "100%", width: 1000, height: totalH, display: "block", overflow: "visible", fontFamily: "'DM Sans','DM Mono',sans-serif", userSelect: "none" }}>
+    <svg ref={svgRef} viewBox={`0 0 700 ${totalH}`} style={{ maxWidth: "100%", minWidth: 560, width: 1000, height: totalH, display: "block", overflow: "visible", fontFamily: "'DM Sans','DM Mono',sans-serif", userSelect: "none" }}>
       <rect x="0" y="0" width="700" height={totalH} fill={t.bg} />
       <rect x={LABEL_W} y={TOP} width={700 - LABEL_W - CHART_R} height={rows.length * ROW_H} fill={t.surf} rx="4" />
 
@@ -232,7 +232,7 @@ function RadarChart({ rows, t, getSeverityColor }) {
   const ringLabels = [-2, -1, 1, 2];
 
   return (
-    <svg viewBox="0 0 700 540" style={{ maxWidth: "100%", width: 1000, height: 600, display: "block", overflow: "visible", fontFamily: "'DM Sans','DM Mono',sans-serif", userSelect: "none" }}>
+    <svg viewBox="0 0 700 540" style={{ maxWidth: "100%", minWidth: 560, width: 1000, height: 600, display: "block", overflow: "visible", fontFamily: "'DM Sans','DM Mono',sans-serif", userSelect: "none" }}>
       <rect x="0" y="0" width="700" height="540" fill={t.bg} rx="4" />
 
       <text x={CX} y={16} textAnchor="middle" fill={t.tx2} fontSize="13" fontWeight="700" fontFamily="'Syne',sans-serif">
@@ -311,7 +311,7 @@ function SummaryView({ rows, t, formatValue }) {
   return (
     <div style={{ width: "100%", fontFamily: "'DM Sans',sans-serif" }}>
       {/* Grand total badge row */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 16, justifyContent: "center" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 16, justifyContent: "center" }}>
         {[
           { label: "Normal (≤1σ)", count: grandNormal, color: t.ok },
           { label: "Mild (1–2σ)", count: grandMild, color: t.warn },
@@ -625,7 +625,7 @@ export default function NormogramPanel({ allMeas, norms, t, formatAngle }) {
   return (
     <div ref={containerRef} style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "100%" }}>
       {/* Chart type toggle */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 12, background: t.surf2, borderRadius: 8, padding: 3, border: `1px solid ${t.bdr}` }}>
+      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 4, marginBottom: 12, background: t.surf2, borderRadius: 8, padding: 3, border: `1px solid ${t.bdr}` }}>
         {[
           { id: "polygon", label: "Polygon", icon: "⬡" },
           { id: "wiggle", label: "Wiggle", icon: "▬" },
