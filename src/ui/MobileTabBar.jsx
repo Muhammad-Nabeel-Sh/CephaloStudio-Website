@@ -15,9 +15,10 @@ const TABS = [
 export default function MobileTabBar({ t }) {
   const mobileTab = useUIStore(s => s.mobileTab);
   return (
-    <div style={{
+    <div className="mobile-chrome" style={{
       display: "flex", height: 52, background: t.surf, borderTop: `1px solid ${t.bdr}`,
       flexShrink: 0, position: "relative", zIndex: 20,
+      paddingBottom: "env(safe-area-inset-bottom, 0px)",
     }}>
       {TABS.map(tab => {
         const active = mobileTab === tab.key;

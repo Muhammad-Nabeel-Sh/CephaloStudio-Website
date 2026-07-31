@@ -24,7 +24,7 @@ export default function SessionFilmstrip({ project, t, onUpdateProject, compact 
   };
 
   return (
-    <div style={{
+    <div className="mobile-chrome" style={{
       display: "flex", alignItems: "stretch", gap: 0, flexShrink: 0,
       background: t.surf, borderBottom: `1px solid ${t.bdr}`,
       overflow: "hidden", height: compact ? 44 : 62,
