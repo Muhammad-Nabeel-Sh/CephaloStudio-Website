@@ -291,6 +291,9 @@ export function validateExample(data) {
     if (m.stage != null && typeof m.stage !== "number" && typeof m.stage !== "string") {
       return `Example markup "${m.label || "(unnamed)"}" field "stage" must be a number or string.`;
     }
+    if (m.hint != null && typeof m.hint !== "string") {
+      return `Example markup "${m.label || "(unnamed)"}" field "hint" must be a string.`;
+    }
   }
   // Optional `measurements` envelope: a teaching mapping table. Each entry names
   // a measurement, the labels of the points that combine into it, an optional

@@ -572,7 +572,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   }, []);
   const setRightPanel = useCallback((v) => useUIStore.setState({ rightPanel: v }), []);
   const setPlacingQueue = useCallback((v) => {
-    useUIStore.setState({ placingQueue: typeof v === "function" ? v(useUIStore.getState().placingQueue) : v });
+    useToolStore.setState({ placingQueue: typeof v === "function" ? v(useToolStore.getState().placingQueue) : v });
   }, []);
   const setShowLUT = useCallback((v) => {
     useUIStore.setState({ showLUT: typeof v === "function" ? v(useUIStore.getState().showLUT) : v });

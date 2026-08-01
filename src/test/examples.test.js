@@ -385,6 +385,11 @@ describe("buildStages", () => {
   it("validateExample accepts numeric and string stages", () => {
     expect(validateExample(mkExample({ markups: [{ type: "point", label: "N", stage: 2 }, { type: "point", label: "A", stage: "cranial base" }] }))).toBeNull();
   });
+
+  it("validateExample accepts a string hint and rejects a wrong-typed hint", () => {
+    expect(validateExample(mkExample({ markups: [{ type: "point", label: "N", hint: "Find the frontonasal suture." }] }))).toBeNull();
+    expect(validateExample(mkExample({ markups: [{ type: "point", label: "N", hint: 42 }] }))).toMatch(/hint/);
+  });
 });
 
 // ─── Community manifest (Phase 7: fetch + authoring docs) ─────────────────
