@@ -30,6 +30,7 @@ export const useUIStore = create(() => ({
   rightPanelWidth: 440,
   rightPanelResizing: false,
   showDisplacement: false,
+  showGroupsLegend: false,
   compareSessionId: null,
   displacementOverlay: false,
   refLandmark1: "",

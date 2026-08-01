@@ -56,6 +56,7 @@ export function MarkupGearSettings({
   showAnnotations, setShowAnnotations, annotationSize, setAnnotationSize,
   showDefTooltips, setShowDefTooltips, showDisplacement, setShowDisplacement,
   showGrid, setShowGrid, showAirwayOverlay, setShowAirwayOverlay,
+  showGroupsLegend, setShowGroupsLegend,
   defaultLineStyle, setDefaultLineStyle, defaultMarkupColor, setDefaultMarkupColor,
   defaultLineWidth, setDefaultLineWidth, autoHideLabels, setAutoHideLabels,
   annotationBold, setAnnotationBold, snapTolerance, setSnapTolerance,
@@ -95,6 +96,7 @@ export function MarkupGearSettings({
           <ToggleRow t={t} label="Displacement" checked={showDisplacement} onChange={() => setShowDisplacement(v => !v)} />
           <ToggleRow t={t} label="Grid overlay" checked={showGrid} onChange={() => setShowGrid(v => !v)} />
           <ToggleRow t={t} label="Airway overlay" checked={showAirwayOverlay} onChange={() => setShowAirwayOverlay(v => !v)} />
+          <ToggleRow t={t} label="Groups legend" checked={showGroupsLegend} onChange={() => setShowGroupsLegend(v => !v)} />
 
           {/* ── DEFAULTS ── */}
           <SectionHeader t={t} label="Defaults" />

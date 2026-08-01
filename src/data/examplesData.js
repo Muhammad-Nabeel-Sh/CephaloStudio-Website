@@ -22,8 +22,13 @@ Object.keys(parsed).forEach(name => {
   const total = data?.markups?.length || 0;
   EXAMPLE_LIST.push({
     id: name,
-    label: name === "Landmarks" ? "Example 1" : name,
+    label: data?.name || (name === "Landmarks" ? "Example 1" : name),
+    description: data?.description || "",
+    author: data?.author || "",
+    projection: data?.projection || "",
+    analysisName: data?.analysisName || "",
     subtitle: total > 1 ? `${data?.markups?.[0]?.label || "Template"} + ${ptCount} landmarks` : `${ptCount} landmarks`,
     badge: `${total} items`,
+    ptCount,
   });
 });

@@ -50,6 +50,43 @@ const GUIDES = {
     ],
   },
 
+  comparisons: {
+    title: "Comparisons Guide",
+    icon: "🔍",
+    sections: [
+      {
+        heading: "What is comparison?",
+        body: "Compare lets you overlay two sessions to visualise changes between timepoints, treatments, or raters. The compared session's markups are rendered on the canvas on top of the active session, with alignment, blending, displacement vectors, tracking lines, and airway overlay controls.",
+        icon: "📖",
+      },
+      {
+        heading: "Alignment modes",
+        items: [
+          "2-Point — pick two landmarks as anchors; the compared session is translated, rotated, and scaled so those landmarks match",
+          "Procrustes — uses ALL matching landmarks to compute the optimal rotation, translation, and scale via generalized Procrustes analysis",
+          "Vector Scale — scales the length of the displacement arrows",
+        ],
+        icon: "🎯",
+      },
+      {
+        heading: "Overlay tools",
+        items: [
+          "⇝ Vec — draws displacement lines between matching landmarks (green <2mm, yellow 2-5mm, red >5mm)",
+          "Overlay — renders the compared session semi-transparently with the chosen alignment",
+          "Blend — controls the transparency of the overlaid session",
+          "Show tracking lines — connects each landmark to its matched position",
+          "Show airway overlay — highlights the airway tracing of the compared session",
+        ],
+        icon: "🖼️",
+      },
+      {
+        heading: "Tips",
+        body: "• Ensure both sessions use matching landmark labels — Procrustes, displacement vectors, and airway overlay rely on label matching\n• Select a compare session from the dropdown; the active session is the base\n• For a full quantified analysis (deltas, angles, growth), use the Superimposition research module\n• The compare overlay shares the same 2-Point / Procrustes algorithms used by the Superimposition module",
+        icon: "💡",
+      },
+    ],
+  },
+
   subjects: {
     title: "Subjects Guide",
     icon: "👤",

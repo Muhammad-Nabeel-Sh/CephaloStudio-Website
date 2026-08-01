@@ -254,3 +254,37 @@ export function validateCepht(data) {
   }
   return null;
 }
+
+// ─── .cepht example validation (Examples panel 2.0) ─────────────────────────
+// An *example* is a cepht template that doubles as a worked analysis. On top of
+// the base `validateCepht` structure it carries an optional but encouraged
+// envelope: `description`, `author`, `projection`, `analysisName` (the last two
+// power the "load a full analysis" flow — see src/workspace/template.js).
+// Returns null if valid, or a human-readable error string. Envelope fields are
+// optional; only *wrongly-typed* present values are rejected, so community
+// examples with a bare minimum never fail hard.
+const EXAMPLE_PROJECTIONS = ["lateral", "ap", "smv", "opg", "handwrist", "photolateral", "photofrontal"];
+
+export function validateExample(data) {
+  const base = validateCepht(data);
+  if (base) return base;
+  const env = [
+    ["description", "string"],
+    ["author", "string"],
+    ["analysisName", "string"],
+  ];
+  for (const [key, type] of env) {
+    if (data[key] != null && typeof data[key] !== type) {
+      return `Example field "${key}" must be a ${type} (got ${typeof data[key]}).`;
+    }
+  }
+  if (data.projection != null) {
+    if (typeof data.projection !== "string") {
+      return "Example field \"projection\" must be a string.";
+    }
+    if (!EXAMPLE_PROJECTIONS.includes(data.projection)) {
+      return `Unknown example projection "${data.projection}". Supported: ${EXAMPLE_PROJECTIONS.join(", ")}.`;
+    }
+  }
+  return null;
+}

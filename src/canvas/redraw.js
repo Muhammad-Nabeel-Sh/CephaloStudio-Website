@@ -32,7 +32,7 @@ export function createRedraw(dc) {
       displacementOverlay, overlayBlend, overlayAlignMode, overlayVectorScale,
       showTrackingLines, refLandmark1, refLandmark2, showCalib, pendingRuler,
       showGrid, showAirwayOverlay, showCpAlways, showAnchorAlways,
-      snapTolerance, autoHideLabels, annotationBold,
+      snapTolerance, autoHideLabels, annotationBold, showGroupsLegend,
     } = dc;
     const zoom = dc.zoomRef.current;
 
@@ -410,6 +410,9 @@ export function createRedraw(dc) {
 
     if (showLUT) dc.drawLUTLegend(ctx2d, lutMode, lutInvert, W, H, t);
 
+    // ── Groups legend ──
+    if (showGroupsLegend) drawGroupsLegend(ctx2d, markups, t, W, H);
+
     // ── Coordinate readout ──
     if (mousePos) {
       const ip = { x: (mousePos.x - pan.x) / zoom, y: (mousePos.y - pan.y) / zoom };
@@ -429,4 +432,68 @@ export function createRedraw(dc) {
 
     ctx2d.restore(); // end DPR scale
   };
+}
+
+// ────────────────────────────────────────────────────────────────────────────────
+// Groups legend — drawn on the main canvas when the markup settings toggle is on.
+// Derives { id, color, count } from the optional `group` field on point markups.
+// ────────────────────────────────────────────────────────────────────────────────
+export function drawGroupsLegend(ctx, markups, t, W, H) {
+  const map = new Map();
+  for (const m of markups) {
+    if (m.type !== "point" || !m.group) continue;
+    const g = map.get(m.group) || { id: m.group, color: m.color || t.acc, count: 0 };
+    g.count++;
+    map.set(m.group, g);
+  }
+  const groups = [...map.values()];
+  if (!groups.length) return;
+
+  const padX = 10, rowH = 18, headH = 20;
+  const font = '11px "DM Sans",sans-serif';
+  const countFont = '10px "DM Mono",monospace';
+  ctx.save();
+  ctx.font = font;
+  let w = 90;
+  for (const g of groups) {
+    ctx.font = countFont;
+    const cw = ctx.measureText(String(g.count)).width;
+    ctx.font = font;
+    w = Math.max(w, 28 + ctx.measureText(g.id).width + cw + 12);
+  }
+  w = Math.min(w, W - 24);
+  const maxRows = Math.max(1, Math.floor((H - 18) / rowH));
+  const rows = groups.slice(0, maxRows);
+  const h = headH + rows.length * rowH + 6;
+  const x = padX, y = padX;
+
+  ctx.fillStyle = t.surf + "e6";
+  ctx.strokeStyle = t.bdr;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 8);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = t.tx3;
+  ctx.font = 'bold 8px "DM Sans",sans-serif';
+  ctx.fillText("GROUPS", x + 10, y + 14);
+
+  ctx.font = font;
+  rows.forEach((g, i) => {
+    const ry = y + headH + i * rowH;
+    ctx.fillStyle = g.color;
+    ctx.fillRect(x + 10, ry + 2, 12, 12);
+    ctx.strokeStyle = t.bdr;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 10, ry + 2, 12, 12);
+    ctx.fillStyle = t.tx;
+    ctx.fillText(g.id, x + 28, ry + 13);
+    ctx.font = countFont;
+    ctx.fillStyle = t.tx3;
+    const cw = ctx.measureText(String(g.count)).width;
+    ctx.fillText(String(g.count), x + w - 10 - cw, ry + 13);
+    ctx.font = font;
+  });
+  ctx.restore();
 }

@@ -11,6 +11,7 @@ export function MarkupsPanel({ markups, t, theme, selectedId, onSelect, onDelete
   showAnnotations, setShowAnnotations, annotationSize, setAnnotationSize,
   showDefTooltips, setShowDefTooltips, showDisplacement, setShowDisplacement,
   showGrid, setShowGrid, showAirwayOverlay, setShowAirwayOverlay,
+  showGroupsLegend, setShowGroupsLegend,
   defaultLineStyle, setDefaultLineStyle, defaultMarkupColor, setDefaultMarkupColor,
   defaultLineWidth, setDefaultLineWidth, autoHideLabels, setAutoHideLabels,
   annotationBold, setAnnotationBold, snapTolerance, setSnapTolerance,
@@ -77,6 +78,7 @@ export function MarkupsPanel({ markups, t, theme, selectedId, onSelect, onDelete
           showDisplacement={showDisplacement} setShowDisplacement={setShowDisplacement}
           showGrid={showGrid} setShowGrid={setShowGrid}
           showAirwayOverlay={showAirwayOverlay} setShowAirwayOverlay={setShowAirwayOverlay}
+          showGroupsLegend={showGroupsLegend} setShowGroupsLegend={setShowGroupsLegend}
           defaultLineStyle={defaultLineStyle} setDefaultLineStyle={setDefaultLineStyle}
           defaultMarkupColor={defaultMarkupColor} setDefaultMarkupColor={setDefaultMarkupColor}
           defaultLineWidth={defaultLineWidth} setDefaultLineWidth={setDefaultLineWidth}

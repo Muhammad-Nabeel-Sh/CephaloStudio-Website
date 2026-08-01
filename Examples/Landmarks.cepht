@@ -2557,15 +2557,15 @@
     },
     {
       "id": "ejbqov2q",
-      "color": "#a855f7",
+      "color": "#f59e0b",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Nasion",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#f59e0b",
+      "fillColor": "#f59e0b22",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -2575,19 +2575,20 @@
           "x": 1620.8977116177525,
           "y": -150.27612503571305
         }
-      ]
+      ],
+      "group": "cranial base"
     },
     {
       "id": "sd638g3h",
-      "color": "#a855f7",
+      "color": "#f59e0b",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Sella Turcica",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#f59e0b",
+      "fillColor": "#f59e0b22",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -2597,19 +2598,20 @@
           "x": 1355.7000760091241,
           "y": -102.67654941365171
         }
-      ]
+      ],
+      "group": "cranial base"
     },
     {
       "id": "8ftzjhur",
-      "color": "#a855f7",
+      "color": "#60a5fa",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Point A",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#60a5fa",
+      "fillColor": "#60a5fa22",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -2619,19 +2621,20 @@
           "x": 1638.7560319959555,
           "y": 91.88196991059526
         }
-      ]
+      ],
+      "group": "maxillary"
     },
     {
       "id": "2b5gx6y4",
-      "color": "#a855f7",
+      "color": "#a78bfa",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Point B",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#a78bfa",
+      "fillColor": "#a78bfa22",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -2641,19 +2644,20 @@
           "x": 1621.5850696600446,
           "y": 272.08611438859623
         }
-      ]
+      ],
+      "group": "mandibular"
     },
     {
       "id": "h0tdbdne",
-      "color": "#a855f7",
+      "color": "#60a5fa",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Anterior Nasal Spine",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#60a5fa",
+      "fillColor": "#60a5fa22",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -2663,19 +2667,20 @@
           "x": 1649.5273412345466,
           "y": 78.71542445623747
         }
-      ]
+      ],
+      "group": "maxillary"
     },
     {
       "id": "4kd1b4s8",
-      "color": "#a855f7",
+      "color": "#60a5fa",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Posterior Nasal Spine",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#60a5fa",
+      "fillColor": "#60a5fa22",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -2685,19 +2690,20 @@
           "x": 1411.0692855740929,
           "y": 55.30949621268145
         }
-      ]
+      ],
+      "group": "maxillary"
     },
     {
       "id": "eh5afao8",
-      "color": "#a855f7",
+      "color": "#a78bfa",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Pogonion",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#a78bfa",
+      "fillColor": "#a78bfa22",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -2707,19 +2713,20 @@
           "x": 1631.6312310314072,
           "y": 316.3901304104903
         }
-      ]
+      ],
+      "group": "mandibular"
     },
     {
       "id": "r3pcilwx",
-      "color": "#a855f7",
+      "color": "#a78bfa",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Gnathion",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#a78bfa",
+      "fillColor": "#a78bfa22",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -2729,19 +2736,20 @@
           "x": 1621.3577606423082,
           "y": 337.51728968630835
         }
-      ]
+      ],
+      "group": "mandibular"
     },
     {
       "id": "2thghurl",
-      "color": "#a855f7",
+      "color": "#a78bfa",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Menton",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#a78bfa",
+      "fillColor": "#a78bfa22",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -2751,19 +2759,20 @@
           "x": 1596.7425236015838,
           "y": 346.7998821567554
         }
-      ]
+      ],
+      "group": "mandibular"
     },
     {
       "id": "zze9nhiy",
-      "color": "#a855f7",
+      "color": "#a78bfa",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Gonion",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#a78bfa",
+      "fillColor": "#a78bfa22",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -2773,19 +2782,20 @@
           "x": 1329.1493979823053,
           "y": 238.04528998176568
         }
-      ]
+      ],
+      "group": "mandibular"
     },
     {
       "id": "j2tmfcrp",
-      "color": "#a855f7",
+      "color": "#f472b6",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Incision Superius Incisalis",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#f472b6",
+      "fillColor": "#f472b622",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -2795,19 +2805,20 @@
           "x": 1643.8796138322057,
           "y": 203.94649550339034
         }
-      ]
+      ],
+      "group": "dentition"
     },
     {
       "id": "mw1canm5",
-      "color": "#a855f7",
+      "color": "#f472b6",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Incision Superius Apicalis",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#f472b6",
+      "fillColor": "#f472b622",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -2817,19 +2828,20 @@
           "x": 1612.7680774729063,
           "y": 92.51062890735446
         }
-      ]
+      ],
+      "group": "dentition"
     },
     {
       "id": "kg2gtos9",
-      "color": "#a855f7",
+      "color": "#f472b6",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Incision Inferius Incisalis",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#f472b6",
+      "fillColor": "#f472b622",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -2839,19 +2851,20 @@
           "x": 1629.7149115025402,
           "y": 192.0562974691699
         }
-      ]
+      ],
+      "group": "dentition"
     },
     {
       "id": "5i2b5qjt",
-      "color": "#a855f7",
+      "color": "#f472b6",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Incision Inferius Apicalis",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#f472b6",
+      "fillColor": "#f472b622",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -2861,19 +2874,20 @@
           "x": 1603.1765944744561,
           "y": 283.2025783621619
         }
-      ]
+      ],
+      "group": "dentition"
     },
     {
       "id": "6tsfnnjr",
-      "color": "#a855f7",
+      "color": "#fbbf24",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Pronasale",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#fbbf24",
+      "fillColor": "#fbbf2422",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -2883,19 +2897,20 @@
           "x": 1761.5378304409944,
           "y": 26.29066900071642
         }
-      ]
+      ],
+      "group": "soft tissue"
     },
     {
       "id": "7ldnn8t1",
-      "color": "#a855f7",
+      "color": "#fbbf24",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Subnasale",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#fbbf24",
+      "fillColor": "#fbbf2422",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -2905,19 +2920,20 @@
           "x": 1685.0008498590253,
           "y": 85.75494749226235
         }
-      ]
+      ],
+      "group": "soft tissue"
     },
     {
       "id": "5n5l4tc8",
-      "color": "#a855f7",
+      "color": "#fbbf24",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Labiale superius",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#fbbf24",
+      "fillColor": "#fbbf2422",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -2927,19 +2943,20 @@
           "x": 1681.7245688075132,
           "y": 174.32871924478474
         }
-      ]
+      ],
+      "group": "soft tissue"
     },
     {
       "id": "c3v500ix",
-      "color": "#a855f7",
+      "color": "#fbbf24",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Labiale inferius",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#fbbf24",
+      "fillColor": "#fbbf2422",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -2949,19 +2966,20 @@
           "x": 1675.9789991409302,
           "y": 198.28498470158604
         }
-      ]
+      ],
+      "group": "soft tissue"
     },
     {
       "id": "9fwi0h5w",
-      "color": "#a855f7",
+      "color": "#fbbf24",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Pogonion'",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#fbbf24",
+      "fillColor": "#fbbf2422",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -2971,19 +2989,20 @@
           "x": 1669.787936675831,
           "y": 332.55702102897806
         }
-      ]
+      ],
+      "group": "soft tissue"
     },
     {
       "id": "794z5xze",
-      "color": "#a855f7",
+      "color": "#60a5fa",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Orbitale",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#60a5fa",
+      "fillColor": "#60a5fa22",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -2993,19 +3012,20 @@
           "x": 1566.6590587071166,
           "y": -18.8709154125264
         }
-      ]
+      ],
+      "group": "maxillary"
     },
     {
       "id": "chtquriz",
-      "color": "#a855f7",
+      "color": "#f59e0b",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Porion",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#f59e0b",
+      "fillColor": "#f59e0b22",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -3015,19 +3035,20 @@
           "x": 1205.4520115104388,
           "y": -12.335530080714747
         }
-      ]
+      ],
+      "group": "cranial base"
     },
     {
       "id": "epg1jee9",
-      "color": "#a855f7",
+      "color": "#f59e0b",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Nasion'",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#f59e0b",
+      "fillColor": "#f59e0b22",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -3037,19 +3058,20 @@
           "x": 1651.8855458236765,
           "y": -143.573060807081
         }
-      ]
+      ],
+      "group": "cranial base"
     },
     {
       "id": "p9c1zu4w",
-      "color": "#a855f7",
+      "color": "#fbbf24",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Glabella",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#fbbf24",
+      "fillColor": "#fbbf2422",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -3059,19 +3081,20 @@
           "x": 1659.7554598326415,
           "y": -195.21937149091383
         }
-      ]
+      ],
+      "group": "soft tissue"
     },
     {
       "id": "meqxoqjf",
-      "color": "#a855f7",
+      "color": "#fbbf24",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Columella",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#fbbf24",
+      "fillColor": "#fbbf2422",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -3081,19 +3104,20 @@
           "x": 1726.656084511948,
           "y": 70.76072217784154
         }
-      ]
+      ],
+      "group": "soft tissue"
     },
     {
       "id": "s8blrgvd",
-      "color": "#a855f7",
+      "color": "#60a5fa",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Point A'",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#60a5fa",
+      "fillColor": "#60a5fa22",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -3103,19 +3127,20 @@
           "x": 1679.2470243818002,
           "y": 102.08949727422404
         }
-      ]
+      ],
+      "group": "maxillary"
     },
     {
       "id": "o91cbjlj",
-      "color": "#a855f7",
+      "color": "#fbbf24",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Stomion",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#fbbf24",
+      "fillColor": "#fbbf2422",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -3125,19 +3150,20 @@
           "x": 1664.0150185628365,
           "y": 185.04322012077512
         }
-      ]
+      ],
+      "group": "soft tissue"
     },
     {
       "id": "x2v747ii",
-      "color": "#a855f7",
+      "color": "#a78bfa",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Point B'",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#a78bfa",
+      "fillColor": "#a78bfa22",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -3147,19 +3173,20 @@
           "x": 1652.8056947981063,
           "y": 257.3771576404268
         }
-      ]
+      ],
+      "group": "mandibular"
     },
     {
       "id": "5xwea9gm",
-      "color": "#a855f7",
+      "color": "#a78bfa",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Menton'",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#a78bfa",
+      "fillColor": "#a78bfa22",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -3169,19 +3196,20 @@
           "x": 1598.985955266708,
           "y": 394.42745042885144
         }
-      ]
+      ],
+      "group": "mandibular"
     },
     {
       "id": "3a9ouovu",
-      "color": "#a855f7",
+      "color": "#a78bfa",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Gnathion'",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#a78bfa",
+      "fillColor": "#a78bfa22",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -3191,19 +3219,20 @@
           "x": 1647.5860044175995,
           "y": 372.675009075025
         }
-      ]
+      ],
+      "group": "mandibular"
     },
     {
       "id": "roj82wgy",
-      "color": "#a855f7",
+      "color": "#fbbf24",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Rhinion",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#fbbf24",
+      "fillColor": "#fbbf2422",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -3213,19 +3242,20 @@
           "x": 1660.046433885049,
           "y": -60.087931868313454
         }
-      ]
+      ],
+      "group": "soft tissue"
     },
     {
       "id": "4fg5ono6",
-      "color": "#a855f7",
+      "color": "#60a5fa",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Prosthion",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#60a5fa",
+      "fillColor": "#60a5fa22",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -3235,19 +3265,20 @@
           "x": 1647.0698944859248,
           "y": 153.9045562073872
         }
-      ]
+      ],
+      "group": "maxillary"
     },
     {
       "id": "bl2gzwuy",
-      "color": "#a855f7",
+      "color": "#60a5fa",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Key Ridge",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#60a5fa",
+      "fillColor": "#60a5fa22",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -3257,19 +3288,20 @@
           "x": 1513.2397889235522,
           "y": 63.76883700014295
         }
-      ]
+      ],
+      "group": "maxillary"
     },
     {
       "id": "6xmidt6c",
-      "color": "#a855f7",
+      "color": "#a78bfa",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Condylion",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#a78bfa",
+      "fillColor": "#a78bfa22",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -3279,19 +3311,20 @@
           "x": 1273.7130846509533,
           "y": -12.347839897757375
         }
-      ]
+      ],
+      "group": "mandibular"
     },
     {
       "id": "4b47arzq",
-      "color": "#a855f7",
+      "color": "#f59e0b",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Basion",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#f59e0b",
+      "fillColor": "#f59e0b22",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -3301,19 +3334,20 @@
           "x": 1228.5556693043495,
           "y": 38.49606478878895
         }
-      ]
+      ],
+      "group": "cranial base"
     },
     {
       "id": "um12u2eb",
-      "color": "#a855f7",
+      "color": "#a78bfa",
       "width": 1.5,
       "style": "solid",
       "size": 6,
       "label": "Infradentale",
       "definition": "",
       "showLength": true,
-      "strokeColor": "#a855f7",
-      "fillColor": "#a855f722",
+      "strokeColor": "#a78bfa",
+      "fillColor": "#a78bfa22",
       "strokeWidth": 1.5,
       "visible": true,
       "placed": true,
@@ -3323,7 +3357,8 @@
           "x": 1625.5323905268076,
           "y": 242.94918282736938
         }
-      ]
+      ],
+      "group": "mandibular"
     }
   ],
   "formulas": [],

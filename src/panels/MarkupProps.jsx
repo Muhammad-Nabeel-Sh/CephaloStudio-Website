@@ -1,19 +1,36 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { computeMeasurements, normDeviation, deviationColor, uid } from "../lib/utils.js";
 import { Btn, PropRow, Inp, Divider } from "../ui/ui.jsx";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MARKUP PROPERTIES
 // ═══════════════════════════════════════════════════════════════════════════════
-export function MarkupProps({ m, t, theme, onUpdate, onDelete, calibration, onParallel, formatAngle, norms, onUpdateNorms }) {
+export function MarkupProps({ m, t, theme, onUpdate, onDelete, calibration, onParallel, formatAngle, norms, onUpdateNorms, groupOptions }) {
   const meas = computeMeasurements(m, calibration);
   const relNorms = (norms || []).filter(n => n.markupLabel === m.label);
   const [editingNorm, setEditingNorm] = useState(null);
+
+  const groupColor = useMemo(() => {
+    const g = (groupOptions || []).find(g => g.id === m.group);
+    return g ? g.color : (m.color || t.acc);
+  }, [groupOptions, m.group, m.color, t]);
+
+  const onUpdateGroup = value => {
+    const v = (value || "").trim();
+    const existing = (groupOptions || []).find(g => g.id === v);
+    if (existing) {
+      const c = existing.color;
+      onUpdate({ group: v, color: c, strokeColor: c, fillColor: c + "22" });
+    } else {
+      onUpdate({ group: v || null });
+    }
+  };
+
   return (
     <div>
       <div style={{ fontWeight: 700, fontSize: 12, color: t.tx, marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}><span>Properties</span><Btn t={t} small danger onClick={onDelete}>Delete</Btn></div>
       <PropRow label="Label" t={t}><Inp value={m.label || ""} onChange={v => onUpdate({ label: v })} t={t} /></PropRow>
-      {m.type === "point" && <><PropRow label="Definition" t={t}><Inp value={m.definition || ""} onChange={v => onUpdate({ definition: v })} t={t} /></PropRow><PropRow label="Size" t={t}><input type="range" min="3" max="14" value={m.size || 6} onChange={e => onUpdate({ size: +e.target.value })} style={{ width: "100%", accentColor: t.acc }} /></PropRow></>}
+      {m.type === "point" && <><PropRow label="Definition" t={t}><Inp value={m.definition || ""} onChange={v => onUpdate({ definition: v })} t={t} /></PropRow><PropRow label="Size" t={t}><input type="range" min="3" max="14" value={m.size || 6} onChange={e => onUpdate({ size: +e.target.value })} style={{ width: "100%", accentColor: t.acc }} /></PropRow><PropRow label="Group" t={t}><div style={{ display: "flex", alignItems: "center", gap: 6 }}><input list="markup-group-options" value={m.group || ""} onChange={e => onUpdateGroup(e.target.value)} placeholder="e.g. soft tissue" style={{ flex: 1, minWidth: 0, background: t.surf3, border: `1px solid ${t.bdr}`, borderRadius: 4, padding: "3px 6px", color: t.tx, fontSize: 12, fontFamily: "inherit" }} /><datalist id="markup-group-options">{(groupOptions || []).filter(g => g.id !== m.group).map(g => <option key={g.id} value={g.id} />)}</datalist>{m.group && <span title={`Group "${m.group}"`} style={{ width: 16, height: 16, borderRadius: 4, background: groupColor, border: `1px solid ${t.bdr}`, flexShrink: 0 }} />}{m.group && <button onClick={() => onUpdateGroup("")} title="Clear group" style={{ background: "none", border: "none", color: t.tx3, cursor: "pointer", fontSize: 13, lineHeight: 1, padding: "0 2px" }}>&times;</button>}</div></PropRow></>}
       {m.type === "text" && <><PropRow label="Text" t={t}><Inp value={m.text || ""} onChange={v => onUpdate({ text: v })} t={t} /></PropRow><PropRow label="Size" t={t}><input type="range" min="8" max="48" value={m.fontSize || 14} onChange={e => onUpdate({ fontSize: +e.target.value })} style={{ width: "100%", accentColor: t.acc }} /></PropRow><PropRow label="Bold" t={t}><input type="checkbox" checked={!!m.bold} onChange={e => onUpdate({ bold: e.target.checked })} style={{ accentColor: t.acc }} /></PropRow></>}
       {(m.type === "curve" || m.type === "polyline" || m.type === "polygon") && <PropRow label="Dash" t={t}><select value={m.style || "solid"} onChange={e => onUpdate({ style: e.target.value })} style={{ background: t.surf3, border: `1px solid ${t.bdr}`, borderRadius: 4, padding: "3px 6px", color: t.tx, fontSize: 12, width: "100%", fontFamily: "inherit" }}><option value="solid">Solid</option><option value="dashed">Dashed</option><option value="dotted">Dotted</option></select></PropRow>}
       {(m.type === "curve" || m.type === "polyline" || m.type === "polygon") && <PropRow label="Style" t={t}><div style={{ display: "flex", gap: 4 }}>{["linear", "bspline"].map(s => <button key={s} onClick={() => onUpdate({ curveStyle: s })} style={{ padding: "2px 8px", fontSize: 10, border: `1px solid ${t.bdr}`, borderRadius: 4, background: m.curveStyle === s ? t.acc : "transparent", color: m.curveStyle === s ? (theme === "light" ? "#fff" : t.bg) : t.tx, cursor: "pointer", fontWeight: 600 }}>{s === "linear" ? "Linear" : "B-Spline"}</button>)}</div></PropRow>}

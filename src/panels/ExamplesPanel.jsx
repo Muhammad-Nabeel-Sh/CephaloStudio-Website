@@ -2,6 +2,19 @@ import { useState, useRef, useMemo, useEffect, useCallback } from "react";
 import { EXAMPLE_LIST, getExampleData } from "../data/examplesData.js";
 import { drawMarkup } from "../canvas/drawMarkups.js";
 
+function titleCase(s) {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
+
+function withAlpha(hex, alpha) {
+  return hex + Math.round(alpha * 255).toString(16).padStart(2, "0");
+}
+
+function dimCopy(m) {
+  const c = withAlpha(m.color || "#888888", 0.12);
+  return { ...m, color: c, strokeColor: c, fillColor: c };
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // EXAMPLES PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -15,14 +28,7 @@ export function ExamplesPanel({ t }) {
   }, []);
 
   return (
-    <div style={{ padding: 12, position: "relative" }}>
-      {/* Coming Soon Overlay */}
-      <div style={{ position:"absolute",inset:0,zIndex:10,background:`${t.surf}CC`,backdropFilter:"blur(1px)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",borderRadius:8 }}>
-        <div style={{ fontSize:28,marginBottom:6,opacity:0.8 }}>&#x1F6A7;</div>
-        <div style={{ fontFamily:"'Syne',sans-serif",fontWeight:800,fontSize:18,color:t.tx,marginBottom:4 }}>Coming Soon</div>
-        <div style={{ fontSize:11,color:t.tx2,textAlign:"center",maxWidth:180,lineHeight:1.4 }}>Example templates are being finalized for the next release.</div>
-      </div>
-
+    <div style={{ padding: 12 }}>
       {data && (
         <ExampleViewerModal
           t={t}
@@ -30,23 +36,34 @@ export function ExamplesPanel({ t }) {
           onClose={() => setData(null)}
         />
       )}
-      <div style={{ fontSize: 11, color: t.tx2, marginBottom: 12, lineHeight: 1.5, pointerEvents:"none" }}>
-        Browse example templates. Click <strong>View</strong> to see a preview on canvas.
+      <div style={{ fontSize: 11, color: t.tx2, marginBottom: 12, lineHeight: 1.5 }}>
+        Browse worked examples and interactive illustrations. Click <strong>View</strong> to explore the tracing on canvas — hover any point to read its definition.
       </div>
-      <div style={{ display: "flex", flexDirection: "column", gap: 8, pointerEvents:"none", opacity:0.5 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {EXAMPLE_LIST.map(ex => (
           <div key={ex.id} onClick={() => openExample(ex.id)}
-            style={{ padding: "12px", borderRadius: 8, background: t.surf2, border: `1px solid ${t.bdr}`, cursor: "pointer", display: "flex", alignItems: "center", gap: 10, transition: "border-color 0.15s" }}>
-            <div style={{ width: 36, height: 36, borderRadius: 6, background: t.surf3, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>&#x1F4CB;</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, color: t.tx, marginBottom: 2 }}>{ex.label}</div>
-              <div style={{ fontSize: 10, color: t.tx2 }}>{ex.subtitle}</div>
+            style={{ padding: 12, borderRadius: 8, background: t.surf2, border: `1px solid ${t.bdr}`, cursor: "pointer", display: "flex", flexDirection: "column", gap: 6, transition: "border-color 0.15s" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 6, background: t.surf3, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>&#x1F4CB;</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: t.tx, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ex.label}</div>
+                <div style={{ fontSize: 10, color: t.tx2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ex.subtitle}</div>
+              </div>
+              <button onClick={e => { e.stopPropagation(); openExample(ex.id); }}
+                style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${t.bdr}`, background: t.surf3, color: t.tx, fontSize: 10, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>
+                View
+              </button>
             </div>
-            <span style={{ fontSize: 9, color: t.tx3, background: t.surf3, padding: "2px 6px", borderRadius: 4, whiteSpace: "nowrap" }}>{ex.badge}</span>
-            <button onClick={e => { e.stopPropagation(); openExample(ex.id); }}
-              style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: t.acc, color: t.bg, fontSize: 10, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>
-              View
-            </button>
+            {ex.analysisName && (
+              <span style={{ alignSelf: "flex-start", fontSize: 9, color: t.acc, background: `${t.acc}22`, padding: "2px 8px", borderRadius: 4, fontWeight: 700 }}>
+                {ex.analysisName}
+              </span>
+            )}
+            {ex.description && (
+              <div style={{ fontSize: 10, color: t.tx2, lineHeight: 1.45, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                {ex.description}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -67,6 +84,7 @@ function ExampleViewerModal({ t, data, onClose }) {
   const [panning, setPanning] = useState(false);
   const panStart = useRef(null);
   const [hoveredPt, setHoveredPt] = useState(null);
+  const [activeGroup, setActiveGroup] = useState(null);
 
   // Compute bounding box derived from data
   const boundingBox = useMemo(() => {
@@ -88,6 +106,19 @@ function ExampleViewerModal({ t, data, onClose }) {
     if (isFinite(minX) && minX !== Infinity) return { minX, maxX, minY, maxY };
     return { minX: 0, maxX: 800, minY: 0, maxY: 600 };
   }, [data]);
+
+  // Teaching groups present in the example (from optional `group` on point markups)
+  const groups = useMemo(() => {
+    if (!data?.markups) return [];
+    const map = new Map();
+    for (const m of data.markups) {
+      if (m.type !== "point" || !m.group) continue;
+      const g = map.get(m.group) || { id: m.group, color: m.color || t.acc, count: 0 };
+      g.count++;
+      map.set(m.group, g);
+    }
+    return [...map.values()];
+  }, [data, t]);
 
   // Reset zoom/pan when bounding box changes (new data)
   useEffect(() => {
@@ -111,6 +142,8 @@ function ExampleViewerModal({ t, data, onClose }) {
     if (!pts.length) return;
     const sp = { x: pts[0].x * zoom + pan.x, y: pts[0].y * zoom + pan.y };
     const hasDef = !!hp.definition;
+    const hasGroup = !!hp.group;
+    const gColor = hp.color || t.acc;
     const tipW = Math.max(120, Math.min(340, W - sp.x - 20));
     if (tipW < 60) return;
     const lines = []; let line = "";
@@ -122,19 +155,24 @@ function ExampleViewerModal({ t, data, onClose }) {
       }
       if (line) lines.push(line);
     }
-    const tipH = hasDef ? Math.max(54, 38 + lines.length * 18) : 40;
+    const tipH = Math.max(54, 30 + (hasGroup ? 17 : 0) + (hasDef ? 6 : 0) + lines.length * 15);
     let tx = sp.x + 14, ty = sp.y - 10;
     if (tx + tipW > W - 8) tx = sp.x - tipW - 14;
     ctx.save();
     ctx.shadowColor = "rgba(0,0,0,0.4)"; ctx.shadowBlur = 10; ctx.shadowOffsetY = 2;
     ctx.fillStyle = t.surf2; ctx.beginPath(); ctx.roundRect(tx, ty, tipW, tipH, 8); ctx.fill();
     ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-    ctx.fillStyle = t.acc; ctx.beginPath(); ctx.roundRect(tx, ty, tipW, 3, { upperLeft: 8, upperRight: 8 }); ctx.fill();
+    ctx.fillStyle = gColor; ctx.beginPath(); ctx.roundRect(tx, ty, tipW, 3, { upperLeft: 8, upperRight: 8 }); ctx.fill();
+    const yy = ty + 20;
+    if (hasGroup) {
+      ctx.fillStyle = gColor; ctx.font = 'bold 9px "DM Sans",sans-serif';
+      ctx.fillText(titleCase(hp.group), tx + 12, ty + 16);
+    }
     ctx.fillStyle = t.tx; ctx.font = 'bold 12px "DM Sans",sans-serif';
-    ctx.fillText(hp.label, tx + 12, ty + (hasDef ? 20 : 26));
+    ctx.fillText(hp.label, tx + 12, yy + (hasGroup ? 2 : 6));
     if (hasDef) {
       ctx.fillStyle = t.tx2; ctx.font = '11px "DM Sans",sans-serif';
-      lines.forEach((l, i) => ctx.fillText(l, tx + 12, ty + 38 + i * 16));
+      lines.forEach((l, i) => ctx.fillText(l, tx + 12, yy + (hasGroup ? 20 : 24) + i * 15));
     }
     ctx.restore();
   }, [hoveredPt, data, t, zoom, pan]);
@@ -154,13 +192,16 @@ function ExampleViewerModal({ t, data, onClose }) {
     if (data?.markups) {
       const cal = { done: false, pxPerMm: 1, knownMm: "" };
       const cs = { w: W, h: H };
+      const hoveredGroup = hoveredPt ? (data.markups.find(m => m.id === hoveredPt.mid)?.group || null) : null;
+      const focusGroup = activeGroup || hoveredGroup;
       data.markups.forEach(m => {
-        drawMarkup(ctx, m, zoom, pan, cal, null, t, false, cs, "signed-deg", true, 1, null);
+        const mk = (focusGroup && m.group !== focusGroup) ? dimCopy(m) : m;
+        drawMarkup(ctx, mk, zoom, pan, cal, null, t, false, cs, "signed-deg", true, 1, null);
       });
     }
     renderTooltip(ctx, W);
     ctx.restore();
-  }, [data, t, zoom, pan, renderTooltip]);
+  }, [data, t, zoom, pan, renderTooltip, activeGroup, hoveredPt]);
 
   useEffect(() => {
     if (!rafRef.current)
@@ -312,7 +353,7 @@ function ExampleViewerModal({ t, data, onClose }) {
           <span style={{ fontSize: 16 }}>&#x1F4CB;</span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: t.tx }}>Example: {data?.name || "Template Preview"}</div>
-            <div style={{ fontSize: 10, color: t.tx2 }}>{data?.markups?.length || 0} markups · {data?.projection || ""} projection</div>
+            <div style={{ fontSize: 10, color: t.tx2 }}>{data?.markups?.length || 0} markups · {data?.projection || ""} projection{data?.author ? ` · by ${data.author}` : ""}</div>
           </div>
           <span style={{ fontSize: 9, color: t.tx3, fontFamily: "'DM Mono',monospace" }}>{data?.markups?.filter(m => m.type === "point").length || 0} pts</span>
           <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: 4 }}>
@@ -323,6 +364,11 @@ function ExampleViewerModal({ t, data, onClose }) {
           </div>
           <button onClick={onClose} title="Close" style={{ background: "none", border: "none", color: t.tx3, cursor: "pointer", fontSize: 20, lineHeight: 1, padding: "0 4px" }}>&times;</button>
         </div>
+        {data?.description && (
+          <div style={{ padding: "8px 16px", fontSize: 11, color: t.tx2, lineHeight: 1.5, borderBottom: `1px solid ${t.bdr}`, flexShrink: 0 }}>
+            {data.description}
+          </div>
+        )}
         <div ref={containerRef} style={{ flex: 1, position: "relative", minHeight: 0 }}>
           <canvas ref={canvasRef}
             onMouseDown={handleMouseDown}
@@ -331,6 +377,31 @@ function ExampleViewerModal({ t, data, onClose }) {
             onMouseLeave={handleMouseLeave}
             onDoubleClick={handleDblClick}
             style={{ display: "block", width: "100%", height: "100%", cursor: cursorStyle, touchAction: "none" }} />
+          {groups.length > 0 && (
+            <div style={{ position: "absolute", top: 10, left: 10, zIndex: 3, background: `${t.surf2}e6`, border: `1px solid ${t.bdr}`, borderRadius: 8, padding: "7px 8px", display: "flex", flexDirection: "column", gap: 3, maxWidth: 170, boxShadow: `0 6px 16px ${t.shadow}40`, userSelect: "none" }}>
+              <div style={{ fontSize: 8, fontWeight: 700, color: t.tx2, letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 2, marginLeft: 2 }}>Groups</div>
+              {groups.map(g => {
+                const on = activeGroup === g.id;
+                const off = activeGroup && !on;
+                return (
+                  <div key={g.id} onClick={() => setActiveGroup(on ? null : g.id)} title={`Highlight ${g.id} landmarks`}
+                    style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 10, color: t.tx, cursor: "pointer", padding: "3px 5px", borderRadius: 5, background: on ? `${g.color}22` : "transparent", border: on ? `1px solid ${g.color}66` : "1px solid transparent", opacity: off ? 0.4 : 1, transition: "opacity 0.15s" }}>
+                    <span style={{ width: 9, height: 9, borderRadius: 3, background: g.color, flexShrink: 0 }} />
+                    <span style={{ flex: 1, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{titleCase(g.id)}</span>
+                    <span style={{ color: t.tx3, fontSize: 9 }}>{g.count}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderTop: `1px solid ${t.bdr}`, flexShrink: 0 }}>
+          <div style={{ flex: 1, fontSize: 10, color: t.tx3, lineHeight: 1.4 }}>
+            Drag to pan · scroll to zoom · double-click to fit. Hover any point to read its definition and highlight its group; click a group to isolate it.
+          </div>
+          <button onClick={onClose} style={{ padding: "6px 14px", borderRadius: 6, border: `1px solid ${t.bdr}`, background: t.surf3, color: t.tx, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+            Close
+          </button>
         </div>
       </div>
     </div>

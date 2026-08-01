@@ -487,6 +487,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const showAnnotations = useUIStore(s => s.showAnnotations);
   const annotationSize = useUIStore(s => s.annotationSize);
   const showDisplacement = useUIStore(s => s.showDisplacement);
+  const showGroupsLegend = useUIStore(s => s.showGroupsLegend);
   const rightPanel = useUIStore(s => s.rightPanel);
   const showCalib = useUIStore(s => s.showCalib);
   const pendingRuler = useUIStore(s => s.pendingRuler);
@@ -614,6 +615,9 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const setShowAirwayOverlay = useCallback((v) => {
     useUIStore.setState({ showAirwayOverlay: typeof v === "function" ? v(useUIStore.getState().showAirwayOverlay) : v });
   }, []);
+  const setShowGroupsLegend = useCallback((v) => {
+    useUIStore.setState({ showGroupsLegend: typeof v === "function" ? v(useUIStore.getState().showGroupsLegend) : v });
+  }, []);
   const setShowReportOptions = useCallback((v) => {
     useUIStore.setState({ showReportOptions: typeof v === "function" ? v(useUIStore.getState().showReportOptions) : v });
   }, []);
@@ -733,6 +737,16 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
   const patientSex=activeSession?.meta?.sex||null;
   const patientAge=activeSession?.meta?.age!==undefined&&activeSession?.meta?.age!==null?Number(activeSession.meta.age):null;
   const selectedMarkup=markups.find(m=>m.id===selectedId);
+
+  const groupOptions=useMemo(()=>{
+    const map=new Map();
+    for(const m of markups){
+      if(!m.group||m.type!=="point")continue;
+      const g=map.get(m.group)||{id:m.group,color:m.color||"",count:0};
+      g.count++;map.set(m.group,g);
+    }
+    return [...map.values()];
+  },[markups]);
 
   const [userPresets,setUserPresets]=useState(()=>loadNormLibrary());
   const handleSavePreset=useCallback((preset,mode)=>{setUserPresets(prev=>{const next=mode==="update"?prev.map(p=>p.id===preset.id?preset:p):[...prev,preset];saveNormLibrary(next);return next;});},[]);
@@ -957,6 +971,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       showAirwayOverlay:us.showAirwayOverlay,showCpAlways:us.showCpAlways,
       showAnchorAlways:us.showAnchorAlways,snapTolerance:us.snapTolerance,
       autoHideLabels:us.autoHideLabels,annotationBold:us.annotationBold,
+      showGroupsLegend:us.showGroupsLegend,
       getProcessed,
       alignTwoPoints,
       silhouettes:SILHOUETTES,
@@ -991,7 +1006,10 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
         sg:us.showGrid,sb:us.showScaleBar,dt:us.showDefTooltips,an:us.showAnnotations,
         lut:us.showLUT,as:us.annotationSize,disp:us.showDisplacement,cmp:us.compareSession,
         aw:us.showAirwayOverlay,cpa:us.showCpAlways,ana:us.showAnchorAlways,tol:us.snapTolerance,
-        al:us.autoHideLabels,ab:us.annotationBold };
+        al:us.autoHideLabels,ab:us.annotationBold,
+        sgl:us.showGroupsLegend,
+        ovd:us.displacementOverlay,ovb:us.overlayBlend,ovs:us.overlayVectorScale,
+        ovm:us.overlayAlignMode,rl1:us.refLandmark1,rl2:us.refLandmark2,stl:us.showTrackingLines };
     };
     lastRedrawStateRef.current=pick();
     const check=()=>{
@@ -1569,6 +1587,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     showAnnotations,setShowAnnotations,annotationSize,setAnnotationSize,
     showDefTooltips,setShowDefTooltips,showDisplacement,setShowDisplacement,
     showGrid,setShowGrid,showAirwayOverlay,setShowAirwayOverlay,
+    showGroupsLegend,setShowGroupsLegend,
     defaultLineStyle,setDefaultLineStyle,defaultMarkupColor,setDefaultMarkupColor,
     defaultLineWidth,setDefaultLineWidth,autoHideLabels,setAutoHideLabels,
     annotationBold,setAnnotationBold,snapTolerance,setSnapTolerance,
@@ -1703,7 +1722,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
                 canvasSize={canvasSize} toImage={toImage} addMarkup={addMarkup} pushUndo={pushUndo}
               />
             {selectedMarkup&&<div className="markupprops-panel" style={{borderTop:`1px solid ${t.bdr}`,padding:12,flexShrink:0,overflowY:"auto",scrollbarWidth:"none"}}>
-                <MarkupProps m={selectedMarkup} t={t} theme={theme} onUpdate={p=>{pushUndo();updMarkup(selectedMarkup.id,p);}} onDelete={()=>delMarkup(selectedMarkup.id)} calibration={calibration} onParallel={()=>dispatch({type:"SET",payload:{activeTool:"parallel"}})} formatAngle={formatAngle} norms={norms} onUpdateNorms={ns=>updSession({norms:ns})}/>
+                <MarkupProps m={selectedMarkup} t={t} theme={theme} onUpdate={p=>{pushUndo();updMarkup(selectedMarkup.id,p);if(p.color&&selectedMarkup.group){markups.filter(x=>x.id!==selectedMarkup.id&&x.group===selectedMarkup.group&&x.type==="point").forEach(x=>updMarkup(x.id,{color:p.color,strokeColor:p.color,fillColor:p.color+"22"}));}}} onDelete={()=>delMarkup(selectedMarkup.id)} calibration={calibration} onParallel={()=>dispatch({type:"SET",payload:{activeTool:"parallel"}})} formatAngle={formatAngle} norms={norms} onUpdateNorms={ns=>updSession({norms:ns})} groupOptions={groupOptions}/>
               </div>}
             </div>
             <div onMouseDown={()=>dispatch({type:"SET",payload:{rightPanelResizing:true}})} style={{width:4,cursor:"col-resize",background: rightPanelResizing ? t.acc : "transparent",transition:"background 0.15s",flexShrink:0}}/>
@@ -1727,7 +1746,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
             canvasSize={canvasSize} toImage={toImage} addMarkup={addMarkup} pushUndo={pushUndo}
           />
           {selectedMarkup&&<div style={{borderTop:`1px solid ${t.bdr}`,padding:12,flexShrink:0}}>
-            <MarkupProps m={selectedMarkup} t={t} theme={theme} onUpdate={p=>{pushUndo();updMarkup(selectedMarkup.id,p);}} onDelete={()=>delMarkup(selectedMarkup.id)} calibration={calibration} onParallel={()=>dispatch({type:"SET",payload:{activeTool:"parallel"}})} formatAngle={formatAngle} norms={norms} onUpdateNorms={ns=>updSession({norms:ns})}/>
+            <MarkupProps m={selectedMarkup} t={t} theme={theme} onUpdate={p=>{pushUndo();updMarkup(selectedMarkup.id,p);if(p.color&&selectedMarkup.group){markups.filter(x=>x.id!==selectedMarkup.id&&x.group===selectedMarkup.group&&x.type==="point").forEach(x=>updMarkup(x.id,{color:p.color,strokeColor:p.color,fillColor:p.color+"22"}));}}} onDelete={()=>delMarkup(selectedMarkup.id)} calibration={calibration} onParallel={()=>dispatch({type:"SET",payload:{activeTool:"parallel"}})} formatAngle={formatAngle} norms={norms} onUpdateNorms={ns=>updSession({norms:ns})} groupOptions={groupOptions}/>
           </div>}
         </>}
       </MobileBottomSheet>}

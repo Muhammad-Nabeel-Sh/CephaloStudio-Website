@@ -25,7 +25,7 @@ export default function SessionsPanel({
   const [tab, setTab] = useState("sessions");
   const [newSubjectLabel, setNewSubjectLabel] = useState("");
 
-  const [showCompare, setShowCompare] = useState(false);
+  const [showCompare, setShowCompare] = useState(true);
   const [showMetaModal, setShowMetaModal] = useState(false);
   const [guideKey, setGuideKey] = useState(null);
 
@@ -75,14 +75,14 @@ export default function SessionsPanel({
   return (
     <div style={{ padding: 12 }}>
       <div style={{ display: "flex", gap: 2, marginBottom: 12, borderBottom: `1px solid ${t.bdr}44`, alignItems: "center" }}>
-        {["sessions", "subjects"].map(tabId => (
+        {["sessions", "subjects", "comparisons"].map(tabId => (
           <button key={tabId} onClick={() => setTab(tabId)}
             style={{
               padding: "5px 10px", fontSize: 9, fontWeight: 600, cursor: "pointer",
               border: "none", borderBottom: tab === tabId ? `2px solid ${t.acc}` : "2px solid transparent",
               background: "transparent", color: tab === tabId ? t.acc : t.tx3, textTransform: "uppercase",
             }}>
-            {tabId === "sessions" ? `Sessions (${sessionList.length})` : `Subjects (${subjects.length})`}
+            {tabId === "sessions" ? `Sessions (${sessionList.length})` : tabId === "subjects" ? `Subjects (${subjects.length})` : `Comparisons`}
           </button>
         ))}
         <div style={{ flex: 1 }} />
@@ -171,101 +171,108 @@ export default function SessionsPanel({
             </div>
           )}
 
-          {/* ─── Session Comparison ─── */}
-          <div style={{ marginTop: 16, borderTop: `1px solid ${t.bdr}44`, paddingTop: 12 }}>
-            <div onClick={() => setShowCompare(v => !v)} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", marginBottom: showCompare ? 10 : 0 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: t.tx, textTransform: "uppercase", letterSpacing: 0.5 }}>Comparison</span>
-              <span style={{ fontSize: 9, color: t.tx3 }}>{compareSession ? `active` : `off`}</span>
-              <span style={{ marginLeft: "auto", color: t.tx3, fontSize: 10 }}>{showCompare ? "▾" : "▸"}</span>
-            </div>
-            {showCompare && (
-              <div>
-                <div style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 10, color: t.tx2, marginBottom: 3 }}>Compare to</div>
-                  <select value={compareSession?.id || ""} onChange={e => { const sel = e.target.value; setCompareSession(sel ? sessionList.find(s => s.id === sel) : null); }}
-                    style={{ width: "100%", fontSize: 11, padding: "4px 6px", borderRadius: 4, border: `1px solid ${t.bdr}`, background: t.surf3, color: t.tx, fontFamily: "inherit" }}>
-                    <option value="">None</option>
-                    {otherSessions.map(s => (
-                      <option key={s.id} value={s.id}>{s.name || s.id.slice(0, 6)}{s.meta?.timepoint ? ` (${s.meta.timepoint})` : ""}{s.meta?.group ? ` [${s.meta.group}]` : ""}</option>
-                    ))}
-                  </select>
-                </div>
-                {compareSession && (
-                  <>
-                    <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
-                      <Btn t={t} small active={showDisplacement} onClick={() => setShowDisplacement(v => !v)}>⇝ Vec</Btn>
-                      <Btn t={t} small active={displacementOverlay} onClick={() => setDisplacementOverlay(v => !v)}>Overlay</Btn>
-                    </div>
-                    {displacementOverlay && (
-                      <div style={{ marginBottom: 8, padding: 8, borderRadius: 6, background: t.surf3, border: `1px solid ${t.bdr}44` }}>
-                        <div style={{ fontSize: 10, color: t.tx2, marginBottom: 6 }}>Alignment</div>
-                        <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
-                          {[{id:"2pt",label:"2-Point"},{id:"procrustes",label:"Procrustes"}].map(m => (
-                            <Btn key={m.id} t={t} small active={overlayAlignMode === m.id} onClick={() => setOverlayAlignMode(m.id)}>{m.label}</Btn>
-                          ))}
-                        </div>
-                        {overlayAlignMode === "2pt" && (
-                          <>
-                            <div style={{ fontSize: 9, color: t.tx3, lineHeight: 1.5, marginBottom: 6 }}>
-                              Select two landmarks as alignment anchors. The compared session is translated, rotated, and scaled to match.
-                            </div>
-                            <div style={{ marginBottom: 6 }}>
-                              <div style={{ fontSize: 9, color: t.tx3, marginBottom: 2 }}>Anchor pt 1</div>
-                              <select value={refLandmark1 || ""} onChange={e => setRefLandmark1(e.target.value || null)}
-                                style={{ width: "100%", fontSize: 10, padding: "3px 5px", borderRadius: 4, border: `1px solid ${t.bdr}`, background: t.surf2, color: t.tx, fontFamily: "inherit" }}>
-                                <option value="">Select...</option>
-                                {uniquePointLabels.map(l => <option key={l} value={l}>{l}</option>)}
-                              </select>
-                            </div>
-                            <div style={{ marginBottom: 6 }}>
-                              <div style={{ fontSize: 9, color: t.tx3, marginBottom: 2 }}>Anchor pt 2</div>
-                              <select value={refLandmark2 || ""} onChange={e => setRefLandmark2(e.target.value || null)}
-                                style={{ width: "100%", fontSize: 10, padding: "3px 5px", borderRadius: 4, border: `1px solid ${t.bdr}`, background: t.surf2, color: t.tx, fontFamily: "inherit" }}>
-                                <option value="">Select...</option>
-                                {uniquePointLabels.map(l => <option key={l} value={l}>{l}</option>)}
-                              </select>
-                            </div>
-                          </>
-                        )}
-                        {overlayAlignMode === "procrustes" && (
-                          <div style={{ fontSize: 9, color: t.tx3, lineHeight: 1.5, marginBottom: 6 }}>
-                            Uses all matching landmarks to compute optimal rotation, translation, and scale via generalized Procrustes analysis.
-                          </div>
-                        )}
-                        <div style={{ marginBottom: 6 }}>
-                          <div style={{ fontSize: 9, color: t.tx3, marginBottom: 2 }}>Blend</div>
-                          <input type="range" min="0.1" max="1" step="0.05" value={overlayBlend} onChange={e => setOverlayBlend(+e.target.value)}
-                            style={{ width: "100%", accentColor: t.acc }} />
-                          <div style={{ fontSize: 9, color: t.tx2, textAlign: "right" }}>{Math.round(overlayBlend * 100)}%</div>
-                        </div>
-                        <div style={{ marginBottom: 6 }}>
-                          <div style={{ fontSize: 9, color: t.tx3, marginBottom: 2 }}>Vector Scale</div>
-                          <input type="range" min="0.5" max="5" step="0.25" value={overlayVectorScale} onChange={e => setOverlayVectorScale(+e.target.value)}
-                            style={{ width: "100%", accentColor: t.acc }} />
-                          <div style={{ fontSize: 9, color: t.tx2, textAlign: "right" }}>{overlayVectorScale.toFixed(1)}\u00d7</div>
-                        </div>
-                        <div style={{ marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
-                          <input type="checkbox" id="trackingLines" checked={showTrackingLines} onChange={e => setShowTrackingLines(e.target.checked)}
-                            style={{ accentColor: t.acc }} />
-                          <label htmlFor="trackingLines" style={{ fontSize: 9, color: t.tx2, cursor: "pointer" }}>Show tracking lines</label>
-                        </div>
-                        <div style={{ marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
-                          <input type="checkbox" id="airwayOverlay" checked={showAirwayOverlay} onChange={e => setShowAirwayOverlay(e.target.checked)}
-                            style={{ accentColor: t.acc }} />
-                          <label htmlFor="airwayOverlay" style={{ fontSize: 9, color: t.tx2, cursor: "pointer" }}>Show airway overlay</label>
-                        </div>
-                      </div>
-                    )}
-                    <div style={{ fontSize: 9, color: t.tx3, lineHeight: 1.5 }}>
-                      <b style={{ color: t.tx2 }}>⇝ Vec</b> draws displacement lines between matching landmarks.
-                      <br /><b style={{ color: t.tx2 }}>Overlay</b> renders the compared session with alignment: <b>2-Point</b> (manual anchors) or <b>Procrustes</b> (all landmarks).
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
         </>
+      )}
+
+      {tab === "comparisons" && (
+        <div>
+          <InfoBox t={t}>
+            Compare two sessions: pick a <b>comparison session</b>, align it with <b>2-Point</b>
+            or <b>Procrustes</b>, and visualise movement with displacement vectors, tracking
+            lines, and the airway overlay.
+          </InfoBox>
+          <div onClick={() => setShowCompare(v => !v)} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", marginBottom: showCompare ? 10 : 0 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: t.tx, textTransform: "uppercase", letterSpacing: 0.5 }}>Comparison</span>
+            <span style={{ fontSize: 9, color: t.tx3 }}>{compareSession ? `active` : `off`}</span>
+            <span style={{ marginLeft: "auto", color: t.tx3, fontSize: 10 }}>{showCompare ? "▾" : "▸"}</span>
+          </div>
+          {showCompare && (
+            <div>
+              <div style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 10, color: t.tx2, marginBottom: 3 }}>Compare to</div>
+                <select value={compareSession?.id || ""} onChange={e => { const sel = e.target.value; setCompareSession(sel ? sessionList.find(s => s.id === sel) : null); }}
+                  style={{ width: "100%", fontSize: 11, padding: "4px 6px", borderRadius: 4, border: `1px solid ${t.bdr}`, background: t.surf3, color: t.tx, fontFamily: "inherit" }}>
+                  <option value="">None</option>
+                  {otherSessions.map(s => (
+                    <option key={s.id} value={s.id}>{s.name || s.id.slice(0, 6)}{s.meta?.timepoint ? ` (${s.meta.timepoint})` : ""}{s.meta?.group ? ` [${s.meta.group}]` : ""}</option>
+                  ))}
+                </select>
+              </div>
+              {compareSession && (
+                <>
+                  <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+                    <Btn t={t} small active={showDisplacement} onClick={() => setShowDisplacement(v => !v)}>⇝ Vec</Btn>
+                    <Btn t={t} small active={displacementOverlay} onClick={() => setDisplacementOverlay(v => !v)}>Overlay</Btn>
+                  </div>
+                  {displacementOverlay && (
+                    <div style={{ marginBottom: 8, padding: 8, borderRadius: 6, background: t.surf3, border: `1px solid ${t.bdr}44` }}>
+                      <div style={{ fontSize: 10, color: t.tx2, marginBottom: 6 }}>Alignment</div>
+                      <div style={{ display: "flex", gap: 4, marginBottom: 8 }}>
+                        {[{id:"2pt",label:"2-Point"},{id:"procrustes",label:"Procrustes"}].map(m => (
+                          <Btn key={m.id} t={t} small active={overlayAlignMode === m.id} onClick={() => setOverlayAlignMode(m.id)}>{m.label}</Btn>
+                        ))}
+                      </div>
+                      {overlayAlignMode === "2pt" && (
+                        <>
+                          <div style={{ fontSize: 9, color: t.tx3, lineHeight: 1.5, marginBottom: 6 }}>
+                            Select two landmarks as alignment anchors. The compared session is translated, rotated, and scaled to match.
+                          </div>
+                          <div style={{ marginBottom: 6 }}>
+                            <div style={{ fontSize: 9, color: t.tx3, marginBottom: 2 }}>Anchor pt 1</div>
+                            <select value={refLandmark1 || ""} onChange={e => setRefLandmark1(e.target.value || null)}
+                              style={{ width: "100%", fontSize: 10, padding: "3px 5px", borderRadius: 4, border: `1px solid ${t.bdr}`, background: t.surf2, color: t.tx, fontFamily: "inherit" }}>
+                              <option value="">Select...</option>
+                              {uniquePointLabels.map(l => <option key={l} value={l}>{l}</option>)}
+                            </select>
+                          </div>
+                          <div style={{ marginBottom: 6 }}>
+                            <div style={{ fontSize: 9, color: t.tx3, marginBottom: 2 }}>Anchor pt 2</div>
+                            <select value={refLandmark2 || ""} onChange={e => setRefLandmark2(e.target.value || null)}
+                              style={{ width: "100%", fontSize: 10, padding: "3px 5px", borderRadius: 4, border: `1px solid ${t.bdr}`, background: t.surf2, color: t.tx, fontFamily: "inherit" }}>
+                              <option value="">Select...</option>
+                              {uniquePointLabels.map(l => <option key={l} value={l}>{l}</option>)}
+                            </select>
+                          </div>
+                        </>
+                      )}
+                      {overlayAlignMode === "procrustes" && (
+                        <div style={{ fontSize: 9, color: t.tx3, lineHeight: 1.5, marginBottom: 6 }}>
+                          Uses all matching landmarks to compute optimal rotation, translation, and scale via generalized Procrustes analysis.
+                        </div>
+                      )}
+                      <div style={{ marginBottom: 6 }}>
+                        <div style={{ fontSize: 9, color: t.tx3, marginBottom: 2 }}>Blend</div>
+                        <input type="range" min="0.1" max="1" step="0.05" value={overlayBlend} onChange={e => setOverlayBlend(+e.target.value)}
+                          style={{ width: "100%", accentColor: t.acc }} />
+                        <div style={{ fontSize: 9, color: t.tx2, textAlign: "right" }}>{Math.round(overlayBlend * 100)}%</div>
+                      </div>
+                      <div style={{ marginBottom: 6 }}>
+                        <div style={{ fontSize: 9, color: t.tx3, marginBottom: 2 }}>Vector Scale</div>
+                        <input type="range" min="0.5" max="5" step="0.25" value={overlayVectorScale} onChange={e => setOverlayVectorScale(+e.target.value)}
+                          style={{ width: "100%", accentColor: t.acc }} />
+                        <div style={{ fontSize: 9, color: t.tx2, textAlign: "right" }}>{overlayVectorScale.toFixed(1)}\u00d7</div>
+                      </div>
+                      <div style={{ marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                        <input type="checkbox" id="trackingLines" checked={showTrackingLines} onChange={e => setShowTrackingLines(e.target.checked)}
+                          style={{ accentColor: t.acc }} />
+                        <label htmlFor="trackingLines" style={{ fontSize: 9, color: t.tx2, cursor: "pointer" }}>Show tracking lines</label>
+                      </div>
+                      <div style={{ marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                        <input type="checkbox" id="airwayOverlay" checked={showAirwayOverlay} onChange={e => setShowAirwayOverlay(e.target.checked)}
+                          style={{ accentColor: t.acc }} />
+                        <label htmlFor="airwayOverlay" style={{ fontSize: 9, color: t.tx2, cursor: "pointer" }}>Show airway overlay</label>
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ fontSize: 9, color: t.tx3, lineHeight: 1.5 }}>
+                    <b style={{ color: t.tx2 }}>⇝ Vec</b> draws displacement lines between matching landmarks.
+                    <br /><b style={{ color: t.tx2 }}>Overlay</b> renders the compared session with alignment: <b>2-Point</b> (manual anchors) or <b>Procrustes</b> (all landmarks).
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {tab === "subjects" && (
