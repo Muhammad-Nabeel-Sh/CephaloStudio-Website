@@ -454,7 +454,7 @@ describe("parseCommunityManifest", () => {
 
   it("exposes repo and contribution URLs", () => {
     expect(typeof COMMUNITY_EXAMPLES_URL).toBe("string");
-    expect(COMMUNITY_EXAMPLES_URL.endsWith("examples/manifest.json")).toBe(true);
+    expect(COMMUNITY_EXAMPLES_URL.endsWith("Examples/manifest.json")).toBe(true);
     expect(getRepoURL()).toContain("github.com");
     expect(getContributionURL()).toContain("contribute.html");
   });

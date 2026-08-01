@@ -196,7 +196,7 @@ export function ExamplesPanel({ t }) {
         ))}
         <div style={{ fontSize: 10, color: t.tx3, marginTop: 10, lineHeight: 1.6 }}>
           Authors: place markups in the workspace, annotate with groups / hints / stages, then export the template and drop it in the repo's{" "}
-          <a href={getRepoURL()} target="_blank" rel="noreferrer" style={{ color: t.acc }}>examples/ folder</a>. See <code style={{ fontFamily: "'DM Mono',monospace" }}>Examples/README.md</code> for the full authoring guide.
+          <a href={getRepoURL()} target="_blank" rel="noreferrer" style={{ color: t.acc }}>Examples/ folder</a>. See <code style={{ fontFamily: "'DM Mono',monospace" }}>Examples/README.md</code> for the full authoring guide.
         </div>
       </div>
     </div>

@@ -21,8 +21,8 @@ can drive four teaching modes:
    Markup panel.
 2. **Export** the template (`.cepht`). It is automatically validated on export and
    again when opened in the Examples panel.
-3. Drop the file into the repo's `examples/` folder and add an entry to
-   `examples/manifest.json` (see below).
+3. Drop the file into the repo's `Examples/` folder and add an entry to
+   `Examples/manifest.json` (see below).
 
 ## The envelope
 
@@ -85,8 +85,8 @@ order and shows the name + formula + tells in a scrolling table.
 
 ## Publishing to the community feed
 
-1. Add your `.cepht` to the repo's `examples/` folder.
-2. Add an entry to `examples/manifest.json`:
+1. Add your `.cepht` to the repo's `Examples/` folder.
+2. Add an entry to `Examples/manifest.json`:
 
 ```jsonc
 {
@@ -95,7 +95,7 @@ order and shows the name + formula + tells in a scrolling table.
   "examples": [
     {
       "id": "my-illustration",
-      "url": "https://raw.githubusercontent.com/<owner>/<repo>/main/examples/MyIllustration.cepht",
+      "url": "https://raw.githubusercontent.com/<owner>/<repo>/main/Examples/MyIllustration.cepht",
       "label": "My Illustration",
       "author": "Dr. Jane Doe",
       "description": "One-line description.",

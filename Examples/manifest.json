@@ -1,0 +1,15 @@
+{
+  "version": "1.0",
+  "updated": "2026-08-01",
+  "examples": [
+    {
+      "id": "Landmarks",
+      "url": "https://raw.githubusercontent.com/Muhammad-Nabeel-Sh/CephaloStudio-Website/main/Examples/Landmarks.cepht",
+      "label": "Landmarks",
+      "author": "CephaloStudio",
+      "description": "The 35 key cephalometric landmarks, grouped into teaching sets with placement hints and a measurement explanation table.",
+      "projection": "lateral",
+      "ptCount": 35
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 // COMMUNITY EXAMPLES — Fetch, cache, and browse community-contributed example
 // illustrations (.cepht teaching files) from a public GitHub repository.
 //
-// The repo stores an `examples/manifest.json` file with this format:
+// The repo stores a manifest at `Examples/manifest.json` with this format:
 // { "version": "1.0", "updated": "ISO date", "examples": [
 //   { "id", "url", "label", "author", "description", "projection", "ptCount" }
 // ] }
@@ -22,8 +22,8 @@ const GITHUB_OWNER = "Muhammad-Nabeel-Sh";
 const GITHUB_REPO = "CephaloStudio-Website";
 const GITHUB_BRANCH = "main";
 
-export const COMMUNITY_EXAMPLES_URL = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/${GITHUB_BRANCH}/examples/manifest.json`;
-const REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/tree/${GITHUB_BRANCH}/examples`;
+export const COMMUNITY_EXAMPLES_URL = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/${GITHUB_BRANCH}/Examples/manifest.json`;
+const REPO_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/tree/${GITHUB_BRANCH}/Examples`;
 const CONTRIBUTION_URL = "/contribute.html";
 
 // ─── Manifest parsing ───────────────────────────────────────────────────────
