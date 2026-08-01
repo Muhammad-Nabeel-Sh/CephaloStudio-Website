@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { useToolStore } from "./toolStore.js";
 import { useUIStore } from "./uiStore.js";
+import { useSessionStore } from "./sessionStore.js";
 
 export { useToolStore } from "./toolStore.js";
 export { useUIStore } from "./uiStore.js";
@@ -32,6 +33,29 @@ export function useStoreDispatch() {
     if (Object.keys(tp).length) useToolStore.setState(tp);
     if (Object.keys(up).length) useUIStore.setState(up);
   }, []);
+}
+
+// ─── Placing-queue ↔ placement-state sync after undo/redo ────────
+// Each placing click pushes one undo entry; undo()/redo() restore markups but leave
+// placingIdx untouched, which previously desynced the queue (reverted points skipped).
+// Recompute placingIdx from the actually-placed queue items so the queue stays coherent.
+export function syncPlacingQueue() {
+  const ts = useToolStore.getState();
+  if (!ts.placingMode && ts.placingQueue.length === 0) return;
+  const ms = useSessionStore.getState().markups;
+  const queue = ts.placingQueue;
+  let placed = 0;
+  while (placed < queue.length) {
+    const m = ms.find(x => x.id === queue[placed]);
+    if (!m || !m.placed) break;
+    placed++;
+  }
+  const nextMissing = placed < queue.length && !ms.some(x => x.id === queue[placed]);
+  if (nextMissing || placed >= queue.length) {
+    useToolStore.setState({ placingMode: false, placingQueue: [], placingIdx: 0 });
+  } else {
+    useToolStore.setState({ placingMode: true, placingIdx: placed });
+  }
 }
 
 // ─── Combined hook for backward compat ───────────────────────────

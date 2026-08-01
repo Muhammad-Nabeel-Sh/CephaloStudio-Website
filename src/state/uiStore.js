@@ -66,5 +66,6 @@ export const useUIStore = create(() => ({
   },
   pinnedFormulas: new Set(),
   copiedMarkup: null,
+  contextMenu: null,
   favoriteTools: initialFavorites,
 }));

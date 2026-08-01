@@ -52,7 +52,7 @@ import { encryptJSON, decryptJSON, clearSecureStorage, secureStorageAvailable } 
 import { anonymizeProject, hasUnanonymizedPHI } from "./report/anonymize.js";
 import { logError, logWarn } from "./lib/logger.js";
 
-import { useStoreDispatch } from "./state/workspaceStore.js";
+import { useStoreDispatch, syncPlacingQueue } from "./state/workspaceStore.js";
 import { useToolStore, useUIStore } from "./state/workspaceStore.js";
 import { useSessionStore, setSessionChangeHandler } from "./state/sessionStore.js";
 
@@ -799,8 +799,8 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     return val.toFixed(1)+"°";
   },[angleMode]);
   const pushUndo=useCallback(()=>useSessionStore.getState().pushUndo(),[]);
-  const undo=useCallback(()=>useSessionStore.getState().undo(),[]);
-  const redo=useCallback(()=>useSessionStore.getState().redo(),[]);
+  const undo=useCallback(()=>{useSessionStore.getState().undo();syncPlacingQueue();},[]);
+  const redo=useCallback(()=>{useSessionStore.getState().redo();syncPlacingQueue();},[]);
   const refreshAutoMeas=useCallback(ms=>refreshAutoMeasurements(ms),[]);
   const updMarkups=useCallback(fn=>{useSessionStore.getState().pushUndo();useSessionStore.getState().updMarkups(fn);},[]);
   const updMarkup=useCallback((id,patch)=>useSessionStore.getState().updMarkup(id,patch),[]);
@@ -1066,7 +1066,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
           case"redo":redo();return;
           case"escape":{boxSelectRectRef.current=null;dispatch({type:"SET",payload:{currentDraw:null,selectedId:null,selectedIds:[]}});if(mobileToolsExpanded)dispatch({type:"SET",payload:{mobileToolsExpanded:false}});else if(placingMode){if(placingIdx<placingQueue.length-1)dispatch({type:"SET",payload:{placingIdx:placingIdx+1}});else{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}}return;}
           case"contextMenu":{e.preventDefault();const hitMarkup=selectedId||null;setContextMenu({x:window.innerWidth/2,y:window.innerHeight/2,markupId:hitMarkup,imageX:0,imageY:0});return;}
-          case"placeUndo":{if(placingMode&&placingQueue.length>0){if(placingIdx>0)dispatch({type:"SET",payload:{placingIdx:placingIdx-1}});else{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}return;}const idsToDelete=selectedIds.length?selectedIds:selectedId?[selectedId]:[];const ms=useSessionStore.getState().markups;const lockedIds=new Set(ms.filter(m=>m.locked).map(m=>m.id));const filtered=idsToDelete.filter(id=>!lockedIds.has(id));if(filtered.length){pushUndo();updSession({markups:refreshAutoMeas(ms.filter(m=>!filtered.includes(m.id)))});}dispatch({type:"SET",payload:{selectedIds:[],selectedId:null}});return;}
+          case"placeUndo":{if(placingMode&&placingQueue.length>0){if(placingIdx>0){undo();}else{dispatch({type:"SET",payload:{placingMode:false}});dispatch({type:"SET",payload:{placingQueue:[]}});dispatch({type:"SET",payload:{placingIdx:0}});}return;}const idsToDelete=selectedIds.length?selectedIds:selectedId?[selectedId]:[];const ms=useSessionStore.getState().markups;const lockedIds=new Set(ms.filter(m=>m.locked).map(m=>m.id));const filtered=idsToDelete.filter(id=>!lockedIds.has(id));if(filtered.length){pushUndo();updSession({markups:refreshAutoMeas(ms.filter(m=>!filtered.includes(m.id)))});}dispatch({type:"SET",payload:{selectedIds:[],selectedId:null}});return;}
           case"deleteSelected":{const idsToDelete=selectedIds.length?selectedIds:selectedId?[selectedId]:[];const ms=useSessionStore.getState().markups;const lockedIds=new Set(ms.filter(m=>m.locked).map(m=>m.id));const filtered=idsToDelete.filter(id=>!lockedIds.has(id));if(filtered.length){pushUndo();updSession({markups:refreshAutoMeas(ms.filter(m=>!filtered.includes(m.id)))});}dispatch({type:"SET",payload:{selectedIds:[],selectedId:null}});return;}
           case"zoomIn":{zoomRef.current=clamp(zoomRef.current*1.15,0.05,15);dispatch({type:"SET",payload:{zoom:zoomRef.current}});return;}
           case"zoomOut":{zoomRef.current=clamp(zoomRef.current/1.15,0.05,15);dispatch({type:"SET",payload:{zoom:zoomRef.current}});return;}
