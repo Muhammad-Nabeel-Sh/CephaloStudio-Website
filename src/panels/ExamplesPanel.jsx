@@ -42,6 +42,33 @@ function drawGuidePulse(ctx, m, zoom, pan, idx, anim) {
   ctx.restore();
 }
 
+function drawMeasLines(ctx, mm, markups, zoom, pan, t) {
+  const pos = {};
+  for (const m of markups) {
+    if (m.type !== "point" || !m.label || !m.points?.[0]) continue;
+    if (mm.pts.includes(m.label)) pos[m.label] = m.points[0];
+  }
+  const sp = mm.pts.filter(l => pos[l]).map(l => ({ x: pos[l].x * zoom + pan.x, y: pos[l].y * zoom + pan.y }));
+  if (sp.length < 2) return;
+  const color = t.acc;
+  ctx.save();
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.setLineDash([6, 4]);
+  ctx.beginPath();
+  for (const s of sp) ctx.lineTo(s.x, s.y);
+  if (sp.length >= 3) ctx.closePath();
+  ctx.stroke();
+  ctx.setLineDash([]);
+  sp.forEach((s, i) => {
+    ctx.fillStyle = color;
+    ctx.beginPath(); ctx.arc(s.x, s.y, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#fff"; ctx.font = 'bold 8px "DM Mono",monospace';
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(String(i + 1), s.x, s.y + 0.5);
+  });
+  ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+  ctx.restore();
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // EXAMPLES PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -114,6 +141,7 @@ function ExampleViewerModal({ t, data, onClose }) {
   const [activeGroup, setActiveGroup] = useState(null);
   const [mode, setMode] = useState("browse");
   const [guideIdx, setGuideIdx] = useState(0);
+  const [activeMeas, setActiveMeas] = useState(null);
   const guideAnimRef = useRef(0);
 
   // Compute bounding box derived from data
@@ -159,6 +187,10 @@ function ExampleViewerModal({ t, data, onClose }) {
   const guideSteps = useMemo(() => buildGuideSteps(data?.markups), [data]);
   const currentStep = mode === "guide" ? (guideSteps[guideIdx] || null) : null;
 
+  // Teaching measurements (optional `measurements` envelope on the example)
+  const measurements = useMemo(() => (data?.measurements || []), [data]);
+  const activeMeasObj = activeMeas != null ? (measurements[activeMeas] || null) : null;
+
   // Reset zoom/pan when bounding box changes (new data)
   useEffect(() => {
     if (!boundingBox || !containerRef.current) return;
@@ -190,13 +222,15 @@ function ExampleViewerModal({ t, data, onClose }) {
     return () => cancelAnimationFrame(raf);
   }, [mode, guideIdx, guideSteps, focusOnPoint]);
 
-  // Guide mode: arrow-key navigation
+  // Guide/measure modes: keyboard navigation
   useEffect(() => {
-    if (mode !== "guide") return;
+    if (mode !== "guide" && mode !== "measure") return;
     const onKey = e => {
-      if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); setGuideIdx(i => Math.min(i + 1, guideSteps.length - 1)); }
-      else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); setGuideIdx(i => Math.max(i - 1, 0)); }
-      else if (e.key === "Escape") setMode("browse");
+      if (mode === "guide") {
+        if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); setGuideIdx(i => Math.min(i + 1, guideSteps.length - 1)); }
+        else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); setGuideIdx(i => Math.max(i - 1, 0)); }
+      }
+      if (e.key === "Escape") setMode("browse");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -277,20 +311,24 @@ function ExampleViewerModal({ t, data, onClose }) {
       const hoveredGroup = hoveredPt ? (data.markups.find(m => m.id === hoveredPt.mid)?.group || null) : null;
       const focusGroup = activeGroup || hoveredGroup;
       const guidePt = mode === "guide" ? (guideSteps[guideIdx] || null) : null;
+      const measPt = mode === "measure" && activeMeasObj ? new Set(activeMeasObj.pts) : null;
       data.markups.forEach(m => {
         let mk = m;
         if (guidePt) {
           if (m.id !== guidePt.id) mk = dimCopy(m, m.type === "silhouette" ? 0.3 : 0.18);
+        } else if (measPt) {
+          if (m.type !== "point" || !m.label || !measPt.has(m.label)) mk = dimCopy(m);
         } else if (focusGroup && m.group !== focusGroup) {
           mk = dimCopy(m);
         }
         drawMarkup(ctx, mk, zoom, pan, cal, null, t, false, cs, "signed-deg", true, 1, null);
       });
       if (guidePt) drawGuidePulse(ctx, guidePt, zoom, pan, guideIdx, guideAnimRef.current);
+      if (mode === "measure" && activeMeasObj) drawMeasLines(ctx, activeMeasObj, data.markups, zoom, pan, t);
     }
     renderTooltip(ctx, W);
     ctx.restore();
-  }, [data, t, zoom, pan, renderTooltip, activeGroup, hoveredPt, mode, guideSteps, guideIdx]);
+  }, [data, t, zoom, pan, renderTooltip, activeGroup, hoveredPt, mode, guideSteps, guideIdx, activeMeasObj]);
 
   // Guide mode: continuous pulse animation (runs after redraw is defined)
   useEffect(() => {
@@ -460,12 +498,19 @@ function ExampleViewerModal({ t, data, onClose }) {
           </div>
           <span style={{ fontSize: 9, color: t.tx3, fontFamily: "'DM Mono',monospace" }}>{data?.markups?.filter(m => m.type === "point").length || 0} pts</span>
           <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: 4 }}>
-            <button onClick={() => { if (mode === "browse") { setGuideIdx(0); setMode("guide"); } else setMode("browse"); }}
-              title={guideSteps.length ? (mode === "guide" ? "Exit guided placement" : "Step-by-step placement guide") : "No placed points to guide"}
-              disabled={guideSteps.length === 0}
-              style={{ background: mode === "guide" ? t.acc : t.surf3, color: mode === "guide" ? "#fff" : t.tx2, border: `1px solid ${t.bdr}`, borderRadius: 4, cursor: guideSteps.length ? "pointer" : "not-allowed", fontSize: 10, fontWeight: 700, height: 26, padding: "0 10px", opacity: guideSteps.length ? 1 : 0.5, whiteSpace: "nowrap" }}>
-              {mode === "guide" ? "Browse" : "Guide"}
-            </button>
+            <div style={{ display: "flex", background: t.surf3, border: `1px solid ${t.bdr}`, borderRadius: 5, overflow: "hidden", flexShrink: 0 }}>
+              {[["browse", "Browse"], ["guide", "Guide"], ["measure", "Measure"]].map(([m, l]) => {
+                const disabled = m === "guide" ? guideSteps.length === 0 : m === "measure" ? measurements.length === 0 : false;
+                return (
+                  <button key={m} onClick={() => { setMode(m); if (m === "guide") setGuideIdx(0); if (m === "measure") setActiveMeas(0); }}
+                    disabled={disabled}
+                    title={m === "guide" ? "Step-by-step placement guide" : m === "measure" ? "Measurement mapping table" : "Free browsing"}
+                    style={{ background: mode === m ? t.acc : "transparent", color: mode === m ? "#fff" : t.tx2, border: "none", fontSize: 10, fontWeight: 700, height: 26, padding: "0 10px", cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.45 : 1, whiteSpace: "nowrap" }}>
+                    {l}
+                  </button>
+                );
+              })}
+            </div>
             <button onClick={zoomOut} title="Zoom out" style={{ background: t.surf3, border: `1px solid ${t.bdr}`, borderRadius: 4, color: t.tx2, cursor: "pointer", fontSize: 14, width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center" }}>&#x2212;</button>
             <span style={{ fontSize: 10, color: t.tx3, fontFamily: "'DM Mono',monospace", minWidth: 32, textAlign: "center" }}>{Math.round(zoom * 100)}%</span>
             <button onClick={zoomIn} title="Zoom in" style={{ background: t.surf3, border: `1px solid ${t.bdr}`, borderRadius: 4, color: t.tx2, cursor: "pointer", fontSize: 14, width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
@@ -511,7 +556,7 @@ function ExampleViewerModal({ t, data, onClose }) {
             onMouseLeave={handleMouseLeave}
             onDoubleClick={handleDblClick}
             style={{ display: "block", width: "100%", height: "100%", cursor: cursorStyle, touchAction: "none" }} />
-          {mode !== "guide" && groups.length > 0 && (
+          {mode === "browse" && groups.length > 0 && (
             <div style={{ position: "absolute", top: 10, left: 10, zIndex: 3, background: `${t.surf2}e6`, border: `1px solid ${t.bdr}`, borderRadius: 8, padding: "7px 8px", display: "flex", flexDirection: "column", gap: 3, maxWidth: 170, boxShadow: `0 6px 16px ${t.shadow}40`, userSelect: "none" }}>
               <div style={{ fontSize: 8, fontWeight: 700, color: t.tx2, letterSpacing: 0.6, textTransform: "uppercase", marginBottom: 2, marginLeft: 2 }}>Groups</div>
               {groups.map(g => {
@@ -528,12 +573,34 @@ function ExampleViewerModal({ t, data, onClose }) {
               })}
             </div>
           )}
+          {mode === "measure" && measurements.length > 0 && (
+            <div style={{ position: "absolute", top: 10, right: 10, bottom: 10, width: 248, zIndex: 3, background: `${t.surf2}e6`, border: `1px solid ${t.bdr}`, borderRadius: 8, overflowY: "auto", padding: "8px 9px", boxShadow: `0 6px 16px ${t.shadow}40`, userSelect: "none" }}>
+              <div style={{ fontSize: 8, fontWeight: 700, color: t.tx2, letterSpacing: 0.6, textTransform: "uppercase", margin: "2px 2px 6px" }}>Measurements</div>
+              <div style={{ fontSize: 9, color: t.tx3, lineHeight: 1.4, margin: "0 2px 8px" }}>Click a measurement to map its points on the tracing.</div>
+              {measurements.map((mm, i) => {
+                const on = activeMeas === i;
+                return (
+                  <div key={i} onClick={() => setActiveMeas(on ? null : i)} title={`Map ${mm.name}`}
+                    style={{ borderRadius: 6, padding: "6px 8px", marginBottom: 5, cursor: "pointer", background: on ? `${t.acc}16` : "transparent", border: on ? `1px solid ${t.acc}66` : "1px solid transparent", transition: "background 0.15s" }}>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 6, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: on ? t.acc : t.tx }}>{mm.name}</span>
+                      {mm.formula && <span style={{ fontSize: 9, color: t.tx3, fontFamily: "'DM Mono',monospace" }}>= {mm.formula}</span>}
+                    </div>
+                    <div style={{ fontSize: 9.5, color: t.tx2, lineHeight: 1.4, marginTop: 3 }}>{mm.tells}</div>
+                    <div style={{ fontSize: 8.5, color: t.tx3, fontFamily: "'DM Mono',monospace", marginTop: 3, opacity: 0.8 }}>{mm.pts.join(" · ")}</div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderTop: `1px solid ${t.bdr}`, flexShrink: 0 }}>
           <div style={{ flex: 1, fontSize: 10, color: t.tx3, lineHeight: 1.4 }}>
             {mode === "guide"
               ? "Follow the steps to place landmarks in clinical order. Use the arrow buttons or ← / → keys to move; Esc returns to browse view."
-              : "Drag to pan · scroll to zoom · double-click to fit. Hover any point to read its definition and highlight its group; click a group to isolate it."}
+              : mode === "measure"
+                ? "Click a measurement in the list to map its points on the tracing; Esc returns to browse view."
+                : "Drag to pan · scroll to zoom · double-click to fit. Hover any point to read its definition and highlight its group; click a group to isolate it."}
           </div>
           <button onClick={onClose} style={{ padding: "6px 14px", borderRadius: 6, border: `1px solid ${t.bdr}`, background: t.surf3, color: t.tx, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
             Close

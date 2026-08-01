@@ -286,5 +286,28 @@ export function validateExample(data) {
       return `Unknown example projection "${data.projection}". Supported: ${EXAMPLE_PROJECTIONS.join(", ")}.`;
     }
   }
+  // Optional `measurements` envelope: a teaching mapping table. Each entry names
+  // a measurement, the labels of the points that combine into it, an optional
+  // human-readable formula (for computed measures), and a one-line explanation.
+  if (data.measurements != null) {
+    if (!Array.isArray(data.measurements)) {
+      return "Example field \"measurements\" must be an array.";
+    }
+    for (let i = 0; i < data.measurements.length; i++) {
+      const mm = data.measurements[i];
+      if (!mm || typeof mm !== "object" || typeof mm.name !== "string" || !mm.name) {
+        return `Example measurement #${i + 1} needs a non-empty "name" string.`;
+      }
+      if (!Array.isArray(mm.pts) || !mm.pts.length || mm.pts.some(p => typeof p !== "string")) {
+        return `Example measurement "${mm.name}" needs a non-empty "pts" array of point-label strings.`;
+      }
+      if (mm.formula != null && typeof mm.formula !== "string") {
+        return `Example measurement "${mm.name}" field "formula" must be a string.`;
+      }
+      if (typeof mm.tells !== "string" || !mm.tells) {
+        return `Example measurement "${mm.name}" needs a non-empty "tells" string.`;
+      }
+    }
+  }
   return null;
 }

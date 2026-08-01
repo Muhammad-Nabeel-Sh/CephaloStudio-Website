@@ -3397,5 +3397,78 @@
     }
   ],
   "formulas": [],
-  "norms": []
+  "norms": [],
+  "measurements": [
+    {
+      "name": "SNA",
+      "pts": ["Sella Turcica", "Nasion", "Point A"],
+      "tells": "Angle Sella–Nasion–Point A: places the maxilla relative to the cranial base (norm ~82°)."
+    },
+    {
+      "name": "SNB",
+      "pts": ["Sella Turcica", "Nasion", "Point B"],
+      "tells": "Angle Sella–Nasion–Point B: places the mandible relative to the cranial base (norm ~80°)."
+    },
+    {
+      "name": "ANB",
+      "pts": ["Point A", "Nasion", "Point B"],
+      "formula": "SNA − SNB",
+      "tells": "Sagittal jaw relationship: >4° suggests Class II, <0° suggests Class III (norm ~2°)."
+    },
+    {
+      "name": "Mandibular plane (SN–MP)",
+      "pts": ["Sella Turcica", "Nasion", "Gonion", "Menton"],
+      "tells": "Angle between Sella–Nasion and Gonion–Menton: steep values indicate a vertical growth pattern (norm ~32°)."
+    },
+    {
+      "name": "FMA",
+      "pts": ["Orbitale", "Porion", "Gonion", "Menton"],
+      "tells": "Frankfort–mandibular plane angle; used by Tweed to judge vertical proportions (norm ~25°)."
+    },
+    {
+      "name": "Y-axis",
+      "pts": ["Sella Turcica", "Nasion", "Gnathion"],
+      "tells": "Angle Sella–Nasion to Sella–Gnathion: larger values mean more downward/vertical growth (norm ~66°)."
+    },
+    {
+      "name": "Facial angle",
+      "pts": ["Orbitale", "Porion", "Nasion", "Pogonion"],
+      "tells": "Frankfort horizontal to Nasion–Pogonion: measures mandibular prominence in the face (norm ~87°)."
+    },
+    {
+      "name": "U1–SN",
+      "pts": ["Sella Turcica", "Nasion", "Incision Superius Incisalis", "Incision Superius Apicalis"],
+      "tells": "Upper incisor axis vs Sella–Nasion: upper incisor proclination (norm ~103°)."
+    },
+    {
+      "name": "Interincisal angle",
+      "pts": ["Incision Superius Incisalis", "Incision Superius Apicalis", "Incision Inferius Incisalis", "Incision Inferius Apicalis"],
+      "tells": "Angle between upper and lower incisor axes; reflects incisal compensation (norm ~130°)."
+    },
+    {
+      "name": "IMPA",
+      "pts": ["Incision Inferius Incisalis", "Incision Inferius Apicalis", "Gonion", "Menton"],
+      "tells": "Incisor–mandibular plane angle: lower incisor inclination (norm ~90°)."
+    },
+    {
+      "name": "Convexity",
+      "pts": ["Point A", "Nasion", "Pogonion"],
+      "tells": "Distance from Point A to the Nasion–Pogonion line; profile convexity (norm 0–2 mm)."
+    },
+    {
+      "name": "Gonial angle",
+      "pts": ["Condylion", "Gonion", "Menton"],
+      "tells": "Angle between the mandibular ramus and body; obtuse values suggest posterior vertical growth (norm ~128°)."
+    },
+    {
+      "name": "Upper lip–E plane",
+      "pts": ["Pronasale", "Pogonion'", "Labiale superius"],
+      "tells": "Distance from the upper lip to the E-plane; upper lip protrusion (norm ~−1 to −2 mm)."
+    },
+    {
+      "name": "Lower lip–E plane",
+      "pts": ["Pronasale", "Pogonion'", "Labiale inferius"],
+      "tells": "Distance from the lower lip to the E-plane; lower lip protrusion (norm ~1–2 mm)."
+    }
+  ]
 }

@@ -246,3 +246,62 @@ describe("guide steps", () => {
     expect(buildGuideSteps([{ type: "point", label: "N", points: [{ x: -9001, y: -9001 }] }])).toEqual([]);
   });
 });
+
+// ─── Measurement teaching table (Phase 5: measurement explanation) ──────────
+function mkMeas(overrides = {}) {
+  return { name: "SNA", pts: ["S", "N", "A"], tells: "maxillary position", ...overrides };
+}
+
+describe("measurement teaching envelope", () => {
+  it("accepts a valid optional measurements array", () => {
+    expect(validateExample(mkExample({ measurements: [mkMeas(), mkMeas({ name: "ANB", formula: "SNA − SNB" })] }))).toBeNull();
+  });
+
+  it("rejects non-array measurements", () => {
+    expect(validateExample(mkExample({ measurements: {} }))).toMatch(/measurements/);
+  });
+
+  it("rejects entries missing name / pts / tells or with wrong types", () => {
+    expect(validateExample(mkExample({ measurements: [mkMeas({ name: "" })] }))).toMatch(/name/);
+    expect(validateExample(mkExample({ measurements: [mkMeas({ name: 7 })] }))).toMatch(/name/);
+    expect(validateExample(mkExample({ measurements: [mkMeas({ pts: [] })] }))).toMatch(/pts/);
+    expect(validateExample(mkExample({ measurements: [mkMeas({ pts: ["S", 5] })] }))).toMatch(/pts/);
+    expect(validateExample(mkExample({ measurements: [mkMeas({ tells: 42 })] }))).toMatch(/tells/);
+    expect(validateExample(mkExample({ measurements: [mkMeas({ formula: 9 })] }))).toMatch(/formula/);
+  });
+
+  it("is optional: an example without measurements still validates", () => {
+    expect(validateExample(mkExample())).toBeNull();
+  });
+
+  it("Landmarks ships a teaching measurement table", () => {
+    const data = getExampleData("Landmarks");
+    expect(Array.isArray(data.measurements)).toBe(true);
+    expect(data.measurements.length).toBeGreaterThanOrEqual(10);
+  });
+
+  it("every Landmarks measurement references existing point labels and has a 'tells' line", () => {
+    const data = getExampleData("Landmarks");
+    const labels = new Set((data.markups || []).filter(m => m.type === "point").map(m => m.label));
+    for (const mm of data.measurements) {
+      expect(typeof mm.name, `name on "${mm.name}"`).toBe("string");
+      expect(mm.name.length).toBeGreaterThan(0);
+      expect(mm.pts.length).toBeGreaterThanOrEqual(2);
+      for (const l of mm.pts) {
+        expect(labels.has(l), `"${mm.name}" references "${l}"`).toBe(true);
+      }
+      expect(typeof mm.tells).toBe("string");
+      expect(mm.tells.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("the classic trio (SNA / SNB / ANB) is present and ANB documents its formula", () => {
+    const data = getExampleData("Landmarks");
+    const names = data.measurements.map(m => m.name);
+    expect(names).toContain("SNA");
+    expect(names).toContain("SNB");
+    const anb = data.measurements.find(m => m.name === "ANB");
+    expect(anb).toBeTruthy();
+    expect(anb.formula).toBe("SNA − SNB");
+  });
+});

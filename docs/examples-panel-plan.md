@@ -1,6 +1,6 @@
 # Examples Panel — Interactive Illustration Plan
 
-> Status: **foundation done (12 tests). Phase 2 done (group teaching + legend, 16 tests). Phase 3 done (step-by-step placement guide, 23 tests). Next: practice mode (4.3).**
+> Status: **foundation done (12 tests). Phase 2 done (group teaching + legend, 16 tests). Phase 3 done (placement guide, 23 tests). Phase 5 done (measurement explanation, 30 tests). Skipped Phase 6 (tracing overlay) for now — next: Phase 4 (practice mode) if desired.**
 > Feature: Turn the Examples panel into a library of **interactive teaching
 > illustrations** that guide users in placing points and understanding
 > cephalometric analyses.
@@ -107,6 +107,15 @@ independently shippable + verifiable.
 - Explain computed measures (difference / ratio / sum / percentage) briefly.
 - Source: resolve `analysisName` → `PREDEFINED[projection]` measurements
   (already used by the tests' `findAnalysis` helper).
+- **Done (Phase 5):** Landmarks.cepht ships an explicit `measurements` envelope
+  (14 classic lateral measurements: SNA, SNB, ANB, SN–MP, FMA, Y-axis, Facial
+  angle, U1–SN, Interincisal, IMPA, Convexity, Gonial angle, upper/lower lip–E
+  plane). Each entry is `{ name, pts: [point labels], formula?, tells }`.
+  `validateExample` validates the envelope (optional; typed; `pts` = non-empty
+  label-array). The viewer has a **Measure** mode (third segment of the mode
+  switcher): a scrollable right-hand table lists every measurement with its
+  formula + one-liner; clicking a card dims all unrelated markups and draws a
+  dashed line connecting the mapped points (numbered vertices) on the tracing.
 
 ### 4.5 Step-by-step tracing overlay
 - "Build mode": reveal the tracing in stages (e.g. by group, or by the
@@ -143,10 +152,12 @@ independently shippable + verifiable.
   step strip (prev/next/progress/definition/hint), pulsing ring + auto-focus +
   group dimming, ←/→/Esc keyboard nav. 7 tests added (23 total).
 - **Phase 4 — practice-placing** (4.3): Practice mode with feedback + score.
-- **Phase 5 — measurement explanation** (4.4): mapping table from
-  `analysisName` (Landmarks may declare a matching analysis or ship its own).
-- **Phase 6 — step-by-step tracing overlay** (4.5): Build mode with reveal
-  slider.
+- **Phase 5 — measurement explanation** (4.4, done): `measurements` envelope on
+  Landmarks (14 teaching measurements), `validateExample` checks it, Measure
+  mode with clickable mapping table + dashed connecting lines on the tracing.
+  7 tests added (30 total).
+- **Phase 6 — step-by-step tracing overlay (skipped for now):** Build mode with
+  reveal slider.
 - **Phase 7 — community + authoring docs (optional):** fetch examples, browse
   UI, `Examples/README.md` guide for authors.
 
