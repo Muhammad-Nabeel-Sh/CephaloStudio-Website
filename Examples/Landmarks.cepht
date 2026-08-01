@@ -2562,7 +2562,7 @@
       "style": "solid",
       "size": 6,
       "label": "Nasion",
-      "definition": "",
+      "definition": "The most anterior point of the frontonasal suture.",
       "showLength": true,
       "strokeColor": "#f59e0b",
       "fillColor": "#f59e0b22",
@@ -2576,7 +2576,8 @@
           "y": -150.27612503571305
         }
       ],
-      "group": "cranial base"
+      "group": "cranial base",
+      "hint": "The deepest point of the nasal bridge, where the frontal bone meets the nasal bones."
     },
     {
       "id": "sd638g3h",
@@ -2585,7 +2586,7 @@
       "style": "solid",
       "size": 6,
       "label": "Sella Turcica",
-      "definition": "",
+      "definition": "The center of the pituitary fossa of the sphenoid bone.",
       "showLength": true,
       "strokeColor": "#f59e0b",
       "fillColor": "#f59e0b22",
@@ -2599,7 +2600,8 @@
           "y": -102.67654941365171
         }
       ],
-      "group": "cranial base"
+      "group": "cranial base",
+      "hint": "The geometric center of the sella turcica — the middle of the pituitary fossa."
     },
     {
       "id": "8ftzjhur",
@@ -2608,7 +2610,7 @@
       "style": "solid",
       "size": 6,
       "label": "Point A",
-      "definition": "",
+      "definition": "The deepest point of the maxillary concavity between Anterior Nasal Spine and Prosthion.",
       "showLength": true,
       "strokeColor": "#60a5fa",
       "fillColor": "#60a5fa22",
@@ -2622,7 +2624,8 @@
           "y": 91.88196991059526
         }
       ],
-      "group": "maxillary"
+      "group": "maxillary",
+      "hint": "The deepest point of the curve between ANS and Prosthion; the maxillary base."
     },
     {
       "id": "2b5gx6y4",
@@ -2631,7 +2634,7 @@
       "style": "solid",
       "size": 6,
       "label": "Point B",
-      "definition": "",
+      "definition": "The deepest point of the mandibular concavity between Infradentale and Pogonion.",
       "showLength": true,
       "strokeColor": "#a78bfa",
       "fillColor": "#a78bfa22",
@@ -2645,7 +2648,8 @@
           "y": 272.08611438859623
         }
       ],
-      "group": "mandibular"
+      "group": "mandibular",
+      "hint": "The deepest point of the curve between Infradentale and Pogonion; the mandibular base."
     },
     {
       "id": "h0tdbdne",
@@ -2654,7 +2658,7 @@
       "style": "solid",
       "size": 6,
       "label": "Anterior Nasal Spine",
-      "definition": "",
+      "definition": "The tip of the anterior nasal spine.",
       "showLength": true,
       "strokeColor": "#60a5fa",
       "fillColor": "#60a5fa22",
@@ -2668,7 +2672,8 @@
           "y": 78.71542445623747
         }
       ],
-      "group": "maxillary"
+      "group": "maxillary",
+      "hint": "The sharp anterior tip of the nasal floor."
     },
     {
       "id": "4kd1b4s8",
@@ -2677,7 +2682,7 @@
       "style": "solid",
       "size": 6,
       "label": "Posterior Nasal Spine",
-      "definition": "",
+      "definition": "The posterior tip of the hard palate.",
       "showLength": true,
       "strokeColor": "#60a5fa",
       "fillColor": "#60a5fa22",
@@ -2691,7 +2696,8 @@
           "y": 55.30949621268145
         }
       ],
-      "group": "maxillary"
+      "group": "maxillary",
+      "hint": "The posterior tip of the hard palate; defines the palatal plane with ANS."
     },
     {
       "id": "eh5afao8",
@@ -2700,7 +2706,7 @@
       "style": "solid",
       "size": 6,
       "label": "Pogonion",
-      "definition": "",
+      "definition": "The most anterior point of the bony chin.",
       "showLength": true,
       "strokeColor": "#a78bfa",
       "fillColor": "#a78bfa22",
@@ -2714,7 +2720,8 @@
           "y": 316.3901304104903
         }
       ],
-      "group": "mandibular"
+      "group": "mandibular",
+      "hint": "The most anterior point of the mandibular symphysis."
     },
     {
       "id": "r3pcilwx",
@@ -2723,7 +2730,7 @@
       "style": "solid",
       "size": 6,
       "label": "Gnathion",
-      "definition": "",
+      "definition": "The most anterior inferior point of the bony chin, midway between Pogonion and Menton.",
       "showLength": true,
       "strokeColor": "#a78bfa",
       "fillColor": "#a78bfa22",
@@ -2737,7 +2744,8 @@
           "y": 337.51728968630835
         }
       ],
-      "group": "mandibular"
+      "group": "mandibular",
+      "hint": "On the chin's lower border, halfway between Pogonion and Menton."
     },
     {
       "id": "2thghurl",
@@ -2746,7 +2754,7 @@
       "style": "solid",
       "size": 6,
       "label": "Menton",
-      "definition": "",
+      "definition": "The most inferior point of the mandibular symphysis.",
       "showLength": true,
       "strokeColor": "#a78bfa",
       "fillColor": "#a78bfa22",
@@ -2760,7 +2768,8 @@
           "y": 346.7998821567554
         }
       ],
-      "group": "mandibular"
+      "group": "mandibular",
+      "hint": "The lowest point of the bony chin."
     },
     {
       "id": "zze9nhiy",
@@ -2769,7 +2778,7 @@
       "style": "solid",
       "size": 6,
       "label": "Gonion",
-      "definition": "",
+      "definition": "The most inferior, posterior, lateral point of the mandibular angle.",
       "showLength": true,
       "strokeColor": "#a78bfa",
       "fillColor": "#a78bfa22",
@@ -2783,7 +2792,8 @@
           "y": 238.04528998176568
         }
       ],
-      "group": "mandibular"
+      "group": "mandibular",
+      "hint": "The angle of the mandible; if the corner is rounded, take its midpoint."
     },
     {
       "id": "j2tmfcrp",
@@ -2792,7 +2802,7 @@
       "style": "solid",
       "size": 6,
       "label": "Incision Superius Incisalis",
-      "definition": "",
+      "definition": "The incisal tip of the upper central incisor.",
       "showLength": true,
       "strokeColor": "#f472b6",
       "fillColor": "#f472b622",
@@ -2806,7 +2816,8 @@
           "y": 203.94649550339034
         }
       ],
-      "group": "dentition"
+      "group": "dentition",
+      "hint": "The tip of the upper incisor — the most prominent dental landmark."
     },
     {
       "id": "mw1canm5",
@@ -2815,7 +2826,7 @@
       "style": "solid",
       "size": 6,
       "label": "Incision Superius Apicalis",
-      "definition": "",
+      "definition": "The apex of the root of the upper central incisor.",
       "showLength": true,
       "strokeColor": "#f472b6",
       "fillColor": "#f472b622",
@@ -2829,7 +2840,8 @@
           "y": 92.51062890735446
         }
       ],
-      "group": "dentition"
+      "group": "dentition",
+      "hint": "The root tip of the upper incisor, deep within the bone."
     },
     {
       "id": "kg2gtos9",
@@ -2838,7 +2850,7 @@
       "style": "solid",
       "size": 6,
       "label": "Incision Inferius Incisalis",
-      "definition": "",
+      "definition": "The incisal tip of the lower central incisor.",
       "showLength": true,
       "strokeColor": "#f472b6",
       "fillColor": "#f472b622",
@@ -2852,7 +2864,8 @@
           "y": 192.0562974691699
         }
       ],
-      "group": "dentition"
+      "group": "dentition",
+      "hint": "The tip of the lower central incisor."
     },
     {
       "id": "5i2b5qjt",
@@ -2861,7 +2874,7 @@
       "style": "solid",
       "size": 6,
       "label": "Incision Inferius Apicalis",
-      "definition": "",
+      "definition": "The apex of the root of the lower central incisor.",
       "showLength": true,
       "strokeColor": "#f472b6",
       "fillColor": "#f472b622",
@@ -2875,7 +2888,8 @@
           "y": 283.2025783621619
         }
       ],
-      "group": "dentition"
+      "group": "dentition",
+      "hint": "The root tip of the lower incisor."
     },
     {
       "id": "6tsfnnjr",
@@ -2884,7 +2898,7 @@
       "style": "solid",
       "size": 6,
       "label": "Pronasale",
-      "definition": "",
+      "definition": "The most anterior point of the tip of the nose.",
       "showLength": true,
       "strokeColor": "#fbbf24",
       "fillColor": "#fbbf2422",
@@ -2898,7 +2912,8 @@
           "y": 26.29066900071642
         }
       ],
-      "group": "soft tissue"
+      "group": "soft tissue",
+      "hint": "The tip of the nose."
     },
     {
       "id": "7ldnn8t1",
@@ -2907,7 +2922,7 @@
       "style": "solid",
       "size": 6,
       "label": "Subnasale",
-      "definition": "",
+      "definition": "The point where the columella meets the upper lip.",
       "showLength": true,
       "strokeColor": "#fbbf24",
       "fillColor": "#fbbf2422",
@@ -2921,7 +2936,8 @@
           "y": 85.75494749226235
         }
       ],
-      "group": "soft tissue"
+      "group": "soft tissue",
+      "hint": "The junction of the columella and the upper lip."
     },
     {
       "id": "5n5l4tc8",
@@ -2930,7 +2946,7 @@
       "style": "solid",
       "size": 6,
       "label": "Labiale superius",
-      "definition": "",
+      "definition": "The most anterior point of the upper lip.",
       "showLength": true,
       "strokeColor": "#fbbf24",
       "fillColor": "#fbbf2422",
@@ -2944,7 +2960,8 @@
           "y": 174.32871924478474
         }
       ],
-      "group": "soft tissue"
+      "group": "soft tissue",
+      "hint": "The most prominent point of the upper-lip vermilion."
     },
     {
       "id": "c3v500ix",
@@ -2953,7 +2970,7 @@
       "style": "solid",
       "size": 6,
       "label": "Labiale inferius",
-      "definition": "",
+      "definition": "The most anterior point of the lower lip.",
       "showLength": true,
       "strokeColor": "#fbbf24",
       "fillColor": "#fbbf2422",
@@ -2967,7 +2984,8 @@
           "y": 198.28498470158604
         }
       ],
-      "group": "soft tissue"
+      "group": "soft tissue",
+      "hint": "The most prominent point of the lower-lip vermilion."
     },
     {
       "id": "9fwi0h5w",
@@ -2976,7 +2994,7 @@
       "style": "solid",
       "size": 6,
       "label": "Pogonion'",
-      "definition": "",
+      "definition": "The most anterior point of the soft-tissue chin.",
       "showLength": true,
       "strokeColor": "#fbbf24",
       "fillColor": "#fbbf2422",
@@ -2990,7 +3008,8 @@
           "y": 332.55702102897806
         }
       ],
-      "group": "soft tissue"
+      "group": "soft tissue",
+      "hint": "The most anterior soft-tissue point of the chin."
     },
     {
       "id": "794z5xze",
@@ -2999,7 +3018,7 @@
       "style": "solid",
       "size": 6,
       "label": "Orbitale",
-      "definition": "",
+      "definition": "The most inferior point on the infraorbital margin.",
       "showLength": true,
       "strokeColor": "#60a5fa",
       "fillColor": "#60a5fa22",
@@ -3013,7 +3032,8 @@
           "y": -18.8709154125264
         }
       ],
-      "group": "maxillary"
+      "group": "maxillary",
+      "hint": "The lowest point of the eye socket rim — used for the Frankfort horizontal."
     },
     {
       "id": "chtquriz",
@@ -3022,7 +3042,7 @@
       "style": "solid",
       "size": 6,
       "label": "Porion",
-      "definition": "",
+      "definition": "The uppermost point of the bony external auditory meatus.",
       "showLength": true,
       "strokeColor": "#f59e0b",
       "fillColor": "#f59e0b22",
@@ -3036,7 +3056,8 @@
           "y": -12.335530080714747
         }
       ],
-      "group": "cranial base"
+      "group": "cranial base",
+      "hint": "Highest point of the ear canal; often approximated by the ear rod (Hower)."
     },
     {
       "id": "epg1jee9",
@@ -3045,7 +3066,7 @@
       "style": "solid",
       "size": 6,
       "label": "Nasion'",
-      "definition": "",
+      "definition": "The deepest point of the soft-tissue concavity of the nasal bridge.",
       "showLength": true,
       "strokeColor": "#f59e0b",
       "fillColor": "#f59e0b22",
@@ -3059,7 +3080,8 @@
           "y": -143.573060807081
         }
       ],
-      "group": "cranial base"
+      "group": "cranial base",
+      "hint": "The soft-tissue point directly overlying skeletal Nasion."
     },
     {
       "id": "p9c1zu4w",
@@ -3068,7 +3090,7 @@
       "style": "solid",
       "size": 6,
       "label": "Glabella",
-      "definition": "",
+      "definition": "The most prominent anterior point of the forehead on the soft-tissue profile.",
       "showLength": true,
       "strokeColor": "#fbbf24",
       "fillColor": "#fbbf2422",
@@ -3082,7 +3104,8 @@
           "y": -195.21937149091383
         }
       ],
-      "group": "soft tissue"
+      "group": "soft tissue",
+      "hint": "The most anterior point of the forehead."
     },
     {
       "id": "meqxoqjf",
@@ -3091,7 +3114,7 @@
       "style": "solid",
       "size": 6,
       "label": "Columella",
-      "definition": "",
+      "definition": "The most anterior point of the columella nasi.",
       "showLength": true,
       "strokeColor": "#fbbf24",
       "fillColor": "#fbbf2422",
@@ -3105,7 +3128,8 @@
           "y": 70.76072217784154
         }
       ],
-      "group": "soft tissue"
+      "group": "soft tissue",
+      "hint": "The anterior edge of the nasal base, between the nostrils."
     },
     {
       "id": "s8blrgvd",
@@ -3114,7 +3138,7 @@
       "style": "solid",
       "size": 6,
       "label": "Point A'",
-      "definition": "",
+      "definition": "The deepest point of the upper-lip concavity on the soft-tissue profile.",
       "showLength": true,
       "strokeColor": "#60a5fa",
       "fillColor": "#60a5fa22",
@@ -3128,7 +3152,8 @@
           "y": 102.08949727422404
         }
       ],
-      "group": "maxillary"
+      "group": "maxillary",
+      "hint": "The deepest soft-tissue point of the upper lip, over Point A."
     },
     {
       "id": "o91cbjlj",
@@ -3137,7 +3162,7 @@
       "style": "solid",
       "size": 6,
       "label": "Stomion",
-      "definition": "",
+      "definition": "The midpoint of the oral fissure between the lips.",
       "showLength": true,
       "strokeColor": "#fbbf24",
       "fillColor": "#fbbf2422",
@@ -3151,7 +3176,8 @@
           "y": 185.04322012077512
         }
       ],
-      "group": "soft tissue"
+      "group": "soft tissue",
+      "hint": "The midline point where the lips meet."
     },
     {
       "id": "x2v747ii",
@@ -3160,7 +3186,7 @@
       "style": "solid",
       "size": 6,
       "label": "Point B'",
-      "definition": "",
+      "definition": "The deepest point of the lower-lip/chin concavity on the soft-tissue profile.",
       "showLength": true,
       "strokeColor": "#a78bfa",
       "fillColor": "#a78bfa22",
@@ -3174,7 +3200,8 @@
           "y": 257.3771576404268
         }
       ],
-      "group": "mandibular"
+      "group": "mandibular",
+      "hint": "The deepest soft-tissue point over Point B, just below the lower lip."
     },
     {
       "id": "5xwea9gm",
@@ -3183,7 +3210,7 @@
       "style": "solid",
       "size": 6,
       "label": "Menton'",
-      "definition": "",
+      "definition": "The lowest point of the soft-tissue chin.",
       "showLength": true,
       "strokeColor": "#a78bfa",
       "fillColor": "#a78bfa22",
@@ -3197,7 +3224,8 @@
           "y": 394.42745042885144
         }
       ],
-      "group": "mandibular"
+      "group": "mandibular",
+      "hint": "The inferior-most soft-tissue point over Menton."
     },
     {
       "id": "3a9ouovu",
@@ -3206,7 +3234,7 @@
       "style": "solid",
       "size": 6,
       "label": "Gnathion'",
-      "definition": "",
+      "definition": "The most anterior inferior point of the soft-tissue chin.",
       "showLength": true,
       "strokeColor": "#a78bfa",
       "fillColor": "#a78bfa22",
@@ -3220,7 +3248,8 @@
           "y": 372.675009075025
         }
       ],
-      "group": "mandibular"
+      "group": "mandibular",
+      "hint": "The soft-tissue point over Gnathion."
     },
     {
       "id": "roj82wgy",
@@ -3229,7 +3258,7 @@
       "style": "solid",
       "size": 6,
       "label": "Rhinion",
-      "definition": "",
+      "definition": "The lower end of the nasal bones where they meet the nasal cartilage.",
       "showLength": true,
       "strokeColor": "#fbbf24",
       "fillColor": "#fbbf2422",
@@ -3243,7 +3272,8 @@
           "y": -60.087931868313454
         }
       ],
-      "group": "soft tissue"
+      "group": "soft tissue",
+      "hint": "Where the nasal bones and nasal cartilage join."
     },
     {
       "id": "4fg5ono6",
@@ -3252,7 +3282,7 @@
       "style": "solid",
       "size": 6,
       "label": "Prosthion",
-      "definition": "",
+      "definition": "The most anterior inferior point of the maxillary alveolar process.",
       "showLength": true,
       "strokeColor": "#60a5fa",
       "fillColor": "#60a5fa22",
@@ -3266,7 +3296,8 @@
           "y": 153.9045562073872
         }
       ],
-      "group": "maxillary"
+      "group": "maxillary",
+      "hint": "Lowest point of the maxillary alveolar ridge, at the incisal apex."
     },
     {
       "id": "bl2gzwuy",
@@ -3275,7 +3306,7 @@
       "style": "solid",
       "size": 6,
       "label": "Key Ridge",
-      "definition": "",
+      "definition": "The point where the anterior and posterior walls of the maxillary sinus converge.",
       "showLength": true,
       "strokeColor": "#60a5fa",
       "fillColor": "#60a5fa22",
@@ -3289,7 +3320,8 @@
           "y": 63.76883700014295
         }
       ],
-      "group": "maxillary"
+      "group": "maxillary",
+      "hint": "Along the zygomatic buttress, where the maxillary contour changes direction."
     },
     {
       "id": "6xmidt6c",
@@ -3298,7 +3330,7 @@
       "style": "solid",
       "size": 6,
       "label": "Condylion",
-      "definition": "",
+      "definition": "The most posterior superior point of the mandibular condyle.",
       "showLength": true,
       "strokeColor": "#a78bfa",
       "fillColor": "#a78bfa22",
@@ -3312,7 +3344,8 @@
           "y": -12.347839897757375
         }
       ],
-      "group": "mandibular"
+      "group": "mandibular",
+      "hint": "The highest posterior point of the condylar head; approximates the hinge axis."
     },
     {
       "id": "4b47arzq",
@@ -3321,7 +3354,7 @@
       "style": "solid",
       "size": 6,
       "label": "Basion",
-      "definition": "",
+      "definition": "The most inferior anterior point on the margin of the foramen magnum.",
       "showLength": true,
       "strokeColor": "#f59e0b",
       "fillColor": "#f59e0b22",
@@ -3335,7 +3368,8 @@
           "y": 38.49606478878895
         }
       ],
-      "group": "cranial base"
+      "group": "cranial base",
+      "hint": "At the base of the clivus where it meets the anterior border of the foramen magnum."
     },
     {
       "id": "um12u2eb",
@@ -3344,7 +3378,7 @@
       "style": "solid",
       "size": 6,
       "label": "Infradentale",
-      "definition": "",
+      "definition": "The most anterior superior point of the mandibular alveolar process.",
       "showLength": true,
       "strokeColor": "#a78bfa",
       "fillColor": "#a78bfa22",
@@ -3358,7 +3392,8 @@
           "y": 242.94918282736938
         }
       ],
-      "group": "mandibular"
+      "group": "mandibular",
+      "hint": "Highest point of the mandibular alveolar ridge, at the incisal apex."
     }
   ],
   "formulas": [],

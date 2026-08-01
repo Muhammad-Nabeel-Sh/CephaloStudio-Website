@@ -1,6 +1,6 @@
 # Examples Panel — Interactive Illustration Plan
 
-> Status: **foundation done (envelope validator + metadata + bundled validation, 12 tests). Phase 2 done (hover/group teaching + legend, 16 tests). Next: guide mode.**
+> Status: **foundation done (12 tests). Phase 2 done (group teaching + legend, 16 tests). Phase 3 done (step-by-step placement guide, 23 tests). Next: practice mode (4.3).**
 > Feature: Turn the Examples panel into a library of **interactive teaching
 > illustrations** that guide users in placing points and understanding
 > cephalometric analyses.
@@ -85,6 +85,12 @@ independently shippable + verifiable.
   prev/next controls and a progress indicator.
 - Each step shows: point name, definition, and a "what to look for" hint.
 - Hints come from the existing `definition` plus an optional per-markup `hint`.
+- **Done (Phase 3):** `buildGuideSteps(markups)` in `examplesData.js` filters
+  unplaced points and sorts group-by-group in first-appearance order (ungrouped
+  last). The viewer has a Browse/Guide toggle; guide mode shows a step strip
+  (prev/next, step x/y, progress bar, group chip, point name + definition +
+  TIP), a pulsing numbered ring around the current point, auto-focus on step
+  change, dimming of all other markups, and ←/→/Esc keyboard navigation.
 
 ### 4.3 Practice-placing on the example
 - "Practice mode": the tracing and reference points are hidden (or ghosted);
@@ -132,8 +138,10 @@ independently shippable + verifiable.
   soft tissue) + matching palette colors; viewer derives a clickable group
   legend from the data, dims non-focused groups while hovering or after a
   group click, and the tooltip shows the point's group. 4 tests added (16 total).
-- **Phase 3 — step-by-step placement guide** (4.2): Guide mode with step
-  navigation + highlighted point.
+- **Phase 3 — step-by-step placement guide** (4.2, done): Guide mode with step
+  navigation + highlighted point. `buildGuideSteps` helper, viewer mode toggle,
+  step strip (prev/next/progress/definition/hint), pulsing ring + auto-focus +
+  group dimming, ←/→/Esc keyboard nav. 7 tests added (23 total).
 - **Phase 4 — practice-placing** (4.3): Practice mode with feedback + score.
 - **Phase 5 — measurement explanation** (4.4): mapping table from
   `analysisName` (Landmarks may declare a matching analysis or ship its own).

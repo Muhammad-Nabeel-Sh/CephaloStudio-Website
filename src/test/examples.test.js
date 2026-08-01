@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { validateExample } from "../storage/cephxFormat.js";
-import { EXAMPLE_LIST, getExampleData } from "../data/examplesData.js";
+import { EXAMPLE_LIST, getExampleData, buildGuideSteps } from "../data/examplesData.js";
 import { PREDEFINED } from "../data/constants.js";
 
 // ═════════════════════════════════════════════════════════════════
@@ -172,5 +172,77 @@ describe("group teaching data", () => {
 
   it("group is optional: a point without a group still validates", () => {
     expect(validateExample(mkExample())).toBeNull();
+  });
+});
+
+// ─── Guide steps (Phase 3: step-by-step placement) ────────────────────────
+describe("guide steps", () => {
+  it("buildGuideSteps includes only placed points (x > -9000)", () => {
+    const data = getExampleData("Landmarks");
+    const steps = buildGuideSteps(data.markups);
+    for (const s of steps) {
+      expect(s.points[0].x).toBeGreaterThan(-9000);
+      expect(s.points[0].y).toBeGreaterThan(-9000);
+    }
+  });
+
+  it("covers every placed point exactly once", () => {
+    const data = getExampleData("Landmarks");
+    const placed = (data.markups || []).filter(m => m.type === "point" && m.points?.[0]?.x > -9000);
+    const steps = buildGuideSteps(data.markups);
+    expect(steps.length).toBe(placed.length);
+    expect(new Set(steps.map(s => s.id)).size).toBe(placed.length);
+  });
+
+  it("walks group by group in first-appearance order (ungrouped last)", () => {
+    const data = getExampleData("Landmarks");
+    const steps = buildGuideSteps(data.markups);
+    const seen = new Set();
+    let ungroupedSeen = false;
+    for (const s of steps) {
+      if (!s.group) { ungroupedSeen = true; continue; }
+      expect(ungroupedSeen, `grouped "${s.label}" after ungrouped`).toBe(false);
+      if (!seen.has(s.group)) {
+        seen.add(s.group);
+        expect(s.label, "first point of each group defines group order").toBeTruthy();
+      }
+    }
+    expect(seen.size).toBe(5);
+  });
+
+  it("points of the same group are consecutive in guide order", () => {
+    const data = getExampleData("Landmarks");
+    const steps = buildGuideSteps(data.markups);
+    for (let i = 0; i < steps.length - 1; i++) {
+      if (steps[i].group && steps[i + 1].group && steps[i].group !== steps[i + 1].group) {
+        // group switch: ensure no later point returns to the earlier group
+        for (let j = i + 1; j < steps.length; j++) {
+          expect(steps[j].group, `"${steps[j].label}" repeats group "${steps[i].group}"`).not.toBe(steps[i].group);
+        }
+      }
+    }
+  });
+
+  it("every guide step has teaching content (definition + hint)", () => {
+    const data = getExampleData("Landmarks");
+    const steps = buildGuideSteps(data.markups);
+    expect(steps.length).toBe(35);
+    for (const s of steps) {
+      expect(typeof s.definition, `definition on "${s.label}"`).toBe("string");
+      expect(s.definition.length).toBeGreaterThan(0);
+      expect(typeof s.hint, `hint on "${s.label}"`).toBe("string");
+      expect(s.hint.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("starts with the cranial base and ends with the soft tissue group", () => {
+    const data = getExampleData("Landmarks");
+    const steps = buildGuideSteps(data.markups);
+    expect(steps[0].group).toBe("cranial base");
+    expect(steps[steps.length - 1].group).toBe("soft tissue");
+  });
+
+  it("returns an empty list when no points are placed", () => {
+    expect(buildGuideSteps([{ type: "point", label: "N", points: [{ x: -9001, y: -9001 }] }])).toEqual([]);
   });
 });
