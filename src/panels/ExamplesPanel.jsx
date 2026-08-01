@@ -224,6 +224,41 @@ function ExampleViewerModal({ t, data, onClose }) {
   const [buildPlaying, setBuildPlaying] = useState(false);
   const guideAnimRef = useRef(0);
 
+  // Floating-window geometry (draggable + resizable, like the histogram popup)
+  const [pos, setPos] = useState(() => ({ x: Math.max(24, (window.innerWidth || 1400) - 804), y: 24 }));
+  const [size, setSize] = useState({ w: 780, h: 560 });
+  const [dragging, setDragging] = useState(false);
+  const [resizing, setResizing] = useState(false);
+  const dragRef = useRef(null);
+
+  const onHeaderMD = useCallback(e => {
+    if (e.target.closest("button, input, a")) return;
+    setDragging(true);
+    dragRef.current = { mx: e.clientX, my: e.clientY, px: pos.x, py: pos.y };
+  }, [pos]);
+
+  useEffect(() => {
+    if (!dragging && !resizing) return;
+    const mm = e => {
+      if (dragging && dragRef.current) {
+        setPos({
+          x: Math.min(Math.max(0, dragRef.current.px + (e.clientX - dragRef.current.mx)), (window.innerWidth || 1400) - 60),
+          y: Math.min(Math.max(0, dragRef.current.py + (e.clientY - dragRef.current.my)), (window.innerHeight || 900) - 40),
+        });
+      }
+      if (resizing && dragRef.current) {
+        setSize({
+          w: Math.max(420, Math.min(dragRef.current.pw + (e.clientX - dragRef.current.mx), (window.innerWidth || 1400) - 20)),
+          h: Math.max(360, Math.min(dragRef.current.ph + (e.clientY - dragRef.current.my), (window.innerHeight || 900) - 20)),
+        });
+      }
+    };
+    const mu = () => { setDragging(false); setResizing(false); };
+    window.addEventListener("mousemove", mm);
+    window.addEventListener("mouseup", mu);
+    return () => { window.removeEventListener("mousemove", mm); window.removeEventListener("mouseup", mu); };
+  }, [dragging, resizing]);
+
   // Compute bounding box derived from data
   const boundingBox = useMemo(() => {
     if (!data?.markups) return null;
@@ -319,6 +354,8 @@ function ExampleViewerModal({ t, data, onClose }) {
   useEffect(() => {
     if (mode !== "guide" && mode !== "measure" && mode !== "build") return;
     const onKey = e => {
+      const tag = (e.target && e.target.tagName) || "";
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || e.target?.isContentEditable) return;
       if (mode === "guide" || mode === "build") {
         if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); if (mode === "guide") setGuideIdx(i => Math.min(i + 1, guideSteps.length - 1)); else setBuildStage(i => Math.min(i + 1, buildMax)); }
         else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); if (mode === "guide") setGuideIdx(i => Math.max(i - 1, 0)); else setBuildStage(i => Math.max(i - 1, 0)); }
@@ -589,36 +626,35 @@ function ExampleViewerModal({ t, data, onClose }) {
   const cursorStyle = panning ? "grabbing" : "grab";
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999, backdropFilter: "blur(4px)" }} onClick={onClose}>
-      <div style={{ background: t.surf, border: `1px solid ${t.bdr}`, borderRadius: 12, width: "min(90vw, 780px)", height: "min(90vh, 600px)", display: "flex", flexDirection: "column", boxShadow: `0 24px 64px ${t.shadow}50`, overflow: "hidden" }} onClick={e => e.stopPropagation()}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 16px", borderBottom: `1px solid ${t.bdr}`, flexShrink: 0 }}>
-          <span style={{ fontSize: 16 }}>&#x1F4CB;</span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: t.tx }}>Example: {data?.name || "Template Preview"}</div>
-            <div style={{ fontSize: 10, color: t.tx2 }}>{data?.markups?.length || 0} markups · {data?.projection || ""} projection{data?.author ? ` · by ${data.author}` : ""}</div>
-          </div>
-          <span style={{ fontSize: 9, color: t.tx3, fontFamily: "'DM Mono',monospace" }}>{data?.markups?.filter(m => m.type === "point").length || 0} pts</span>
-          <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: 4 }}>
-            <div style={{ display: "flex", background: t.surf3, border: `1px solid ${t.bdr}`, borderRadius: 5, overflow: "hidden", flexShrink: 0 }}>
-              {[["browse", "Browse"], ["guide", "Guide"], ["measure", "Measure"], ["build", "Build"]].map(([m, l]) => {
-                const disabled = m === "guide" ? guideSteps.length === 0 : m === "measure" ? measurements.length === 0 : m === "build" ? buildStagesData.stages.length === 0 : false;
-                return (
-                  <button key={m} onClick={() => { setMode(m); if (m === "guide") setGuideIdx(0); if (m === "measure") setActiveMeas(0); if (m === "build") { setBuildStage(0); setBuildPlaying(false); } }}
-                    disabled={disabled}
-                    title={m === "guide" ? "Step-by-step placement guide" : m === "measure" ? "Measurement mapping table" : m === "build" ? "Build the tracing in stages" : "Free browsing"}
-                    style={{ background: mode === m ? t.acc : "transparent", color: mode === m ? "#fff" : t.tx2, border: "none", fontSize: 10, fontWeight: 700, height: 26, padding: "0 10px", cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.45 : 1, whiteSpace: "nowrap" }}>
-                    {l}
-                  </button>
-                );
-              })}
-            </div>
-            <button onClick={zoomOut} title="Zoom out" style={{ background: t.surf3, border: `1px solid ${t.bdr}`, borderRadius: 4, color: t.tx2, cursor: "pointer", fontSize: 14, width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center" }}>&#x2212;</button>
-            <span style={{ fontSize: 10, color: t.tx3, fontFamily: "'DM Mono',monospace", minWidth: 32, textAlign: "center" }}>{Math.round(zoom * 100)}%</span>
-            <button onClick={zoomIn} title="Zoom in" style={{ background: t.surf3, border: `1px solid ${t.bdr}`, borderRadius: 4, color: t.tx2, cursor: "pointer", fontSize: 14, width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
-            <button onClick={handleDblClick} title="Reset view" style={{ background: t.surf3, border: `1px solid ${t.bdr}`, borderRadius: 4, color: t.tx2, cursor: "pointer", fontSize: 12, width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center" }}>&#x2299;</button>
-          </div>
-          <button onClick={onClose} title="Close" style={{ background: "none", border: "none", color: t.tx3, cursor: "pointer", fontSize: 20, lineHeight: 1, padding: "0 4px" }}>&times;</button>
+    <div style={{ position: "fixed", left: pos.x, top: pos.y, width: size.w, height: size.h, background: t.surf, border: `1px solid ${t.bdr}`, borderRadius: 12, boxShadow: `0 24px 64px ${t.shadow}50`, zIndex: 9999, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+      <div onMouseDown={onHeaderMD} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderBottom: `1px solid ${t.bdr}`, flexShrink: 0, cursor: "move", userSelect: "none" }}>
+        <span style={{ fontSize: 16 }}>&#x1F4CB;</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: t.tx }}>Example: {data?.name || "Template Preview"}</div>
+          <div style={{ fontSize: 10, color: t.tx2 }}>{data?.markups?.length || 0} markups · {data?.projection || ""} projection{data?.author ? ` · by ${data.author}` : ""}</div>
         </div>
+        <span style={{ fontSize: 9, color: t.tx3, fontFamily: "'DM Mono',monospace" }}>{data?.markups?.filter(m => m.type === "point").length || 0} pts</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: 4 }}>
+          <div style={{ display: "flex", background: t.surf3, border: `1px solid ${t.bdr}`, borderRadius: 5, overflow: "hidden", flexShrink: 0 }}>
+            {[["browse", "Browse"], ["guide", "Guide"], ["measure", "Measure"], ["build", "Build"]].map(([m, l]) => {
+              const disabled = m === "guide" ? guideSteps.length === 0 : m === "measure" ? measurements.length === 0 : m === "build" ? buildStagesData.stages.length === 0 : false;
+              return (
+                <button key={m} onClick={() => { setMode(m); if (m === "guide") setGuideIdx(0); if (m === "measure") setActiveMeas(0); if (m === "build") { setBuildStage(0); setBuildPlaying(false); } }}
+                  disabled={disabled}
+                  title={m === "guide" ? "Step-by-step placement guide" : m === "measure" ? "Measurement mapping table" : m === "build" ? "Build the tracing in stages" : "Free browsing"}
+                  style={{ background: mode === m ? t.acc : "transparent", color: mode === m ? "#fff" : t.tx2, border: "none", fontSize: 10, fontWeight: 700, height: 26, padding: "0 10px", cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.45 : 1, whiteSpace: "nowrap" }}>
+                  {l}
+                </button>
+              );
+            })}
+          </div>
+          <button onClick={zoomOut} title="Zoom out" style={{ background: t.surf3, border: `1px solid ${t.bdr}`, borderRadius: 4, color: t.tx2, cursor: "pointer", fontSize: 14, width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center" }}>&#x2212;</button>
+          <span style={{ fontSize: 10, color: t.tx3, fontFamily: "'DM Mono',monospace", minWidth: 32, textAlign: "center" }}>{Math.round(zoom * 100)}%</span>
+          <button onClick={zoomIn} title="Zoom in" style={{ background: t.surf3, border: `1px solid ${t.bdr}`, borderRadius: 4, color: t.tx2, cursor: "pointer", fontSize: 14, width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+          <button onClick={handleDblClick} title="Reset view" style={{ background: t.surf3, border: `1px solid ${t.bdr}`, borderRadius: 4, color: t.tx2, cursor: "pointer", fontSize: 12, width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center" }}>&#x2299;</button>
+        </div>
+        <button onClick={onClose} title="Close" style={{ background: "none", border: "none", color: t.tx3, cursor: "pointer", fontSize: 20, lineHeight: 1, padding: "0 4px" }}>&times;</button>
+      </div>
         {data?.description && (
           <div style={{ padding: "8px 16px", fontSize: 11, color: t.tx2, lineHeight: 1.5, borderBottom: `1px solid ${t.bdr}`, flexShrink: 0 }}>
             {data.description}
@@ -734,7 +770,8 @@ function ExampleViewerModal({ t, data, onClose }) {
             Close
           </button>
         </div>
+        <div onMouseDown={e => { e.stopPropagation(); setResizing(true); dragRef.current = { mx: e.clientX, my: e.clientY, pw: size.w, ph: size.h }; }}
+          style={{ position: "absolute", right: 0, bottom: 0, width: 16, height: 16, cursor: "se-resize", background: `linear-gradient(135deg,transparent 50%,${t.bdr} 50%)`, borderBottomRightRadius: 12 }} />
       </div>
-    </div>
   );
 }
