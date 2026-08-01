@@ -1,6 +1,6 @@
 # Examples Panel — Interactive Illustration Plan
 
-> Status: **foundation done (12 tests). Phase 2 done (group teaching + legend, 16 tests). Phase 3 done (placement guide, 23 tests). Phase 5 done (measurement explanation, 30 tests). Skipped Phase 6 (tracing overlay) for now — next: Phase 4 (practice mode) if desired.**
+> Status: **all 7 phases done (45 examples tests). Practice-placing (Phase 4) skipped — explicitly out of scope.** Community feed + authoring docs shipped in Phase 7; final verification green (lint 0, 425 tests, build OK).
 > Feature: Turn the Examples panel into a library of **interactive teaching
 > illustrations** that guide users in placing points and understanding
 > cephalometric analyses.
@@ -123,6 +123,18 @@ independently shippable + verifiable.
   tracing is assembled.
 - Implementation: render only markups whose stage ≤ current, using the existing
   `drawMarkup` calls with a stage filter.
+- **Done (Phase 6):** stage ordering is per-markup via an optional `stage`
+  field (number or string) — `buildStages(markups)` in `examplesData.js`
+  derives explicit stages (numeric ascending, named by first-appearance;
+  unstaged markups become always-visible context) and falls back to
+  **point-by-point** guide order when no markup has a `stage` (placed points
+  revealed one per step, group by group, ungrouped last; non-point markups —
+  the tracing — stay as context). The viewer has a **Build** mode (4th
+  segment): a control strip with prev/next, play/pause (▶ / Space), a range
+  slider, stage chip and an "Adds:" listing of the current stage's markups;
+  the canvas reveals context + all stages ≤ current and hides the rest.
+  `MarkupProps` gained a **Stage** authoring field (free text + suggestions
+  from existing stages), and `validateExample` checks the field's type.
 
 ---
 
@@ -151,15 +163,23 @@ independently shippable + verifiable.
   navigation + highlighted point. `buildGuideSteps` helper, viewer mode toggle,
   step strip (prev/next/progress/definition/hint), pulsing ring + auto-focus +
   group dimming, ←/→/Esc keyboard nav. 7 tests added (23 total).
-- **Phase 4 — practice-placing** (4.3): Practice mode with feedback + score.
+- **Phase 4 — practice-placing (skipped for now):** Practice mode with feedback
+  + score.
 - **Phase 5 — measurement explanation** (4.4, done): `measurements` envelope on
   Landmarks (14 teaching measurements), `validateExample` checks it, Measure
   mode with clickable mapping table + dashed connecting lines on the tracing.
   7 tests added (30 total).
-- **Phase 6 — step-by-step tracing overlay (skipped for now):** Build mode with
-  reveal slider.
-- **Phase 7 — community + authoring docs (optional):** fetch examples, browse
-  UI, `Examples/README.md` guide for authors.
+- **Phase 6 — step-by-step tracing overlay** (4.5, done): Build mode with
+  reveal slider. `buildStages` helper (explicit `stage` fields, point-by-point
+  guide-order fallback, non-point markups = context), Build segment + control
+  strip (prev/next/slider/play/Space), hidden-until-revealed rendering,
+  `Stage` authoring field in MarkupProps. 9 tests added (39 total).
+- **Phase 7 — community + authoring docs (done):** `src/data/communityExamples.js`
+  (manifest fetch/cache/validate, `fetchExampleFile`, `clearCommunityCache`,
+  `getRepoURL`/`getContributionURL`), Community section in `ExamplesPanel` (refresh,
+  loading/error/stale-cache states, `.cepht` fetch + `validateExample` gate),
+  `Examples/README.md` authoring guide, `parseCommunityManifest` tests. 6 tests
+  added (45 total).
 
 Phases 2–6 are independent additions to the same viewer and can ship in any
 order; each ends with lint + tests + build green.

@@ -286,6 +286,12 @@ export function validateExample(data) {
       return `Unknown example projection "${data.projection}". Supported: ${EXAMPLE_PROJECTIONS.join(", ")}.`;
     }
   }
+  // Optional per-markup `stage` (build-mode reveal order): number or string.
+  for (const m of data.markups || []) {
+    if (m.stage != null && typeof m.stage !== "number" && typeof m.stage !== "string") {
+      return `Example markup "${m.label || "(unnamed)"}" field "stage" must be a number or string.`;
+    }
+  }
   // Optional `measurements` envelope: a teaching mapping table. Each entry names
   // a measurement, the labels of the points that combine into it, an optional
   // human-readable formula (for computed measures), and a one-line explanation.

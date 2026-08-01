@@ -748,6 +748,15 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
     return [...map.values()];
   },[markups]);
 
+  const stageOptions=useMemo(()=>{
+    const set=new Set();
+    for(const m of markups){
+      if(m.stage==null||m.stage==="")continue;
+      set.add(String(m.stage));
+    }
+    return [...set];
+  },[markups]);
+
   const [userPresets,setUserPresets]=useState(()=>loadNormLibrary());
   const handleSavePreset=useCallback((preset,mode)=>{setUserPresets(prev=>{const next=mode==="update"?prev.map(p=>p.id===preset.id?preset:p):[...prev,preset];saveNormLibrary(next);return next;});},[]);
   const handleDeletePreset=useCallback(id=>{setUserPresets(prev=>{const next=prev.filter(p=>p.id!==id);saveNormLibrary(next);return next;});},[]);
@@ -1722,7 +1731,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
                 canvasSize={canvasSize} toImage={toImage} addMarkup={addMarkup} pushUndo={pushUndo}
               />
             {selectedMarkup&&<div className="markupprops-panel" style={{borderTop:`1px solid ${t.bdr}`,padding:12,flexShrink:0,overflowY:"auto",scrollbarWidth:"none"}}>
-                <MarkupProps m={selectedMarkup} t={t} theme={theme} onUpdate={p=>{pushUndo();updMarkup(selectedMarkup.id,p);if(p.color&&selectedMarkup.group){markups.filter(x=>x.id!==selectedMarkup.id&&x.group===selectedMarkup.group&&x.type==="point").forEach(x=>updMarkup(x.id,{color:p.color,strokeColor:p.color,fillColor:p.color+"22"}));}}} onDelete={()=>delMarkup(selectedMarkup.id)} calibration={calibration} onParallel={()=>dispatch({type:"SET",payload:{activeTool:"parallel"}})} formatAngle={formatAngle} norms={norms} onUpdateNorms={ns=>updSession({norms:ns})} groupOptions={groupOptions}/>
+                <MarkupProps m={selectedMarkup} t={t} theme={theme} onUpdate={p=>{pushUndo();updMarkup(selectedMarkup.id,p);if(p.color&&selectedMarkup.group){markups.filter(x=>x.id!==selectedMarkup.id&&x.group===selectedMarkup.group&&x.type==="point").forEach(x=>updMarkup(x.id,{color:p.color,strokeColor:p.color,fillColor:p.color+"22"}));}}} onDelete={()=>delMarkup(selectedMarkup.id)} calibration={calibration} onParallel={()=>dispatch({type:"SET",payload:{activeTool:"parallel"}})} formatAngle={formatAngle} norms={norms} onUpdateNorms={ns=>updSession({norms:ns})} groupOptions={groupOptions} stageOptions={stageOptions}/>
               </div>}
             </div>
             <div onMouseDown={()=>dispatch({type:"SET",payload:{rightPanelResizing:true}})} style={{width:4,cursor:"col-resize",background: rightPanelResizing ? t.acc : "transparent",transition:"background 0.15s",flexShrink:0}}/>
@@ -1746,7 +1755,7 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
             canvasSize={canvasSize} toImage={toImage} addMarkup={addMarkup} pushUndo={pushUndo}
           />
           {selectedMarkup&&<div style={{borderTop:`1px solid ${t.bdr}`,padding:12,flexShrink:0}}>
-            <MarkupProps m={selectedMarkup} t={t} theme={theme} onUpdate={p=>{pushUndo();updMarkup(selectedMarkup.id,p);if(p.color&&selectedMarkup.group){markups.filter(x=>x.id!==selectedMarkup.id&&x.group===selectedMarkup.group&&x.type==="point").forEach(x=>updMarkup(x.id,{color:p.color,strokeColor:p.color,fillColor:p.color+"22"}));}}} onDelete={()=>delMarkup(selectedMarkup.id)} calibration={calibration} onParallel={()=>dispatch({type:"SET",payload:{activeTool:"parallel"}})} formatAngle={formatAngle} norms={norms} onUpdateNorms={ns=>updSession({norms:ns})} groupOptions={groupOptions}/>
+            <MarkupProps m={selectedMarkup} t={t} theme={theme} onUpdate={p=>{pushUndo();updMarkup(selectedMarkup.id,p);if(p.color&&selectedMarkup.group){markups.filter(x=>x.id!==selectedMarkup.id&&x.group===selectedMarkup.group&&x.type==="point").forEach(x=>updMarkup(x.id,{color:p.color,strokeColor:p.color,fillColor:p.color+"22"}));}}} onDelete={()=>delMarkup(selectedMarkup.id)} calibration={calibration} onParallel={()=>dispatch({type:"SET",payload:{activeTool:"parallel"}})} formatAngle={formatAngle} norms={norms} onUpdateNorms={ns=>updSession({norms:ns})} groupOptions={groupOptions} stageOptions={stageOptions}/>
           </div>}
         </>}
       </MobileBottomSheet>}

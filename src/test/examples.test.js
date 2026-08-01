@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { validateExample } from "../storage/cephxFormat.js";
-import { EXAMPLE_LIST, getExampleData, buildGuideSteps } from "../data/examplesData.js";
+import { EXAMPLE_LIST, getExampleData, buildGuideSteps, buildStages } from "../data/examplesData.js";
+import { parseCommunityManifest, COMMUNITY_EXAMPLES_URL, getRepoURL, getContributionURL } from "../data/communityExamples.js";
 import { PREDEFINED } from "../data/constants.js";
 
 // ═════════════════════════════════════════════════════════════════
@@ -305,3 +306,157 @@ describe("measurement teaching envelope", () => {
     expect(anb.formula).toBe("SNA − SNB");
   });
 });
+
+// ─── Build stages (Phase 6: step-by-step tracing overlay) ───────────────────
+function mkM(label, extra = {}) {
+  return { id: label, type: "point", label, points: [{ x: 1, y: 1 }], ...extra };
+}
+
+describe("buildStages", () => {
+  it("uses explicit numeric stages sorted ascending", () => {
+    const { stages, context, hasExplicit } = buildStages([
+      mkM("A", { stage: 3 }), mkM("B", { stage: 1 }), mkM("C", { stage: 2 }), mkM("D", { stage: 1 }),
+    ]);
+    expect(hasExplicit).toBe(true);
+    expect(stages.map(s => s.label)).toEqual(["1", "2", "3"]);
+    expect(stages[0].markups.map(m => m.label)).toEqual(["B", "D"]);
+    expect(stages[2].markups.map(m => m.label)).toEqual(["A"]);
+    expect(context).toEqual([]);
+  });
+
+  it("uses explicit named stages in first-appearance order", () => {
+    const { stages } = buildStages([
+      mkM("N", { stage: "cranial base" }), mkM("S", { stage: "cranial base" }), mkM("A", { stage: "maxillary" }),
+    ]);
+    expect(stages.map(s => s.label)).toEqual(["cranial base", "maxillary"]);
+    expect(stages[0].markups.map(m => m.label)).toEqual(["N", "S"]);
+  });
+
+  it("treats markups without a stage as always-visible context", () => {
+    const { stages, context } = buildStages([
+      mkM("Sil", { type: "silhouette" }), mkM("N", { stage: 1 }), mkM("A", { stage: 2 }),
+    ]);
+    expect(context.map(m => m.label)).toEqual(["Sil"]);
+    expect(stages.length).toBe(2);
+  });
+
+  it("falls back to point-by-point guide order when no markup has a stage", () => {
+    const { stages, context, hasExplicit } = buildStages([
+      mkM("Sil", { type: "silhouette" }), mkM("N", { group: "cranial base" }), mkM("A", { group: "maxillary" }), mkM("B", { group: "cranial base" }), mkM("Lone", {}),
+    ]);
+    expect(hasExplicit).toBe(false);
+    expect(stages.map(s => s.label)).toEqual(["N", "B", "A", "Lone"]);
+    expect(stages.every(s => s.markups.length === 1)).toBe(true);
+    expect(context.map(m => m.label)).toEqual(["Sil"]);
+  });
+
+  it("returns no stages when there are no placed points", () => {
+    const { stages, context } = buildStages([
+      { id: "a", type: "silhouette", label: "T" },
+      { id: "b", type: "line", label: "L", points: [{ x: 0, y: 0 }, { x: 1, y: 1 }] },
+    ]);
+    expect(stages).toEqual([]);
+    expect(context.length).toBe(2);
+  });
+
+  it("skips unplaced points in the fallback stages", () => {
+    const { stages, context } = buildStages([
+      mkM("Unplaced", { points: [{ x: -9001, y: -9001 }] }), mkM("Placed", {}),
+    ]);
+    expect(stages.map(s => s.label)).toEqual(["Placed"]);
+    expect(context).toEqual([]);
+  });
+
+  it("Landmarks falls back to 35 point-by-point stages over the silhouette context", () => {
+    const data = getExampleData("Landmarks");
+    const { stages, context, hasExplicit } = buildStages(data.markups);
+    expect(hasExplicit).toBe(false);
+    expect(stages.length).toBe(35);
+    expect(stages[0].label).toBe("Nasion");
+    expect(stages[stages.length - 1].label).toBe("Rhinion");
+    expect(stages.every(s => s.markups.length === 1)).toBe(true);
+    expect(context.map(m => m.type)).toEqual(["silhouette"]);
+  });
+
+  it("validateExample rejects a wrong-typed stage field", () => {
+    expect(validateExample(mkExample({ markups: [{ type: "point", label: "N", stage: {} }] }))).toMatch(/stage/);
+  });
+
+  it("validateExample accepts numeric and string stages", () => {
+    expect(validateExample(mkExample({ markups: [{ type: "point", label: "N", stage: 2 }, { type: "point", label: "A", stage: "cranial base" }] }))).toBeNull();
+  });
+});
+
+// ─── Community manifest (Phase 7: fetch + authoring docs) ─────────────────
+function mkManifest(overrides = {}) {
+  return {
+    version: "1.0",
+    updated: "2026-01-01",
+    examples: [{ id: "e1", url: "https://example.com/a.cepht", label: "Twin Block", author: "Dr A", projection: "lateral", ptCount: 12 }],
+    ...overrides,
+  };
+}
+
+describe("parseCommunityManifest", () => {
+  it("returns { updated, examples } for a well-formed manifest", () => {
+    const res = parseCommunityManifest(mkManifest());
+    expect(res).toEqual({
+      updated: "2026-01-01",
+      examples: [{
+        id: "e1",
+        url: "https://example.com/a.cepht",
+        label: "Twin Block",
+        subtitle: "",
+        description: "",
+        author: "Dr A",
+        projection: "lateral",
+        analysisName: "",
+        ptCount: 12,
+        badge: "12 pts",
+      }],
+    });
+  });
+
+  it("returns null for a structurally bad manifest", () => {
+    expect(parseCommunityManifest(null)).toBeNull();
+    expect(parseCommunityManifest({})).toBeNull();
+    expect(parseCommunityManifest({ examples: "nope" })).toBeNull();
+    expect(parseCommunityManifest([])).toBeNull();
+  });
+
+  it("drops entries without a url", () => {
+    const res = parseCommunityManifest(mkManifest({
+      examples: [{ id: "ok", url: "https://x/a.cepht" }, { id: "no-url" }, null, "string"],
+    }));
+    expect(res.examples.length).toBe(1);
+    expect(res.examples[0].id).toBe("ok");
+  });
+
+  it("falls back to sensible defaults for missing fields", () => {
+    const res = parseCommunityManifest(mkManifest({ examples: [{ url: "https://x/a.cepht" }] }));
+    const ex = res.examples[0];
+    expect(ex.id).toBe("community-0");
+    expect(ex.label).toBe("community-0");
+    expect(ex.ptCount).toBe(0);
+    expect(ex.badge).toBe("community");
+    expect(typeof ex.description).toBe("string");
+    expect(typeof ex.author).toBe("string");
+  });
+
+  it("keeps optional subtitle / description / analysisName when provided", () => {
+    const res = parseCommunityManifest(mkManifest({
+      examples: [{ id: "e", url: "https://x/a.cepht", subtitle: "fun", description: "desc", analysisName: "Steiner Analysis" }],
+    }));
+    expect(res.examples[0].subtitle).toBe("fun");
+    expect(res.examples[0].description).toBe("desc");
+    expect(res.examples[0].analysisName).toBe("Steiner Analysis");
+  });
+
+  it("exposes repo and contribution URLs", () => {
+    expect(typeof COMMUNITY_EXAMPLES_URL).toBe("string");
+    expect(COMMUNITY_EXAMPLES_URL.endsWith("examples/manifest.json")).toBe(true);
+    expect(getRepoURL()).toContain("github.com");
+    expect(getContributionURL()).toContain("contribute.html");
+  });
+});
+

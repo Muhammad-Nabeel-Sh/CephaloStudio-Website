@@ -1,5 +1,6 @@
 import { useState, useRef, useMemo, useEffect, useCallback } from "react";
-import { EXAMPLE_LIST, getExampleData, buildGuideSteps } from "../data/examplesData.js";
+import { EXAMPLE_LIST, getExampleData, buildGuideSteps, buildStages } from "../data/examplesData.js";
+import { fetchCommunityExamples, fetchExampleFile, getRepoURL } from "../data/communityExamples.js";
 import { drawMarkup } from "../canvas/drawMarkups.js";
 
 function titleCase(s) {
@@ -72,13 +73,79 @@ function drawMeasLines(ctx, mm, markups, zoom, pan, t) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // EXAMPLES PANEL
 // ═══════════════════════════════════════════════════════════════════════════════
+function ExampleCard({ ex, t, onOpen }) {
+  const subtitle = ex.subtitle || [ex.author, ex.projection].filter(Boolean).join(" · ") || "community example";
+  return (
+    <div onClick={onOpen}
+      style={{ padding: 12, borderRadius: 8, background: t.surf2, border: `1px solid ${t.bdr}`, cursor: "pointer", display: "flex", flexDirection: "column", gap: 6, transition: "border-color 0.15s" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+        <div style={{ width: 36, height: 36, borderRadius: 6, background: t.surf3, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>&#x1F4CB;</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: t.tx, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ex.label}</div>
+          <div style={{ fontSize: 10, color: t.tx2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{subtitle}</div>
+        </div>
+        <button onClick={e => { e.stopPropagation(); onOpen(); }}
+          style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${t.bdr}`, background: t.surf3, color: t.tx, fontSize: 10, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>
+          View
+        </button>
+      </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        {ex.analysisName && (
+          <span style={{ fontSize: 9, color: t.acc, background: `${t.acc}22`, padding: "2px 8px", borderRadius: 4, fontWeight: 700 }}>{ex.analysisName}</span>
+        )}
+        {ex.ptCount ? (
+          <span style={{ fontSize: 9, color: t.tx2, background: t.surf3, padding: "2px 8px", borderRadius: 4, fontWeight: 700 }}>{ex.ptCount} pts</span>
+        ) : null}
+      </div>
+      {ex.description && (
+        <div style={{ fontSize: 10, color: t.tx2, lineHeight: 1.45, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+          {ex.description}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ExamplesPanel({ t }) {
   const [data, setData] = useState(null);
+  const [community, setCommunity] = useState({ state: "loading", examples: [], updated: null, error: null, stale: false });
+  const [commErr, setCommErr] = useState(null);
 
   const openExample = useCallback((id) => {
     const d = getExampleData(id);
     if (!d) { alert("Could not load example. Make sure the Examples/ folder contains .cepht files."); return; }
     setData(d);
+  }, []);
+
+  const applyCommunity = useCallback(res => {
+    setCommunity({
+      state: res.ok ? "ready" : "error",
+      examples: res.examples || [],
+      updated: res.updated || null,
+      error: res.error || null,
+      stale: !!res.stale,
+    });
+  }, []);
+
+  const loadCommunity = useCallback((force = false) => {
+    if (force) setCommunity(s => ({ ...s, state: "loading" }));
+    fetchCommunityExamples(force).then(applyCommunity);
+  }, [applyCommunity]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchCommunityExamples(false).then(res => {
+      if (cancelled) return;
+      applyCommunity(res);
+    });
+    return () => { cancelled = true; };
+  }, [applyCommunity]);
+
+  const openCommunity = useCallback(async ex => {
+    setCommErr(null);
+    const res = await fetchExampleFile(ex.url);
+    if (!res.ok) { setCommErr(`Could not load "${ex.label}": ${res.error}`); return; }
+    setData(res.data);
   }, []);
 
   return (
@@ -95,31 +162,42 @@ export function ExamplesPanel({ t }) {
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {EXAMPLE_LIST.map(ex => (
-          <div key={ex.id} onClick={() => openExample(ex.id)}
-            style={{ padding: 12, borderRadius: 8, background: t.surf2, border: `1px solid ${t.bdr}`, cursor: "pointer", display: "flex", flexDirection: "column", gap: 6, transition: "border-color 0.15s" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-              <div style={{ width: 36, height: 36, borderRadius: 6, background: t.surf3, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>&#x1F4CB;</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: t.tx, marginBottom: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ex.label}</div>
-                <div style={{ fontSize: 10, color: t.tx2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{ex.subtitle}</div>
-              </div>
-              <button onClick={e => { e.stopPropagation(); openExample(ex.id); }}
-                style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${t.bdr}`, background: t.surf3, color: t.tx, fontSize: 10, fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>
-                View
-              </button>
-            </div>
-            {ex.analysisName && (
-              <span style={{ alignSelf: "flex-start", fontSize: 9, color: t.acc, background: `${t.acc}22`, padding: "2px 8px", borderRadius: 4, fontWeight: 700 }}>
-                {ex.analysisName}
-              </span>
-            )}
-            {ex.description && (
-              <div style={{ fontSize: 10, color: t.tx2, lineHeight: 1.45, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                {ex.description}
-              </div>
-            )}
-          </div>
+          <ExampleCard key={ex.id} ex={ex} t={t} onOpen={() => openExample(ex.id)} />
         ))}
+      </div>
+
+      <div style={{ marginTop: 20, borderTop: `1px solid ${t.bdr}`, paddingTop: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: t.tx2, letterSpacing: 0.4, textTransform: "uppercase" }}>Community examples</span>
+          {community.updated && <span style={{ fontSize: 9, color: t.tx3 }}>updated {community.updated}</span>}
+          <span style={{ flex: 1 }} />
+          <button onClick={() => loadCommunity(true)} disabled={community.state === "loading"}
+            style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${t.bdr}`, background: t.surf3, color: t.tx, fontSize: 10, fontWeight: 700, cursor: community.state === "loading" ? "not-allowed" : "pointer", opacity: community.state === "loading" ? 0.5 : 1, flexShrink: 0 }}>
+            {community.state === "loading" ? "Loading…" : "↻ Refresh"}
+          </button>
+        </div>
+        {community.stale && (
+          <div style={{ fontSize: 10, color: t.warn, marginBottom: 8 }}>Offline — showing cached list{community.error ? ` (${community.error})` : ""}.</div>
+        )}
+        {commErr && (
+          <div style={{ fontSize: 10, color: t.err, marginBottom: 8 }}>{commErr}</div>
+        )}
+        {community.state === "loading" && (
+          <div style={{ fontSize: 11, color: t.tx3, padding: "10px 2px" }}>Loading community examples…</div>
+        )}
+        {community.state === "error" && (
+          <div style={{ fontSize: 11, color: t.err, padding: "10px 2px" }}>Could not reach the community feed ({community.error}).</div>
+        )}
+        {community.state === "ready" && community.examples.length === 0 && (
+          <div style={{ fontSize: 11, color: t.tx3, padding: "10px 2px" }}>No community examples yet — be the first to contribute one.</div>
+        )}
+        {community.state === "ready" && community.examples.map(ex => (
+          <ExampleCard key={ex.id} ex={ex} t={t} onOpen={() => openCommunity(ex)} />
+        ))}
+        <div style={{ fontSize: 10, color: t.tx3, marginTop: 10, lineHeight: 1.6 }}>
+          Authors: place markups in the workspace, annotate with groups / hints / stages, then export the template and drop it in the repo's{" "}
+          <a href={getRepoURL()} target="_blank" rel="noreferrer" style={{ color: t.acc }}>examples/ folder</a>. See <code style={{ fontFamily: "'DM Mono',monospace" }}>Examples/README.md</code> for the full authoring guide.
+        </div>
       </div>
     </div>
   );
@@ -142,6 +220,8 @@ function ExampleViewerModal({ t, data, onClose }) {
   const [mode, setMode] = useState("browse");
   const [guideIdx, setGuideIdx] = useState(0);
   const [activeMeas, setActiveMeas] = useState(null);
+  const [buildStage, setBuildStage] = useState(0);
+  const [buildPlaying, setBuildPlaying] = useState(false);
   const guideAnimRef = useRef(0);
 
   // Compute bounding box derived from data
@@ -191,6 +271,11 @@ function ExampleViewerModal({ t, data, onClose }) {
   const measurements = useMemo(() => (data?.measurements || []), [data]);
   const activeMeasObj = activeMeas != null ? (measurements[activeMeas] || null) : null;
 
+  // Build-mode stages (explicit `stage` fields, falling back to group order)
+  const buildStagesData = useMemo(() => buildStages(data?.markups), [data]);
+  const currentBuildStage = buildStagesData.stages[Math.min(buildStage, buildStagesData.stages.length - 1)] || null;
+  const buildMax = Math.max(buildStagesData.stages.length - 1, 0);
+
   // Reset zoom/pan when bounding box changes (new data)
   useEffect(() => {
     if (!boundingBox || !containerRef.current) return;
@@ -222,19 +307,28 @@ function ExampleViewerModal({ t, data, onClose }) {
     return () => cancelAnimationFrame(raf);
   }, [mode, guideIdx, guideSteps, focusOnPoint]);
 
-  // Guide/measure modes: keyboard navigation
+  // Build mode: auto-advance while playing
+  const effectivePlaying = mode === "build" && buildPlaying && buildStage < buildMax;
   useEffect(() => {
-    if (mode !== "guide" && mode !== "measure") return;
+    if (!effectivePlaying) return;
+    const timer = setTimeout(() => setBuildStage(i => Math.min(i + 1, buildMax)), 1100);
+    return () => clearTimeout(timer);
+  }, [effectivePlaying, buildStage, buildMax]);
+
+  // Guide/measure/build modes: keyboard navigation
+  useEffect(() => {
+    if (mode !== "guide" && mode !== "measure" && mode !== "build") return;
     const onKey = e => {
-      if (mode === "guide") {
-        if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); setGuideIdx(i => Math.min(i + 1, guideSteps.length - 1)); }
-        else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); setGuideIdx(i => Math.max(i - 1, 0)); }
+      if (mode === "guide" || mode === "build") {
+        if (e.key === "ArrowRight" || e.key === "ArrowDown") { e.preventDefault(); if (mode === "guide") setGuideIdx(i => Math.min(i + 1, guideSteps.length - 1)); else setBuildStage(i => Math.min(i + 1, buildMax)); }
+        else if (e.key === "ArrowLeft" || e.key === "ArrowUp") { e.preventDefault(); if (mode === "guide") setGuideIdx(i => Math.max(i - 1, 0)); else setBuildStage(i => Math.max(i - 1, 0)); }
+        else if (e.key === " ") { e.preventDefault(); if (mode === "build") setBuildPlaying(p => !p); }
       }
       if (e.key === "Escape") setMode("browse");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [mode, guideSteps.length]);
+  }, [mode, guideSteps.length, buildMax]);
 
   // Point definition tooltip on hover
   const renderTooltip = useCallback((ctx, W) => {
@@ -312,10 +406,17 @@ function ExampleViewerModal({ t, data, onClose }) {
       const focusGroup = activeGroup || hoveredGroup;
       const guidePt = mode === "guide" ? (guideSteps[guideIdx] || null) : null;
       const measPt = mode === "measure" && activeMeasObj ? new Set(activeMeasObj.pts) : null;
+      const revealedIds = mode === "build" ? (() => {
+        const s = new Set(buildStagesData.context.map(m => m.id));
+        buildStagesData.stages.slice(0, buildStage + 1).forEach(st => st.markups.forEach(m => s.add(m.id)));
+        return s;
+      })() : null;
       data.markups.forEach(m => {
         let mk = m;
         if (guidePt) {
           if (m.id !== guidePt.id) mk = dimCopy(m, m.type === "silhouette" ? 0.3 : 0.18);
+        } else if (revealedIds) {
+          if (!revealedIds.has(m.id)) return;
         } else if (measPt) {
           if (m.type !== "point" || !m.label || !measPt.has(m.label)) mk = dimCopy(m);
         } else if (focusGroup && m.group !== focusGroup) {
@@ -328,7 +429,7 @@ function ExampleViewerModal({ t, data, onClose }) {
     }
     renderTooltip(ctx, W);
     ctx.restore();
-  }, [data, t, zoom, pan, renderTooltip, activeGroup, hoveredPt, mode, guideSteps, guideIdx, activeMeasObj]);
+  }, [data, t, zoom, pan, renderTooltip, activeGroup, hoveredPt, mode, guideSteps, guideIdx, activeMeasObj, buildStagesData, buildStage]);
 
   // Guide mode: continuous pulse animation (runs after redraw is defined)
   useEffect(() => {
@@ -499,12 +600,12 @@ function ExampleViewerModal({ t, data, onClose }) {
           <span style={{ fontSize: 9, color: t.tx3, fontFamily: "'DM Mono',monospace" }}>{data?.markups?.filter(m => m.type === "point").length || 0} pts</span>
           <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: 4 }}>
             <div style={{ display: "flex", background: t.surf3, border: `1px solid ${t.bdr}`, borderRadius: 5, overflow: "hidden", flexShrink: 0 }}>
-              {[["browse", "Browse"], ["guide", "Guide"], ["measure", "Measure"]].map(([m, l]) => {
-                const disabled = m === "guide" ? guideSteps.length === 0 : m === "measure" ? measurements.length === 0 : false;
+              {[["browse", "Browse"], ["guide", "Guide"], ["measure", "Measure"], ["build", "Build"]].map(([m, l]) => {
+                const disabled = m === "guide" ? guideSteps.length === 0 : m === "measure" ? measurements.length === 0 : m === "build" ? buildStagesData.stages.length === 0 : false;
                 return (
-                  <button key={m} onClick={() => { setMode(m); if (m === "guide") setGuideIdx(0); if (m === "measure") setActiveMeas(0); }}
+                  <button key={m} onClick={() => { setMode(m); if (m === "guide") setGuideIdx(0); if (m === "measure") setActiveMeas(0); if (m === "build") { setBuildStage(0); setBuildPlaying(false); } }}
                     disabled={disabled}
-                    title={m === "guide" ? "Step-by-step placement guide" : m === "measure" ? "Measurement mapping table" : "Free browsing"}
+                    title={m === "guide" ? "Step-by-step placement guide" : m === "measure" ? "Measurement mapping table" : m === "build" ? "Build the tracing in stages" : "Free browsing"}
                     style={{ background: mode === m ? t.acc : "transparent", color: mode === m ? "#fff" : t.tx2, border: "none", fontSize: 10, fontWeight: 700, height: 26, padding: "0 10px", cursor: disabled ? "not-allowed" : "pointer", opacity: disabled ? 0.45 : 1, whiteSpace: "nowrap" }}>
                     {l}
                   </button>
@@ -544,6 +645,31 @@ function ExampleViewerModal({ t, data, onClose }) {
             {currentStep.hint && (
               <div style={{ marginTop: 6, fontSize: 11, color: t.tx3, lineHeight: 1.45, background: `${groupColor(currentStep.group)}14`, padding: "6px 9px", borderRadius: 6 }}>
                 <span style={{ fontWeight: 700, color: groupColor(currentStep.group) }}>TIP: </span>{currentStep.hint}
+              </div>
+            )}
+          </div>
+        )}
+        {mode === "build" && buildStagesData.stages.length > 0 && (
+          <div style={{ padding: "10px 16px", borderBottom: `1px solid ${t.bdr}`, background: `${t.surf2}80`, flexShrink: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <button onClick={() => { setBuildPlaying(false); setBuildStage(i => Math.max(i - 1, 0)); }} disabled={buildStage === 0} title="Previous stage (←)"
+                style={{ background: t.surf3, border: `1px solid ${t.bdr}`, borderRadius: 4, color: t.tx2, cursor: buildStage === 0 ? "not-allowed" : "pointer", fontSize: 13, width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", opacity: buildStage === 0 ? 0.4 : 1 }}>&#x2190;</button>
+              <button onClick={() => setBuildPlaying(p => !p)} disabled={buildStage >= buildMax} title="Play / pause (Space)"
+                style={{ background: effectivePlaying ? t.acc : t.surf3, border: `1px solid ${t.bdr}`, borderRadius: 4, color: effectivePlaying ? "#fff" : t.tx2, cursor: buildStage >= buildMax ? "not-allowed" : "pointer", fontSize: 10, fontWeight: 700, width: 34, height: 26, display: "flex", alignItems: "center", justifyContent: "center", opacity: buildStage >= buildMax ? 0.4 : 1 }}>
+                {effectivePlaying ? "❚❚" : "▶"}
+              </button>
+              <button onClick={() => { setBuildPlaying(false); setBuildStage(i => Math.min(i + 1, buildMax)); }} disabled={buildStage >= buildMax} title="Next stage (→)"
+                style={{ background: t.surf3, border: `1px solid ${t.bdr}`, borderRadius: 4, color: t.tx2, cursor: buildStage >= buildMax ? "not-allowed" : "pointer", fontSize: 13, width: 26, height: 26, display: "flex", alignItems: "center", justifyContent: "center", opacity: buildStage >= buildMax ? 0.4 : 1 }}>&#x2192;</button>
+              <span style={{ fontSize: 10, fontFamily: "'DM Mono',monospace", color: t.tx3, minWidth: 66 }}>Stage {buildStage + 1} / {buildStagesData.stages.length}</span>
+              <input type="range" min={0} max={buildMax} value={Math.min(buildStage, buildMax)} onChange={e => { setBuildPlaying(false); setBuildStage(Number(e.target.value)); }}
+                style={{ flex: 1, minWidth: 40, accentColor: t.acc, cursor: "pointer" }} />
+              {currentBuildStage && (
+                <span style={{ fontSize: 10, color: t.tx2, fontWeight: 700, whiteSpace: "nowrap", background: `${t.acc}14`, border: `1px solid ${t.bdr}`, borderRadius: 999, padding: "3px 10px" }}>{titleCase(currentBuildStage.label)}</span>
+              )}
+            </div>
+            {currentBuildStage && (
+              <div style={{ marginTop: 8, fontSize: 11, color: t.tx2, lineHeight: 1.4 }}>
+                <span style={{ fontWeight: 700, color: t.tx }}>Adds:</span> {currentBuildStage.markups.map(m => m.label).join(", ")}
               </div>
             )}
           </div>
@@ -600,7 +726,9 @@ function ExampleViewerModal({ t, data, onClose }) {
               ? "Follow the steps to place landmarks in clinical order. Use the arrow buttons or ← / → keys to move; Esc returns to browse view."
               : mode === "measure"
                 ? "Click a measurement in the list to map its points on the tracing; Esc returns to browse view."
-                : "Drag to pan · scroll to zoom · double-click to fit. Hover any point to read its definition and highlight its group; click a group to isolate it."}
+                : mode === "build"
+                  ? "Reveal the tracing in stages with the slider or ▶ play. Use ← / → to step, Space to play/pause, Esc to return to browse view."
+                  : "Drag to pan · scroll to zoom · double-click to fit. Hover any point to read its definition and highlight its group; click a group to isolate it."}
           </div>
           <button onClick={onClose} style={{ padding: "6px 14px", borderRadius: 6, border: `1px solid ${t.bdr}`, background: t.surf3, color: t.tx, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
             Close
