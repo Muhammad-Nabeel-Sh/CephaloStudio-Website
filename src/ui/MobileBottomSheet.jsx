@@ -27,6 +27,8 @@ export default function MobileBottomSheet({ t, isOpen, onClose, children }) {
   const pctRef = useRef(100);
   const rafRef = useRef(null);
   const hideTimer = useRef(null);
+  const draggingRef = useRef(false);
+  const movedRef = useRef(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -102,21 +104,39 @@ export default function MobileBottomSheet({ t, isOpen, onClose, children }) {
     }
   }, [syncState]);
 
-  const onHandleTouchStart = useCallback((e) => {
-    startYRef.current = e.touches[0].clientY;
+  const onHandlePointerDown = useCallback((e) => {
+    draggingRef.current = true;
+    movedRef.current = false;
+    startYRef.current = e.clientY;
     startPctRef.current = pctRef.current;
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* noop */ }
   }, []);
 
-  const onHandleTouchMove = useCallback((e) => {
-    const dy = e.touches[0].clientY - startYRef.current;
+  const onHandlePointerMove = useCallback((e) => {
+    if (!draggingRef.current) return;
+    const dy = e.clientY - startYRef.current;
+    if (Math.abs(dy) > 4) movedRef.current = true;
     const pct = startPctRef.current + (dy / window.innerHeight) * 100;
     setTranslate(pct);
   }, [setTranslate]);
 
-  const onHandleTouchEnd = useCallback(() => {
+  const onHandlePointerUp = useCallback(() => {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
     const el = sheetRef.current;
     if (!el) return;
     const current = pctRef.current;
+    // Tap (no movement): toggle between collapsed (snapped) and expanded.
+    if (!movedRef.current) {
+      if (current <= 20) {
+        dispatch({ type: "SHOW" });
+        animateTo(SNAP_OPEN);
+      } else {
+        dispatch({ type: "FULL" });
+        animateTo(5);
+      }
+      return;
+    }
     if (current > 50) {
       animateTo(100);
       if (hideTimer.current) clearTimeout(hideTimer.current);
@@ -169,12 +189,13 @@ export default function MobileBottomSheet({ t, isOpen, onClose, children }) {
         boxShadow: `0 -4px 24px ${t.shadow}66`,
       }}>
         <div className="mobile-chrome" style={{
-          display: "flex", justifyContent: "center", padding: "8px 0 2px",
-          cursor: "grab", touchAction: "none", flexShrink: 0,
+          display: "flex", justifyContent: "center", alignItems: "center",
+          height: 40, width: "100%", flexShrink: 0,
+          cursor: "grab", touchAction: "none", userSelect: "none", WebkitUserSelect: "none",
         }}
-          onTouchStart={onHandleTouchStart}
-          onTouchMove={onHandleTouchMove}
-          onTouchEnd={onHandleTouchEnd}
+          onPointerDown={onHandlePointerDown}
+          onPointerMove={onHandlePointerMove}
+          onPointerUp={onHandlePointerUp}
         >
           <div style={{
             width: 36, height: 4, borderRadius: 2,

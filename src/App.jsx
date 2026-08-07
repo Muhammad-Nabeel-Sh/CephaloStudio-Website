@@ -1826,10 +1826,10 @@ function Workspace({project,onUpdateProject,onHome,t,theme,setTheme,onSave,onImp
       {showFormulaEditor&&<Modal t={t} title={editFormulaId?"Edit Formula":"New Formula"} onClose={()=>dispatch({type:"SET",payload:{showFormulaEditor:false}})}><FormulaEditor t={t} formula={editFormulaId?formulas.find(f=>f.id===editFormulaId):null} scope={measScope} onSave={f=>{const newFs=editFormulaId?formulas.map(x=>x.id===editFormulaId?f:x):[...formulas,f];updSession({formulas:newFs});dispatch({type:"SET",payload:{showFormulaEditor:false}});}} onClose={()=>dispatch({type:"SET",payload:{showFormulaEditor:false}})}/></Modal>}
       {showHistogram&&<FloatingHistogram hist={histData} t={t} lutMode={lutMode} lutInvert={lutInvert} processing={processing} onProcessingChange={p=>updSession({processing:p})} onClose={()=>dispatch({type:"SET",payload:{showHistogram:false}})}/>}
       {guideKey&&<PanelGuideModal t={t} guideKey={guideKey} onClose={()=>setGuideKey(null)}/>}
-      <div style={{position:"relative",bottom:0,left:0,right:0,zIndex:999,background:t.surf,borderTop:`1px solid ${t.surf}`,padding:"3px 12px",display:"flex",justifyContent:"center",alignItems:"center",gap:8,fontSize:9,color:t.tx3}}>
+      {!isMobile&&<div style={{position:"relative",bottom:0,left:0,right:0,zIndex:999,background:t.surf,borderTop:`1px solid ${t.surf}`,padding:"3px 12px",display:"flex",justifyContent:"center",alignItems:"center",gap:8,fontSize:9,color:t.tx3}}>
         <span style={{fontWeight:700,fontSize:8,color:t.warn,letterSpacing:0.5}}>⚠ RESEARCH & EDUCATIONAL USE ONLY</span>
         <span>Not cleared for clinical diagnosis. Clinical decisions should not rely solely on these measurements.</span>
-      </div>
+      </div>}
     </div>
   );
 }
