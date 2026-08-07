@@ -21,9 +21,9 @@
     <title>Cephalometry Studio</title>
     <style>
       body { margin: 0; background: #1a1a2e; }
-      #splash { display:flex; align-items:center; justify-content:center; height:100vh; background:#1a1a2e; flex-direction:column; gap:16px; }
-      #splash-logo { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; color: #7c5cfc; }
-      #splash-sub { font-family: 'DM Sans', sans-serif; font-size: 13px; color: #888; }
+      #splash { display:flex; align-items:center; justify-content:center; height:100vh; height:100dvh; width:100%; box-sizing:border-box; padding:24px; background:#1a1a2e; flex-direction:column; gap:16px; text-align:center; }
+      #splash-logo { font-family: 'Syne', sans-serif; font-size: clamp(24px, 8vw, 28px); font-weight: 800; color: #7c5cfc; line-height: 1.2; text-align:center; }
+      #splash-sub { font-family: 'DM Sans', sans-serif; font-size: 13px; color: #888; text-align:center; }
       @keyframes splashPulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
       #splash-dot { animation: splashPulse 1.2s ease-in-out infinite; }
     </style>

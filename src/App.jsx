@@ -2002,12 +2002,17 @@ async function clearAllLocalData() {
 }
 
 export default function CephalometryStudio(){
+  const splashMobile=useMediaQuery("(max-width: 640px)");
   const[theme,setTheme]=useState("bluish");const t=useMemo(()=>({...THEMES[theme],id:theme}),[theme]);
   // Start empty and async-load the encrypted autosave so the PHI blob is never
   // held in plaintext localStorage. `loaded` guards the save effect so the
   // initial empty state can't clobber the just-decrypted projects.
   const[projects,setProjects]=useState([]);const[activeId,setActiveId]=useState(null);
   const[loaded,setLoaded]=useState(false);
+  // On load, greet the user with a choice: jump straight into the most recent
+  // project (canvas) or land on the homepage. `welcome` holds the project id to
+  // offer; it is consumed by the first click and never re-shown during the session.
+  const[welcome,setWelcome]=useState(null);
   const dirtyRef=useRef(false);
   // D3: surface IDB-unavailable / storage-quota failures as a dismissible banner
   // instead of silently degrading (incognito mode, full storage). The autosave
@@ -2029,7 +2034,9 @@ export default function CephalometryStudio(){
         logWarn(`Retention: purged ${purged} project(s) older than ${retentionDays} days.`);
       }
       setProjects(withRetention);
-      setActiveId(withRetention.length>0?withRetention[0].id:null);
+      if(withRetention.length>0){
+        setWelcome({projectId:withRetention[0].id});
+      }
       setLoaded(true);
     })();
     return ()=>{cancelled=true;};
@@ -2043,6 +2050,35 @@ export default function CephalometryStudio(){
     window.addEventListener("cephalostudio:storage-warning",onWarn);
     return ()=>window.removeEventListener("cephalostudio:storage-warning",onWarn);
   },[]);
+
+  // Mobile: enter browser fullscreen by default on load. Browsers reject a
+  // load-time requestFullscreen() (it needs a user gesture — and logs an error
+  // even when the promise is caught), so we only request it on the first tap
+  // anywhere: after one interaction the canvas is fullscreen, gesture-safe.
+  useEffect(()=>{
+    if(!splashMobile)return;
+    let attempted=false;
+    const enterFs=()=>{
+      if(document.fullscreenElement||document.webkitFullscreenElement)return;
+      const el=document.documentElement;
+      const req=el.requestFullscreen||el.webkitRequestFullscreen;
+      try{
+        const p=req?.call(el);
+        if(p&&typeof p.catch==="function")p.catch(()=>{});
+      }catch{/* fullscreen unavailable */}
+    };
+    const onGesture=()=>{
+      if(attempted)return;
+      attempted=true;
+      enterFs();
+    };
+    window.addEventListener("pointerdown",onGesture);
+    window.addEventListener("touchstart",onGesture);
+    return ()=>{
+      window.removeEventListener("pointerdown",onGesture);
+      window.removeEventListener("touchstart",onGesture);
+    };
+  },[splashMobile]);
 
   // W4: debounce autosave so rapid edits don't encrypt-write per tick
   const saveTimerRef=useRef(null);
@@ -2121,6 +2157,22 @@ export default function CephalometryStudio(){
             <span style={{flex:1,lineHeight:1.4}}>⚠ {storageWarn.message}</span>
             <button onClick={()=>setStorageWarn(null)} aria-label="Dismiss warning" style={{background:"none",border:`1px solid ${t.bdr}`,borderRadius:4,color:t.tx2,cursor:"pointer",fontSize:13,padding:"1px 7px",lineHeight:1}}>×</button>
           </div>
+        )}
+        {loaded&&welcome&&!activeId&&(
+          <Modal t={t} title="Welcome back" onClose={()=>setWelcome(null)} customWidth={splashMobile?340:420}>
+            <div style={{display:"flex",flexDirection:"column",gap:splashMobile?20:16}}>
+              <div style={{fontSize:splashMobile?14:12,color:t.tx2,lineHeight:1.6}}>
+                You have saved projects in this browser.
+                {projects.find(p=>p.id===welcome.projectId)?.name&&(
+                  <span> Your most recent one is <strong style={{color:t.tx}}>{projects.find(p=>p.id===welcome.projectId).name}</strong>.</span>
+                )}
+              </div>
+              <div style={{display:"flex",flexDirection:splashMobile?"column":"row",justifyContent:splashMobile?"stretch":"flex-end",gap:10}}>
+                <Btn t={t} onClick={()=>setWelcome(null)} style={splashMobile?{width:"100%",padding:"14px 16px",fontSize:15}:undefined}>Homepage</Btn>
+                <Btn t={t} active onClick={()=>{setActiveId(welcome.projectId);setWelcome(null);}} style={splashMobile?{width:"100%",padding:"14px 16px",fontSize:15}:undefined}>Continue to canvas</Btn>
+              </div>
+            </div>
+          </Modal>
         )}
         {!activeId&&!loaded&&<div role="status" aria-live="polite" style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",color:t.tx3,fontSize:12}}>Loading your projects…</div>}
         {!activeId&&loaded&&<HomePage t={t} theme={theme} setTheme={setTheme} projects={projects} onOpen={id=>setActiveId(id)} onCreate={createProject} onImport={importCephxFile} storageEncrypted={secureStorageAvailable()} onClearLocalData={handleClearLocalData}/>}
